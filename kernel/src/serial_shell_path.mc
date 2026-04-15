@@ -14,7 +14,7 @@ func path_init(serial_state: serial_service.SerialServiceState, shell_state: she
 }
 
 func pathwith(p: SerialShellPathState, serial: serial_service.SerialServiceState, shell: shell_service.ShellServiceState) SerialShellPathState {
-    return SerialShellPathState{ serial_state: serial, shell_state: shell, shell_endpoint_id: p.shell_endpoint_id }
+    return p with { serial_state: serial, shell_state: shell }
 }
 
 func build_reply_observation(shell_state: shell_service.ShellServiceState, shell_endpoint_id: u32, effect: service_effect.Effect) syscall.ReceiveObservation {

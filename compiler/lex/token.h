@@ -30,6 +30,7 @@ enum class TokenKind {
     kWhile,
     kIn,
     kIs,
+    kWith,
     kReturn,
     kBreak,
     kContinue,

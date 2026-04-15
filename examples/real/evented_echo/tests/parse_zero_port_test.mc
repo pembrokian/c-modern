@@ -10,5 +10,5 @@ func test_parse_zero_port() *i32 {
     if test_err != nil {
         return test_err
     }
-    return testing.expect_usize_eq((usize)(value), 0)
+    return testing.expect_usize_eq(usize(value), 0)
 }

@@ -1,0 +1,3 @@
+SemanticModule
+  Function name=pack params=[u32] returns=[u8]
+  Function name=widen params=[u8] returns=[u32]

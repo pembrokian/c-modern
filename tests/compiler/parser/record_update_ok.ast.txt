@@ -1,15 +1,18 @@
 SourceFile
   ModuleKind=ordinary
-  FuncDecl name=build
+  FuncDecl name=update
+    ParamDecl name=cfg
+      NamedType name=Config
+    returns:
+      NamedType name=Config
     body:
       BlockStmt
         statements:
-          BindingOrAssignStmt hasInitializer=true
-            NamePattern names=[cfg]
+          ReturnStmt
             exprs:
-              AggregateInitExpr
-                typeTarget:
-                  NamedType name=Config
+              RecordUpdateExpr
+                left:
+                  NameExpr text=cfg
                 inits:
                   FieldInit name=path
                     LiteralExpr text="out" kind=string_lit

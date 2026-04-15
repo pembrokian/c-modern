@@ -1,0 +1,7 @@
+Module
+  Function name=pack returns=[u8]
+    Local name=value type=u32 param readonly
+    Block label=entry0
+      load_local %v0:u32 target=value
+      convert_numeric %v1:u8 target=u8 operands=[%v0]
+      terminator return values=[%v1]

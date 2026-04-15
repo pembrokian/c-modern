@@ -4,7 +4,7 @@ import strings
 import time
 
 func main() i32 {
-    max_u64: u64 = (u64)(-1)
+    max_u64: u64 = u64(-1)
 
     joined_buf: *Buffer<u8> = path.join(mem.default_allocator(), "root", "child.txt")
     if joined_buf == nil {
@@ -70,13 +70,13 @@ func main() i32 {
         return 19
     }
 
-    one_ms: time.Duration = time.millis((u64)(1))
-    two_s: time.Duration = time.seconds((u64)(2))
+    one_ms: time.Duration = time.millis(u64(1))
+    two_s: time.Duration = time.seconds(u64(2))
     combined: time.Duration = time.add(one_ms, two_s)
-    if time.nanos(one_ms) != (u64)(1000000) {
+    if time.nanos(one_ms) != u64(1000000) {
         return 5
     }
-    if time.nanos(combined) != (u64)(2001000000) {
+    if time.nanos(combined) != u64(2001000000) {
         return 6
     }
 
@@ -85,8 +85,8 @@ func main() i32 {
         return 20
     }
 
-    near_max: time.Duration = time.from_nanos(max_u64 - (u64)(5))
-    saturated_sum: time.Duration = time.add(near_max, time.from_nanos((u64)(9)))
+    near_max: time.Duration = time.from_nanos(max_u64 - u64(5))
+    saturated_sum: time.Duration = time.add(near_max, time.from_nanos(u64(9)))
     if time.nanos(saturated_sum) != max_u64 {
         return 21
     }

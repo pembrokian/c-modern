@@ -457,6 +457,25 @@ class Checker {
         return UnknownType();
     }
 
+    std::vector<std::pair<std::string, Type>> ResolveAggregateFieldTypes(const Type& aggregate_type) const {
+        const Type normalized = NormalizeAggregateExpectedType(aggregate_type);
+        const Type resolved_aggregate = StripType(normalized, *module_, TypeStripMode::kAliasesOnly);
+        if (resolved_aggregate.kind == Type::Kind::kArray) {
+            return {};
+        }
+
+        const auto builtin_fields = BuiltinAggregateFields(resolved_aggregate);
+        if (!builtin_fields.empty()) {
+            return builtin_fields;
+        }
+
+        if (const TypeDeclSummary* type_decl = LookupStructType(resolved_aggregate); type_decl != nullptr) {
+            return InstantiateTypeDeclFields(*type_decl, resolved_aggregate);
+        }
+
+        return {};
+    }
+
     void ApplyNestedAggregateTypeHints(Expr& expr, const Type& aggregate_type) {
         const Type normalized = NormalizeAggregateExpectedType(aggregate_type);
         const Type resolved_aggregate = StripType(normalized, *module_, TypeStripMode::kAliasesOnly);
@@ -472,12 +491,7 @@ class Checker {
             return;
         }
 
-        const TypeDeclSummary* type_decl = LookupStructType(resolved_aggregate);
-        const auto builtin_fields = BuiltinAggregateFields(resolved_aggregate);
-        const auto instantiated_fields =
-            type_decl != nullptr ? InstantiateTypeDeclFields(*type_decl, resolved_aggregate)
-                                 : std::vector<std::pair<std::string, Type>> {};
-        const auto& field_source = type_decl != nullptr ? instantiated_fields : builtin_fields;
+        const auto field_source = ResolveAggregateFieldTypes(resolved_aggregate);
         if (field_source.empty()) {
             return;
         }
@@ -806,6 +820,12 @@ class Checker {
                 }
                 ValidateTypeExpr(expr.type_target.get(), CurrentTypeParams(), expr.type_target->span);
                 const Type target_type = SemanticTypeFromAst(expr.type_target.get(), CurrentTypeParams());
+                if (expr.bare_type_target_syntax) {
+                    const Type stripped_target = CanonicalizeBuiltinType(StripType(target_type, *module_, TypeStripMode::kAliasesAndDistinct));
+                    if (!mc::sema::IsIntegerType(stripped_target) || operand->kind != ConstValue::Kind::kInteger) {
+                        return std::nullopt;
+                    }
+                }
                 return ConvertConstValue(target_type, *operand);
             }
             case Expr::Kind::kField:
@@ -893,6 +913,57 @@ class Checker {
                 ConstValue result;
                 result.kind = ConstValue::Kind::kAggregate;
                 result.field_names = std::move(ordered_names);
+                result.elements.reserve(ordered_values.size());
+                for (const auto& field_value : ordered_values) {
+                    if (!field_value.has_value()) {
+                        return std::nullopt;
+                    }
+                    result.elements.push_back(*field_value);
+                }
+                result.text = RenderConstValue(result);
+                return result;
+            }
+            case Expr::Kind::kRecordUpdate: {
+                if (expr.left == nullptr) {
+                    return std::nullopt;
+                }
+
+                const auto base_value = EvaluateConstExpr(*expr.left, report_errors, active_names);
+                if (!base_value.has_value() || base_value->kind != ConstValue::Kind::kAggregate || base_value->field_names.empty()) {
+                    return std::nullopt;
+                }
+
+                std::vector<std::optional<ConstValue>> ordered_values(base_value->elements.size());
+                for (std::size_t index = 0; index < base_value->elements.size(); ++index) {
+                    ordered_values[index] = base_value->elements[index];
+                }
+
+                std::unordered_set<std::string> updated_fields;
+                for (const auto& field_init : expr.field_inits) {
+                    if (!field_init.has_name || field_init.value == nullptr) {
+                        return std::nullopt;
+                    }
+                    if (!updated_fields.insert(field_init.name).second) {
+                        return std::nullopt;
+                    }
+
+                    const auto found = std::find(base_value->field_names.begin(), base_value->field_names.end(), field_init.name);
+                    if (found == base_value->field_names.end()) {
+                        return std::nullopt;
+                    }
+
+                    const auto field_value = EvaluateConstExpr(*field_init.value, report_errors, active_names);
+                    if (!field_value.has_value()) {
+                        return std::nullopt;
+                    }
+
+                    const std::size_t target_index = static_cast<std::size_t>(std::distance(base_value->field_names.begin(), found));
+                    ordered_values[target_index] = *field_value;
+                }
+
+                ConstValue result;
+                result.kind = ConstValue::Kind::kAggregate;
+                result.field_names = base_value->field_names;
                 result.elements.reserve(ordered_values.size());
                 for (const auto& field_value : ordered_values) {
                     if (!field_value.has_value()) {
@@ -2086,6 +2157,15 @@ class Checker {
                 return conversion_target;
             }
             const Type actual = arg_types.front();
+            if (expr.bare_type_target_syntax) {
+                const Type stripped_target = CanonicalizeBuiltinType(StripType(conversion_target, *module_, TypeStripMode::kAliasesAndDistinct));
+                if (!mc::sema::IsIntegerType(stripped_target) || !IsIntegerLikeType(actual, *module_)) {
+                    Report(expr.args.front()->span,
+                           "explicit integer conversion to " + FormatType(conversion_target) +
+                               " requires integer argument but got " + FormatType(actual));
+                }
+                return stripped_target;
+            }
             // Infer missing type parameters (e.g. bare `Slice` → `Slice<T>`) before
             // validating. The error message uses the original written target so the
             // user sees what they wrote, not the inferred form.
@@ -2451,13 +2531,9 @@ class Checker {
                     return record(resolved_aggregate);
                 }
 
-                const TypeDeclSummary* type_decl = LookupStructType(resolved_aggregate);
-                const auto builtin_fields = BuiltinAggregateFields(resolved_aggregate);
-                if (type_decl != nullptr || !builtin_fields.empty()) {
+                const auto field_source = ResolveAggregateFieldTypes(resolved_aggregate);
+                if (!field_source.empty()) {
                     std::unordered_map<std::string, Type> fields;
-                    const auto instantiated_fields =
-                        type_decl != nullptr ? InstantiateTypeDeclFields(*type_decl, resolved_aggregate) : std::vector<std::pair<std::string, Type>> {};
-                    const auto& field_source = type_decl != nullptr ? instantiated_fields : builtin_fields;
                     for (const auto& field : field_source) {
                         fields[field.first] = field.second;
                     }
@@ -2495,6 +2571,70 @@ class Checker {
                     }
                 }
                 return record(resolved_aggregate);
+            }
+            case Expr::Kind::kRecordUpdate: {
+                if (expr.left == nullptr) {
+                    for (const auto& field_init : expr.field_inits) {
+                        if (field_init.value != nullptr) {
+                            (void)AnalyzeExpr(*field_init.value);
+                        }
+                    }
+                    Report(expr.span, "record update requires a base value");
+                    return record(UnknownType());
+                }
+
+                const Type base_type = AnalyzeExpr(*expr.left);
+                const Type normalized_base = NormalizeAggregateExpectedType(base_type);
+                const auto field_source = ResolveAggregateFieldTypes(base_type);
+                if (field_source.empty()) {
+                    for (const auto& field_init : expr.field_inits) {
+                        if (field_init.value != nullptr) {
+                            (void)AnalyzeExpr(*field_init.value);
+                        }
+                    }
+                    if (!IsUnknown(normalized_base)) {
+                        Report(expr.span, "record update requires a record-typed base value");
+                    }
+                    return record(UnknownType());
+                }
+
+                std::unordered_map<std::string, Type> fields;
+                for (const auto& field : field_source) {
+                    fields[field.first] = field.second;
+                }
+
+                std::unordered_set<std::string> updated_fields;
+                for (const auto& field_init : expr.field_inits) {
+                    if (field_init.value == nullptr) {
+                        continue;
+                    }
+                    if (!field_init.has_name) {
+                        (void)AnalyzeExpr(*field_init.value);
+                        Report(field_init.span, "record update requires named fields");
+                        continue;
+                    }
+                    if (!updated_fields.insert(field_init.name).second) {
+                        (void)AnalyzeExpr(*field_init.value);
+                        Report(field_init.span, "duplicate record update field: " + field_init.name);
+                        continue;
+                    }
+
+                    const auto found = fields.find(field_init.name);
+                    if (found == fields.end()) {
+                        (void)AnalyzeExpr(*field_init.value);
+                        Report(field_init.span, "type " + FormatType(normalized_base) + " has no field named " + field_init.name);
+                        continue;
+                    }
+
+                    ApplyExpectedAggregateType(*field_init.value, found->second);
+                    const Type value_type = AnalyzeExpr(*field_init.value);
+                    if (!IsAssignable(found->second, value_type, *module_)) {
+                        Report(field_init.span,
+                               "record update field type mismatch for " + field_init.name + ": expected " +
+                                   FormatType(found->second) + ", got " + FormatType(value_type));
+                    }
+                }
+                return record(base_type);
             }
             case Expr::Kind::kParen:
                 return record(AnalyzeExpr(*expr.left));

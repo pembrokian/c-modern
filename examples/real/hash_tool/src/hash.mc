@@ -11,7 +11,7 @@ func hash_bytes(bytes: Slice<u8>) u64 {
     index: usize = 0
     while index < bytes.len {
         hash = hash * HASH_MULTIPLIER
-        hash = hash + (u64)(bytes[index])
+        hash = hash + u64(bytes[index])
         index = index + 1
     }
     return hash
@@ -19,9 +19,9 @@ func hash_bytes(bytes: Slice<u8>) u64 {
 
 func hex_digit(nibble: u64) u8 {
     if nibble < 10 {
-        return (u8)(48 + nibble)
+        return u8(48 + nibble)
     }
-    return (u8)(87 + nibble)
+    return u8(87 + nibble)
 }
 
 func hex_u64(value: u64) *Buffer<u8> {

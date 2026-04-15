@@ -39,15 +39,14 @@ struct ServiceMark {
     endpoint_id: u32
     pid: u32
     generation: u32
-    generation_payload: [4]u8
 }
 
 func service_ref(endpoint_id: u32) ServiceRef {
     return ServiceRef{ endpoint_id: endpoint_id }
 }
 
-func service_mark(endpoint_id: u32, pid: u32, generation: u32, generation_payload: [4]u8) ServiceMark {
-    return ServiceMark{ endpoint_id: endpoint_id, pid: pid, generation: generation, generation_payload: generation_payload }
+func service_mark(endpoint_id: u32, pid: u32, generation: u32) ServiceMark {
+    return ServiceMark{ endpoint_id: endpoint_id, pid: pid, generation: generation }
 }
 
 func ref_endpoint(ref: ServiceRef) u32 {
@@ -67,46 +66,12 @@ func mark_generation(mark: ServiceMark) u32 {
 }
 
 func mark_generation_payload(mark: ServiceMark) [4]u8 {
-    return mark.generation_payload
-}
-
-func generation_initial_payload() [4]u8 {
     payload: [4]u8
-    payload[0] = 0
-    payload[1] = 0
-    payload[2] = 0
-    payload[3] = 1
+    payload[0] = u8(mark.generation >> 24)
+    payload[1] = u8(mark.generation >> 16)
+    payload[2] = u8(mark.generation >> 8)
+    payload[3] = u8(mark.generation)
     return payload
-}
-
-func generation_zero_payload() [4]u8 {
-    payload: [4]u8
-    payload[0] = 0
-    payload[1] = 0
-    payload[2] = 0
-    payload[3] = 0
-    return payload
-}
-
-func generation_next_payload(current: [4]u8) [4]u8 {
-    next: [4]u8 = current
-    if next[3] != 255 {
-        next[3] = next[3] + 1
-        return next
-    }
-    next[3] = 0
-    if next[2] != 255 {
-        next[2] = next[2] + 1
-        return next
-    }
-    next[2] = 0
-    if next[1] != 255 {
-        next[1] = next[1] + 1
-        return next
-    }
-    next[1] = 0
-    next[0] = next[0] + 1
-    return next
 }
 
 func refs_equal(a: ServiceRef, b: ServiceRef) bool {

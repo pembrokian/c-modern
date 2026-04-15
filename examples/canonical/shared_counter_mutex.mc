@@ -104,7 +104,7 @@ func main() i32 {
     if worker2_status != 0 {
         return 17
     }
-    if counter_value != (i64)(ITERATIONS + ITERATIONS) {
+    if counter_value != i64(ITERATIONS + ITERATIONS) {
         return 18
     }
 

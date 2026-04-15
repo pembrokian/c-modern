@@ -29,7 +29,7 @@ func main() i32 {
     }
 
     num_buf: *Buffer<u8>
-    num_buf, err = fmt.sprint_i32(alloc, (i32)(-42))
+    num_buf, err = fmt.sprint_i32(alloc, i32(-42))
     if !errors.is_ok(err) {
         return 5
     }

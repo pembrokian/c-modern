@@ -73,6 +73,8 @@ std::string_view ToString(Expr::Kind kind) {
             return "SliceExpr";
         case Expr::Kind::kAggregateInit:
             return "AggregateInitExpr";
+        case Expr::Kind::kRecordUpdate:
+            return "RecordUpdateExpr";
         case Expr::Kind::kParen:
             return "ParenExpr";
     }
@@ -185,6 +187,7 @@ std::string_view SecondaryTextLabel(const Expr& expr) {
         case Expr::Kind::kIndex:
         case Expr::Kind::kSlice:
         case Expr::Kind::kAggregateInit:
+        case Expr::Kind::kRecordUpdate:
         case Expr::Kind::kParen:
             return " secondary=";
     }

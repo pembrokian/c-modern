@@ -3,7 +3,7 @@ Phase 195 -- Narrow Record-Update Syntax For Owner-Local State Mutation
 
 Status
 ------
-PLANNED
+COMPLETED
 
 Purpose
 -------
@@ -150,3 +150,23 @@ What this phase should prove
   an explicit, non-magical way
 - that active kernel code can become clearer at the exact sites where the
   current language still forces full-record restatement
+
+Implementation result
+---------------------
+- Landed one explicit `base with { field: value, ... }` AST form and `with`
+  keyword support in the parser.
+- Kept semantic ownership in `compiler/sema/check.cpp`: record updates require
+  a real record-typed base value, named fields only, duplicate-field rejection,
+  and replacement-type checking against the declared field type.
+- Lowered record update through the existing aggregate path in MIR by
+  projecting preserved base fields and rebuilding the aggregate deterministically
+  rather than admitting a new runtime instruction or mutation concept.
+- Spent the feature immediately in `kernel/src/boot_update.mc` and
+  `kernel/src/serial_shell_path.mc`, replacing the previous whole-record
+  reconstruction helpers with direct copy-with updates.
+- Added focused parser, sema, and MIR fixtures that cover positive lowering,
+  nested aggregate inference inside updated fields, and negative field-ownership
+  validation.
+- Deliberately kept nested path updates such as `base with { child.field:
+  value }` out of scope; that remaining limitation is recorded in the backlog
+  as a separate potential language feature rather than widening Phase 195.

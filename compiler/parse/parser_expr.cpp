@@ -1,8 +1,17 @@
 #include "compiler/parse/parser_internal.h"
 
+#include <string_view>
 #include <utility>
 
 namespace mc::parse {
+namespace {
+
+bool IsBuiltinIntegerTypeName(std::string_view name) {
+    return name == "i8" || name == "i16" || name == "i32" || name == "i64" || name == "isize" || name == "u8" ||
+           name == "u16" || name == "u32" || name == "u64" || name == "usize" || name == "uintptr";
+}
+
+}  // namespace
 
 std::unique_ptr<Expr> Parser::ParseExpr(bool allow_aggregate_init) {
     const AggInitGuard guard(*this, allow_aggregate_init);
@@ -369,6 +378,10 @@ bool Parser::LooksLikeTypeCallExpr() const {
     return inner_type_end.has_value() && Peek(*inner_type_end).kind == TokenKind::kRParen && Peek(*inner_type_end + 1).kind == TokenKind::kLParen;
 }
 
+bool Parser::LooksLikeBareIntegerConversionExpr() const {
+    return Check(TokenKind::kIdentifier) && IsBuiltinIntegerTypeName(Current().lexeme) && Peek(1).kind == TokenKind::kLParen;
+}
+
 bool Parser::LooksLikeTypeAggregateInitExpr() const {
     if (!IsTypeExprStart(Current().kind)) {
         return false;
@@ -395,6 +408,30 @@ std::unique_ptr<Expr> Parser::ParseTypeCallExpr() {
     Consume(TokenKind::kLParen, "expected '(' before conversion target type");
     expr->type_target = ParseTypeExpr();
     Consume(TokenKind::kRParen, "expected ')' after conversion target type");
+    Consume(TokenKind::kLParen, "expected '(' after conversion target type");
+    if (!Check(TokenKind::kRParen)) {
+        do {
+            expr->args.push_back(ParseExpr());
+        } while (Match(TokenKind::kComma));
+    }
+    Consume(TokenKind::kRParen, "expected ')' after call arguments");
+    expr->span.end = Previous().span.end;
+    return expr;
+}
+
+std::unique_ptr<Expr> Parser::ParseBareIntegerConversionExpr() {
+    auto expr = std::make_unique<Expr>();
+    expr->kind = Expr::Kind::kCall;
+    expr->bare_type_target_syntax = true;
+    expr->span.begin = Current().span.begin;
+
+    auto type = std::make_unique<TypeExpr>();
+    type->kind = TypeExpr::Kind::kNamed;
+    type->span = Current().span;
+    type->name = Current().lexeme;
+    expr->type_target = std::move(type);
+
+    Advance();
     Consume(TokenKind::kLParen, "expected '(' after conversion target type");
     if (!Check(TokenKind::kRParen)) {
         do {
@@ -442,6 +479,9 @@ std::unique_ptr<Expr> Parser::ParseBraceAggregateInitExpr() {
 }
 
 std::unique_ptr<Expr> Parser::ParseUnaryExpr() {
+    if (LooksLikeBareIntegerConversionExpr()) {
+        return ParseBareIntegerConversionExpr();
+    }
     if (LooksLikeTypeCallExpr()) {
         return ParseTypeCallExpr();
     }
@@ -580,6 +620,25 @@ std::unique_ptr<Expr> Parser::ParsePostfixExpr() {
                 } while (Match(TokenKind::kComma) && (SkipNewlines(), true));
             }
             Consume(TokenKind::kRBrace, "expected '}' after aggregate initializer");
+            node->span.end = Previous().span.end;
+            expr = std::move(node);
+            continue;
+        }
+
+        if (Match(TokenKind::kWith)) {
+            auto node = std::make_unique<Expr>();
+            node->kind = Expr::Kind::kRecordUpdate;
+            node->span.begin = expr->span.begin;
+            node->left = std::move(expr);
+            Consume(TokenKind::kLBrace, "expected '{' after 'with'");
+            SkipNewlines();
+            if (!Check(TokenKind::kRBrace)) {
+                do {
+                    node->field_inits.push_back(ParseFieldInit());
+                    SkipNewlines();
+                } while (Match(TokenKind::kComma) && (SkipNewlines(), true));
+            }
+            Consume(TokenKind::kRBrace, "expected '}' after record update");
             node->span.end = Previous().span.end;
             expr = std::move(node);
             continue;

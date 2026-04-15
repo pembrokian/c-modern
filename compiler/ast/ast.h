@@ -121,10 +121,17 @@ struct DefaultCase : Node {
 //   kIndex           : left = base, right = index
 //   kSlice           : left = base, right = begin, extra = end
 //   kAggregateInit   : left = named base or type_target = explicit/inferred type, field_inits = fields
+//   kRecordUpdate    : left = base value expression, field_inits = replaced fields
 //   kParen           : left = inner expression
 //
 // Optional pointer fields: nullptr means the field is absent for that Kind.
 //   left, right, extra, type_target are all optional.
+//
+// Conversion syntax flag:
+//   bare_type_target_syntax = true when a CallExpr came from the narrow
+//   builtin-integer target form `u8(expr)` admitted in Phase 194. This lets
+//   sema keep that source form narrower than the older parenthesized explicit
+//   conversion surface.
 //
 // secondary_text meanings by Kind:
 //   kQualifiedName   : member name after the dot
@@ -144,6 +151,7 @@ struct Expr : Node {
         kIndex,
         kSlice,
         kAggregateInit,
+        kRecordUpdate,
         kParen,
     };
 
@@ -154,6 +162,7 @@ struct Expr : Node {
     std::optional<double> float_literal_value;
     std::vector<std::unique_ptr<TypeExpr>> type_args;
     std::unique_ptr<TypeExpr> type_target;
+    bool bare_type_target_syntax = false;
     std::vector<std::unique_ptr<Expr>> args;
     std::vector<FieldInit> field_inits;
     std::unique_ptr<Expr> left;

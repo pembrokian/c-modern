@@ -185,6 +185,8 @@ class FunctionLowerer {
         switch (expr.kind) {
             case Expr::Kind::kParen:
                 return expr.left != nullptr ? ExprTypeOrUnknown(*expr.left) : sema::UnknownType();
+            case Expr::Kind::kRecordUpdate:
+                return expr.left != nullptr ? ExprTypeOrUnknown(*expr.left) : sema::UnknownType();
             case Expr::Kind::kName:
                 if (local_types_.contains(expr.text)) {
                     return local_types_.at(expr.text);
@@ -237,6 +239,41 @@ class FunctionLowerer {
             default:
                 return sema::UnknownType();
         }
+    }
+
+    std::vector<std::pair<std::string, sema::Type>> ResolveAggregateFieldTypes(const sema::Type& aggregate_type) const {
+        const auto builtin_fields = sema::BuiltinAggregateFields(aggregate_type);
+        if (!builtin_fields.empty()) {
+            return builtin_fields;
+        }
+
+        const sema::Type canonical = StripMirAliasOrDistinct(module_, sema::CanonicalizeBuiltinType(aggregate_type));
+        if (canonical.kind == sema::Type::Kind::kNamed) {
+            if (const TypeDecl* type_decl = FindMirTypeDecl(module_, canonical.name); type_decl != nullptr) {
+                return InstantiateMirFields(*type_decl, canonical);
+            }
+        }
+
+        return {};
+    }
+
+    ValueInfo EmitRecordUpdatePreservedField(const ValueInfo& base,
+                                             std::string_view field_name,
+                                             const sema::Type& field_type,
+                                             const mc::support::SourceSpan& span) {
+        const std::string value = NewValue();
+        Emit({
+            .kind = Instruction::Kind::kField,
+            .result = value,
+            .type = KnownTypeOrError(field_type, span, "record update preserved field type"),
+            .target = std::string(field_name),
+            .target_kind = Instruction::TargetKind::kField,
+            .target_name = std::string(field_name),
+            .target_display = std::string(field_name),
+            .target_base_type = base.type,
+            .operands = {base.value},
+        });
+        return {value, field_type};
     }
 
     sema::Type ExprTypeOrUnknown(const Expr& expr) const {
@@ -1623,6 +1660,47 @@ class FunctionLowerer {
                     field_names.push_back(field_init.has_name ? field_init.name : std::string("_"));
                 }
                 const sema::Type type = KnownTypeOrError(ExprTypeOrUnknown(expr), expr.span, "aggregate initializer type");
+                const std::string value = NewValue();
+                Emit({
+                    .kind = Instruction::Kind::kAggregateInit,
+                    .result = value,
+                    .type = type,
+                    .target = sema::FormatType(type),
+                    .operands = std::move(operands),
+                    .field_names = std::move(field_names),
+                });
+                return {value, type};
+            }
+            case Expr::Kind::kRecordUpdate: {
+                const auto base = LowerExpr(*expr.left);
+                const sema::Type type = KnownTypeOrError(ExprTypeOrUnknown(expr), expr.span, "record update type");
+                const auto field_source = ResolveAggregateFieldTypes(type);
+                if (field_source.empty()) {
+                    Report(expr.span, "record update requires aggregate field metadata");
+                    return {base.value, type};
+                }
+
+                std::unordered_map<std::string, const ast::FieldInit*> updated_fields;
+                for (const auto& field_init : expr.field_inits) {
+                    if (field_init.has_name) {
+                        updated_fields[field_init.name] = &field_init;
+                    }
+                }
+
+                std::vector<std::string> operands;
+                std::vector<std::string> field_names;
+                operands.reserve(field_source.size());
+                field_names.reserve(field_source.size());
+                for (const auto& field : field_source) {
+                    const auto found = updated_fields.find(field.first);
+                    if (found != updated_fields.end() && found->second != nullptr && found->second->value != nullptr) {
+                        operands.push_back(LowerExpr(*found->second->value).value);
+                    } else {
+                        operands.push_back(EmitRecordUpdatePreservedField(base, field.first, field.second, expr.span).value);
+                    }
+                    field_names.push_back(field.first);
+                }
+
                 const std::string value = NewValue();
                 Emit({
                     .kind = Instruction::Kind::kAggregateInit,

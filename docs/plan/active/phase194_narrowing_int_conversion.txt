@@ -3,11 +3,11 @@ Phase 194 -- Narrow Explicit Integer Conversion For Compact Protocol Packing
 
 Status
 ------
-PARKED
+COMPLETE
 
 Purpose
 -------
-Consider one narrow explicit integer-conversion surface so admitted low-level
+Admit one narrow explicit integer-conversion surface so admitted low-level
 owners can state intentional byte or word truncation directly in source
 without reopening implicit numeric coercions, broader arithmetic widening, or
 a general cast framework.
@@ -45,18 +45,27 @@ Repository status note
   `kernel/src/service_identity.mc` and `kernel/src/boot.mc` instead of
   widening compiler behavior.
 
-Problem being solved
---------------------
-- The current language has no narrow explicit conversion form for intentional
-  width changes such as `u32` to `u8` when packing compact payload bytes.
-- Mixed-width integer comparison and byte extraction therefore pressure owner
-  code into one of two unsatisfying shapes:
-  1. keep parallel same-width shadow state solely so compact payloads can be
-     answered without explicit packing
-  2. restructure protocols to avoid the conversion instead of stating the
-     intended truncation directly
-- That pressure is still bounded today, but it has now recurred across two
-  real admitted consumers rather than one isolated local neatness request.
+Implemented result
+------------------
+Phase 194 lands one explicit builtin-integer target conversion form:
+
+1. `u8(expr)` and the analogous builtin scalar integer targets now parse as a
+  dedicated explicit conversion expression rather than an ordinary call
+2. the admitted bare syntax is limited to builtin scalar integer target names
+3. sema requires the source expression of that bare form to be integer-typed
+  and preserves the rule that ordinary mixed-width arithmetic does not gain
+  implicit narrowing
+4. MIR and LLVM reuse the existing explicit numeric conversion lowering path
+  so the feature remains explicit end-to-end rather than backend-only
+5. the feature is spent immediately in `kernel/src/service_identity.mc` to
+  pack restart-generation reply bytes directly from the numeric generation
+  counter, removing the owner-local tracked four-byte shadow state from
+  `ServiceMark` and `ServiceCell<T>`
+
+The older parenthesized explicit conversion surface remains in place for the
+broader preexisting explicit-conversion families already admitted elsewhere in
+the compiler. Phase 194 does not widen the new bare syntax to those broader
+families.
 
 Core rule
 ---------
@@ -71,7 +80,7 @@ Core rule
 
 Chosen conversion shape
 -----------------------
-If this parked phase is reopened, the narrowest honest shape is:
+The landed shape is:
 
 1. admit one explicit integer-conversion expression that names the target
    integer type directly at the conversion site
@@ -83,15 +92,15 @@ If this parked phase is reopened, the narrowest honest shape is:
 5. spend the feature immediately on one real compact-packing owner instead of
    landing it as unused language surface
 
-Likely syntax direction
+Landed syntax direction
 -----------------------
-The likely direction for a future active implementation is one explicit
-target-typed conversion form such as:
+The landed explicit target-typed conversion form is:
 
 1. `u8(expr)` for integer-to-integer conversion where the target type is
-   named directly
-2. or another equally explicit target-typed form if parser pressure proves
-   the parenthesized call-like spelling ambiguous in practice
+  named directly
+2. the same direct spelling for the other builtin scalar integer targets:
+  `i8`, `i16`, `i32`, `i64`, `isize`, `u8`, `u16`, `u32`, `u64`, `usize`,
+  and `uintptr`
 
 The important constraint is not the exact token spelling.
 The important constraint is that the source must state the target integer
@@ -108,37 +117,38 @@ Why this is the right next step
 - It stays much smaller and more honest than a broader cast model because the
   feature can be limited to scalar integer conversions only.
 
-Required implementation surfaces
---------------------------------
-If this phase is reopened for implementation, the likely owning surfaces are:
+Implemented surfaces
+--------------------
+The landed owning surfaces are:
 
 1. `compiler/parse/parser_expr.cpp`
-   - parse one explicit target-typed integer-conversion expression without
-     widening the rest of expression grammar unnecessarily
+   - parse the narrow builtin-integer bare conversion form and mark it as the
+     Phase 194 surface without widening ordinary call parsing broadly
 
 2. `compiler/ast/ast.h`
-   - add the narrowest expression representation needed to distinguish an
-     explicit integer conversion from an ordinary call or type expression
+   - carry one narrow syntax flag so sema can distinguish the new bare
+     builtin-integer form from the older parenthesized explicit conversions
 
 3. `compiler/sema/check.cpp`
-   - validate that the source expression and target type are both integer
-     types and reject non-integer uses in the first slice
+   - validate that the new bare source form is integer-to-integer only while
+     leaving the older parenthesized explicit-conversion path unchanged
 
 4. `compiler/mir/`
-   - lower the admitted conversions deterministically with explicit width
-     change semantics rather than hidden coercion
+   - reuse the existing explicit numeric conversion lowering path; no new MIR
+     opcode family is required
 
 5. `compiler/codegen_llvm/`
-   - map the narrowed MIR conversion operation onto the existing integer
-     conversion primitives in the backend
+   - reuse the existing integer conversion backend mapping; no new backend
+     cast family is admitted
 
-6. `kernel/src/ticket_service.mc` or `kernel/src/service_identity.mc`
-   - spend the feature immediately on one real compact-packing or byte-
-     comparison path that currently carries owner-local workaround state
+6. `kernel/src/service_identity.mc`, `kernel/src/boot.mc`,
+   `kernel/src/boot_update.mc`, and `kernel/src/boot_identity.mc`
+   - spend the feature immediately on the restart-generation byte-packing path
+     and delete the tracked shadow payload state
 
 7. `tests/compiler/sema/` and `tests/compiler/mir/`
-   - add focused positive and negative coverage for explicit integer
-     conversion legality, determinism, and rejection of implicit narrowing
+   - add focused positive and negative coverage for bare integer conversion
+     legality, determinism, and rejection of non-integer bare uses
 
 Chosen slice for this phase
 ---------------------------
@@ -154,20 +164,33 @@ What this phase should not do
 -----------------------------
 - no implicit numeric coercion rules
 - no pointer casts, address reinterpretation, or ABI escape hatch
-- no float conversion model
+- no new bare float conversion model
 - no general cast framework shared across all type families
 - no hidden truncation in comparison or assignment
 - no backend-only legalization that sema does not model explicitly
 
+What this phase intentionally leaves unchanged
+---------------------------------------------
+- the older parenthesized explicit-conversion syntax remains the only source
+  spelling for non-integer explicit conversions already admitted elsewhere in
+  the compiler
+- distinct, alias, pointer, slice, and other broader explicit conversions do
+  not gain the new bare `T(expr)` syntax in this phase
+- no implicit mixed-width comparison, assignment, or aggregate-construction
+  rule is added
+
 Planning rule for this phase
 ----------------------------
-- Reopen only when a real admitted owner is more distorted by same-width
-  shadow state or protocol reshaping than by the language staying explicit.
-- Start from the smallest real kernel consumer rather than from an abstract
-  numeric-type completeness goal.
-- Keep the semantics target-typed, explicit, and deterministic.
-- If the design starts pressuring broader coercion rules, stop and keep this
-  phase parked rather than widening it opportunistically.
+Follow-on work should reopen only when a real admitted owner is more distorted
+by the remaining limits than by the language staying explicit.
+
+If follow-on work is considered:
+
+1. start from the smallest real owner rather than from an abstract
+   numeric-type completeness goal
+2. keep the semantics target-typed, explicit, and deterministic
+3. stop if the design starts pressuring implicit coercion rules or a general
+   cast framework
 
 What this phase should prove
 ----------------------------

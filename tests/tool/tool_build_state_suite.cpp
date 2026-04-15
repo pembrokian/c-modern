@@ -206,7 +206,7 @@ void TestProjectImportedAbiTypeMirDeclarations(const std::filesystem::path& bina
         "\n"
         "func main() i32 {\n"
         "    header: helper.Header = helper.make_header()\n"
-        "    return (i32)(header.tag) + header.value\n"
+        "    return i32(header.tag) + header.value\n"
         "}\n");
     const std::filesystem::path build_dir = binary_root / "imported_abi_build";
     std::filesystem::remove_all(build_dir);

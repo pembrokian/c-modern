@@ -1,0 +1,39 @@
+Module
+  TypeDecl kind=struct name=Inner
+    Field name=value type=i32
+  TypeDecl kind=struct name=Pair
+    Field name=left type=i32
+    Field name=right type=Inner
+  Function name=rewrite returns=[Pair]
+    Local name=pair type=Pair param readonly
+    Block label=entry0
+      load_local %v0:Pair target=pair
+      field %v1:i32 target=left target_kind=field target_name=left target_base=Pair operands=[%v0]
+      const %v2:int_literal op=7
+      aggregate_init %v3:Inner target=Inner operands=[%v2] fields=[value]
+      aggregate_init %v4:Pair target=Pair operands=[%v1, %v3] fields=[left, right]
+      terminator return values=[%v4]
+  Function name=read returns=[i32]
+    Local name=pair type=Pair param readonly
+    Block label=entry0
+      load_local %v0:Pair target=pair
+      symbol_ref %v1:proc(Pair)->Pair target=rewrite target_kind=function target_name=rewrite
+      call %v2:Pair target=rewrite target_kind=function target_name=rewrite operands=[%v1, %v0]
+      load_local %v3:Pair target=pair
+      symbol_ref %v4:proc(Pair)->Pair target=rewrite target_kind=function target_name=rewrite
+      call %v5:Pair target=rewrite target_kind=function target_name=rewrite operands=[%v4, %v3]
+      field %v6:Inner target=right target_kind=field target_name=right target_display=rewrite(pair).right target_base=Pair operands=[%v5]
+      field %v7:i32 target=value target_kind=field target_name=value target_display=rewrite(pair).right.value target_base=Inner operands=[%v6]
+      terminator return values=[%v7]
+  Function name=main returns=[i32]
+    Local name=start type=Pair
+    Block label=entry0
+      const %v0:int_literal op=1
+      const %v1:int_literal op=2
+      aggregate_init %v2:Inner target=Inner operands=[%v1] fields=[value]
+      aggregate_init %v3:Pair target=Pair operands=[%v0, %v2] fields=[left, right]
+      store_local target=start operands=[%v3]
+      load_local %v4:Pair target=start
+      symbol_ref %v5:proc(Pair)->i32 target=read target_kind=function target_name=read
+      call %v6:i32 target=read target_kind=function target_name=read operands=[%v5, %v4]
+      terminator return values=[%v6]

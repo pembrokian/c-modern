@@ -1,0 +1,3 @@
+type Pair has no field named extra
+record update requires named fields
+duplicate record update field: right

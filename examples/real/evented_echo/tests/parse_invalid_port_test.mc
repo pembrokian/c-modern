@@ -12,7 +12,7 @@ func test_parse_invalid_port() *i32 {
     if test_err != nil {
         return test_err
     }
-    test_err = testing.expect_usize_eq((usize)(value), 0)
+    test_err = testing.expect_usize_eq(usize(value), 0)
     if test_err != nil {
         return test_err
     }
@@ -22,7 +22,7 @@ func test_parse_invalid_port() *i32 {
     if test_err != nil {
         return test_err
     }
-    test_err = testing.expect_usize_eq((usize)(value), 0)
+    test_err = testing.expect_usize_eq(usize(value), 0)
     if test_err != nil {
         return test_err
     }

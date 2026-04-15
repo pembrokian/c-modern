@@ -39,27 +39,27 @@ func boot_ticket_ref() service_identity.ServiceRef {
 }
 
 func boot_log_mark(s: KernelBootState) service_identity.ServiceMark {
-    return service_identity.service_mark(service_topology.LOG_ENDPOINT_ID, s.log.state.pid, s.log.generation, s.log.generation_payload)
+    return service_identity.service_mark(service_topology.LOG_ENDPOINT_ID, s.log.state.pid, s.log.generation)
 }
 
 func boot_kv_mark(s: KernelBootState) service_identity.ServiceMark {
-    return service_identity.service_mark(service_topology.KV_ENDPOINT_ID, s.kv.state.pid, s.kv.generation, s.kv.generation_payload)
+    return service_identity.service_mark(service_topology.KV_ENDPOINT_ID, s.kv.state.pid, s.kv.generation)
 }
 
 func boot_queue_mark(s: KernelBootState) service_identity.ServiceMark {
-    return service_identity.service_mark(service_topology.QUEUE_ENDPOINT_ID, s.queue.state.pid, s.queue.generation, s.queue.generation_payload)
+    return service_identity.service_mark(service_topology.QUEUE_ENDPOINT_ID, s.queue.state.pid, s.queue.generation)
 }
 
 func boot_echo_mark(s: KernelBootState) service_identity.ServiceMark {
-    return service_identity.service_mark(service_topology.ECHO_ENDPOINT_ID, s.echo.state.pid, s.echo.generation, s.echo.generation_payload)
+    return service_identity.service_mark(service_topology.ECHO_ENDPOINT_ID, s.echo.state.pid, s.echo.generation)
 }
 
 func boot_transfer_mark(s: KernelBootState) service_identity.ServiceMark {
-    return service_identity.service_mark(service_topology.TRANSFER_ENDPOINT_ID, s.transfer.state.pid, s.transfer.generation, s.transfer.generation_payload)
+    return service_identity.service_mark(service_topology.TRANSFER_ENDPOINT_ID, s.transfer.state.pid, s.transfer.generation)
 }
 
 func boot_ticket_mark(s: KernelBootState) service_identity.ServiceMark {
-    return service_identity.service_mark(service_topology.TICKET_ENDPOINT_ID, s.ticket.state.pid, s.ticket.generation, s.ticket.generation_payload)
+    return service_identity.service_mark(service_topology.TICKET_ENDPOINT_ID, s.ticket.state.pid, s.ticket.generation)
 }
 
 func bootmark_for_endpoint(s: KernelBootState, endpoint: u32) service_identity.ServiceMark {
@@ -81,5 +81,5 @@ func bootmark_for_endpoint(s: KernelBootState, endpoint: u32) service_identity.S
     if endpoint == service_topology.TICKET_ENDPOINT_ID {
         return boot_ticket_mark(s)
     }
-    return service_identity.service_mark(endpoint, 0, 0, service_identity.generation_zero_payload())
+    return service_identity.service_mark(endpoint, 0, 0)
 }

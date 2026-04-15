@@ -74,6 +74,7 @@ constexpr std::string_view kExprKindNames[] = {"name",
                                                "index",
                                                "slice",
                                                "aggregate-init",
+                                               "record-update",
                                                "paren"};
 constexpr std::size_t kExprKindCount = static_cast<std::size_t>(Expr::Kind::kParen) + 1;
 static_assert(sizeof(kExprKindNames) / sizeof(kExprKindNames[0]) == kExprKindCount);
@@ -269,6 +270,21 @@ std::string RenderExprInline(const Expr& expr) {
         case Expr::Kind::kAggregateInit: {
             std::ostringstream stream;
             stream << RenderExprOrPlaceholder(expr.left.get()) << '{';
+            for (std::size_t index = 0; index < expr.field_inits.size(); ++index) {
+                if (index > 0) {
+                    stream << ", ";
+                }
+                if (expr.field_inits[index].has_name) {
+                    stream << expr.field_inits[index].name << ": ";
+                }
+                stream << RenderExprInline(*expr.field_inits[index].value);
+            }
+            stream << '}';
+            return stream.str();
+        }
+        case Expr::Kind::kRecordUpdate: {
+            std::ostringstream stream;
+            stream << RenderExprOrPlaceholder(expr.left.get()) << " with {";
             for (std::size_t index = 0; index < expr.field_inits.size(); ++index) {
                 if (index > 0) {
                     stream << ", ";

@@ -132,6 +132,21 @@ std::string RenderExprInline(const ast::Expr& expr) {
         case ast::Expr::Kind::kAggregateInit:
             return expr.type_target != nullptr ? RenderTypeInline(*expr.type_target)
                                                : (expr.left != nullptr ? RenderExprInline(*expr.left) : std::string("<?>"));
+        case ast::Expr::Kind::kRecordUpdate: {
+            std::ostringstream stream;
+            stream << (expr.left != nullptr ? RenderExprInline(*expr.left) : std::string("<?>")) << " with {";
+            for (std::size_t index = 0; index < expr.field_inits.size(); ++index) {
+                if (index > 0) {
+                    stream << ", ";
+                }
+                if (expr.field_inits[index].has_name) {
+                    stream << expr.field_inits[index].name << ": ";
+                }
+                stream << RenderExprInline(*expr.field_inits[index].value);
+            }
+            stream << '}';
+            return stream.str();
+        }
         case ast::Expr::Kind::kParen:
             return "(" + (expr.left != nullptr ? RenderExprInline(*expr.left) : std::string("<?>")) + ")";
     }
