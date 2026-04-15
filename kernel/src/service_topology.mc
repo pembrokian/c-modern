@@ -8,6 +8,25 @@
 // Adding a new boot-wired service means adding one endpoint ID constant,
 // one slot constant, and incrementing SERVICE_COUNT.  All callers that need
 // either the endpoint ID or the owner pid reference this module directly.
+//
+// Endpoint id classification (Phase 183):
+//   - Ownership: service_topology.mc is the sole definer of endpoint id
+//     constants.  No other module introduces new endpoint id values.
+//   - Routing: kernel_dispatch.mc routes on endpoint ids.  It uses
+//     endpoint_is_boot_wired() as the explicit addressing gate: if the
+//     caller supplies an id that is not a boot-wired public name, the
+//     dispatcher returns InvalidEndpoint without consulting any service.
+//   - Public name vs authority: knowing a boot-wired endpoint id is
+//     sufficient to address that service.  The dispatcher performs no
+//     capability check.  Endpoint ids are stable public names, not
+//     authority tokens in the capability sense.
+//   - Authority surface: handle transfer lives in
+//     syscall.ReceiveObservation.received_handle_slot and
+//     received_handle_count.  That is the intended future authority gate,
+//     separate from routing by name.
+//   - Conclusion: endpoint ids are stable public names that double as
+//     routing keys.  They are NOT elevated authority-bearing values.
+//     A caller that knows a valid public name may address the service.
 
 const SERIAL_ENDPOINT_ID: u32 = 10
 const SHELL_ENDPOINT_ID: u32 = 11
@@ -80,4 +99,28 @@ func service_slot_is_valid(slot: ServiceSlot) bool {
         return false
     }
     return true
+}
+
+// endpoint_is_boot_wired returns true when the endpoint id names one of the
+// five statically wired boot services.  This is the explicit addressing
+// gate: the dispatcher uses this to separate known public names from unknown
+// ids before any service-specific routing.  All boot-wired endpoints are
+// publicly addressable.
+func endpoint_is_boot_wired(endpoint: u32) bool {
+    if endpoint == SERIAL_ENDPOINT_ID {
+        return true
+    }
+    if endpoint == SHELL_ENDPOINT_ID {
+        return true
+    }
+    if endpoint == LOG_ENDPOINT_ID {
+        return true
+    }
+    if endpoint == KV_ENDPOINT_ID {
+        return true
+    }
+    if endpoint == ECHO_ENDPOINT_ID {
+        return true
+    }
+    return false
 }

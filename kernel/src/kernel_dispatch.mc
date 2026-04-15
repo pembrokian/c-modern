@@ -128,8 +128,15 @@ func kernel_dispatch_serial(state: *boot.KernelBootState, obs: syscall.ReceiveOb
 }
 
 // Top-level dispatch step: route to the serial path or directly to leaf
-// services.  No endpoint-specific post-processing needed at this level.
+// services.  The endpoint_is_boot_wired guard is the explicit address
+// check: only known public names route forward; unknown ids return
+// InvalidEndpoint here rather than falling through the per-service chain.
+// There is no capability check.  Knowing a valid boot-wired endpoint id is
+// sufficient to address the service.
 func kernel_dispatch_step(state: *boot.KernelBootState, observation: syscall.ReceiveObservation) service_effect.Effect {
+    if !service_topology.endpoint_is_boot_wired(observation.endpoint_id) {
+        return service_effect.effect_reply(syscall.SyscallStatus.InvalidEndpoint, 0, primitives.zero_payload())
+    }
     if observation.endpoint_id == service_topology.SERIAL_ENDPOINT_ID {
         return kernel_dispatch_serial(state, observation)
     }

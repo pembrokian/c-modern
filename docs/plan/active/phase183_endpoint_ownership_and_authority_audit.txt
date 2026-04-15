@@ -3,7 +3,66 @@ Phase 183 -- Endpoint Ownership And Authority Audit
 
 Status
 ------
-PLANNED
+COMPLETE
+
+Outcome
+-------
+Phase 183 landed as one explicit ownership classification of boot-wired
+endpoint ids, one bounded follow-through in the dispatcher, and one
+dedicated behavior-first test fixture.
+
+The classification established in code:
+
+- Ownership: `service_topology.mc` is the sole definer of endpoint id
+  constants.  No other module introduces new endpoint id values.
+- Routing: `kernel_dispatch.mc` routes on endpoint ids.  `kernel_dispatch_step`
+  now has an explicit `endpoint_is_boot_wired` guard before per-service
+  routing.  Unknown endpoint ids return `InvalidEndpoint` at this gate
+  rather than falling through the per-service chain implicitly.
+- Public name vs authority: endpoint ids are stable public names that
+  double as routing keys.  Knowing a boot-wired endpoint id is sufficient
+  to address that service.  No capability check is performed.
+- Authority surface: handle transfer lives in
+  `syscall.ReceiveObservation.received_handle_slot` and
+  `received_handle_count`.  That is the intended future authority gate,
+  separate and distinct from routing by name.
+- Conclusion: endpoint ids are stable public names, not elevated
+  authority-bearing values.  The distinction from capability-based authority
+  is now stated in code comments and enforced by the explicit gate.
+
+The bounded follow-through:
+
+- `service_topology.endpoint_is_boot_wired(endpoint: u32) bool` added as
+  the explicit public-name gate.  All five wired endpoints return true;
+  all other values return false.
+- `kernel_dispatch_step` now calls `endpoint_is_boot_wired` before routing,
+  replacing the implicit fall-through to `InvalidEndpoint` in the service
+  chain with one explicit owner-local decision at the gateway.
+
+What did not change:
+
+- no capability model, endpoint allocator, naming service, or compiler-known
+  endpoint type
+- no dynamic topology, endpoint rebinding, or service registry
+- no compiler, sema, MIR, backend, ABI, target, runtime, or `hal` expansion
+
+Phase result
+------------
+The repository now has an explicit answer to whether endpoint ids are
+names, routing keys, authorities, or a split contract:
+
+  Endpoint ids are stable public names and routing keys.
+  Knowing one is sufficient to address the service.
+  They are NOT capability authority tokens.
+  The authority surface for IPC is the (currently reserved) handle-slot
+  transfer mechanism in `syscall.ReceiveObservation`.
+
+Phase 184 (capability propagation and leakage) can now rely on this explicit
+contract rather than inferring it from the implicit fall-through behavior.
+
+Validation
+----------
+- `tests/system/kernel_reset_lane_phase183_endpoint_authority`
 
 Purpose
 -------
