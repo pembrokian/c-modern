@@ -18,6 +18,7 @@ Current scope (Phase 153)
 - All three canonical service shapes are present: forwarding (`serial_service`, `shell_service`, `serial_shell_path`), append/tail (`log_service`), and key/value (`kv_service`).
 - The compact shell route now reaches `log_service` and `kv_service` over the real reset-lane path instead of stopping at shell-local echo behavior.
 - One bounded kv-write observation now flows into `log_service` through the explicit serial-shell composition seam.
+- One bounded transferred-handle path now flows through `transfer_service` over an explicit transfer endpoint instead of widening ordinary named traffic.
 - Ring-buffer observability lives in [`kernel/src/serial_shell_event_log.mc`](src/serial_shell_event_log.mc).
 - The dispatch entry is [`kernel/src/boot.mc`](src/boot.mc): `kernel_init()` + `kernel_dispatch_step()`.
 - The integration loop owner is [`kernel/src/scenarios.mc`](src/scenarios.mc): one scripted observation loop over the serial path.
@@ -34,7 +35,6 @@ The following modules are deferred until the named phase boundary forces them:
 - `timer` — Phase 155; only if temporal dispatch semantics are under audit
 - `sched` (ready-queue slice) — when lifecycle is needed; `ReadyQueue` + `TaskSlot` without `LifecycleAudit`
 - `capability` — Phase 154 (identity/addressing); rights model + handle table ~80 lines, no validation-observation coupling
-- `transfer_service` — Phase 154; lean grant/emit dispatch without `last_*` observation fields
 - `lifecycle/init` — Phase 153 or when Phase 149 restart needs spawn/exit; one struct + two handlers, not a `LifecycleAudit`
 - `mmu` — probably never in this tree; hosted execution makes MMU stubs meaningless
 

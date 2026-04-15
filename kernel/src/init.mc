@@ -18,6 +18,7 @@ import echo_service
 import kv_service
 import log_service
 import service_topology
+import transfer_service
 
 func can_restart(endpoint: u32) bool {
     if endpoint == service_topology.LOG_ENDPOINT_ID {
@@ -27,6 +28,9 @@ func can_restart(endpoint: u32) bool {
         return true
     }
     if endpoint == service_topology.ECHO_ENDPOINT_ID {
+        return true
+    }
+    if endpoint == service_topology.TRANSFER_ENDPOINT_ID {
         return true
     }
     return false
@@ -41,6 +45,9 @@ func restart(state: boot.KernelBootState, endpoint: u32) boot.KernelBootState {
     }
     if endpoint == service_topology.ECHO_ENDPOINT_ID {
         return restart_echo(state)
+    }
+    if endpoint == service_topology.TRANSFER_ENDPOINT_ID {
+        return restart_transfer(state)
     }
     return state
 }
@@ -60,4 +67,9 @@ func restart_kv(state: boot.KernelBootState) boot.KernelBootState {
 func restart_echo(state: boot.KernelBootState) boot.KernelBootState {
     echo_slot: service_topology.ServiceSlot = service_topology.ECHO_SLOT
     return boot.bootrestart_echo(state, echo_service.echo_init(echo_slot.pid, 1))
+}
+
+func restart_transfer(state: boot.KernelBootState) boot.KernelBootState {
+    transfer_slot: service_topology.ServiceSlot = service_topology.TRANSFER_SLOT
+    return boot.bootrestart_transfer(state, transfer_service.transfer_init(transfer_slot.pid, 1))
 }

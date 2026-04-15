@@ -8,8 +8,19 @@ Current structure
 - `tool_suite_common.h` and `tool_suite_common.cpp`: shared project-writing,
   command-running, assertion helpers, and projected-MIR golden helpers used by
   the grouped tool suites.
-- `tool_workflow_tests.cpp` and `tool_workflow_suite.cpp`: CLI, project graph,
-  and workflow validation.
+- `tool_workflow_tests.cpp`: workflow validation driver.
+- `tool_workflow_orchestrator.cpp`: thin workflow suite entry that dispatches
+  to the behavior-owned workflow families.
+- `tool_help_suite.cpp`: help text, mode selection, and direct-source versus
+  project workflow validation.
+- `tool_test_command_suite.cpp`: `mc test` ordinary-test and regression
+  workflow validation.
+- `tool_project_validation_suite.cpp`: target selection, import-root,
+  duplicate-root, and project-graph validation.
+- `tool_multifile_module_suite.cpp`: module-set and multi-file module
+  validation.
+- `tool_kernel_reset_lane_suite.cpp`: reset-lane kernel workflow validation,
+  including the table-driven fixture family.
 - `tool_build_state_tests.cpp` and `tool_build_state_suite.cpp`: interface
   artifact, incremental rebuild, and build-state validation.
 - `tool_real_project_tests.cpp` and `tool_real_project_suite.cpp`: repository-

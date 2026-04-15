@@ -19,7 +19,7 @@ func obs_for(endpoint: u32) syscall.ReceiveObservation {
     return syscall.ReceiveObservation{ status: syscall.SyscallStatus.Ok, block_reason: syscall.BlockReason.None, endpoint_id: endpoint, source_pid: 1, payload_len: 0, received_handle_slot: 0, received_handle_count: 0, payload: ipc.zero_payload() }
 }
 
-// All five boot-wired endpoints are recognized as public names.
+// All six boot-wired endpoints are recognized as public names.
 func check_all_boot_endpoints_are_named() bool {
     if !service_topology.endpoint_is_boot_wired(service_topology.SERIAL_ENDPOINT_ID) {
         return false
@@ -34,6 +34,9 @@ func check_all_boot_endpoints_are_named() bool {
         return false
     }
     if !service_topology.endpoint_is_boot_wired(service_topology.ECHO_ENDPOINT_ID) {
+        return false
+    }
+    if !service_topology.endpoint_is_boot_wired(service_topology.TRANSFER_ENDPOINT_ID) {
         return false
     }
     return true
@@ -84,6 +87,7 @@ func check_service_ref_names_boot_wired_endpoint() bool {
     log_ref: service_identity.ServiceRef = boot.boot_log_ref()
     kv_ref: service_identity.ServiceRef = boot.boot_kv_ref()
     echo_ref: service_identity.ServiceRef = boot.boot_echo_ref()
+    transfer_ref: service_identity.ServiceRef = boot.boot_transfer_ref()
 
     if service_identity.ref_endpoint(log_ref) != service_topology.LOG_ENDPOINT_ID {
         return false
@@ -94,10 +98,16 @@ func check_service_ref_names_boot_wired_endpoint() bool {
     if service_identity.ref_endpoint(echo_ref) != service_topology.ECHO_ENDPOINT_ID {
         return false
     }
+    if service_identity.ref_endpoint(transfer_ref) != service_topology.TRANSFER_ENDPOINT_ID {
+        return false
+    }
     if !service_topology.endpoint_is_boot_wired(service_identity.ref_endpoint(log_ref)) {
         return false
     }
     if !service_topology.endpoint_is_boot_wired(service_identity.ref_endpoint(kv_ref)) {
+        return false
+    }
+    if !service_topology.endpoint_is_boot_wired(service_identity.ref_endpoint(transfer_ref)) {
         return false
     }
     return true

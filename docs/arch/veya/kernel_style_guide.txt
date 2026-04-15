@@ -407,10 +407,12 @@ When implementing a new kernel service or modifying an existing one:
   3. Read the named phase plan in docs/plan/active/.
   4. Read kv_service.mc as the style reference.
   5. Follow sections 2–10 exactly.
-  6. Write one behavior-first test fixture in
-     tests/system/kernel_reset_lane_<name>/src/main.mc that exercises the
-     phase contract.  Register it via InstallKernelResetLaneFixtureProject
-     in tests/tool/tool_workflow_suite.cpp.
+    6. Write one behavior-first test fixture in
+      tests/system/kernel_reset_lane_<name>/src/main.mc that exercises the
+      phase contract. Register it in the reset-lane workflow owner,
+      tests/tool/tool_kernel_reset_lane_suite.cpp, via the shared
+      ResetLaneScenario table rather than by adding another near-identical
+      handwritten runner.
   7. Do not add audit blocks to kernel/src/main.mc.
   8. Do not add MIR golden projections; system test fixtures are sufficient.
   9. Run:

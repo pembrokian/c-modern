@@ -27,6 +27,7 @@ func smoke_slot_endpoints_match_constants() bool {
     log_slot: service_topology.ServiceSlot = service_topology.LOG_SLOT
     kv_slot: service_topology.ServiceSlot = service_topology.KV_SLOT
     echo_slot: service_topology.ServiceSlot = service_topology.ECHO_SLOT
+    transfer_slot: service_topology.ServiceSlot = service_topology.TRANSFER_SLOT
 
     if serial_slot.endpoint != service_topology.SERIAL_ENDPOINT_ID {
         return false
@@ -43,12 +44,15 @@ func smoke_slot_endpoints_match_constants() bool {
     if echo_slot.endpoint != service_topology.ECHO_ENDPOINT_ID {
         return false
     }
+    if transfer_slot.endpoint != service_topology.TRANSFER_ENDPOINT_ID {
+        return false
+    }
     return true
 }
 
-// B: SERVICE_COUNT must equal 5 — the number of boot-wired slots.
-func smoke_service_count_is_five() bool {
-    if service_topology.SERVICE_COUNT != 5 {
+// B: SERVICE_COUNT must equal 6 — the number of boot-wired slots.
+func smoke_service_count_is_six() bool {
+    if service_topology.SERVICE_COUNT != 6 {
         return false
     }
     return true
@@ -70,7 +74,7 @@ func main() i32 {
     if smoke_slot_endpoints_match_constants() == false {
         return 1
     }
-    if smoke_service_count_is_five() == false {
+    if smoke_service_count_is_six() == false {
         return 2
     }
     if smoke_init_and_round_trip() == false {

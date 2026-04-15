@@ -3,7 +3,66 @@ Phase 184 -- Capability Propagation And Leakage Probe
 
 Status
 ------
-PLANNED
+COMPLETE
+
+Outcome
+-------
+Phase 184 landed as one explicit authority-boundary hardening at the current
+dispatch gateway rather than as a capability-framework expansion.
+
+The landed implementation makes the current authority-lifetime story explicit
+in code:
+
+- boot-wired endpoint ids remain stable public names and routing keys, exactly
+  as Phase 183 classified them
+- restart continuity remains split exactly as Phase 182 classified it: routing
+  continuity and boot-wired pid continuity stay stable, while service-instance
+  identity is replaced and retained-state continuity remains owner-local
+- non-zero `syscall.ReceiveObservation.received_handle_slot` or
+  `received_handle_count` is now treated as explicit authority-bearing
+  metadata rather than as ordinary named traffic
+- `syscall.observation_has_received_handle(...)` names that boundary in code
+  and `kernel_dispatch.kernel_dispatch_step(...)` rejects any such
+  observation with `InvalidCapability` before endpoint-name routing
+- the resulting rule is additive and narrow: plain name-based traffic still
+  works before and after restart, but stale or injected handle metadata no
+  longer rides along the public-name path silently
+
+The bounded follow-through:
+
+- `kernel/src/syscall.mc` now exposes
+  `observation_has_received_handle(obs: ReceiveObservation) bool`
+- `kernel/src/kernel_dispatch.mc` now returns `InvalidCapability` for any
+  observation carrying non-zero handle metadata before consulting the
+  endpoint-name gate
+- one dedicated workflow fixture probes four concrete cases: pre-restart
+  handle-bearing traffic, post-restart stale handle-bearing traffic, plain
+  named traffic after restart, and repeated hostile attempts with injected
+  handle metadata
+
+What did not change:
+
+- no new capability types
+- no authority registry, ambient authority helper layer, or session model
+- no dynamic topology, discovery work, or supervisor
+- no compiler, sema, MIR, backend, ABI, target, runtime, or `hal` expansion
+
+Phase result
+------------
+The repository now has one explicit answer to the Phase 184 leakage question:
+
+  explicit authority still means explicit authority under restart and reuse,
+  but only because handle-bearing observations are now rejected at the
+  dispatch boundary instead of being silently treated as ordinary public-name
+  traffic.
+
+Routing continuity survives restart.  Owner-local retained-state continuity
+survives where explicitly reloaded.  Handle metadata does not survive as an
+ambient or accidental authority channel.
+
+Validation
+----------
+- `mc_tool_workflow_unit`
 
 Purpose
 -------

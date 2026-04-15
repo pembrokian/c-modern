@@ -116,8 +116,13 @@ This file is a fast orientation map for agents working in this repository.
   - Veya-facing execution proofs still stay here for now; do not create a separate `tests/tool/veya/` subtree yet
   - grouped tool coverage now lives in:
     - `tests/tool/tool_suite_common.cpp`: shared grouped tool helpers
-    - `tests/tool/tool_workflow_tests.cpp`: workflow and CLI/project validation driver
-    - `tests/tool/tool_workflow_suite.cpp`: workflow and CLI/project grouped implementation
+    - `tests/tool/tool_workflow_tests.cpp`: workflow validation driver
+    - `tests/tool/tool_workflow_orchestrator.cpp`: thin workflow suite entry that dispatches the behavior-owned workflow families
+    - `tests/tool/tool_help_suite.cpp`: help text, mode selection, and direct-source versus project workflow validation
+    - `tests/tool/tool_test_command_suite.cpp`: ordinary test and `mc test` workflow validation
+    - `tests/tool/tool_project_validation_suite.cpp`: target selection, import-root, duplicate-root, and project-graph validation
+    - `tests/tool/tool_multifile_module_suite.cpp`: module-set and multi-file module validation
+    - `tests/tool/tool_kernel_reset_lane_suite.cpp`: reset-lane kernel workflow validation and table-driven fixture runs
     - `tests/tool/tool_build_state_tests.cpp`: build-state and incremental rebuild driver
     - `tests/tool/tool_build_state_suite.cpp`: build-state grouped implementation
     - `tests/tool/tool_real_project_tests.cpp`: real-project workflow driver

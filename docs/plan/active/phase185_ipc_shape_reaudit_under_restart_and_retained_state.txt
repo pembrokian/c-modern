@@ -3,7 +3,52 @@ Phase 185 -- IPC Shape Re-Audit Under Restart And Retained State
 
 Status
 ------
-PLANNED
+COMPLETE
+
+Outcome
+-------
+Phase 185 found that the first real IPC-owned mismatch after restart
+identity, retained-state reload, and the Phase 184 authority-gateway repair
+was not payload width, typed transport, or reply correlation. It was the
+complete absence of one honest transferred-handle runtime path.
+
+The landed implementation keeps the compact IPC model intact while admitting
+exactly one narrower authority-context exception:
+
+- Phase 184's gateway rule remains the default: ordinary named traffic still
+  rejects any non-zero `ReceiveObservation.received_handle_slot` or
+  `received_handle_count` with `InvalidCapability`
+- one explicit `TRANSFER_ENDPOINT_ID` path now exists for handle-bearing
+  observations; it is separate from the ordinary public-name route
+- one boot-owned `transfer_grant` table mints monotonic one-shot grant ids so
+  stale slot values do not regain authority when physical storage is reused
+- one small `transfer_service` owner consumes exactly one transferred endpoint
+  handle and uses it for one bounded follow-through send without widening
+  shell, log, kv, restart policy, or compiler surfaces
+- the runtime carry surface widened only where the live slice required it:
+  `service_effect.Message` now carries attached-handle metadata plus the
+  resolved transferred endpoint id for the admitted transfer-only path;
+  `Effect` did not widen because the transfer owner resolves the endpoint
+  before it emits its one send
+- one reset-lane workflow fixture now proves the intended contract directly:
+  ordinary named-path rejection still holds, transfer is destructive on
+  success, consumed grants cannot be reused, and restart preserves stable
+  routing without reviving stale authority
+
+Phase result
+------------
+The repository now has one explicit answer to the Phase 185 IPC question:
+
+  the compact IPC model still holds under restart and retained-state growth,
+  but only because one honest transferred-handle path is now admitted
+  directly instead of being left as either impossible or ambient.
+
+Payload widening remains deferred for the right reason. The first mismatch
+was authority-context carry, not payload width or typed transport.
+
+Validation
+----------
+- `mc_tool_workflow_unit`
 
 Purpose
 -------
@@ -33,6 +78,11 @@ Repository status note
 ----------------------
 - The current IPC shape is still compact and explicit: receive, handle, one
   effect, optional send, optional reply.
+- Phase 184 plus Phase 185 now keep handle-bearing traffic explicit in two
+  separate ways: the default dispatch gateway still rejects any non-zero
+  `ReceiveObservation.received_handle_slot` or `received_handle_count` with
+  `InvalidCapability` before endpoint-name routing, and Phase 185 admits one
+  explicit transfer-endpoint exception for one direct transferred-handle path.
 - The shell-visible system already carries restart-sensitive and retained-
   state-sensitive interactions.
 - Earlier IPC work named one model boundary around advisory-send visibility and
@@ -45,6 +95,10 @@ Problem being solved
 - New pressure may make the next IPC mismatch look superficially like payload
   size when the real issue is identity continuity, restart visibility, reply
   interpretation, or authority context.
+- After Phase 184, the narrowest authority-context follow-through is also
+  clearer: if the next real mismatch is no longer metadata leakage but the
+  absence of one honest transferred-handle path, the repository needs the
+  smallest direct carry path rather than a broader capability subsystem.
 - Without a dedicated re-audit, the next broader IPC change could solve the
   wrong problem.
 
@@ -70,6 +124,50 @@ Chosen slice for this phase
    and only if that repair is narrower than broader identity or authority work
 4. one explicit statement of whether payload widening is still deferred for
    the right reason
+
+Smallest Honest Path If Authority Context Wins
+----------------------------------------------
+If this phase finds that the first real IPC-owned mismatch is no longer
+payload width or reply interpretation but the absence of one admitted
+transferred-handle runtime path, the next slice should stay as small and flat
+as the earlier Phase 100 and Phase 118 boundaries rather than widening into a
+capability framework.
+
+That smallest path is:
+
+1. keep Phase 184's gateway rule as the default: ordinary named traffic still
+  rejects all non-zero received-handle metadata
+2. admit one explicit direct-receive path that is allowed to carry exactly one
+  transferred endpoint handle, with no multi-handle family, no rights algebra,
+  no ambient lookup, and no shell-protocol widening
+3. extend only the current runtime-owned carry chain needed for that one move:
+  `syscall.ReceiveObservation`, `service_effect.Message`, and the narrowest
+  `Effect` or dispatch-owned follow-through shape required to preserve one
+  attached handle through one send and one receive
+4. choose one simple service owner whose whole job is to consume one
+  transferred handle and use it for one bounded follow-through action; do not
+  widen existing shell, log, kv, or restart policy just to stage the proof
+5. keep restart semantics split exactly as Phase 182 named them: transferred
+  authority may name a stable route, but it does not imply service-instance
+  continuity or new ambient authority after restart
+6. prove the slice with one focused workflow fixture that checks destructive-
+  on-success transfer, receiver-local visibility, old-holder refusal, and one
+  post-restart no-ambient-revival check
+
+If this path is admitted later, the expected owner surfaces are still local
+and explicit:
+
+- `kernel/src/syscall.mc`: direct receive-observation carry fields and the
+  gateway rule or narrowly named exception path
+- `kernel/src/service_effect.mc`: one bounded message or effect carry surface
+- `kernel/src/kernel_dispatch.mc`: one explicit dispatch path for handle-
+  carrying traffic, separate from the ordinary public-name path
+- one small service module in `kernel/src/` following the kernel style guide,
+  likely a transfer-only owner rather than a widened existing service
+- one reset-lane workflow fixture under `tests/system/`
+
+If the re-audit finds that payload width, reply interpretation, or restart
+visibility still fails first, this mapped path should remain deferred.
 
 What this phase should not do
 -----------------------------

@@ -11,14 +11,15 @@ func cmd(payload: [4]u8) syscall.ReceiveObservation {
 }
 
 func smoke_topology_is_enumerable() bool {
-    expected: [5]u32
+    expected: [6]u32
     expected[0] = service_topology.SERIAL_ENDPOINT_ID
     expected[1] = service_topology.SHELL_ENDPOINT_ID
     expected[2] = service_topology.LOG_ENDPOINT_ID
     expected[3] = service_topology.KV_ENDPOINT_ID
     expected[4] = service_topology.ECHO_ENDPOINT_ID
+    expected[5] = service_topology.TRANSFER_ENDPOINT_ID
 
-    if service_topology.service_count() != 5 {
+    if service_topology.service_count() != 6 {
         return false
     }
     for i in 0..service_topology.service_count() {
@@ -31,7 +32,7 @@ func smoke_topology_is_enumerable() bool {
         }
     }
 
-    invalid: service_topology.ServiceSlot = service_topology.service_slot_at(5)
+    invalid: service_topology.ServiceSlot = service_topology.service_slot_at(6)
     if service_topology.service_slot_is_valid(invalid) {
         return false
     }
@@ -60,6 +61,9 @@ func smoke_restart_owner_stays_flat() bool {
         return false
     }
     if !init.can_restart(service_topology.ECHO_ENDPOINT_ID) {
+        return false
+    }
+    if !init.can_restart(service_topology.TRANSFER_ENDPOINT_ID) {
         return false
     }
     return true

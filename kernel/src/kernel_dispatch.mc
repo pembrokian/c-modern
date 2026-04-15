@@ -16,6 +16,8 @@ import serial_shell_path
 import service_effect
 import service_topology
 import syscall
+import transfer_grant
+import transfer_service
 
 // MAX_EFFECT_CHAIN_DEPTH guards against send loops between services.
 // If the chain exceeds this depth the original caller receives Exhausted.
@@ -66,7 +68,24 @@ func kernel_dispatch_leaf(state: *boot.KernelBootState, msg: service_effect.Mess
         *state = boot.bootwith_echo(current, echo_result.state)
         return echo_result.effect
     }
+    if msg.endpoint_id == service_topology.TRANSFER_ENDPOINT_ID {
+        transfer_result: transfer_service.TransferResult = transfer_service.handle(current.transfer.state, msg)
+        *state = boot.bootwith_transfer(current, transfer_result.state)
+        return transfer_result.effect
+    }
     return service_effect.effect_reply(syscall.SyscallStatus.InvalidEndpoint, 0, primitives.zero_payload())
+}
+
+func kernel_dispatch_transfer_receive(state: *boot.KernelBootState, observation: syscall.ReceiveObservation) service_effect.Effect {
+    current: boot.KernelBootState = *state
+    grant: transfer_grant.GrantConsume = transfer_grant.grant_consume(current.grants, observation.source_pid, observation.received_handle_slot, observation.received_handle_count)
+    if grant.status != syscall.SyscallStatus.Ok {
+        return service_effect.effect_reply(grant.status, 0, primitives.zero_payload())
+    }
+    current = boot.bootwith_grants(current, grant.table)
+    *state = current
+    transfer_effect: service_effect.Effect = kernel_dispatch_leaf(state, service_effect.message_with_handle(observation.source_pid, observation.endpoint_id, observation.payload_len, observation.payload, observation.received_handle_slot, observation.received_handle_count, grant.endpoint))
+    return execute_effect(state, transfer_effect, 0)
 }
 
 func execute_effect(state: *boot.KernelBootState, effect: service_effect.Effect, depth: u32) service_effect.Effect {
@@ -131,9 +150,17 @@ func kernel_dispatch_serial(state: *boot.KernelBootState, obs: syscall.ReceiveOb
 // services.  The endpoint_is_boot_wired guard is the explicit address
 // check: only known public names route forward; unknown ids return
 // InvalidEndpoint here rather than falling through the per-service chain.
-// There is no capability check.  Knowing a valid boot-wired endpoint id is
-// sufficient to address the service.
+// Handle-bearing observations are rejected first: capability metadata is not
+// part of ordinary named traffic in the current system.  Knowing a valid
+// boot-wired endpoint id is sufficient to address the service only when the
+// observation carries no explicit handle metadata.
 func kernel_dispatch_step(state: *boot.KernelBootState, observation: syscall.ReceiveObservation) service_effect.Effect {
+    if syscall.observation_has_received_handle(observation) {
+        if observation.endpoint_id == service_topology.TRANSFER_ENDPOINT_ID {
+            return kernel_dispatch_transfer_receive(state, observation)
+        }
+        return service_effect.effect_reply(syscall.SyscallStatus.InvalidCapability, 0, primitives.zero_payload())
+    }
     if !service_topology.endpoint_is_boot_wired(observation.endpoint_id) {
         return service_effect.effect_reply(syscall.SyscallStatus.InvalidEndpoint, 0, primitives.zero_payload())
     }

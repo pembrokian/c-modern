@@ -27,8 +27,9 @@ struct ReceiveObservation {
     source_pid: u32
     payload_len: usize
     // received_handle_slot and received_handle_count are reserved for future
-    // capability-passing. They must be zero-initialised and ignored by all
-    // current services.
+    // capability-passing. Current direct dispatch rejects any non-zero value
+    // at the gateway so services never treat handle-bearing traffic as plain
+    // named messaging.
     received_handle_slot: u32
     received_handle_count: usize
     payload: [4]u8
@@ -36,4 +37,14 @@ struct ReceiveObservation {
 
 func empty_receive_observation() ReceiveObservation {
     return ReceiveObservation{ status: SyscallStatus.None, block_reason: BlockReason.None, endpoint_id: 0, source_pid: 0, payload_len: 0, received_handle_slot: 0, received_handle_count: 0, payload: primitives.zero_payload() }
+}
+
+func observation_has_received_handle(obs: ReceiveObservation) bool {
+    if obs.received_handle_slot != 0 {
+        return true
+    }
+    if obs.received_handle_count != 0 {
+        return true
+    }
+    return false
 }

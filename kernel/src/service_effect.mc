@@ -5,6 +5,9 @@ struct Message {
     source_pid: u32
     endpoint_id: u32
     payload_len: usize
+    received_handle_slot: u32
+    received_handle_count: usize
+    received_endpoint_id: u32
     payload: [4]u8
 }
 
@@ -32,7 +35,11 @@ struct Effect {
 }
 
 func message(source_pid: u32, endpoint_id: u32, payload_len: usize, payload: [4]u8) Message {
-    return Message{ source_pid: source_pid, endpoint_id: endpoint_id, payload_len: payload_len, payload: payload }
+    return Message{ source_pid: source_pid, endpoint_id: endpoint_id, payload_len: payload_len, received_handle_slot: 0, received_handle_count: 0, received_endpoint_id: 0, payload: payload }
+}
+
+func message_with_handle(source_pid: u32, endpoint_id: u32, payload_len: usize, payload: [4]u8, received_handle_slot: u32, received_handle_count: usize, received_endpoint_id: u32) Message {
+    return Message{ source_pid: source_pid, endpoint_id: endpoint_id, payload_len: payload_len, received_handle_slot: received_handle_slot, received_handle_count: received_handle_count, received_endpoint_id: received_endpoint_id, payload: payload }
 }
 
 func effect_none() Effect {
@@ -139,5 +146,5 @@ func effect_send_dropped(e: Effect) u32 {
 }
 
 func from_receive_observation(obs: syscall.ReceiveObservation) Message {
-    return message(obs.source_pid, obs.endpoint_id, obs.payload_len, obs.payload)
+    return message_with_handle(obs.source_pid, obs.endpoint_id, obs.payload_len, obs.payload, obs.received_handle_slot, obs.received_handle_count, 0)
 }

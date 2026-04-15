@@ -33,6 +33,7 @@ const SHELL_ENDPOINT_ID: u32 = 11
 const LOG_ENDPOINT_ID: u32 = 12
 const KV_ENDPOINT_ID: u32 = 13
 const ECHO_ENDPOINT_ID: u32 = 14
+const TRANSFER_ENDPOINT_ID: u32 = 15
 
 // ServiceSlot records the static wiring for one boot service: which endpoint
 // it occupies and which pid owns it.  Both values are fixed at kernel_init
@@ -47,13 +48,14 @@ const SHELL_SLOT: ServiceSlot = ServiceSlot{ endpoint: SHELL_ENDPOINT_ID, pid: 2
 const LOG_SLOT: ServiceSlot = ServiceSlot{ endpoint: LOG_ENDPOINT_ID, pid: 3 }
 const KV_SLOT: ServiceSlot = ServiceSlot{ endpoint: KV_ENDPOINT_ID, pid: 4 }
 const ECHO_SLOT: ServiceSlot = ServiceSlot{ endpoint: ECHO_ENDPOINT_ID, pid: 5 }
+const TRANSFER_SLOT: ServiceSlot = ServiceSlot{ endpoint: TRANSFER_ENDPOINT_ID, pid: 6 }
 
 // SERVICE_COUNT is the number of boot-wired services in the static topology.
 // Increment this when a new slot constant is added above.
-const SERVICE_COUNT: u32 = 5
+const SERVICE_COUNT: u32 = 6
 
 func service_count() usize {
-    return 5
+    return 6
 }
 
 func service_slot_at(index: usize) ServiceSlot {
@@ -71,6 +73,9 @@ func service_slot_at(index: usize) ServiceSlot {
     }
     if index == 4 {
         return ECHO_SLOT
+    }
+    if index == 5 {
+        return TRANSFER_SLOT
     }
     return ServiceSlot{ endpoint: 0, pid: 0 }
 }
@@ -90,6 +95,9 @@ func service_slot_for_endpoint(endpoint: u32) ServiceSlot {
     }
     if endpoint == ECHO_ENDPOINT_ID {
         return ECHO_SLOT
+    }
+    if endpoint == TRANSFER_ENDPOINT_ID {
+        return TRANSFER_SLOT
     }
     return ServiceSlot{ endpoint: 0, pid: 0 }
 }
@@ -120,6 +128,9 @@ func endpoint_is_boot_wired(endpoint: u32) bool {
         return true
     }
     if endpoint == ECHO_ENDPOINT_ID {
+        return true
+    }
+    if endpoint == TRANSFER_ENDPOINT_ID {
         return true
     }
     return false

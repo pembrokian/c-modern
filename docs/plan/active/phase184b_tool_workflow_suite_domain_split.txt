@@ -1,0 +1,67 @@
+Phase 184B -- Tool Workflow Suite Domain Split
+==============================================
+
+Status
+------
+COMPLETE
+
+Outcome
+-------
+Phase 184B refactored the active workflow test owner from one catalog-style
+translation unit into behavior-owned suite files while preserving the same
+user-visible workflow contracts.
+
+The landed implementation keeps the existing explicit assertions and fixture
+setup style, but moves ownership to smaller files and removes the largest
+repetitive cluster:
+
+- `tests/tool/tool_workflow_orchestrator.cpp` is now the thin suite entry
+  that delegates to behavior-owned families
+- `tests/tool/tool_help_suite.cpp` owns help text, mode selection, and direct
+  source versus project workflow checks
+- `tests/tool/tool_test_command_suite.cpp` owns ordinary test and `mc test`
+  behavior checks
+- `tests/tool/tool_project_validation_suite.cpp` owns target selection,
+  import-root, duplicate-root, and link-graph validation
+- `tests/tool/tool_multifile_module_suite.cpp` owns module-set and multi-file
+  module behavior
+- `tests/tool/tool_kernel_reset_lane_suite.cpp` owns the reset-lane kernel
+  workflow family and now runs that family through one table-driven scenario
+  list instead of dozens of near-identical handwritten functions
+
+What changed
+------------
+- the workflow target in `CMakeLists.txt` now builds the split suite files
+  instead of a single monolithic implementation file
+- the reset-lane family now uses one `ResetLaneScenario` table plus one shared
+  `RunKernelResetLaneScenario(...)` helper
+- the public workflow assertions stay explicit and local to the behavior they
+  document; no generic DSL or hidden assertion layer was introduced
+- the test runner contract remains unchanged: `RunWorkflowToolSuite(...)`
+  still owns the active `mc_tool_workflow_unit` suite entrypoint
+
+What did not change
+-------------------
+- no compiler, sema, MIR, backend, ABI, target, runtime, or `hal` expansion
+- no new test framework, reflection layer, or code-generated registry
+- no change to user-visible `mc` diagnostics or workflow behavior
+- no kernel semantic change; the reset-lane work here is test-suite structure
+  only
+
+Why this phase stopped here
+---------------------------
+The current workflow suite was "catalog big", not architecturally confused.
+The narrow fix was file ownership and repetitive-scenario removal, not a new
+framework.
+
+This phase therefore chose:
+
+- split by behavioral domain, not by historical phase number
+- table-drive the reset-lane family where the structure was nearly identical
+- preserve direct assertions for user-visible diagnostics
+- keep the suite explicit and deterministic rather than introducing a larger
+  testing DSL
+
+Validation
+----------
+- `mc_tool_workflow_unit`
