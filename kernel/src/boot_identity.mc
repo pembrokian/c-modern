@@ -71,23 +71,20 @@ func boot_ticket_mark(s: KernelBootState) service_identity.ServiceMark {
 }
 
 func bootmark_for_endpoint(s: KernelBootState, endpoint: u32) service_identity.ServiceMark {
-    if endpoint == service_topology.LOG_ENDPOINT_ID {
+    switch endpoint {
+    case service_topology.LOG_ENDPOINT_ID:
         return boot_log_mark(s)
-    }
-    if endpoint == service_topology.KV_ENDPOINT_ID {
+    case service_topology.KV_ENDPOINT_ID:
         return boot_kv_mark(s)
-    }
-    if endpoint == service_topology.QUEUE_ENDPOINT_ID {
+    case service_topology.QUEUE_ENDPOINT_ID:
         return boot_queue_mark(s)
-    }
-    if endpoint == service_topology.ECHO_ENDPOINT_ID {
+    case service_topology.ECHO_ENDPOINT_ID:
         return boot_echo_mark(s)
-    }
-    if endpoint == service_topology.TRANSFER_ENDPOINT_ID {
+    case service_topology.TRANSFER_ENDPOINT_ID:
         return boot_transfer_mark(s)
-    }
-    if endpoint == service_topology.TICKET_ENDPOINT_ID {
+    case service_topology.TICKET_ENDPOINT_ID:
         return boot_ticket_mark(s)
+    default:
+        return service_identity.service_mark(endpoint, 0, 0)
     }
-    return service_identity.service_mark(endpoint, 0, 0)
 }

@@ -73,7 +73,8 @@ func kernel_dispatch_shell_control(state: *boot.KernelBootState, msg: service_ef
     if msg.payload[3] != serial_protocol.CMD_BANG {
         return shell_service.invalid_effect(shell_service.SHELL_INVALID_SHAPE)
     }
-    if msg.payload[1] == serial_protocol.CMD_I {
+    switch msg.payload[1] {
+    case serial_protocol.CMD_I:
         if msg.payload[2] == serial_protocol.TARGET_WORKSET {
             return shell_service.lifecycle_identity_effect(syscall.SyscallStatus.Ok, boot.boot_workset_generation_payload(*state))
         }
@@ -83,60 +84,60 @@ func kernel_dispatch_shell_control(state: *boot.KernelBootState, msg: service_ef
         }
         mark: service_identity.ServiceMark = boot.bootmark_for_endpoint(*state, identity_endpoint)
         return shell_service.lifecycle_identity_effect(syscall.SyscallStatus.Ok, service_identity.mark_generation_payload(mark))
-    }
-    if msg.payload[2] == serial_protocol.TARGET_AUDIT {
-        *state = init.restart_retained_audit_lane(*state)
-        return shell_service.lifecycle_effect(syscall.SyscallStatus.Ok, msg.payload[2], serial_protocol.LIFECYCLE_RELOAD)
-    }
-    if msg.payload[2] == serial_protocol.TARGET_WORKSET {
-        *state = init.restart_retained_workset(*state)
-        return shell_service.lifecycle_effect(syscall.SyscallStatus.Ok, msg.payload[2], serial_protocol.LIFECYCLE_RELOAD)
-    }
-    restart_endpoint: u32 = shell_service.lifecycle_target_endpoint(msg.payload[2])
-    if restart_endpoint == 0 {
+    case serial_protocol.CMD_R:
+        switch msg.payload[2] {
+        case serial_protocol.TARGET_AUDIT:
+            *state = init.restart_retained_audit_lane(*state)
+            return shell_service.lifecycle_effect(syscall.SyscallStatus.Ok, msg.payload[2], serial_protocol.LIFECYCLE_RELOAD)
+        case serial_protocol.TARGET_WORKSET:
+            *state = init.restart_retained_workset(*state)
+            return shell_service.lifecycle_effect(syscall.SyscallStatus.Ok, msg.payload[2], serial_protocol.LIFECYCLE_RELOAD)
+        default:
+            restart_endpoint: u32 = shell_service.lifecycle_target_endpoint(msg.payload[2])
+            if restart_endpoint == 0 {
+                return shell_service.invalid_effect(shell_service.SHELL_INVALID_COMMAND)
+            }
+            if !service_topology.service_can_restart(restart_endpoint) {
+                return shell_service.lifecycle_effect(syscall.SyscallStatus.InvalidArgument, msg.payload[2], shell_service.lifecycle_mode(restart_endpoint))
+            }
+            *state = init.restart(*state, restart_endpoint)
+            return shell_service.lifecycle_effect(syscall.SyscallStatus.Ok, msg.payload[2], shell_service.lifecycle_mode(restart_endpoint))
+        }
+    default:
         return shell_service.invalid_effect(shell_service.SHELL_INVALID_COMMAND)
     }
-    if !service_topology.service_can_restart(restart_endpoint) {
-        return shell_service.lifecycle_effect(syscall.SyscallStatus.InvalidArgument, msg.payload[2], shell_service.lifecycle_mode(restart_endpoint))
-    }
-    *state = init.restart(*state, restart_endpoint)
-    return shell_service.lifecycle_effect(syscall.SyscallStatus.Ok, msg.payload[2], shell_service.lifecycle_mode(restart_endpoint))
 }
 
 func kernel_dispatch_leaf(state: *boot.KernelBootState, msg: service_effect.Message) service_effect.Effect {
     current: boot.KernelBootState = *state
-    if msg.endpoint_id == service_topology.SHELL_ENDPOINT_ID {
+    switch msg.endpoint_id {
+    case service_topology.SHELL_ENDPOINT_ID:
         return kernel_dispatch_shell_control(state, msg)
-    }
-    if msg.endpoint_id == service_topology.LOG_ENDPOINT_ID {
+    case service_topology.LOG_ENDPOINT_ID:
         log_result: log_service.LogResult = log_service.handle(current.log.state, msg)
         *state = boot.bootwith_log(current, log_result.state)
         return log_result.effect
-    }
-    if msg.endpoint_id == service_topology.KV_ENDPOINT_ID {
+    case service_topology.KV_ENDPOINT_ID:
         return kernel_dispatch_kv(state, msg)
-    }
-    if msg.endpoint_id == service_topology.QUEUE_ENDPOINT_ID {
+    case service_topology.QUEUE_ENDPOINT_ID:
         queue_result: queue_service.QueueResult = queue_service.handle(current.queue.state, msg)
         *state = boot.bootwith_queue(current, queue_result.state)
         return queue_result.effect
-    }
-    if msg.endpoint_id == service_topology.ECHO_ENDPOINT_ID {
+    case service_topology.ECHO_ENDPOINT_ID:
         echo_result: echo_service.EchoResult = echo_service.handle(current.echo.state, msg)
         *state = boot.bootwith_echo(current, echo_result.state)
         return echo_result.effect
-    }
-    if msg.endpoint_id == service_topology.TRANSFER_ENDPOINT_ID {
+    case service_topology.TRANSFER_ENDPOINT_ID:
         transfer_result: transfer_service.TransferResult = transfer_service.handle(current.transfer.state, msg)
         *state = boot.bootwith_transfer(current, transfer_result.state)
         return transfer_result.effect
-    }
-    if msg.endpoint_id == service_topology.TICKET_ENDPOINT_ID {
+    case service_topology.TICKET_ENDPOINT_ID:
         ticket_result: ticket_service.TicketResult = ticket_service.handle(current.ticket.state, msg)
         *state = boot.bootwith_ticket(current, ticket_result.state)
         return ticket_result.effect
+    default:
+        return service_effect.effect_reply(syscall.SyscallStatus.InvalidEndpoint, 0, primitives.zero_payload())
     }
-    return service_effect.effect_reply(syscall.SyscallStatus.InvalidEndpoint, 0, primitives.zero_payload())
 }
 
 func kernel_dispatch_transfer_receive(state: *boot.KernelBootState, observation: syscall.ReceiveObservation) service_effect.Effect {
@@ -219,19 +220,22 @@ func kernel_dispatch_serial(state: *boot.KernelBootState, obs: syscall.ReceiveOb
 // observation carries no explicit handle metadata.
 func kernel_dispatch_step(state: *boot.KernelBootState, observation: syscall.ReceiveObservation) service_effect.Effect {
     if syscall.observation_has_received_handle(observation) {
-        if observation.endpoint_id == service_topology.TRANSFER_ENDPOINT_ID {
+        switch observation.endpoint_id {
+        case service_topology.TRANSFER_ENDPOINT_ID:
             return kernel_dispatch_transfer_receive(state, observation)
+        default:
+            return service_effect.effect_reply(syscall.SyscallStatus.InvalidCapability, 0, primitives.zero_payload())
         }
-        return service_effect.effect_reply(syscall.SyscallStatus.InvalidCapability, 0, primitives.zero_payload())
     }
     if !service_topology.endpoint_is_boot_wired(observation.endpoint_id) {
         return service_effect.effect_reply(syscall.SyscallStatus.InvalidEndpoint, 0, primitives.zero_payload())
     }
-    if observation.endpoint_id == service_topology.SERIAL_ENDPOINT_ID {
+    switch observation.endpoint_id {
+    case service_topology.SERIAL_ENDPOINT_ID:
         return kernel_dispatch_serial(state, observation)
-    }
-    if observation.endpoint_id == service_topology.TRANSFER_ENDPOINT_ID {
+    case service_topology.TRANSFER_ENDPOINT_ID:
         return execute_effect(state, kernel_dispatch_leaf(state, service_effect.message(observation.source_pid, observation.endpoint_id, observation.payload_len, observation.payload)), 0)
+    default:
+        return kernel_dispatch_leaf(state, service_effect.message(observation.source_pid, observation.endpoint_id, observation.payload_len, observation.payload))
     }
-    return kernel_dispatch_leaf(state, service_effect.message(observation.source_pid, observation.endpoint_id, observation.payload_len, observation.payload))
 }

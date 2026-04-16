@@ -151,8 +151,19 @@ std::vector<std::unique_ptr<Stmt>> Parser::ParseCaseBodyStatements() {
 }
 
 bool Parser::LooksLikeVariantCasePattern() const {
-    return Check(TokenKind::kIdentifier) &&
-           (Peek(1).kind == TokenKind::kLParen || (Peek(1).kind == TokenKind::kDot && Peek(2).kind == TokenKind::kIdentifier));
+    if (!Check(TokenKind::kIdentifier)) {
+        return false;
+    }
+    if (Peek(1).kind == TokenKind::kLParen) {
+        return true;
+    }
+    if (Peek(1).kind != TokenKind::kDot || Peek(2).kind != TokenKind::kIdentifier) {
+        return false;
+    }
+    if (Peek(3).kind == TokenKind::kLParen) {
+        return true;
+    }
+    return Peek(3).kind == TokenKind::kDot && Peek(4).kind == TokenKind::kIdentifier;
 }
 
 std::string Parser::ParseCaseVariantName() {

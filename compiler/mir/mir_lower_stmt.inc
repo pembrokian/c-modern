@@ -205,6 +205,22 @@
             test_blocks.push_back(CreateBlock("switch_test"));
         }
 
+        std::vector<std::optional<std::size_t>> case_body_blocks(stmt.switch_cases.size());
+        for (std::size_t index = 0; index < stmt.switch_cases.size(); ++index) {
+            if (!stmt.switch_cases[index].statements.empty()) {
+                case_body_blocks[index] = CreateBlock("switch_case");
+            }
+        }
+
+        std::vector<std::size_t> case_true_targets(stmt.switch_cases.size(), default_block.has_value() ? *default_block : merge_block);
+        std::size_t shared_target = default_block.has_value() ? *default_block : merge_block;
+        for (std::size_t index = stmt.switch_cases.size(); index > 0; --index) {
+            if (case_body_blocks[index - 1].has_value()) {
+                shared_target = *case_body_blocks[index - 1];
+            }
+            case_true_targets[index - 1] = shared_target;
+        }
+
         for (std::size_t index = 0; index < stmt.switch_cases.size(); ++index) {
             const auto& switch_case = stmt.switch_cases[index];
 
@@ -221,7 +237,6 @@
                 comparison = EmitVariantMatchValue(selector, switch_case.pattern.variant_name);
             }
 
-            const std::size_t body_block = CreateBlock("switch_case");
             const std::string false_target =
                 index + 1 < test_blocks.size() ? function_.blocks[test_blocks[index + 1]].label
                                                : (default_block.has_value() ? function_.blocks[*default_block].label : function_.blocks[merge_block].label);
@@ -229,10 +244,14 @@
             auto& test = function_.blocks[*current_block_];
             test.terminator.kind = Terminator::Kind::kCondBranch;
             test.terminator.values = {comparison.value};
-            test.terminator.true_target = function_.blocks[body_block].label;
+            test.terminator.true_target = function_.blocks[case_true_targets[index]].label;
             test.terminator.false_target = false_target;
 
-            current_block_ = body_block;
+            if (!case_body_blocks[index].has_value()) {
+                continue;
+            }
+
+            current_block_ = *case_body_blocks[index];
             if (switch_case.pattern.kind == mc::ast::CasePattern::Kind::kVariant) {
                 for (std::size_t binding_index = 0; binding_index < switch_case.pattern.bindings.size(); ++binding_index) {
                     const std::string& binding_name = switch_case.pattern.bindings[binding_index];

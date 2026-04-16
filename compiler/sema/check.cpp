@@ -1674,15 +1674,26 @@ class Checker {
                 return stmt.then_branch != nullptr && stmt.else_branch != nullptr && StmtAlwaysReturns(*stmt.then_branch) &&
                        StmtAlwaysReturns(*stmt.else_branch);
             case Stmt::Kind::kSwitch:
+            {
                 if (!stmt.has_default_case) {
                     return false;
                 }
-                for (const auto& switch_case : stmt.switch_cases) {
-                    if (!StmtListAlwaysReturns(switch_case.statements)) {
+                bool shared_body_returns = StmtListAlwaysReturns(stmt.default_case.statements);
+                for (std::size_t index = stmt.switch_cases.size(); index > 0; --index) {
+                    const auto& switch_case = stmt.switch_cases[index - 1];
+                    if (switch_case.statements.empty()) {
+                        if (!shared_body_returns) {
+                            return false;
+                        }
+                        continue;
+                    }
+                    shared_body_returns = StmtListAlwaysReturns(switch_case.statements);
+                    if (!shared_body_returns) {
                         return false;
                     }
                 }
-                return StmtListAlwaysReturns(stmt.default_case.statements);
+                return shared_body_returns;
+            }
             default:
                 return false;
         }

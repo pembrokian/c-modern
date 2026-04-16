@@ -122,22 +122,20 @@ func step_matches(spec: StepSpec, state: *boot.KernelBootState, effect: service_
     if service_effect.effect_reply_status(effect) != check.status {
         return 0
     }
-    if check.kind == StepCheckKind.Status {
+    switch check.kind {
+    case StepCheckKind.Status:
         return 1
-    }
-    if check.kind == StepCheckKind.Payload0 {
+    case StepCheckKind.Payload0:
         if service_effect.effect_reply_payload(effect)[0] != check.payload0 {
             return 0
         }
         return 1
-    }
-    if check.kind == StepCheckKind.Payload1 {
+    case StepCheckKind.Payload1:
         if service_effect.effect_reply_payload(effect)[1] != check.payload1 {
             return 0
         }
         return 1
-    }
-    if check.kind == StepCheckKind.LogTailState {
+    case StepCheckKind.LogTailState:
         payload: [4]u8 = service_effect.effect_reply_payload(effect)
         if service_effect.effect_reply_payload_len(effect) != log_service.log_len(s.log.state) {
             return 0
@@ -149,14 +147,12 @@ func step_matches(spec: StepSpec, state: *boot.KernelBootState, effect: service_
             return 0
         }
         return 1
-    }
-    if check.kind == StepCheckKind.ReplyLen {
+    case StepCheckKind.ReplyLen:
         if service_effect.effect_reply_payload_len(effect) != check.reply_len {
             return 0
         }
         return 1
-    }
-    if check.kind == StepCheckKind.ReplyLenAndLogLen {
+    case StepCheckKind.ReplyLenAndLogLen:
         if service_effect.effect_reply_payload_len(effect) != check.reply_len {
             return 0
         }
@@ -164,14 +160,14 @@ func step_matches(spec: StepSpec, state: *boot.KernelBootState, effect: service_
             return 0
         }
         return 1
-    }
-    if check.kind == StepCheckKind.Witness {
+    case StepCheckKind.Witness:
         if service_effect.effect_send_dropped(effect) != check.send_dropped {
             return 0
         }
         return 1
+    default:
+        return 0
     }
-    return 0
 }
 
 func run_main(state: *boot.KernelBootState) i32 {

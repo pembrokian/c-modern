@@ -220,6 +220,8 @@ int main(int argc, char** argv) {
         {"imported_atomic_ok.mc", "imported_atomic_ok.mir.txt", true, "", {}, {{"sync", "import_roots/sync_module.mc"}}},
         {"imported_event_buffer_ok.mc", "imported_event_buffer_ok.mir.txt", true, "", {"tests/compiler/mir/import_roots"}, {}},
         {"qualified_variant_import_root_ok.mc", "qualified_variant_import_root_ok.mir.txt", true, "", {}, {{"color_module", "import_roots/color_module.mc"}}},
+        {"switch_imported_const_ok.mc", "switch_imported_const_ok.mir.txt", true, "", {}, {{"switch_consts", "import_roots/switch_consts.mc"}}},
+        {"switch_shared_case_ok.mc", "switch_shared_case_ok.mir.txt", true, "", {}, {}},
     };
 
     std::unordered_set<std::string> explicit_sources;

@@ -1,0 +1,3 @@
+SemanticModule
+  Import name=switch_consts
+  Function name=choose params=[u8] returns=[i32]

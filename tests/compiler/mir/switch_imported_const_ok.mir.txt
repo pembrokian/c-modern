@@ -1,0 +1,22 @@
+Module
+  Import name=switch_consts
+  Function name=choose returns=[i32]
+    Local name=value type=u8 param readonly
+    Block label=entry0
+      load_local %v0:u8 target=value
+      symbol_ref %v1:u8 target=switch_consts.CMD_A target_kind=global target_name=switch_consts.CMD_A
+      binary %v2:bool op=== operands=[%v0, %v1]
+      terminator cond value=%v2 true=switch_case4 false=switch_test3
+    Block label=switch_default2
+      const %v7:int_literal op=30
+      terminator return values=[%v7]
+    Block label=switch_test3
+      symbol_ref %v4:u8 target=switch_consts.CMD_B target_kind=global target_name=switch_consts.CMD_B
+      binary %v5:bool op=== operands=[%v0, %v4]
+      terminator cond value=%v5 true=switch_case5 false=switch_default2
+    Block label=switch_case4
+      const %v3:int_literal op=10
+      terminator return values=[%v3]
+    Block label=switch_case5
+      const %v6:int_literal op=20
+      terminator return values=[%v6]

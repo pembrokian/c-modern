@@ -26,25 +26,22 @@ func restart(state: boot.KernelBootState, endpoint: u32) boot.KernelBootState {
     if !service_topology.service_can_restart(endpoint) {
         return state
     }
-    if endpoint == service_topology.LOG_ENDPOINT_ID {
+    switch endpoint {
+    case service_topology.LOG_ENDPOINT_ID:
         return restart_log(state)
-    }
-    if endpoint == service_topology.KV_ENDPOINT_ID {
+    case service_topology.KV_ENDPOINT_ID:
         return restart_kv(state)
-    }
-    if endpoint == service_topology.QUEUE_ENDPOINT_ID {
+    case service_topology.QUEUE_ENDPOINT_ID:
         return restart_queue(state)
-    }
-    if endpoint == service_topology.ECHO_ENDPOINT_ID {
+    case service_topology.ECHO_ENDPOINT_ID:
         return restart_echo(state)
-    }
-    if endpoint == service_topology.TRANSFER_ENDPOINT_ID {
+    case service_topology.TRANSFER_ENDPOINT_ID:
         return restart_transfer(state)
-    }
-    if endpoint == service_topology.TICKET_ENDPOINT_ID {
+    case service_topology.TICKET_ENDPOINT_ID:
         return restart_ticket(state)
+    default:
+        return state
     }
-    return state
 }
 
 func restart_log(state: boot.KernelBootState) boot.KernelBootState {

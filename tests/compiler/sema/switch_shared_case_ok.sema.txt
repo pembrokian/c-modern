@@ -1,0 +1,2 @@
+SemanticModule
+  Function name=choose params=[i32] returns=[i32]

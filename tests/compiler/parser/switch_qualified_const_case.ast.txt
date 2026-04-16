@@ -1,0 +1,30 @@
+SourceFile
+  ModuleKind=ordinary
+  FuncDecl name=choose
+    ParamDecl name=value
+      NamedType name=u8
+    returns:
+      NamedType name=i32
+    body:
+      BlockStmt
+        statements:
+          SwitchStmt
+            exprs:
+              NameExpr text=value
+            cases:
+              SwitchCase:
+                ExprCasePattern
+                  QualifiedNameExpr text=serial_protocol member=CMD_E
+                ReturnStmt
+                  exprs:
+                    LiteralExpr text=10 kind=int_lit
+              SwitchCase:
+                ExprCasePattern
+                  QualifiedNameExpr text=serial_protocol member=CMD_L
+                ReturnStmt
+                  exprs:
+                    LiteralExpr text=20 kind=int_lit
+            default:
+              ReturnStmt
+                exprs:
+                  LiteralExpr text=30 kind=int_lit
