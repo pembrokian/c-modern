@@ -149,10 +149,6 @@ file(GLOB tool_real_project_case_sources CONFIGURE_DEPENDS
 add_executable(mc_tool_real_project_tests
     tests/tool/tool_real_project_tests.cpp
     tests/tool/tool_suite_common.cpp
-    tests/tool/tool_real_project_issue_rollup_suite.cpp
-    tests/tool/tool_real_project_process_suite.cpp
-    tests/tool/tool_real_project_review_board_suite.cpp
-    tests/tool/tool_real_project_simple_tools_suite.cpp
     tests/tool/tool_real_project_suite.cpp
     ${tool_real_project_case_sources}
 )

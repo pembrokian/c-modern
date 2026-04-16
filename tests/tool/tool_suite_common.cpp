@@ -17,8 +17,6 @@ using mc::test_support::ReadFile;
 using mc::test_support::RunCommandCapture;
 using mc::test_support::WriteFile;
 
-namespace {
-
 constexpr std::string_view kKernelRuntimeRootRelativePath = "runtime";
 constexpr std::string_view kFreestandingKernelRunContractStdoutContainsV1 =
     "stdout-contains-v1";
@@ -26,6 +24,35 @@ constexpr std::string_view kFreestandingKernelRunContractSuccessExitV1 =
     "success-exit-v1";
 constexpr std::string_view kFreestandingKernelMirContractFirstMatchProjectionV1 =
     "first-match-projection-v1";
+
+enum class RunContractKind {
+    success_exit_v1,
+    stdout_contains_v1,
+};
+
+enum class MirContractKind {
+    first_match_projection_v1,
+};
+
+enum class ArtifactAuditKind {
+    standalone_manual_relink,
+    kernel_manual_relink,
+    file_contains,
+};
+
+enum class ProjectCommandExpectation {
+    success,
+    failure,
+};
+
+enum class ProjectCommandOutputMode {
+    discard,
+    capture,
+};
+
+void ValidateFreestandingKernelRuntimePhaseDescriptor(const FreestandingKernelRuntimePhaseDescriptor& phase_check,
+                                                      const std::filesystem::path& phase_toml_path,
+                                                      int shard);
 
 std::string NormalizeProjectionText(std::string_view text) {
     std::string normalized(text);
@@ -89,13 +116,16 @@ std::optional<std::string> ParseArrayEntry(std::string_view line) {
 
 std::vector<std::string> ParseInlineQuotedArray(std::string_view line, std::string_view key) {
     const std::string prefix = std::string(key) + " = [";
-    if (!line.starts_with(prefix) || line.back() != ']') {
+    if (!line.starts_with(prefix) || line.size() < prefix.size() + 1 || line.back() != ']') {
         Fail("runtime phase directory contains an invalid inline array for key: " + std::string(key));
     }
-    std::string_view inner = line.substr(prefix.size(), line.size() - prefix.size() - 1);
+    std::string_view inner = line;
+    inner.remove_prefix(prefix.size());
+    inner.remove_suffix(1);
     std::vector<std::string> values;
+
     while (!inner.empty()) {
-        while (!inner.empty() && (inner.front() == ' ' || inner.front() == ',')) {
+        while (!inner.empty() && inner.front() == ' ') {
             inner.remove_prefix(1);
         }
         if (inner.empty()) {
@@ -105,14 +135,282 @@ std::vector<std::string> ParseInlineQuotedArray(std::string_view line, std::stri
             Fail("runtime phase directory inline array should contain quoted strings for key: " + std::string(key));
         }
         inner.remove_prefix(1);
-        const std::size_t end_quote = inner.find('"');
-        if (end_quote == std::string_view::npos) {
+
+        std::string value;
+        bool closed_quote = false;
+        bool escape_next = false;
+        while (!inner.empty()) {
+            const char ch = inner.front();
+            inner.remove_prefix(1);
+
+            if (escape_next) {
+                value.push_back(ch);
+                escape_next = false;
+                continue;
+            }
+            if (ch == '\\') {
+                escape_next = true;
+                continue;
+            }
+            if (ch == '"') {
+                closed_quote = true;
+                break;
+            }
+            value.push_back(ch);
+        }
+
+        if (escape_next) {
+            Fail("runtime phase directory inline array ends with a dangling escape for key: " + std::string(key));
+        }
+        if (!closed_quote) {
             Fail("runtime phase directory inline array is missing a closing quote for key: " + std::string(key));
         }
-        values.emplace_back(inner.substr(0, end_quote));
-        inner.remove_prefix(end_quote + 1);
+        values.push_back(std::move(value));
+
+        while (!inner.empty() && inner.front() == ' ') {
+            inner.remove_prefix(1);
+        }
+        if (inner.empty()) {
+            break;
+        }
+        if (inner.front() != ',') {
+            Fail("runtime phase directory inline array should separate quoted strings with commas for key: " +
+                 std::string(key));
+        }
+        inner.remove_prefix(1);
+        while (!inner.empty() && inner.front() == ' ') {
+            inner.remove_prefix(1);
+        }
+        if (inner.empty()) {
+            Fail("runtime phase directory inline array should not end with a trailing comma for key: " +
+                 std::string(key));
+        }
     }
+
     return values;
+}
+
+RunContractKind ParseRunContractKind(std::string_view run_contract,
+                                     const std::string& context) {
+    if (run_contract == kFreestandingKernelRunContractSuccessExitV1) {
+        return RunContractKind::success_exit_v1;
+    }
+    if (run_contract == kFreestandingKernelRunContractStdoutContainsV1) {
+        return RunContractKind::stdout_contains_v1;
+    }
+    Fail(context + std::string(run_contract));
+}
+
+MirContractKind ParseMirContractKind(std::string_view mir_contract,
+                                     const std::string& context) {
+    if (mir_contract == kFreestandingKernelMirContractFirstMatchProjectionV1) {
+        return MirContractKind::first_match_projection_v1;
+    }
+    Fail(context + std::string(mir_contract));
+}
+
+ArtifactAuditKind ParseArtifactAuditKind(std::string_view kind,
+                                         const std::string& context) {
+    if (kind == "standalone_manual_relink") {
+        return ArtifactAuditKind::standalone_manual_relink;
+    }
+    if (kind == "kernel_manual_relink") {
+        return ArtifactAuditKind::kernel_manual_relink;
+    }
+    if (kind == "file_contains") {
+        return ArtifactAuditKind::file_contains;
+    }
+    Fail(context + std::string(kind));
+}
+
+std::vector<std::filesystem::path> CollectPhaseDirectories(const std::filesystem::path& runtime_root) {
+    std::vector<std::filesystem::path> phase_dirs;
+    for (const auto& entry : std::filesystem::directory_iterator(runtime_root)) {
+        if (entry.is_directory()) {
+            phase_dirs.push_back(entry.path());
+        }
+    }
+    std::sort(phase_dirs.begin(), phase_dirs.end());
+    return phase_dirs;
+}
+
+FreestandingKernelRuntimePhaseDescriptor ParseRuntimePhaseDescriptor(const std::filesystem::path& phase_dir,
+                                                                    const std::filesystem::path& phase_toml_path) {
+    enum class ArrayMode {
+        none,
+        selectors,
+    };
+
+    FreestandingKernelRuntimePhaseDescriptor current;
+    ArrayMode array_mode = ArrayMode::none;
+    std::istringstream stream(ReadFile(phase_toml_path));
+    std::string raw_line;
+    while (std::getline(stream, raw_line)) {
+        const std::string line = TrimCopy(raw_line);
+        if (line.empty() || line.starts_with('#')) {
+            continue;
+        }
+        if (array_mode == ArrayMode::selectors) {
+            if (line == "]") {
+                array_mode = ArrayMode::none;
+                continue;
+            }
+            current.mir_selector_storage.push_back(*ParseArrayEntry(line));
+            continue;
+        }
+        if (const auto value = ParseQuotedSetting(line, "label")) {
+            current.label = *value;
+            continue;
+        }
+        if (const auto value = ParseIntSetting(line, "phase")) {
+            current.phase = *value;
+            continue;
+        }
+        if (const auto value = ParseIntSetting(line, "shard")) {
+            current.shard = *value;
+            continue;
+        }
+        if (const auto value = ParseQuotedSetting(line, "project")) {
+            current.project = *value;
+            continue;
+        }
+        if (const auto value = ParseQuotedSetting(line, "target")) {
+            current.target = *value;
+            continue;
+        }
+        if (const auto value = ParseQuotedSetting(line, "output_stem")) {
+            current.output_stem = *value;
+            continue;
+        }
+        if (const auto value = ParseQuotedSetting(line, "build_context")) {
+            current.build_context = *value;
+            continue;
+        }
+        if (const auto value = ParseQuotedSetting(line, "run_context")) {
+            current.run_context = *value;
+            continue;
+        }
+        if (const auto value = ParseQuotedSetting(line, "run_contract")) {
+            current.run_contract = *value;
+            continue;
+        }
+        if (const auto value = ParseQuotedSetting(line, "run_golden")) {
+            current.expected_run_lines_file = (std::filesystem::path(kKernelRuntimeRootRelativePath) /
+                                               phase_dir.filename() / *value)
+                                                  .generic_string();
+            continue;
+        }
+        if (const auto value = ParseQuotedSetting(line, "mir_golden")) {
+            current.expected_mir_contract_file = (std::filesystem::path(kKernelRuntimeRootRelativePath) /
+                                                  phase_dir.filename() / *value)
+                                                     .generic_string();
+            continue;
+        }
+        if (const auto value = ParseQuotedSetting(line, "mir_contract")) {
+            current.mir_contract = *value;
+            continue;
+        }
+        if (line.starts_with("required_objects = [")) {
+            current.required_object_file_storage = ParseInlineQuotedArray(line, "required_objects");
+            continue;
+        }
+        if (line == "selectors = [") {
+            array_mode = ArrayMode::selectors;
+            continue;
+        }
+        Fail("runtime phase directory contains an unknown directive: " + line);
+    }
+    if (array_mode != ArrayMode::none) {
+        Fail("runtime phase directory has an unterminated selectors array: " + phase_toml_path.generic_string());
+    }
+    return current;
+}
+
+std::vector<FreestandingKernelRuntimePhaseDescriptor> LoadRuntimePhaseDescriptorsImpl(
+    const std::filesystem::path& source_root,
+    std::optional<int> requested_shard) {
+    const std::filesystem::path runtime_root = ResolveFreestandingKernelGoldenPath(source_root,
+                                                                                   kKernelRuntimeRootRelativePath);
+    std::vector<FreestandingKernelRuntimePhaseDescriptor> phase_checks;
+    if (!std::filesystem::exists(runtime_root)) {
+        return phase_checks;
+    }
+
+    for (const auto& phase_dir : CollectPhaseDirectories(runtime_root)) {
+        const std::filesystem::path phase_toml_path = phase_dir / "phase.toml";
+        if (!std::filesystem::exists(phase_toml_path)) {
+            continue;
+        }
+
+        auto current = ParseRuntimePhaseDescriptor(phase_dir, phase_toml_path);
+        if (requested_shard.has_value() && current.shard != *requested_shard) {
+            continue;
+        }
+        if (current.run_contract.empty()) {
+            current.run_contract = current.expected_run_lines_file.empty()
+                                       ? std::string(kFreestandingKernelRunContractSuccessExitV1)
+                                       : std::string(kFreestandingKernelRunContractStdoutContainsV1);
+        }
+        current.RefreshViews();
+        ValidateFreestandingKernelRuntimePhaseDescriptor(current,
+                                                        phase_toml_path,
+                                                        requested_shard.value_or(current.shard));
+        phase_checks.push_back(std::move(current));
+    }
+
+    return phase_checks;
+}
+
+std::vector<std::string> BuildProjectCommandArgs(const std::filesystem::path& mc_path,
+                                                 std::string_view subcommand,
+                                                 const std::filesystem::path& project_path,
+                                                 const std::filesystem::path& build_dir,
+                                                 std::string_view target_name,
+                                                 std::optional<std::filesystem::path> sample_path) {
+    std::vector<std::string> args{
+        mc_path.generic_string(),
+        std::string(subcommand),
+        "--project",
+        project_path.generic_string(),
+    };
+    if (!target_name.empty()) {
+        args.push_back("--target");
+        args.push_back(std::string(target_name));
+    }
+    args.push_back("--build-dir");
+    args.push_back(build_dir.generic_string());
+    if (sample_path.has_value()) {
+        args.push_back("--");
+        args.push_back(sample_path->generic_string());
+    }
+    return args;
+}
+
+std::string RunProjectCommandAndCheck(const std::filesystem::path& output_path,
+                                      const std::vector<std::string>& args,
+                                      const std::string& context,
+                                      ProjectCommandExpectation expectation,
+                                      ProjectCommandOutputMode output_mode) {
+    const auto [outcome, output] = RunCommandCapture(args, output_path, context);
+    switch (expectation) {
+    case ProjectCommandExpectation::success:
+        if (!outcome.exited || outcome.exit_code != 0) {
+            Fail(context + " should pass:\n" + output);
+        }
+        break;
+    case ProjectCommandExpectation::failure:
+        if (!outcome.exited || outcome.exit_code == 0) {
+            Fail(context + " should fail:\n" + output);
+        }
+        break;
+    }
+
+    switch (output_mode) {
+    case ProjectCommandOutputMode::discard:
+        return {};
+    case ProjectCommandOutputMode::capture:
+        return output;
+    }
 }
 
 void ValidateFreestandingKernelRuntimePhaseDescriptor(const FreestandingKernelRuntimePhaseDescriptor& phase_check,
@@ -125,48 +423,47 @@ void ValidateFreestandingKernelRuntimePhaseDescriptor(const FreestandingKernelRu
         phase_check.mir_selector_storage.empty()) {
         Fail("runtime phase directory missing or invalid required fields: " + phase_toml_path.generic_string());
     }
-    if (phase_check.run_contract == kFreestandingKernelRunContractStdoutContainsV1) {
+    switch (ParseRunContractKind(phase_check.run_contract,
+                                 "runtime phase directory has an unsupported run contract: ")) {
+    case RunContractKind::stdout_contains_v1:
         if (phase_check.expected_run_lines_file.empty()) {
             Fail("runtime phase directory missing stdout run golden for run contract: " +
                  phase_toml_path.generic_string());
         }
         return;
-    }
-    if (phase_check.run_contract == kFreestandingKernelRunContractSuccessExitV1) {
+    case RunContractKind::success_exit_v1:
         return;
     }
-    Fail("runtime phase directory has an unsupported run contract: " + phase_toml_path.generic_string());
 }
 
 void ExpectFreestandingKernelRunContract(std::string_view run_output,
                                          const FreestandingKernelPhaseCheck& phase_check,
                                          const std::filesystem::path& source_root,
                                          const std::string& context) {
-    if (phase_check.run_contract == kFreestandingKernelRunContractSuccessExitV1) {
+    switch (ParseRunContractKind(phase_check.run_contract, context + " unsupported run contract: ")) {
+    case RunContractKind::success_exit_v1:
         return;
-    }
-    if (phase_check.run_contract == kFreestandingKernelRunContractStdoutContainsV1) {
+    case RunContractKind::stdout_contains_v1:
         ExpectTextContainsLinesFile(run_output,
                                     ResolveFreestandingKernelGoldenPath(source_root,
                                                                         phase_check.expected_run_lines_file),
                                     context);
         return;
     }
-    Fail(context + " unsupported run contract: " + std::string(phase_check.run_contract));
 }
 
 void ExpectFreestandingKernelMirContract(std::string_view mir_text,
                                          const FreestandingKernelPhaseCheck& phase_check,
                                          const std::filesystem::path& expected_contract_path,
                                          const std::string& context) {
-    if (phase_check.mir_contract == kFreestandingKernelMirContractFirstMatchProjectionV1) {
+    switch (ParseMirContractKind(phase_check.mir_contract, context + " unsupported MIR contract: ")) {
+    case MirContractKind::first_match_projection_v1:
         ExpectMirFirstMatchProjectionFileSpan(mir_text,
                                               phase_check.mir_selectors,
                                               expected_contract_path,
                                               context);
         return;
     }
-    Fail(context + " unsupported MIR contract: " + std::string(phase_check.mir_contract));
 }
 
 void ValidateFreestandingKernelTextAuditDescriptor(const FreestandingKernelTextAuditDescriptor& descriptor,
@@ -182,28 +479,27 @@ void ValidateFreestandingKernelArtifactAuditDescriptor(const FreestandingKernelA
     if (descriptor.label.empty() || descriptor.kind.empty()) {
         Fail("kernel artifact audit descriptor missing required fields: " + descriptor_path.generic_string());
     }
-    if (descriptor.kind == "standalone_manual_relink") {
+    switch (ParseArtifactAuditKind(descriptor.kind,
+                                   "unknown kernel artifact audit kind in descriptor: ")) {
+    case ArtifactAuditKind::standalone_manual_relink:
         if (descriptor.project_name.empty() || descriptor.main_source_file.empty() ||
             descriptor.driver_support_source_file.empty() || descriptor.manual_support_source_file.empty() ||
             descriptor.expected_exit_code < 0) {
             Fail("standalone manual relink descriptor missing required fields: " + descriptor_path.generic_string());
         }
         return;
-    }
-    if (descriptor.kind == "kernel_manual_relink") {
+    case ArtifactAuditKind::kernel_manual_relink:
         if (descriptor.output_stem.empty() || descriptor.build_context.empty() || descriptor.run_context.empty() ||
             descriptor.expected_run_lines_file.empty()) {
             Fail("kernel manual relink descriptor missing required fields: " + descriptor_path.generic_string());
         }
         return;
-    }
-    if (descriptor.kind == "file_contains") {
+    case ArtifactAuditKind::file_contains:
         if (descriptor.source_file.empty() || descriptor.expected_run_lines_file.empty()) {
             Fail("file contains descriptor missing required fields: " + descriptor_path.generic_string());
         }
         return;
     }
-    Fail("unknown kernel artifact audit kind in descriptor: " + descriptor_path.generic_string());
 }
 
 std::vector<std::filesystem::path> CollectDescriptorDirectories(const std::filesystem::path& root) {
@@ -219,8 +515,6 @@ std::vector<std::filesystem::path> CollectDescriptorDirectories(const std::files
     std::sort(descriptor_dirs.begin(), descriptor_dirs.end());
     return descriptor_dirs;
 }
-
-}  // namespace
 
 void FreestandingKernelRuntimePhaseDescriptor::RefreshViews() {
     required_object_files.clear();
@@ -280,251 +574,12 @@ std::filesystem::path ResolveFreestandingKernelGoldenPath(const std::filesystem:
 std::vector<FreestandingKernelRuntimePhaseDescriptor> LoadFreestandingKernelRuntimePhaseDescriptors(
     const std::filesystem::path& source_root,
     int shard) {
-    const std::filesystem::path runtime_root = ResolveFreestandingKernelGoldenPath(source_root,
-                                                                                   kKernelRuntimeRootRelativePath);
-    std::vector<FreestandingKernelRuntimePhaseDescriptor> phase_checks;
-    if (!std::filesystem::exists(runtime_root)) {
-        return phase_checks;
-    }
-
-    std::vector<std::filesystem::path> phase_dirs;
-    for (const auto& entry : std::filesystem::directory_iterator(runtime_root)) {
-        if (entry.is_directory()) {
-            phase_dirs.push_back(entry.path());
-        }
-    }
-    std::sort(phase_dirs.begin(), phase_dirs.end());
-
-    enum class ArrayMode {
-        none,
-        selectors,
-    };
-
-    for (const auto& phase_dir : phase_dirs) {
-        const std::filesystem::path phase_toml_path = phase_dir / "phase.toml";
-        if (!std::filesystem::exists(phase_toml_path)) {
-            continue;
-        }
-
-        FreestandingKernelRuntimePhaseDescriptor current;
-        ArrayMode array_mode = ArrayMode::none;
-        std::istringstream stream(ReadFile(phase_toml_path));
-        std::string raw_line;
-        while (std::getline(stream, raw_line)) {
-            const std::string line = TrimCopy(raw_line);
-            if (line.empty() || line.starts_with('#')) {
-                continue;
-            }
-            if (array_mode == ArrayMode::selectors) {
-                if (line == "]") {
-                    array_mode = ArrayMode::none;
-                    continue;
-                }
-                current.mir_selector_storage.push_back(*ParseArrayEntry(line));
-                continue;
-            }
-            if (const auto value = ParseQuotedSetting(line, "label")) {
-                current.label = *value;
-                continue;
-            }
-            if (const auto value = ParseIntSetting(line, "phase")) {
-                current.phase = *value;
-                continue;
-            }
-            if (const auto value = ParseIntSetting(line, "shard")) {
-                current.shard = *value;
-                continue;
-            }
-            if (const auto value = ParseQuotedSetting(line, "project")) {
-                current.project = *value;
-                continue;
-            }
-            if (const auto value = ParseQuotedSetting(line, "target")) {
-                current.target = *value;
-                continue;
-            }
-            if (const auto value = ParseQuotedSetting(line, "output_stem")) {
-                current.output_stem = *value;
-                continue;
-            }
-            if (const auto value = ParseQuotedSetting(line, "build_context")) {
-                current.build_context = *value;
-                continue;
-            }
-            if (const auto value = ParseQuotedSetting(line, "run_context")) {
-                current.run_context = *value;
-                continue;
-            }
-            if (const auto value = ParseQuotedSetting(line, "run_contract")) {
-                current.run_contract = *value;
-                continue;
-            }
-            if (const auto value = ParseQuotedSetting(line, "run_golden")) {
-                current.expected_run_lines_file = (std::filesystem::path(kKernelRuntimeRootRelativePath) /
-                                                   phase_dir.filename() / *value)
-                                                      .generic_string();
-                continue;
-            }
-            if (const auto value = ParseQuotedSetting(line, "mir_golden")) {
-                current.expected_mir_contract_file = (std::filesystem::path(kKernelRuntimeRootRelativePath) /
-                                                      phase_dir.filename() / *value)
-                                                         .generic_string();
-                continue;
-            }
-            if (const auto value = ParseQuotedSetting(line, "mir_contract")) {
-                current.mir_contract = *value;
-                continue;
-            }
-            if (line.starts_with("required_objects = [")) {
-                current.required_object_file_storage = ParseInlineQuotedArray(line, "required_objects");
-                continue;
-            }
-            if (line == "selectors = [") {
-                array_mode = ArrayMode::selectors;
-                continue;
-            }
-            Fail("runtime phase directory contains an unknown directive: " + line);
-        }
-        if (array_mode != ArrayMode::none) {
-            Fail("runtime phase directory has an unterminated selectors array: " + phase_toml_path.generic_string());
-        }
-        if (current.shard != shard) {
-            continue;
-        }
-        if (current.run_contract.empty()) {
-            current.run_contract = current.expected_run_lines_file.empty()
-                                       ? std::string(kFreestandingKernelRunContractSuccessExitV1)
-                                       : std::string(kFreestandingKernelRunContractStdoutContainsV1);
-        }
-        current.RefreshViews();
-        ValidateFreestandingKernelRuntimePhaseDescriptor(current, phase_toml_path, shard);
-        phase_checks.push_back(std::move(current));
-    }
-
-    return phase_checks;
+    return LoadRuntimePhaseDescriptorsImpl(source_root, shard);
 }
 
 std::vector<FreestandingKernelRuntimePhaseDescriptor> LoadAllFreestandingKernelRuntimePhaseDescriptors(
     const std::filesystem::path& source_root) {
-    const std::filesystem::path runtime_root = ResolveFreestandingKernelGoldenPath(source_root,
-                                                                                   kKernelRuntimeRootRelativePath);
-    std::vector<FreestandingKernelRuntimePhaseDescriptor> phase_checks;
-    if (!std::filesystem::exists(runtime_root)) {
-        return phase_checks;
-    }
-
-    std::vector<std::filesystem::path> phase_dirs;
-    for (const auto& entry : std::filesystem::directory_iterator(runtime_root)) {
-        if (entry.is_directory()) {
-            phase_dirs.push_back(entry.path());
-        }
-    }
-    std::sort(phase_dirs.begin(), phase_dirs.end());
-
-    enum class ArrayMode {
-        none,
-        selectors,
-    };
-
-    for (const auto& phase_dir : phase_dirs) {
-        const std::filesystem::path phase_toml_path = phase_dir / "phase.toml";
-        if (!std::filesystem::exists(phase_toml_path)) {
-            continue;
-        }
-
-        FreestandingKernelRuntimePhaseDescriptor current;
-        ArrayMode array_mode = ArrayMode::none;
-        std::istringstream stream(ReadFile(phase_toml_path));
-        std::string raw_line;
-        while (std::getline(stream, raw_line)) {
-            const std::string line = TrimCopy(raw_line);
-            if (line.empty() || line.starts_with('#')) {
-                continue;
-            }
-            if (array_mode == ArrayMode::selectors) {
-                if (line == "]") {
-                    array_mode = ArrayMode::none;
-                    continue;
-                }
-                current.mir_selector_storage.push_back(*ParseArrayEntry(line));
-                continue;
-            }
-            if (const auto value = ParseQuotedSetting(line, "label")) {
-                current.label = *value;
-                continue;
-            }
-            if (const auto value = ParseIntSetting(line, "phase")) {
-                current.phase = *value;
-                continue;
-            }
-            if (const auto value = ParseIntSetting(line, "shard")) {
-                current.shard = *value;
-                continue;
-            }
-            if (const auto value = ParseQuotedSetting(line, "project")) {
-                current.project = *value;
-                continue;
-            }
-            if (const auto value = ParseQuotedSetting(line, "target")) {
-                current.target = *value;
-                continue;
-            }
-            if (const auto value = ParseQuotedSetting(line, "output_stem")) {
-                current.output_stem = *value;
-                continue;
-            }
-            if (const auto value = ParseQuotedSetting(line, "build_context")) {
-                current.build_context = *value;
-                continue;
-            }
-            if (const auto value = ParseQuotedSetting(line, "run_context")) {
-                current.run_context = *value;
-                continue;
-            }
-            if (const auto value = ParseQuotedSetting(line, "run_contract")) {
-                current.run_contract = *value;
-                continue;
-            }
-            if (const auto value = ParseQuotedSetting(line, "run_golden")) {
-                current.expected_run_lines_file = (std::filesystem::path(kKernelRuntimeRootRelativePath) /
-                                                   phase_dir.filename() / *value)
-                                                      .generic_string();
-                continue;
-            }
-            if (const auto value = ParseQuotedSetting(line, "mir_golden")) {
-                current.expected_mir_contract_file = (std::filesystem::path(kKernelRuntimeRootRelativePath) /
-                                                      phase_dir.filename() / *value)
-                                                         .generic_string();
-                continue;
-            }
-            if (const auto value = ParseQuotedSetting(line, "mir_contract")) {
-                current.mir_contract = *value;
-                continue;
-            }
-            if (line.starts_with("required_objects = [")) {
-                current.required_object_file_storage = ParseInlineQuotedArray(line, "required_objects");
-                continue;
-            }
-            if (line == "selectors = [") {
-                array_mode = ArrayMode::selectors;
-                continue;
-            }
-            Fail("runtime phase directory contains an unknown directive: " + line);
-        }
-        if (array_mode != ArrayMode::none) {
-            Fail("runtime phase directory has an unterminated selectors array: " + phase_toml_path.generic_string());
-        }
-        if (current.run_contract.empty()) {
-            current.run_contract = current.expected_run_lines_file.empty()
-                                       ? std::string(kFreestandingKernelRunContractSuccessExitV1)
-                                       : std::string(kFreestandingKernelRunContractStdoutContainsV1);
-        }
-        current.RefreshViews();
-        ValidateFreestandingKernelRuntimePhaseDescriptor(current, phase_toml_path, current.shard);
-        phase_checks.push_back(std::move(current));
-    }
-
-    return phase_checks;
+    return LoadRuntimePhaseDescriptorsImpl(source_root, std::nullopt);
 }
 
 std::vector<FreestandingKernelTextAuditDescriptor> LoadFreestandingKernelTextAuditDescriptors(
@@ -996,18 +1051,16 @@ std::string RunProjectTestAndExpectSuccess(const std::filesystem::path& mc_path,
                                            const std::filesystem::path& build_dir,
                                            std::string_view output_name,
                                            const std::string& context) {
-    const auto [outcome, output] = RunCommandCapture({mc_path.generic_string(),
-                                                      "test",
-                                                      "--project",
-                                                      project_path.generic_string(),
-                                                      "--build-dir",
-                                                      build_dir.generic_string()},
-                                                     build_dir / std::string(output_name),
-                                                     context);
-    if (!outcome.exited || outcome.exit_code != 0) {
-        Fail(context + " should pass:\n" + output);
-    }
-    return output;
+    return RunProjectCommandAndCheck(build_dir / std::string(output_name),
+                                     BuildProjectCommandArgs(mc_path,
+                                                             "test",
+                                                             project_path,
+                                                             build_dir,
+                                                             {},
+                                                             std::nullopt),
+                                     context,
+                                     ProjectCommandExpectation::success,
+                                     ProjectCommandOutputMode::capture);
 }
 
 void BuildProjectTargetAndExpectSuccess(const std::filesystem::path& mc_path,
@@ -1016,53 +1069,34 @@ void BuildProjectTargetAndExpectSuccess(const std::filesystem::path& mc_path,
                                         std::string_view target_name,
                                         std::string_view output_name,
                                         const std::string& context) {
-    std::vector<std::string> args {
-        mc_path.generic_string(),
-        "build",
-        "--project",
-        project_path.generic_string(),
-    };
-    if (!target_name.empty()) {
-        args.push_back("--target");
-        args.push_back(std::string(target_name));
-    }
-    args.push_back("--build-dir");
-    args.push_back(build_dir.generic_string());
-
-    const auto [outcome, output] = RunCommandCapture(args,
-                                                     build_dir / std::string(output_name),
-                                                     context);
-    if (!outcome.exited || outcome.exit_code != 0) {
-        Fail(context + " should pass:\n" + output);
-    }
+    RunProjectCommandAndCheck(build_dir / std::string(output_name),
+                              BuildProjectCommandArgs(mc_path,
+                                                      "build",
+                                                      project_path,
+                                                      build_dir,
+                                                      target_name,
+                                                      std::nullopt),
+                              context,
+                              ProjectCommandExpectation::success,
+                              ProjectCommandOutputMode::discard);
 }
 
 std::string BuildProjectTargetAndCapture(const std::filesystem::path& mc_path,
-                                        const std::filesystem::path& project_path,
-                                        const std::filesystem::path& build_dir,
-                                        std::string_view target_name,
-                                        std::string_view output_name,
-                                        const std::string& context) {
-    std::vector<std::string> args {
-        mc_path.generic_string(),
-        "build",
-        "--project",
-        project_path.generic_string(),
-    };
-    if (!target_name.empty()) {
-        args.push_back("--target");
-        args.push_back(std::string(target_name));
-    }
-    args.push_back("--build-dir");
-    args.push_back(build_dir.generic_string());
-
-    const auto [outcome, output] = RunCommandCapture(args,
-                                                     build_dir / std::string(output_name),
-                                                     context);
-    if (!outcome.exited || outcome.exit_code != 0) {
-        Fail(context + " should pass:\n" + output);
-    }
-    return output;
+                                         const std::filesystem::path& project_path,
+                                         const std::filesystem::path& build_dir,
+                                         std::string_view target_name,
+                                         std::string_view output_name,
+                                         const std::string& context) {
+    return RunProjectCommandAndCheck(build_dir / std::string(output_name),
+                                     BuildProjectCommandArgs(mc_path,
+                                                             "build",
+                                                             project_path,
+                                                             build_dir,
+                                                             target_name,
+                                                             std::nullopt),
+                                     context,
+                                     ProjectCommandExpectation::success,
+                                     ProjectCommandOutputMode::capture);
 }
 
 std::string BuildProjectTargetAndExpectFailure(const std::filesystem::path& mc_path,
@@ -1071,26 +1105,16 @@ std::string BuildProjectTargetAndExpectFailure(const std::filesystem::path& mc_p
                                                std::string_view target_name,
                                                std::string_view output_name,
                                                const std::string& context) {
-    std::vector<std::string> args {
-        mc_path.generic_string(),
-        "build",
-        "--project",
-        project_path.generic_string(),
-    };
-    if (!target_name.empty()) {
-        args.push_back("--target");
-        args.push_back(std::string(target_name));
-    }
-    args.push_back("--build-dir");
-    args.push_back(build_dir.generic_string());
-
-    const auto [outcome, output] = RunCommandCapture(args,
-                                                     build_dir / std::string(output_name),
-                                                     context);
-    if (!outcome.exited || outcome.exit_code == 0) {
-        Fail(context + " should fail:\n" + output);
-    }
-    return output;
+    return RunProjectCommandAndCheck(build_dir / std::string(output_name),
+                                     BuildProjectCommandArgs(mc_path,
+                                                             "build",
+                                                             project_path,
+                                                             build_dir,
+                                                             target_name,
+                                                             std::nullopt),
+                                     context,
+                                     ProjectCommandExpectation::failure,
+                                     ProjectCommandOutputMode::capture);
 }
 
 std::string CheckProjectTargetAndExpectFailure(const std::filesystem::path& mc_path,
@@ -1099,50 +1123,40 @@ std::string CheckProjectTargetAndExpectFailure(const std::filesystem::path& mc_p
                                                std::string_view target_name,
                                                std::string_view output_name,
                                                const std::string& context) {
-    std::vector<std::string> args {
-        mc_path.generic_string(),
-        "check",
-        "--project",
-        project_path.generic_string(),
-    };
-    if (!target_name.empty()) {
-        args.push_back("--target");
-        args.push_back(std::string(target_name));
-    }
-    args.push_back("--build-dir");
-    args.push_back(build_dir.generic_string());
-
-    const auto [outcome, output] = RunCommandCapture(args,
-                                                     build_dir / std::string(output_name),
-                                                     context);
-    if (!outcome.exited || outcome.exit_code == 0) {
-        Fail(context + " should fail:\n" + output);
-    }
-    return output;
+    return RunProjectCommandAndCheck(build_dir / std::string(output_name),
+                                     BuildProjectCommandArgs(mc_path,
+                                                             "check",
+                                                             project_path,
+                                                             build_dir,
+                                                             target_name,
+                                                             std::nullopt),
+                                     context,
+                                     ProjectCommandExpectation::failure,
+                                     ProjectCommandOutputMode::capture);
 }
 
-    void ExpectExitCodeAtLeast(const mc::test_support::CommandOutcome& outcome,
-                              int minimum_exit_code,
-                              std::string_view output,
-                              const std::string& context) {
-        if (!outcome.exited) {
-            std::string message = context + ": process did not exit";
-            if (!output.empty()) {
-                message += "\n";
-                message += output;
-            }
-            Fail(message);
+void ExpectExitCodeAtLeast(const mc::test_support::CommandOutcome& outcome,
+                          int minimum_exit_code,
+                          std::string_view output,
+                          const std::string& context) {
+    if (!outcome.exited) {
+        std::string message = context + ": process did not exit";
+        if (!output.empty()) {
+            message += "\n";
+            message += output;
         }
-        if (outcome.exit_code < minimum_exit_code) {
-            std::string message = context + ": expected exit code >= " + std::to_string(minimum_exit_code) +
-                                  ", got " + std::to_string(outcome.exit_code);
-            if (!output.empty()) {
-                message += "\n";
-                message += output;
-            }
-            Fail(message);
-        }
+        Fail(message);
     }
+    if (outcome.exit_code < minimum_exit_code) {
+        std::string message = context + ": expected exit code >= " + std::to_string(minimum_exit_code) +
+                              ", got " + std::to_string(outcome.exit_code);
+        if (!output.empty()) {
+            message += "\n";
+            message += output;
+        }
+        Fail(message);
+    }
+}
 
 std::string CheckProjectTargetAndExpectSuccess(const std::filesystem::path& mc_path,
                                                const std::filesystem::path& project_path,
@@ -1150,26 +1164,16 @@ std::string CheckProjectTargetAndExpectSuccess(const std::filesystem::path& mc_p
                                                std::string_view target_name,
                                                std::string_view output_name,
                                                const std::string& context) {
-    std::vector<std::string> args {
-        mc_path.generic_string(),
-        "check",
-        "--project",
-        project_path.generic_string(),
-    };
-    if (!target_name.empty()) {
-        args.push_back("--target");
-        args.push_back(std::string(target_name));
-    }
-    args.push_back("--build-dir");
-    args.push_back(build_dir.generic_string());
-
-    const auto [outcome, output] = RunCommandCapture(args,
-                                                     build_dir / std::string(output_name),
-                                                     context);
-    if (!outcome.exited || outcome.exit_code != 0) {
-        Fail(context + " should pass:\n" + output);
-    }
-    return output;
+    return RunProjectCommandAndCheck(build_dir / std::string(output_name),
+                                     BuildProjectCommandArgs(mc_path,
+                                                             "check",
+                                                             project_path,
+                                                             build_dir,
+                                                             target_name,
+                                                             std::nullopt),
+                                     context,
+                                     ProjectCommandExpectation::success,
+                                     ProjectCommandOutputMode::capture);
 }
 
 std::string RunProjectTargetAndExpectSuccess(const std::filesystem::path& mc_path,
@@ -1179,28 +1183,16 @@ std::string RunProjectTargetAndExpectSuccess(const std::filesystem::path& mc_pat
                                              const std::filesystem::path& sample_path,
                                              std::string_view output_name,
                                              const std::string& context) {
-    std::vector<std::string> args {
-        mc_path.generic_string(),
-        "run",
-        "--project",
-        project_path.generic_string(),
-    };
-    if (!target_name.empty()) {
-        args.push_back("--target");
-        args.push_back(std::string(target_name));
-    }
-    args.push_back("--build-dir");
-    args.push_back(build_dir.generic_string());
-    args.push_back("--");
-    args.push_back(sample_path.generic_string());
-
-    const auto [outcome, output] = RunCommandCapture(args,
-                                                     build_dir / std::string(output_name),
-                                                     context);
-    if (!outcome.exited || outcome.exit_code != 0) {
-        Fail(context + " should pass:\n" + output);
-    }
-    return output;
+    return RunProjectCommandAndCheck(build_dir / std::string(output_name),
+                                     BuildProjectCommandArgs(mc_path,
+                                                             "run",
+                                                             project_path,
+                                                             build_dir,
+                                                             target_name,
+                                                             sample_path),
+                                     context,
+                                     ProjectCommandExpectation::success,
+                                     ProjectCommandOutputMode::capture);
 }
 
 std::string RunProjectTargetAndExpectFailure(const std::filesystem::path& mc_path,
@@ -1209,26 +1201,16 @@ std::string RunProjectTargetAndExpectFailure(const std::filesystem::path& mc_pat
                                              std::string_view target_name,
                                              std::string_view output_name,
                                              const std::string& context) {
-    std::vector<std::string> args {
-        mc_path.generic_string(),
-        "run",
-        "--project",
-        project_path.generic_string(),
-    };
-    if (!target_name.empty()) {
-        args.push_back("--target");
-        args.push_back(std::string(target_name));
-    }
-    args.push_back("--build-dir");
-    args.push_back(build_dir.generic_string());
-
-    const auto [outcome, output] = RunCommandCapture(args,
-                                                     build_dir / std::string(output_name),
-                                                     context);
-    if (!outcome.exited || outcome.exit_code == 0) {
-        Fail(context + " should fail:\n" + output);
-    }
-    return output;
+    return RunProjectCommandAndCheck(build_dir / std::string(output_name),
+                                     BuildProjectCommandArgs(mc_path,
+                                                             "run",
+                                                             project_path,
+                                                             build_dir,
+                                                             target_name,
+                                                             std::nullopt),
+                                     context,
+                                     ProjectCommandExpectation::failure,
+                                     ProjectCommandOutputMode::capture);
 }
 
 std::string RunProjectTestTargetAndExpectSuccess(const std::filesystem::path& mc_path,
@@ -1237,26 +1219,16 @@ std::string RunProjectTestTargetAndExpectSuccess(const std::filesystem::path& mc
                                                  std::string_view target_name,
                                                  std::string_view output_name,
                                                  const std::string& context) {
-    std::vector<std::string> args {
-        mc_path.generic_string(),
-        "test",
-        "--project",
-        project_path.generic_string(),
-    };
-    if (!target_name.empty()) {
-        args.push_back("--target");
-        args.push_back(std::string(target_name));
-    }
-    args.push_back("--build-dir");
-    args.push_back(build_dir.generic_string());
-
-    const auto [outcome, output] = RunCommandCapture(args,
-                                                     build_dir / std::string(output_name),
-                                                     context);
-    if (!outcome.exited || outcome.exit_code != 0) {
-        Fail(context + " should pass:\n" + output);
-    }
-    return output;
+    return RunProjectCommandAndCheck(build_dir / std::string(output_name),
+                                     BuildProjectCommandArgs(mc_path,
+                                                             "test",
+                                                             project_path,
+                                                             build_dir,
+                                                             target_name,
+                                                             std::nullopt),
+                                     context,
+                                     ProjectCommandExpectation::success,
+                                     ProjectCommandOutputMode::capture);
 }
 
 void ExpectMirFirstMatchProjection(std::string_view mir_text,

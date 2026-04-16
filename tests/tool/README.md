@@ -29,19 +29,12 @@ Current structure
 - `tool_real_project_suite.cpp`: thin grouped real-project dispatch owner.
 - `tool_real_project_suite_internal.h`: exported declarations for grouped
   real-project case functions.
-- `tool_real_project_simple_tools_suite.cpp`: simple-tools real-project
-  coverage.
-- `tool_real_project_process_suite.cpp`: shared process and relay
-  real-project coverage.
-- `tool_real_project_review_board_suite.cpp`: review-board rebuild-state
-  coverage.
-- `tool_real_project_issue_rollup_suite.cpp`: issue-rollup and grouped-package
-  rebuild-state coverage.
 - `real_projects/<case-name>/case.toml`: checked-in real-project descriptors
   used by CMake registration, grouped-runner dispatch, and local test
   selection.
-- `real_projects/<case-name>/*.cpp`: optional case-local real-project
-  implementations for self-contained slices such as `evented-echo`.
+- `real_projects/<case-name>/test.cpp`: case-local real-project
+  implementation owner for that descriptor directory when the case has
+  bespoke behavior.
 - `../../docs/arch/c-lang/tools/grouped_tool_test_operator_reference.txt`:
   short operator-facing reference for grouped tool and real-project test
   maintenance.
@@ -51,8 +44,9 @@ Current structure
 
 Layout rule
 
-- Keep active suite implementation split by behavior family.
-- Prefer subtrees and focused suite files over growing one monolithic file.
+- Keep real-project implementation ownership directory-local by default.
+- Keep `tool_real_project_suite.cpp` limited to grouped dispatch and case
+  lookup.
 - Keep grouped workflow and real-project case identity descriptor-driven.
 - Keep descriptor semantics unified through `tools/tool_case_manifest.py`.
 - Add a new grouped workflow or real-project case by creating one adjacent

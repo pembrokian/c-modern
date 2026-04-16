@@ -3,7 +3,7 @@ Phase 205 -- Real-Project Case-Local Migration Completion
 
 Status
 ------
-PLANNED
+LANDED
 
 Purpose
 -------
@@ -26,12 +26,9 @@ Repository status note
   case-local `.cpp` files under `tests/tool/real_projects/*/`.
 - The selector now maps case-local paths back to their owning real-project
   CTest through the descriptor directory.
-- Despite that landed path, most real-project behavior still remains in the
-  four shared suite-owner files:
-  - `tests/tool/tool_real_project_simple_tools_suite.cpp`
-  - `tests/tool/tool_real_project_process_suite.cpp`
-  - `tests/tool/tool_real_project_review_board_suite.cpp`
-  - `tests/tool/tool_real_project_issue_rollup_suite.cpp`
+- Phase 205 completes the migration by moving the remaining real-project
+  implementations into adjacent case directories and deleting the four shared
+  suite-owner files that still held case-specific behavior.
 
 Problem being solved
 --------------------
@@ -76,7 +73,7 @@ Concrete migration scope
 Already migrated in Phase 204
 - `evented-echo`
 
-Planned Phase 205 migrations
+Landed Phase 205 migrations
 - from `tests/tool/tool_real_project_simple_tools_suite.cpp`:
   - `grep-lite`
   - `file-walker`
@@ -94,12 +91,16 @@ Planned Phase 205 migrations
   - `issue-rollup-imported-aggregate-const`
   - `module-set-imported-const`
 
-Planned outcome
+Landed outcome
 ---------------
 - every real-project grouped case has a local implementation owner beside its
   adjacent descriptor
-- the shared suite-owner files no longer hold case-specific behavior that can
-  live in the case directory instead
+- the deleted shared suite-owner files no longer own any real-project case
+  behavior:
+  - `tests/tool/tool_real_project_simple_tools_suite.cpp`
+  - `tests/tool/tool_real_project_process_suite.cpp`
+  - `tests/tool/tool_real_project_review_board_suite.cpp`
+  - `tests/tool/tool_real_project_issue_rollup_suite.cpp`
 - the runner target continues to compile real-project cases through
   filesystem-discovered case-local `.cpp` files
 - `tools/select_tests.py` continues to map case-local changes to the narrow
@@ -120,7 +121,7 @@ Case-local path
 
 Shared helper path
 - Keep only helpers that are genuinely reused across multiple cases in shared
-  suite-owner files or shared support surfaces.
+  support surfaces.
 - If a helper becomes case-specific during migration, move it with the case.
 - Do not invent generic abstractions just to avoid a few repeated lines.
 
@@ -153,16 +154,16 @@ Deliverables
 ------------
 - case-local real-project implementation files for each remaining real-project
   case directory under `tests/tool/real_projects/`
-- reduced or removed shared suite-owner files where case-specific behavior has
-  been migrated out
+- removal of the four former shared suite-owner files after their case logic
+  migrated out
 - updated operator-facing docs that describe case-local ownership as the
   normal real-project maintenance path
 - bounded follow-through updates to:
   - `tests/tool/README.md`
   - `docs/arch/c-lang/tools/grouped_tool_test_operator_reference.txt`
-  - `docs/agent/prompts/repo_map.md` if the file layout changes materially
-  - `docs/plan/decision_log.txt` and `docs/plan/backlog.txt` only if a
-    concrete migration blocker or intentional limitation is discovered
+  - `docs/agent/prompts/repo_map.md`
+  - `docs/plan/decision_log.txt`
+  - `docs/plan/backlog.txt`
 
 Validation expectations
 -----------------------
@@ -171,6 +172,14 @@ Validation expectations
 - `tools/select_tests.py` should continue to map a localized case source file
   to the narrow owning real-project CTest target
 - the grouped real-project suite should still pass after the full migration
+
+Validation performed
+--------------------
+- rebuilt `build/debug`, including `mc_tool_real_project_tests`
+- verified `tools/select_tests.py --changed tests/tool/real_projects/issue-rollup/test.cpp`
+  selects `mc_tool_real_project_issue_rollup_unit`
+- reran the full grouped real-project CTest slice:
+  `mc_tool_real_project_.*_unit`
 
 Exit criteria
 -------------

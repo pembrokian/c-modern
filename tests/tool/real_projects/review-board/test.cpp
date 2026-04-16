@@ -390,9 +390,6 @@ void TestRealReviewBoardProject(const std::filesystem::path& source_root,
     const auto review_status_object_time_2 = RequireWriteTime(review_status_object);
     const auto audit_main_object_time_2 = RequireWriteTime(audit_main_object);
     const auto focus_main_object_time_2 = RequireWriteTime(focus_main_object);
-    const auto review_scan_mci_time_2 = RequireWriteTime(review_scan_mci);
-    const auto internal_mci_time_2 = RequireWriteTime(internal_mci);
-    const auto review_status_mci_time_2 = RequireWriteTime(review_status_mci);
     const std::string review_scan_mci_text_2 = ReadFile(review_scan_mci);
     const std::string internal_mci_text_2 = ReadFile(internal_mci);
     const std::string review_status_mci_text_2 = ReadFile(review_status_mci);

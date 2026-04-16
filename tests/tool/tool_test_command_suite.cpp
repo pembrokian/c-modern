@@ -38,37 +38,39 @@ std::pair<CommandOutcome, std::string> RunProjectTestCommand(const std::filesyst
 void TestProjectTestCommandSucceeds(const std::filesystem::path& binary_root,
                                     const std::filesystem::path& mc_path) {
     const std::filesystem::path project_root = binary_root / "test_success_project";
+    const std::filesystem::path tests_root = project_root / "tests";
+    const std::filesystem::path regressions_root = tests_root / "regressions";
     const std::filesystem::path project_path = WriteTestProject(
         project_root,
         "func main() i32 {\n"
         "    return 0\n"
         "}\n");
-    WriteFile(project_root / "tests/alpha_test.mc",
+    WriteFile(tests_root / "alpha_test.mc",
               "func test_alpha_pass() *i32 {\n"
               "    return nil\n"
               "}\n");
-    WriteFile(project_root / "tests/beta_test.mc",
+    WriteFile(tests_root / "beta_test.mc",
               "func test_beta_pass() *i32 {\n"
               "    return nil\n"
               "}\n");
-    WriteFile(project_root / "tests/compiler_manifest.txt",
+    WriteFile(tests_root / "compiler_manifest.txt",
               "check-pass regressions/check_ok.mc\n"
               "check-fail regressions/check_fail.mc regressions/check_fail.errors.txt\n"
               "run-output regressions/run_ok.mc 5 regressions/run_ok.stdout.txt\n"
               "mir regressions/mir_ok.mc regressions/mir_ok.mir.txt\n");
-    WriteFile(project_root / "tests/regressions/check_ok.mc",
+    WriteFile(regressions_root / "check_ok.mc",
               "func helper(value: i32) i32 {\n"
               "    return value\n"
               "}\n");
-    WriteFile(project_root / "tests/regressions/check_fail.mc",
+    WriteFile(regressions_root / "check_fail.mc",
               "import missing\n"
               "\n"
               "func main() i32 {\n"
               "    return 0\n"
               "}\n");
-    WriteFile(project_root / "tests/regressions/check_fail.errors.txt",
+    WriteFile(regressions_root / "check_fail.errors.txt",
               "unable to resolve import module: missing\n");
-    WriteFile(project_root / "tests/regressions/run_ok.mc",
+    WriteFile(regressions_root / "run_ok.mc",
               "import io\n"
               "\n"
               "func main() i32 {\n"
@@ -77,15 +79,15 @@ void TestProjectTestCommandSucceeds(const std::filesystem::path& binary_root,
               "    }\n"
               "    return 5\n"
               "}\n");
-    WriteFile(project_root / "tests/regressions/run_ok.stdout.txt",
+    WriteFile(regressions_root / "run_ok.stdout.txt",
               "phase7 run output\n");
-    WriteFile(project_root / "tests/regressions/mir_ok.mc",
+    WriteFile(regressions_root / "mir_ok.mc",
               "distinct UserId = i32\n"
               "\n"
               "func promote(raw: i32) UserId {\n"
               "    return (UserId)(raw)\n"
               "}\n");
-    WriteFile(project_root / "tests/regressions/mir_ok.mir.txt",
+    WriteFile(regressions_root / "mir_ok.mir.txt",
               "Module\n"
               "  TypeDecl kind=distinct name=UserId\n"
               "    AliasedType=i32\n"
@@ -120,18 +122,19 @@ void TestProjectTestCommandSucceeds(const std::filesystem::path& binary_root,
     ExpectOutputContains(output,
                          "compiler regressions target app: 4 cases, timeout=5000 ms",
                          "compiler regressions should print their scope");
-    ExpectOutputContains(output,
-                         "PASS check-pass " + (project_root / "tests/regressions/check_ok.mc").generic_string(),
-                         "compiler regression check-pass should run");
-    ExpectOutputContains(output,
-                         "PASS check-fail " + (project_root / "tests/regressions/check_fail.mc").generic_string(),
-                         "compiler regression check-fail should run");
-    ExpectOutputContains(output,
-                         "PASS run-output " + (project_root / "tests/regressions/run_ok.mc").generic_string(),
-                         "compiler regression run-output should run");
-    ExpectOutputContains(output,
-                         "PASS mir " + (project_root / "tests/regressions/mir_ok.mc").generic_string(),
-                         "compiler regression MIR fixture should run");
+    const std::vector<std::pair<std::string, std::string>> regression_expectations = {
+        {"PASS check-pass " + (regressions_root / "check_ok.mc").generic_string(),
+         "compiler regression check-pass should run"},
+        {"PASS check-fail " + (regressions_root / "check_fail.mc").generic_string(),
+         "compiler regression check-fail should run"},
+        {"PASS run-output " + (regressions_root / "run_ok.mc").generic_string(),
+         "compiler regression run-output should run"},
+        {"PASS mir " + (regressions_root / "mir_ok.mc").generic_string(),
+         "compiler regression MIR fixture should run"},
+    };
+    for (const auto& [expected_line, contract] : regression_expectations) {
+        ExpectOutputContains(output, expected_line, contract);
+    }
     ExpectOutputContains(output,
                          "PASS compiler regressions for target app (4 cases)",
                          "compiler regressions should print a target-scoped verdict");

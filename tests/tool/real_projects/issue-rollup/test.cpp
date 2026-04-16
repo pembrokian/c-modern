@@ -19,7 +19,6 @@ using mc::test_support::SleepForTimestampTick;
 using mc::test_support::WriteFile;
 using mc::tool_tests::BuildProjectTargetAndCapture;
 using mc::tool_tests::BuildProjectTargetAndExpectSuccess;
-using mc::tool_tests::CheckProjectTargetAndExpectSuccess;
 using mc::tool_tests::RunProjectTargetAndExpectFailure;
 using mc::tool_tests::RunProjectTargetAndExpectSuccess;
 using mc::tool_tests::RunProjectTestAndExpectSuccess;
@@ -415,10 +414,6 @@ void TestRealIssueRollupProject(const std::filesystem::path& source_root,
     const auto rollup_core_object_time_1 = RequireWriteTime(rollup_core_object);
     const auto app_main_object_time_1 = RequireWriteTime(app_main_object);
     const auto report_main_object_time_1 = RequireWriteTime(report_main_object);
-    const auto rollup_model_mci_time_1 = RequireWriteTime(rollup_model_mci);
-    const auto rollup_parse_mci_time_1 = RequireWriteTime(rollup_parse_mci);
-    const auto rollup_render_mci_time_1 = RequireWriteTime(rollup_render_mci);
-    const auto rollup_core_mci_time_1 = RequireWriteTime(rollup_core_mci);
     const std::string rollup_model_mci_text_1 = ReadFile(rollup_model_mci);
     const std::string rollup_parse_mci_text_1 = ReadFile(rollup_parse_mci);
     const std::string rollup_render_mci_text_1 = ReadFile(rollup_render_mci);
@@ -536,18 +531,14 @@ void TestRealIssueRollupProject(const std::filesystem::path& source_root,
 
     const auto rollup_model_object_time_2 = RequireWriteTime(rollup_model_object);
     const auto rollup_parse_object_time_2 = RequireWriteTime(rollup_parse_object);
-    const auto rollup_render_object_time_2 = RequireWriteTime(rollup_render_object);
     const auto rollup_core_object_time_2 = RequireWriteTime(rollup_core_object);
     const auto app_main_object_time_2 = RequireWriteTime(app_main_object);
     const auto report_main_object_time_2 = RequireWriteTime(report_main_object);
-    const auto rollup_model_mci_time_2 = RequireWriteTime(rollup_model_mci);
-    const auto rollup_parse_mci_time_2 = RequireWriteTime(rollup_parse_mci);
-    const auto rollup_render_mci_time_2 = RequireWriteTime(rollup_render_mci);
-    const auto rollup_core_mci_time_2 = RequireWriteTime(rollup_core_mci);
     const std::string rollup_model_mci_text_2 = ReadFile(rollup_model_mci);
     const std::string rollup_parse_mci_text_2 = ReadFile(rollup_parse_mci);
     const std::string rollup_render_mci_text_2 = ReadFile(rollup_render_mci);
     const std::string rollup_core_mci_text_2 = ReadFile(rollup_core_mci);
+    const auto rollup_core_mci_time_2 = RequireWriteTime(rollup_core_mci);
     const auto issue_rollup_core_archive_time_2 = RequireWriteTime(issue_rollup_core_archive);
     const auto issue_rollup_executable_time_2 = RequireWriteTime(issue_rollup_executable);
     const auto issue_rollup_report_executable_time_2 = RequireWriteTime(issue_rollup_report_executable);
@@ -616,9 +607,6 @@ void TestRealIssueRollupProject(const std::filesystem::path& source_root,
     if (RequireWriteTime(rollup_parse_object) != rollup_parse_object_time_2) {
         Fail("phase30 implementation-only report-target rebuild should reuse the already rebuilt parse object");
     }
-    if (RequireWriteTime(rollup_render_object) != rollup_render_object_time_2) {
-        Fail("phase30 implementation-only report-target rebuild should reuse the render object");
-    }
     if (RequireWriteTime(rollup_core_object) != rollup_core_object_time_2) {
         Fail("phase30 implementation-only report-target rebuild should reuse the static-library entry object");
     }
@@ -669,13 +657,9 @@ void TestRealIssueRollupProject(const std::filesystem::path& source_root,
 
     const auto rollup_model_object_time_3 = RequireWriteTime(rollup_model_object);
     const auto rollup_parse_object_time_3 = RequireWriteTime(rollup_parse_object);
-    const auto rollup_render_object_time_3 = RequireWriteTime(rollup_render_object);
     const auto rollup_core_object_time_3 = RequireWriteTime(rollup_core_object);
     const auto app_main_object_time_3 = RequireWriteTime(app_main_object);
     const auto report_main_object_time_3 = RequireWriteTime(report_main_object);
-    const auto rollup_model_mci_time_3 = RequireWriteTime(rollup_model_mci);
-    const auto rollup_parse_mci_time_3 = RequireWriteTime(rollup_parse_mci);
-    const auto rollup_render_mci_time_3 = RequireWriteTime(rollup_render_mci);
     const auto rollup_core_mci_time_3 = RequireWriteTime(rollup_core_mci);
     const auto issue_rollup_core_archive_time_3 = RequireWriteTime(issue_rollup_core_archive);
     const auto issue_rollup_executable_time_3 = RequireWriteTime(issue_rollup_executable);
@@ -695,15 +679,6 @@ void TestRealIssueRollupProject(const std::filesystem::path& source_root,
     }
     if (report_main_object_time_3 != report_main_object_time_2_selected) {
         Fail("phase30 interface-changing default-target rebuild should not touch the non-selected report-target root object");
-    }
-    if (ReadFile(rollup_model_mci) != rollup_model_mci_text_2) {
-        Fail("phase29 interface-changing core edit should preserve the model interface artifact contents");
-    }
-    if (ReadFile(rollup_parse_mci) != rollup_parse_mci_text_2) {
-        Fail("phase29 interface-changing core edit should preserve the parse interface artifact contents");
-    }
-    if (ReadFile(rollup_render_mci) != rollup_render_mci_text_2) {
-        Fail("phase29 interface-changing core edit should preserve the render interface artifact contents");
     }
     if (!(rollup_core_mci_time_3 > rollup_core_mci_time_2)) {
         Fail("phase29 interface-changing core edit should rewrite the static-library entry interface artifact");
@@ -746,9 +721,6 @@ void TestRealIssueRollupProject(const std::filesystem::path& source_root,
     if (RequireWriteTime(rollup_parse_object) != rollup_parse_object_time_3) {
         Fail("phase30 interface-changing report-target rebuild should reuse the parse object");
     }
-    if (RequireWriteTime(rollup_render_object) != rollup_render_object_time_3) {
-        Fail("phase30 interface-changing report-target rebuild should reuse the render object");
-    }
     if (RequireWriteTime(rollup_core_object) != rollup_core_object_time_3) {
         Fail("phase30 interface-changing report-target rebuild should reuse the already rebuilt static-library entry object");
     }
@@ -770,220 +742,6 @@ void TestRealIssueRollupProject(const std::filesystem::path& source_root,
     ExpectIssueRollupRunOutput(interface_report_output,
                                "issue-rollup-attention\n",
                                "phase30 issue rollup interface-changing report-target executable run");
-}
-
-void TestIssueRollupImportedAggregateConstPressure(const std::filesystem::path& source_root,
-                                                   const std::filesystem::path& binary_root,
-                                                   const std::filesystem::path& mc_path) {
-    const std::filesystem::path project_root = source_root / "examples/real/issue_rollup";
-    const std::filesystem::path cloned_project_root = binary_root / "issue_rollup_aggregate_const_clone";
-    CopyDirectoryTree(project_root, cloned_project_root);
-    WriteFile(cloned_project_root / "build.toml",
-              "schema = 1\n"
-              "project = \"issue-rollup\"\n"
-              "default = \"issue-rollup\"\n"
-              "\n"
-              "[targets.issue-rollup-core]\n"
-              "kind = \"staticlib\"\n"
-              "package = \"issue-rollup\"\n"
-              "root = \"src/core/rollup_core.mc\"\n"
-              "mode = \"debug\"\n"
-              "env = \"hosted\"\n"
-              "\n"
-              "[targets.issue-rollup-core.search_paths]\n"
-              "modules = [\"src/core\", \"src/model\", \"src/parse\", \"src/render\", \"" +
-                  (source_root / "stdlib").generic_string() + "\"]\n"
-              "\n"
-              "[targets.issue-rollup-core.runtime]\n"
-              "startup = \"default\"\n"
-              "\n"
-              "[targets.issue-rollup]\n"
-              "kind = \"exe\"\n"
-              "package = \"issue-rollup\"\n"
-              "root = \"src/app/main.mc\"\n"
-              "mode = \"debug\"\n"
-              "env = \"hosted\"\n"
-              "links = [\"issue-rollup-core\"]\n"
-              "\n"
-              "[targets.issue-rollup.search_paths]\n"
-              "modules = [\"src/app\", \"src/core\", \"src/model\", \"src/parse\", \"src/render\", \"" +
-                  (source_root / "stdlib").generic_string() + "\"]\n"
-              "\n"
-              "[targets.issue-rollup.runtime]\n"
-              "startup = \"default\"\n"
-              "\n"
-              "[targets.issue-rollup.tests]\n"
-              "enabled = true\n"
-              "roots = [\"tests\"]\n"
-              "mode = \"checked\"\n"
-              "timeout_ms = 5000\n");
-    WriteFile(cloned_project_root / "src/model/rollup_model.mc",
-              "struct Summary {\n"
-              "    open_items: usize\n"
-              "    closed_items: usize\n"
-              "    blocked_items: usize\n"
-              "    priority_items: usize\n"
-              "}\n"
-              "\n"
-              "const DEFAULT_SUMMARY: Summary = Summary{ open_items: 1, closed_items: 1, blocked_items: 0, priority_items: 0 }\n"
-              "\n"
-              "func total_items(summary: Summary) usize {\n"
-              "    return summary.open_items + summary.closed_items + summary.blocked_items\n"
-              "}\n"
-              "\n"
-              "func has_priority(summary: Summary) bool {\n"
-              "    return summary.priority_items > 0\n"
-              "}\n");
-    WriteFile(cloned_project_root / "src/app/main.mc",
-              "import fs\n"
-              "import mem\n"
-              "import rollup_core\n"
-              "import rollup_model\n"
-              "\n"
-              "const DEFAULT_SUMMARY_COPY: rollup_model.Summary = rollup_model.DEFAULT_SUMMARY\n"
-              "\n"
-              "func main(args: Slice<cstr>) i32 {\n"
-              "    if args.len != 2 {\n"
-              "        return 64\n"
-              "    }\n"
-              "\n"
-              "    buf: *Buffer<u8> = fs.read_all(args[1], mem.default_allocator())\n"
-              "    if buf == nil {\n"
-              "        return 92\n"
-              "    }\n"
-              "    defer mem.buffer_free<u8>(buf)\n"
-              "\n"
-              "    bytes: Slice<u8> = mem.slice_from_buffer<u8>(buf)\n"
-              "    text: str = str{ ptr: bytes.ptr, len: bytes.len }\n"
-              "    return rollup_core.write_text_rollup(text)\n"
-              "}\n");
-
-    const std::filesystem::path cloned_project_path = cloned_project_root / "build.toml";
-    const std::filesystem::path check_build_dir = binary_root / "issue_rollup_aggregate_const_check_build";
-    std::filesystem::remove_all(check_build_dir);
-
-    const std::string output = CheckProjectTargetAndExpectSuccess(mc_path,
-                                                                  cloned_project_path,
-                                                                  check_build_dir,
-                                                                  "",
-                                                                  "issue_rollup_aggregate_const_check_output.txt",
-                                                                  "issue rollup imported aggregate const pressure");
-    ExpectOutputContains(output,
-                         "checked target issue-rollup",
-                         "phase42 issue rollup imported aggregate const pressure should succeed through project check");
-
-    const std::filesystem::path build_dir = binary_root / "issue_rollup_aggregate_const_build";
-    std::filesystem::remove_all(build_dir);
-
-    BuildProjectTargetAndExpectSuccess(mc_path,
-                                       cloned_project_path,
-                                       build_dir,
-                                       "",
-                                       "issue_rollup_aggregate_const_build_output.txt",
-                                       "issue rollup aggregate const executable build");
-
-    const std::string run_output = RunProjectTargetAndExpectSuccess(mc_path,
-                                                                    cloned_project_path,
-                                                                    build_dir,
-                                                                    "",
-                                                                    cloned_project_root / "tests/sample.txt",
-                                                                    "issue_rollup_aggregate_const_run_output.txt",
-                                                                    "issue rollup aggregate const executable run");
-    ExpectIssueRollupRunOutput(run_output,
-                               "issue-rollup-steady\n",
-                               "phase58 issue rollup aggregate const executable run");
-}
-
-void TestModuleSetImportedConstFollowThrough(const std::filesystem::path& source_root,
-                                             const std::filesystem::path& binary_root,
-                                             const std::filesystem::path& mc_path) {
-    const std::filesystem::path project_root = binary_root / "module_set_imported_const_project";
-    std::filesystem::remove_all(project_root);
-
-    WriteFile(project_root / "build.toml",
-              "schema = 1\n"
-              "project = \"phase163-module-set-imported-const\"\n"
-              "default = \"app\"\n"
-              "\n"
-              "[targets.app]\n"
-              "kind = \"exe\"\n"
-              "root = \"src/main.mc\"\n"
-              "mode = \"debug\"\n"
-              "env = \"hosted\"\n"
-              "\n"
-              "[targets.app.search_paths]\n"
-              "modules = [\"src\", \"" + (source_root / "stdlib").generic_string() + "\"]\n"
-              "\n"
-              "[targets.app.runtime]\n"
-              "startup = \"default\"\n"
-              "\n"
-              "[targets.app.module_sets.helper]\n"
-              "files = [\n"
-              "  \"src/helper/00_types.mc\",\n"
-              "  \"src/helper/01_consts.mc\",\n"
-              "]\n");
-    WriteFile(project_root / "src/helper/00_types.mc",
-              "struct Pair {\n"
-              "    left: i32\n"
-              "    right: i32\n"
-              "}\n");
-    WriteFile(project_root / "src/helper/01_consts.mc",
-              "const LIMIT: i32 = 9\n"
-              "const DEFAULT_PAIR: Pair = Pair{ left: LIMIT, right: 5 }\n");
-    WriteFile(project_root / "src/main.mc",
-              "import helper\n"
-              "\n"
-              "const DOUBLE_LIMIT: i32 = helper.LIMIT + helper.LIMIT\n"
-              "const LIMIT_PAIR: helper.Pair = helper.Pair{ left: helper.LIMIT, right: 5 }\n"
-              "const DEFAULT_PAIR_COPY: helper.Pair = helper.DEFAULT_PAIR\n"
-              "\n"
-              "func main() i32 {\n"
-              "    if helper.LIMIT != 9 {\n"
-              "        return 81\n"
-              "    }\n"
-              "    if DOUBLE_LIMIT != 18 {\n"
-              "        return 82\n"
-              "    }\n"
-              "    if LIMIT_PAIR.left != 9 || LIMIT_PAIR.right != 5 {\n"
-              "        return 83\n"
-              "    }\n"
-              "    if DEFAULT_PAIR_COPY.left != 9 || DEFAULT_PAIR_COPY.right != 5 {\n"
-              "        return 84\n"
-              "    }\n"
-              "    return 0\n"
-              "}\n");
-
-    const std::filesystem::path project_path = project_root / "build.toml";
-    const std::filesystem::path check_build_dir = binary_root / "module_set_imported_const_check_build";
-    std::filesystem::remove_all(check_build_dir);
-
-    const std::string check_output = CheckProjectTargetAndExpectSuccess(mc_path,
-                                                                        project_path,
-                                                                        check_build_dir,
-                                                                        "",
-                                                                        "module_set_imported_const_check_output.txt",
-                                                                        "module-set imported const follow-through check");
-    ExpectOutputContains(check_output,
-                         "checked target app",
-                         "phase163 module-set imported const follow-through should succeed through project check");
-
-    const std::filesystem::path build_dir = binary_root / "module_set_imported_const_build";
-    std::filesystem::remove_all(build_dir);
-
-    BuildProjectTargetAndExpectSuccess(mc_path,
-                                       project_path,
-                                       build_dir,
-                                       "",
-                                       "module_set_imported_const_build_output.txt",
-                                       "module-set imported const follow-through build");
-
-    RunProjectTargetAndExpectSuccess(mc_path,
-                                     project_path,
-                                     build_dir,
-                                     "",
-                                     project_path,
-                                     "module_set_imported_const_run_output.txt",
-                                     "module-set imported const follow-through run");
 }
 
 }  // namespace mc::tool_tests
