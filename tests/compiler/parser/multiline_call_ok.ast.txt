@@ -1,0 +1,33 @@
+SourceFile
+  ModuleKind=ordinary
+  FuncDecl name=sum
+    ParamDecl name=left
+      NamedType name=i32
+    ParamDecl name=right
+      NamedType name=i32
+    returns:
+      NamedType name=i32
+    body:
+      BlockStmt
+        statements:
+          ReturnStmt
+            exprs:
+              BinaryExpr text=+
+                left:
+                  NameExpr text=left
+                right:
+                  NameExpr text=right
+  FuncDecl name=main
+    returns:
+      NamedType name=i32
+    body:
+      BlockStmt
+        statements:
+          ReturnStmt
+            exprs:
+              CallExpr
+                left:
+                  NameExpr text=sum
+                args:
+                  LiteralExpr text=1 kind=int_lit
+                  LiteralExpr text=2 kind=int_lit

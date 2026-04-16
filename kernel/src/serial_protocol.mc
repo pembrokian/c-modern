@@ -14,6 +14,7 @@
 //   Q C ! !         — queue count (returns count as reply_payload_len)
 //   Q P ! !         — queue peek
 //   X Q <target> !  — lifecycle query
+//   X S <target> !  — retained summary query
 //   X R <target> !  — explicit restart
 //
 // The CMD_* constants are shared between the encode side (this module) and
@@ -84,6 +85,10 @@ func encode_lifecycle_query(target: u8) [4]u8 {
 
 func encode_lifecycle_identity(target: u8) [4]u8 {
     return ipc.payload_byte(CMD_X, CMD_I, target, CMD_BANG)
+}
+
+func encode_lifecycle_summary(target: u8) [4]u8 {
+    return ipc.payload_byte(CMD_X, CMD_S, target, CMD_BANG)
 }
 
 func encode_lifecycle_restart(target: u8) [4]u8 {

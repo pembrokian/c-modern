@@ -409,10 +409,12 @@ std::unique_ptr<Expr> Parser::ParseTypeCallExpr() {
     expr->type_target = ParseTypeExpr();
     Consume(TokenKind::kRParen, "expected ')' after conversion target type");
     Consume(TokenKind::kLParen, "expected '(' after conversion target type");
+    SkipNewlines();
     if (!Check(TokenKind::kRParen)) {
         do {
             expr->args.push_back(ParseExpr());
-        } while (Match(TokenKind::kComma));
+            SkipNewlines();
+        } while (Match(TokenKind::kComma) && (SkipNewlines(), true));
     }
     Consume(TokenKind::kRParen, "expected ')' after call arguments");
     expr->span.end = Previous().span.end;
@@ -433,10 +435,12 @@ std::unique_ptr<Expr> Parser::ParseBareIntegerConversionExpr() {
 
     Advance();
     Consume(TokenKind::kLParen, "expected '(' after conversion target type");
+    SkipNewlines();
     if (!Check(TokenKind::kRParen)) {
         do {
             expr->args.push_back(ParseExpr());
-        } while (Match(TokenKind::kComma));
+            SkipNewlines();
+        } while (Match(TokenKind::kComma) && (SkipNewlines(), true));
     }
     Consume(TokenKind::kRParen, "expected ')' after call arguments");
     expr->span.end = Previous().span.end;
@@ -595,10 +599,12 @@ std::unique_ptr<Expr> Parser::ParsePostfixExpr() {
             node->kind = Expr::Kind::kCall;
             node->span.begin = expr->span.begin;
             node->left = std::move(expr);
+            SkipNewlines();
             if (!Check(TokenKind::kRParen)) {
                 do {
                     node->args.push_back(ParseExpr());
-                } while (Match(TokenKind::kComma));
+                    SkipNewlines();
+                } while (Match(TokenKind::kComma) && (SkipNewlines(), true));
             }
             Consume(TokenKind::kRParen, "expected ')' after call arguments");
             node->span.end = Previous().span.end;

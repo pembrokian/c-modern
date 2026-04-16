@@ -28,16 +28,52 @@ func bootwith_workset_generation(s: KernelBootState, generation: u32) KernelBoot
     return s with { workset_generation: generation }
 }
 
+func bootwith_audit_generation(s: KernelBootState, generation: u32) KernelBootState {
+    return s with { audit_generation: generation }
+}
+
+func bootwith_log_restart_outcome(s: KernelBootState, outcome: RestartOutcome) KernelBootState {
+    return s with { log_restart_outcome: outcome }
+}
+
+func bootwith_kv_restart_outcome(s: KernelBootState, outcome: RestartOutcome) KernelBootState {
+    return s with { kv_restart_outcome: outcome }
+}
+
+func bootwith_queue_restart_outcome(s: KernelBootState, outcome: RestartOutcome) KernelBootState {
+    return s with { queue_restart_outcome: outcome }
+}
+
+func bootwith_workset_restart_outcome(s: KernelBootState, outcome: RestartOutcome) KernelBootState {
+    return s with { workset_restart_outcome: outcome }
+}
+
+func bootwith_audit_restart_outcome(s: KernelBootState, outcome: RestartOutcome) KernelBootState {
+    return s with { audit_restart_outcome: outcome }
+}
+
 func bootwith_echo(s: KernelBootState, echo: echo_service.EchoServiceState) KernelBootState {
     return s with { echo.state: echo }
+}
+
+func bootwith_echo_restart_outcome(s: KernelBootState, outcome: RestartOutcome) KernelBootState {
+    return s with { echo_restart_outcome: outcome }
 }
 
 func bootwith_transfer(s: KernelBootState, transfer: transfer_service.TransferServiceState) KernelBootState {
     return s with { transfer.state: transfer }
 }
 
+func bootwith_transfer_restart_outcome(s: KernelBootState, outcome: RestartOutcome) KernelBootState {
+    return s with { transfer_restart_outcome: outcome }
+}
+
 func bootwith_ticket(s: KernelBootState, ticket: ticket_service.TicketServiceState) KernelBootState {
     return s with { ticket.state: ticket }
+}
+
+func bootwith_ticket_restart_outcome(s: KernelBootState, outcome: RestartOutcome) KernelBootState {
+    return s with { ticket_restart_outcome: outcome }
 }
 
 func bootwith_grants(s: KernelBootState, grants: transfer_grant.GrantTable) KernelBootState {
@@ -58,6 +94,10 @@ func bootrestart_queue(s: KernelBootState, queue: queue_service.QueueServiceStat
 
 func bootrestart_workset_generation(s: KernelBootState) KernelBootState {
     return s with { workset_generation: s.workset_generation + 1 }
+}
+
+func bootrestart_audit_generation(s: KernelBootState) KernelBootState {
+    return s with { audit_generation: s.audit_generation + 1 }
 }
 
 func bootrestart_echo(s: KernelBootState, echo: echo_service.EchoServiceState) KernelBootState {

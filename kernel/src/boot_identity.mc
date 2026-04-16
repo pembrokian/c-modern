@@ -1,4 +1,5 @@
 import service_identity
+import serial_protocol
 import service_topology
 
 // Named ServiceRef accessors for the four boot-wired services.
@@ -54,8 +55,85 @@ func boot_workset_generation(s: KernelBootState) u32 {
     return s.workset_generation
 }
 
+func boot_audit_generation(s: KernelBootState) u32 {
+    return s.audit_generation
+}
+
 func boot_workset_generation_payload(s: KernelBootState) [4]u8 {
     return service_identity.generation_payload(s.workset_generation)
+}
+
+func summary_participation_code(participation: RetainedSummaryParticipation) u8 {
+    switch participation {
+    case RetainedSummaryParticipation.Service:
+        return 1
+    case RetainedSummaryParticipation.Lane:
+        return 2
+    default:
+        return 0
+    }
+}
+
+func summary_outcome_code(outcome: RestartOutcome) u8 {
+    switch outcome {
+    case RestartOutcome.OrdinaryReplaced:
+        return 1
+    case RestartOutcome.RetainedReloaded:
+        return 2
+    case RestartOutcome.CoordinatedRetainedReloaded:
+        return 3
+    default:
+        return 0
+    }
+}
+
+func summary_payload(participation: RetainedSummaryParticipation, outcome: RestartOutcome, generation: u32) [4]u8 {
+    payload: [4]u8
+    payload[0] = u8((summary_participation_code(participation) << 4) | summary_outcome_code(outcome))
+    payload[1] = u8(generation >> 16)
+    payload[2] = u8(generation >> 8)
+    payload[3] = u8(generation)
+    return payload
+}
+
+func bootrestart_outcome_for_endpoint(s: KernelBootState, endpoint: u32) RestartOutcome {
+    switch endpoint {
+    case service_topology.LOG_ENDPOINT_ID:
+        return s.log_restart_outcome
+    case service_topology.KV_ENDPOINT_ID:
+        return s.kv_restart_outcome
+    case service_topology.QUEUE_ENDPOINT_ID:
+        return s.queue_restart_outcome
+    case service_topology.ECHO_ENDPOINT_ID:
+        return s.echo_restart_outcome
+    case service_topology.TRANSFER_ENDPOINT_ID:
+        return s.transfer_restart_outcome
+    case service_topology.TICKET_ENDPOINT_ID:
+        return s.ticket_restart_outcome
+    default:
+        return RestartOutcome.None
+    }
+}
+
+func bootsummary_payload_for_endpoint(s: KernelBootState, endpoint: u32) [4]u8 {
+    participation: RetainedSummaryParticipation = RetainedSummaryParticipation.None
+    if endpoint == service_topology.LOG_ENDPOINT_ID || endpoint == service_topology.KV_ENDPOINT_ID || endpoint == service_topology.QUEUE_ENDPOINT_ID {
+        participation = RetainedSummaryParticipation.Service
+    }
+    mark: service_identity.ServiceMark = bootmark_for_endpoint(s, endpoint)
+    return summary_payload(participation, bootrestart_outcome_for_endpoint(s, endpoint), service_identity.mark_generation(mark))
+}
+
+func bootsummary_payload_for_target(s: KernelBootState, target: u8) [4]u8 {
+    switch target {
+    case serial_protocol.TARGET_WORKSET:
+        return summary_payload(RetainedSummaryParticipation.Lane, s.workset_restart_outcome, s.workset_generation)
+    case serial_protocol.TARGET_AUDIT:
+        return summary_payload(RetainedSummaryParticipation.Lane, s.audit_restart_outcome, s.audit_generation)
+    default:
+        endpoint: u32 = shell_service.lifecycle_target_endpoint(target)
+        return bootsummary_payload_for_endpoint(s, endpoint)
+    }
 }
 
 func boot_echo_mark(s: KernelBootState) service_identity.ServiceMark {

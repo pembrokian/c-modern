@@ -2258,6 +2258,7 @@ bool EmitAggregateInitInstruction(const mir::Instruction& instruction,
     std::vector<BackendTypeInfo> field_types;
     field_types.reserve(instruction.operands.size());
     const auto builtin_fields = sema::BuiltinAggregateFields(instruction.type);
+    const bool is_array_aggregate = instruction.type.kind == sema::Type::Kind::kArray;
     if (instruction.type.kind == sema::Type::Kind::kNamed || !builtin_fields.empty()) {
         const mir::TypeDecl* type_decl = FindTypeDecl(*state.module, instruction.type.name);
         const auto field_count = type_decl != nullptr ? type_decl->fields.size() : builtin_fields.size();
@@ -2281,6 +2282,41 @@ bool EmitAggregateInitInstruction(const mir::Instruction& instruction,
             }
             field_types.push_back(*lowered_field);
         }
+    } else if (is_array_aggregate) {
+        if (instruction.type.subtypes.empty()) {
+            ReportBackendError(source_path,
+                               "LLVM bootstrap executable emission requires an array element type for aggregate_init in function '" +
+                                   state.function->name + "' block '" + block.label + "'",
+                               diagnostics);
+            return false;
+        }
+        const auto length = mc::support::ParseArrayLength(instruction.type.metadata);
+        if (!length.has_value() || *length != instruction.operands.size()) {
+            ReportBackendError(source_path,
+                               "LLVM bootstrap executable emission requires exact array aggregate_init element count in function '" +
+                                   state.function->name + "' block '" + block.label + "'",
+                               diagnostics);
+            return false;
+        }
+        for (const auto& field_name : instruction.field_names) {
+            if (field_name != "_") {
+                ReportBackendError(source_path,
+                                   "LLVM bootstrap executable emission requires positional array aggregate_init elements in function '" +
+                                       state.function->name + "' block '" + block.label + "'",
+                                   diagnostics);
+                return false;
+            }
+        }
+        const auto element_type = LowerTypeInfo(*state.module, instruction.type.subtypes.front());
+        if (!element_type.has_value()) {
+            ReportBackendError(source_path,
+                               "LLVM bootstrap executable emission could not lower aggregate_init array element type '" +
+                                   sema::FormatType(instruction.type.subtypes.front()) + "' in function '" + state.function->name +
+                                   "' block '" + block.label + "'",
+                               diagnostics);
+            return false;
+        }
+        field_types.assign(instruction.operands.size(), *element_type);
     } else {
         ReportBackendError(source_path,
                            "LLVM bootstrap executable emission only supports named-struct aggregate_init in function '" +
@@ -2709,53 +2745,75 @@ bool EmitCallInstruction(const mir::Instruction& instruction,
         return true;
     }
 
-    const mir::Function* callee = FindFunction(*state.module, instruction.target_name);
-    if (callee == nullptr) {
+    if (instruction.operands.empty()) {
         ReportBackendError(source_path,
-                           "LLVM bootstrap executable emission references unknown direct callee '" +
-                               instruction.target_name + "' in function '" + state.function->name + "' block '" +
-                               block.label + "'",
+                           "LLVM bootstrap executable emission requires a callee operand for call in function '" +
+                               state.function->name + "' block '" + block.label + "'",
                            diagnostics);
         return false;
     }
 
-    const auto function_it = function_symbols.find(callee->name);
-    if (function_it == function_symbols.end()) {
-        ReportBackendError(source_path,
-                           "LLVM bootstrap executable emission has no symbol mapping for direct callee '" +
-                               instruction.target_name + "' in function '" + state.function->name + "' block '" +
-                               block.label + "'",
-                           diagnostics);
+    ExecutableValue callee_value;
+    if (!ResolveExecutableValue(state, instruction.operands.front(), block, source_path, diagnostics, callee_value)) {
         return false;
     }
 
-    const auto callee_params = ParameterLocals(*callee);
-    std::size_t argument_start = 0;
-    if (!instruction.operands.empty()) {
-        ExecutableValue maybe_callee;
-        if (!ResolveExecutableValue(state, instruction.operands.front(), block, source_path, diagnostics, maybe_callee)) {
+    const bool indirect_call = instruction.target_name.empty() || instruction.target_kind != mir::Instruction::TargetKind::kFunction;
+    const mir::Function* callee = nullptr;
+    std::string callee_text;
+    std::size_t argument_start = 1;
+
+    if (indirect_call) {
+        if (!IsProcedureSourceType(callee_value.type.source_name)) {
+            ReportBackendError(source_path,
+                               "LLVM bootstrap executable emission requires procedure-typed callee for indirect call in function '" +
+                                   state.function->name + "' block '" + block.label + "'",
+                               diagnostics);
             return false;
         }
-        if (IsProcedureSourceType(maybe_callee.type.source_name)) {
-            argument_start = 1;
+        callee_text = callee_value.text;
+    } else {
+        callee = FindFunction(*state.module, instruction.target_name);
+        if (callee == nullptr) {
+            ReportBackendError(source_path,
+                               "LLVM bootstrap executable emission references unknown direct callee '" +
+                                   instruction.target_name + "' in function '" + state.function->name + "' block '" +
+                                   block.label + "'",
+                               diagnostics);
+            return false;
         }
+
+        const auto function_it = function_symbols.find(callee->name);
+        if (function_it == function_symbols.end()) {
+            ReportBackendError(source_path,
+                               "LLVM bootstrap executable emission has no symbol mapping for direct callee '" +
+                                   instruction.target_name + "' in function '" + state.function->name + "' block '" +
+                                   block.label + "'",
+                               diagnostics);
+            return false;
+        }
+
+        callee_text = function_it->second;
     }
 
-    const std::size_t argument_count = instruction.operands.size() >= argument_start
-                                           ? instruction.operands.size() - argument_start
-                                           : 0;
-    if (argument_count != callee_params.size()) {
+    const sema::Type callee_type = callee_value.source_type.has_value() ? *callee_value.source_type : sema::UnknownType();
+    const auto parsed_param_count = callee_type.kind == sema::Type::Kind::kProcedure
+                                        ? mc::support::ParseArrayLength(callee_type.metadata)
+                                        : std::optional<std::size_t> {};
+    const std::size_t param_count = parsed_param_count.value_or(0);
+    const std::size_t argument_count = instruction.operands.size() - argument_start;
+    if (callee_type.kind == sema::Type::Kind::kProcedure && argument_count != param_count) {
+        const std::string call_label = indirect_call ? "indirect call" : "call to '" + instruction.target_name + "'";
         ReportBackendError(source_path,
-                           "LLVM bootstrap executable emission expected " +
-                               std::to_string(callee_params.size()) + " call arguments for '" + instruction.target_name +
-                               "' but saw " + std::to_string(argument_count) + " in function '" + state.function->name +
-                               "' block '" + block.label + "'",
+                           "LLVM bootstrap executable emission expected " + std::to_string(param_count) +
+                               " call arguments for " + call_label + " but saw " + std::to_string(argument_count) +
+                               " in function '" + state.function->name + "' block '" + block.label + "'",
                            diagnostics);
         return false;
     }
 
     std::ostringstream args;
-    for (std::size_t index = 0; index < callee_params.size(); ++index) {
+    for (std::size_t index = 0; index < argument_count; ++index) {
         ExecutableValue value;
         if (!ResolveExecutableValue(state,
                                     instruction.operands[argument_start + index],
@@ -2768,7 +2826,7 @@ bool EmitCallInstruction(const mir::Instruction& instruction,
 
         BackendTypeInfo param_type;
         if (!LowerInstructionType(*state.module,
-                                  callee_params[index]->type,
+                      callee_type.subtypes[index],
                                   source_path,
                                   diagnostics,
                                   FunctionBlockContext("call argument", state.function->name, block),
@@ -2782,39 +2840,66 @@ bool EmitCallInstruction(const mir::Instruction& instruction,
         args << LLVMTypeName(param_type) << " " << value.text;
     }
 
+    sema::Type result_source_type = instruction.type;
+    if (callee_type.kind == sema::Type::Kind::kProcedure) {
+        if (param_count >= callee_type.subtypes.size()) {
+            result_source_type = sema::VoidType();
+        } else if (param_count + 1 == callee_type.subtypes.size()) {
+            result_source_type = callee_type.subtypes[param_count];
+        } else {
+            std::vector<sema::Type> return_types;
+            return_types.reserve(callee_type.subtypes.size() - param_count);
+            for (std::size_t index = param_count; index < callee_type.subtypes.size(); ++index) {
+                return_types.push_back(callee_type.subtypes[index]);
+            }
+            result_source_type = sema::TupleType(std::move(return_types));
+        }
+    }
+
     if (instruction.result.empty()) {
-        if (callee->return_types.empty()) {
-            output_lines.push_back("call void " + function_it->second + "(" + args.str() + ")");
+        if (result_source_type.kind == sema::Type::Kind::kVoid) {
+            output_lines.push_back("call void " + callee_text + "(" + args.str() + ")");
             return true;
         }
 
-        const auto lowered_return_type = LowerFunctionReturnType(*state.module, callee->return_types);
-        if (!lowered_return_type.has_value()) {
+        BackendTypeInfo result_type;
+        if (!LowerInstructionType(*state.module,
+                                  result_source_type,
+                                  source_path,
+                                  diagnostics,
+                                  FunctionBlockContext("call result", state.function->name, block),
+                                  result_type)) {
             ReportBackendError(source_path,
                                "LLVM bootstrap executable emission could not lower discarded call result type for '" +
-                                   instruction.target_name + "' in function '" + state.function->name + "' block '" +
+                                   (instruction.target_name.empty() ? instruction.target_display : instruction.target_name) +
+                                   "' in function '" + state.function->name + "' block '" +
                                    block.label + "'",
                                diagnostics);
             return false;
         }
 
-        output_lines.push_back("call " + LLVMTypeName(*lowered_return_type) + " " + function_it->second + "(" + args.str() + ")");
+        output_lines.push_back("call " + LLVMTypeName(result_type) + " " + callee_text + "(" + args.str() + ")");
         return true;
     }
 
-    const auto lowered_return_type = LowerFunctionReturnType(*state.module, callee->return_types);
-    if (!lowered_return_type.has_value()) {
+    BackendTypeInfo result_type;
+    if (!LowerInstructionType(*state.module,
+                              result_source_type,
+                              source_path,
+                              diagnostics,
+                              FunctionBlockContext("call result", state.function->name, block),
+                              result_type)) {
         ReportBackendError(source_path,
                            "LLVM bootstrap executable emission could not lower call result type for '" +
-                               instruction.target_name + "' in function '" + state.function->name + "' block '" +
+                               (instruction.target_name.empty() ? instruction.target_display : instruction.target_name) +
+                               "' in function '" + state.function->name + "' block '" +
                                block.label + "'",
                            diagnostics);
         return false;
     }
-    BackendTypeInfo result_type = *lowered_return_type;
 
     const std::string temp = LLVMTempName(function_index, block_index, instruction_index);
-    output_lines.push_back(temp + " = call " + LLVMTypeName(result_type) + " " + function_it->second + "(" +
+    output_lines.push_back(temp + " = call " + LLVMTypeName(result_type) + " " + callee_text + "(" +
                            args.str() + ")");
     RecordExecutableValue(state, instruction.result, temp, result_type, std::nullopt, instruction.type);
     return true;

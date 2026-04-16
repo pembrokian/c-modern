@@ -1,0 +1,176 @@
+Phase 207 -- Explicit Typed Fixed-Array Aggregate Values
+=======================================================
+
+Status
+------
+COMPLETED
+
+Purpose
+-------
+Land one real language expansion that removes a compiler-owned distortion from
+ active kernel code: explicit typed fixed-array aggregate literals must work as
+ first-class local expression values in the narrow owner-local contexts already
+ justified by `kernel/src/scenario_steps.mc` and similar small helper-oriented
+ code.
+
+This phase is real implementation work.
+It is not a proof-only or documentation-only exercise.
+It should improve the admitted language directly, then spend that support
+ through the existing executable compiler path.
+
+Repository status note
+----------------------
+- Explicit typed aggregate literals already exist on the admitted surface.
+- Typed fixed-array literals such as `[4]i32{ 1, 2, 3, 4 }` already worked in
+  some direct contexts such as call arguments and global constants.
+- The blocked owner-local shape was narrower and later in the pipeline:
+  when a typed fixed-array literal had to survive as a first-class value for
+  local struct initialization or helper returns, MIR validation rejected the
+  lowered `aggregate_init` because it only admitted named aggregates and
+  builtin record-like aggregates.
+- The motivating pressure was real kernel code, not a synthetic benchmark:
+  while tightening `kernel/src/scenario_steps.mc`, the natural `[2]u8` payload
+  shape had to be reverted back to scalar fields because inline literals like
+  `[2]u8{ 0, 0 }` were not executable through the compiler pipeline.
+
+Implemented outcome
+-------------------
+- `compiler/mir/mir_validate.cpp` now admits positional `aggregate_init`
+  instructions whose result type is a fixed array and validates element count,
+  positional-only metadata, and element assignability.
+- `compiler/codegen_llvm/backend.cpp` now lowers fixed-array `aggregate_init`
+  instructions through the executable LLVM path by treating them as positional
+  array aggregates rather than rejecting them as non-struct values.
+- `tests/compiler/mir/mir_tests.cpp` now carries a validator regression proving
+  positional fixed-array aggregate initialization is legal MIR.
+- `tests/compiler/codegen/array_struct_field_literal.mc` now proves the real
+  user-facing slice end to end: an inline typed array literal can initialize a
+  struct field and a helper can return a typed fixed-array value directly.
+- `tests/compiler/codegen/codegen_executable_tests.cpp` now runs that fixture
+  through the executable backend suite.
+
+Problem being solved
+--------------------
+- The language already admitted explicit typed fixed-array literals at parse
+  and sema, but not all honest owner-local uses of those values survived MIR
+  validation and executable lowering.
+- That mismatch forced active kernel code to stay structurally noisier than
+  necessary by splitting obvious small array payloads back into scalar fields.
+- The distortion was compiler-owned, not kernel-owned: the motivating code was
+  simple, local, and already consistent with the kernel style guide's push
+  toward small direct helper values and flat state shapes.
+
+Core rule
+---------
+- Fix the admitted typed fixed-array aggregate-value path at the compiler
+  boundary that actually rejects it.
+- Keep the expansion narrow to explicit typed fixed-array aggregates.
+- Do not reopen general inferred aggregate-value semantics, standalone
+  untyped aggregate values, trailing-comma grammar work, or broader name-scope
+  rewrites inside the same phase.
+- Spend the feature on simple direct program shapes, not a verification
+  framework or a synthetic language-stress harness.
+
+Chosen slice for this phase
+---------------------------
+1. make MIR validation accept positional fixed-array aggregate initialization
+   when the type is explicit and has a fixed length
+2. make executable LLVM lowering build fixed-array aggregate values instead of
+   rejecting them as non-named aggregates
+3. prove the slice on one real executable source shape: inline fixed-array
+   literal inside local struct initialization plus helper return of a typed
+   fixed-array value
+4. update active planning and deferral documents so the landed slice and the
+   still-deferred language pressures are both explicit
+
+Planned outcome
+---------------
+- small owner-local programs can now use explicit typed fixed-array aggregate
+  literals as ordinary expression values in local struct fields and helper
+  returns
+- kernel and ordinary-user code can tighten small payload shapes without being
+  forced back into scalar-field boilerplate by a compiler-only gap
+- the language gains one real ergonomic improvement while still keeping the
+  compiler boundary honest and bounded
+
+Preferred implementation shape
+------------------------------
+Compiler ownership
+- Keep parsing and sema behavior as-is where they already truthfully admit the
+  explicit typed array literal surface.
+- Repair the later-stage rejection where it actually occurs: MIR validation and
+  executable lowering.
+
+Value-shape boundary
+- Treat fixed arrays as positional aggregates.
+- Require explicit fixed length and positional element metadata.
+- Reuse the existing `aggregate_init` path instead of inventing a second MIR
+  instruction family.
+
+Scope boundary
+- Land only explicit typed fixed-array aggregate values.
+- Leave broader standalone aggregate inference, sibling-branch rebinding, and
+  trailing-comma grammar work deferred until a later admitted pressure proves
+  they are the narrowest next step.
+
+Suggested execution order
+-------------------------
+1. Confirm the failure on a minimal executable example that uses a typed array
+   literal as a struct field value.
+2. Extend MIR aggregate validation to admit fixed-array results with positional
+   element checking.
+3. Extend executable LLVM aggregate emission to lower fixed-array aggregate
+   values.
+4. Add one MIR validator regression and one executable regression proving the
+   admitted local-value slice.
+5. Refresh the active phase note, backlog, and decision log so the landing and
+   remaining non-goals are explicit.
+
+Deliverables
+------------
+- end-to-end compiler support for explicit typed fixed-array aggregate literals
+  as first-class local expression values in the admitted owner-local contexts
+- one MIR regression and one executable regression covering the landed slice
+- one completed Phase 207 note and refreshed backlog plus decision-log entries
+
+Validation expectations
+-----------------------
+- the debug tree must build after the MIR and backend changes land
+- `mc_mir_unit` must pass with the new validator coverage
+- `mc_codegen_executable_core_unit` must pass with the new fixed-array
+  aggregate executable fixture
+
+Exit criteria
+-------------
+- a program can return an explicit typed fixed-array aggregate value from a
+  helper and use an explicit typed fixed-array literal inside local struct
+  initialization without compiler rejection
+- MIR validation and executable LLVM lowering both accept the same admitted
+  fixed-array aggregate-value slice
+- the landing stays narrow to explicit typed fixed-array aggregates and does
+  not widen into general aggregate-value inference or unrelated grammar work
+
+Non-goals
+---------
+- standalone aggregate literals without an expected or explicit type owner
+- general inferred aggregate-value semantics for arrays
+- same-name local rebinding across sibling branches
+- trailing-comma support in aggregate literals
+- any kernel runtime, scheduler, service, or workflow framework expansion
+
+Why this is the narrowest honest landing
+---------------------------------------
+- The pressure was real and local: active kernel code wanted a small `[2]u8`
+  payload shape and the compiler, not the kernel model, blocked it.
+- Parser and sema were already close enough that broad language redesign would
+  have solved a larger problem than the one actually exposed.
+- MIR validation and executable lowering were the exact controlling owners for
+  the failure, so fixing them removes the distortion without opening a larger
+  aggregate-semantics wave.
+
+Acceptance criteria for this document
+-------------------------------------
+- Phase 207 is framed as a narrow real compiler implementation phase rather
+  than as a proof-only language exploration note.
+- The document states both the landed explicit typed fixed-array value slice
+  and the deliberately deferred broader language work.

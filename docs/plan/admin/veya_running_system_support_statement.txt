@@ -9,7 +9,7 @@ Purpose
 -------
 Record the current admitted Veya running-system slice separately from the
 broader position note so the repository can state exactly what the work
-through Phase 201 does and does not support.
+through Phase 206 does and does not support.
 
 This is the current refreshed running-system statement.  It supersedes the
 earlier Phase 120 through Phase 121 statement and reflects the post-Phase-188
@@ -126,12 +126,17 @@ Repository status note
   a boot-owned workset generation counter.
 - Phase 201 adds one second explicit coordinated retained restart target for
   the `kv_service` plus `log_service` audit lane.
+- Phase 206 adds one compact shell-visible retained summary query that reports
+  retained participation, generation marker, and last restart outcome for the
+  admitted retained owners and coordinated retained lanes without widening
+  into a bundle registry or framework.
 
 Core rule
 ---------
 - Keep this running-system support statement separate from the broader
   position note.
 - State only the admitted Phase 109 through Phase 201 running-system slice,
+- State only the admitted Phase 109 through Phase 206 running-system slice,
   not a larger platform ambition.
 - Keep service policy init-owned and explicit.
 - Reopen broader running-system claims only when a later kernel proof lands
@@ -167,7 +172,8 @@ Frozen support matrix
   shell_service as a stateless
   command-routing owner with compact hostile-user invalid classification
   (`?C` unknown command, `?S` malformed admitted shape) plus bounded
-  lifecycle query, restart, and identity routing on fixed public targets;
+  lifecycle query, restart, identity, and retained-summary routing on fixed
+  public targets;
   serial_service as serial ingress and reply staging owner; handle-bearing
   observations remain outside ordinary named messaging and are rejected at
   the dispatch gateway with `InvalidCapability` unless they target the
@@ -187,8 +193,9 @@ Frozen support matrix
   kernel_init and the dispatch loop with named arms; init.mc owns
   endpoint-driven restart, explicit per-service retained reload for log or kv
   or queue, explicit coordinated retained restart for the workset (`kv` plus
-  `queue`) and audit lane (`kv` plus `log`), and the boot-owned workset
-  generation advances visible through the shell identity path
+  `queue`) and audit lane (`kv` plus `log`), and the boot-owned workset plus
+  audit generation markers and last-restart outcomes visible through the
+  shell identity and retained-summary path
 - admitted proof set: Phase 109 first-running-kernel slice, Phase 110
   ownership split, Phase 111 scheduler and lifecycle clarification, Phase
   112 syscall boundary, Phase 113 interrupt-entry and generic-dispatch, Phase
@@ -231,8 +238,9 @@ Frozen support matrix
   and peek follow-through, Phase 197 bounded cross-service retained restart
   coordination probe, Phase 198 multi-handle transfer follow-through under
   explicit authority, Phase 200 bounded coordinated retained workset identity
-  query follow-through, and Phase 201 bounded second coordinated retained
-  audit-lane probe
+  query follow-through, Phase 201 bounded second coordinated retained
+  audit-lane probe, and Phase 206 retained service summary and restart
+  outcome inspection
 - unsupported today: dynamic discovery, a general namespace model, dynamic
   loading, a service manager, broader init policy, public freestanding `mc
   run` or `mc test`, broader target-family admission, multicore claims,

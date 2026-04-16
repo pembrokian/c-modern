@@ -1,0 +1,34 @@
+Module
+  TypeDecl kind=struct name=Ops
+    Field name=apply type=proc(i32, i32)->i32
+  Function name=add returns=[i32]
+    Local name=left type=i32 param readonly
+    Local name=right type=i32 param readonly
+    Block label=entry0
+      load_local %v0:i32 target=left
+      load_local %v1:i32 target=right
+      binary %v2:i32 op=+ arithmetic=wrap operands=[%v0, %v1]
+      terminator return values=[%v2]
+  Function name=use_fn returns=[i32]
+    Local name=fn type=proc(i32, i32)->i32 param readonly
+    Local name=left type=i32 param readonly
+    Local name=right type=i32 param readonly
+    Block label=entry0
+      load_local %v0:i32 target=left
+      load_local %v1:i32 target=right
+      load_local %v2:proc(i32, i32)->i32 target=fn
+      call %v3:i32 target=fn target_kind=other target_name=fn operands=[%v2, %v0, %v1]
+      terminator return values=[%v3]
+  Function name=main returns=[i32]
+    Local name=ops type=Ops
+    Block label=entry0
+      symbol_ref %v0:proc(i32, i32)->i32 target=add target_kind=function target_name=add
+      aggregate_init %v1:Ops target=Ops operands=[%v0] fields=[apply]
+      store_local target=ops operands=[%v1]
+      load_local %v2:Ops target=ops
+      field %v3:proc(i32, i32)->i32 target=apply target_kind=field target_name=apply target_display=ops.apply target_base=Ops operands=[%v2]
+      const %v4:int_literal op=20
+      const %v5:int_literal op=22
+      symbol_ref %v6:proc(proc(i32, i32)->i32, i32, i32)->i32 target=use_fn target_kind=function target_name=use_fn
+      call %v7:i32 target=use_fn target_kind=function target_name=use_fn operands=[%v6, %v3, %v4, %v5]
+      terminator return values=[%v7]

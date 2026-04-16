@@ -19,6 +19,19 @@ import ticket_service
 import transfer_grant
 import transfer_service
 
+enum RetainedSummaryParticipation {
+    None,
+    Service,
+    Lane,
+}
+
+enum RestartOutcome {
+    None,
+    OrdinaryReplaced,
+    RetainedReloaded,
+    CoordinatedRetainedReloaded,
+}
+
 struct ServiceCell<T> {
     state: T
     generation: u32
@@ -30,9 +43,18 @@ struct KernelBootState {
     kv: ServiceCell<kv_service.KvServiceState>
     queue: ServiceCell<queue_service.QueueServiceState>
     workset_generation: u32
+    audit_generation: u32
+    log_restart_outcome: RestartOutcome
+    kv_restart_outcome: RestartOutcome
+    queue_restart_outcome: RestartOutcome
+    workset_restart_outcome: RestartOutcome
+    audit_restart_outcome: RestartOutcome
     echo: ServiceCell<echo_service.EchoServiceState>
+    echo_restart_outcome: RestartOutcome
     transfer: ServiceCell<transfer_service.TransferServiceState>
+    transfer_restart_outcome: RestartOutcome
     ticket: ServiceCell<ticket_service.TicketServiceState>
+    ticket_restart_outcome: RestartOutcome
     grants: transfer_grant.GrantTable
 }
 
@@ -54,7 +76,26 @@ func kernel_init() KernelBootState {
     transfer_cell: ServiceCell<transfer_service.TransferServiceState> = ServiceCell<transfer_service.TransferServiceState>{ state: transfer_service.transfer_init(transfer_slot.pid, 1), generation: 1 }
     ticket_cell: ServiceCell<ticket_service.TicketServiceState> = ServiceCell<ticket_service.TicketServiceState>{ state: ticket_service.ticket_init(ticket_slot.pid, 1, 1), generation: 1 }
 
-    return KernelBootState{ path_state: path_state, log: log_cell, kv: kv_cell, queue: queue_cell, workset_generation: 1, echo: echo_cell, transfer: transfer_cell, ticket: ticket_cell, grants: transfer_grant.grant_init() }
+    return KernelBootState{
+        path_state: path_state,
+        log: log_cell,
+        kv: kv_cell,
+        queue: queue_cell,
+        workset_generation: 1,
+        audit_generation: 1,
+        log_restart_outcome: RestartOutcome.None,
+        kv_restart_outcome: RestartOutcome.None,
+        queue_restart_outcome: RestartOutcome.None,
+        workset_restart_outcome: RestartOutcome.None,
+        audit_restart_outcome: RestartOutcome.None,
+        echo: echo_cell,
+        echo_restart_outcome: RestartOutcome.None,
+        transfer: transfer_cell,
+        transfer_restart_outcome: RestartOutcome.None,
+        ticket: ticket_cell,
+        ticket_restart_outcome: RestartOutcome.None,
+        grants: transfer_grant.grant_init()
+    }
 }
 
 func debug_boot_routed(effect: service_effect.Effect) u32 {

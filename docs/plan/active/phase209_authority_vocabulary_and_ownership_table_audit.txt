@@ -1,0 +1,163 @@
+Phase 209 -- Authority Vocabulary And Ownership Table Audit
+===========================================================
+
+Status
+------
+PROPOSED
+
+Purpose
+-------
+Turn the accumulated endpoint, handle-transfer, retained-lane, and shell-
+visible control work into one explicit authority vocabulary and ownership
+audit that the repository can reuse across later phases.
+
+This phase is primarily architecture-shaping implementation and audit work.
+It should land executable follow-through where needed, but its main outcome is
+ to make the already-admitted authority model compact, explicit, and reusable.
+It should not widen into a capability framework, ACL system, or dynamic policy
+ engine.
+
+Repository status note
+----------------------
+- Phase 183 fixed the endpoint address model: boot-wired endpoint ids are
+  stable public names and routing keys.
+- Phase 184 repaired the received-handle leak by making handle-bearing traffic
+  invalid on ordinary named paths.
+- Phase 185 admitted one explicit transfer-only handle path.
+- Phase 198 extended that path to one additive two-handle `(log, kv)` pair
+  without widening into general handle-bearing traffic.
+- Retained-state and restart control phases have also created new authority
+  surfaces: coordinated retained restart targets, shell-visible lifecycle
+  control, and retained summary or policy inspection.
+- The repo now has real authority semantics, but they are recorded mostly as
+  separate phase truths rather than one reusable vocabulary.
+
+Problem being solved
+--------------------
+- The repository lacks one compact authority table that answers the same
+  questions consistently across endpoints, handles, retained lanes, queues,
+  and shell control paths:
+  - who owns this
+  - who may reference this
+  - who may mutate this
+  - who may transfer this
+  - who may observe this
+  - who may destroy this
+- Without that vocabulary, future phases risk either re-litigating old
+  authority decisions or adding new exceptions without a shared frame.
+- The current code is bounded and explicit, but the surrounding architectural
+  truth is harder to inspect than it should be.
+
+Core rule
+---------
+- Make existing authority truth explicit before widening authority features.
+- Prefer one compact vocabulary reused across object kinds.
+- Preserve the current default model: public endpoint names, explicit owner
+  boundaries, ordinary rejection of received handles, and narrow transfer-only
+  exceptions.
+- Do not introduce rights algebra, ACLs, generic capability objects, or a
+  security framework.
+
+Chosen slice for this phase
+---------------------------
+1. publish one repository-owned authority vocabulary covering the admitted
+   object kinds that already carry authority semantics
+2. produce one compact ownership table or equivalent doc surface for:
+   - endpoints
+   - transferred handles
+   - retained coordination targets
+   - shell-visible lifecycle and inspection control paths
+   - any queue or retained object surface whose authority rules are already
+     real and distinct
+3. add executable follow-through only where an existing test or scenario needs
+   one compact truth check to keep the documented vocabulary honest
+4. make no compiler, sema, MIR, backend, ABI, target, runtime, stdlib, or
+   `hal` expansion beyond the minimum needed to validate the authority table
+
+Planned outcome
+---------------
+- the repository gains one shared vocabulary for authority decisions instead
+  of re-explaining each object class ad hoc in later phase notes
+- later phases can ask whether a proposal changes ownership, reference,
+  mutation, transfer, observation, or destruction rights in a disciplined way
+- the current bounded authority model becomes easier to inspect without
+  pretending the repo has a full capability system
+
+Preferred implementation shape
+------------------------------
+Vocabulary path
+- Keep the vocabulary small and concrete.
+- Phrase it in terms already visible in the repo's code and phase history:
+  owner, public name, transfer-only exception, restart target, retained lane,
+  shell control path.
+
+Authority table path
+- Prefer one short architecture note or active phase-owned table over several
+  repeated paragraphs spread across unrelated docs.
+- Keep the table factual and current-owner focused rather than speculative.
+
+Executable follow-through path
+- If a documented authority rule already has fixture coverage, reuse it.
+- Add at most one or two focused checks only where the vocabulary would
+  otherwise be documenting unverified behavior.
+- Keep tests narrow and behavior-owned rather than inventing a new authority
+  audit framework.
+
+Suggested execution order
+-------------------------
+1. Enumerate the currently admitted object kinds with distinct authority
+   semantics.
+2. Write the compact authority vocabulary and map each object kind onto it.
+3. Identify any documented rule that lacks one direct behavior-owned proof.
+4. Add the smallest focused validation needed for that gap.
+5. Refresh backlog, decision-log, or support notes only where the new
+   vocabulary changes how future work should be framed.
+
+Deliverables
+------------
+- one compact authority vocabulary for the admitted running-system slice
+- one ownership table or equivalent audit surface for the key object kinds
+- focused validation for any newly documented but previously unproved rule
+- bounded doc refreshes where the new vocabulary should become the reference
+  point for later phases
+
+Validation expectations
+-----------------------
+- the tree must continue to build after any follow-through checks are added
+- any new focused authority checks must pass
+- existing endpoint, transfer, and retained-control workflow coverage must
+  remain green
+
+Exit criteria
+-------------
+- the repository has one explicit reusable vocabulary for ownership,
+  reference, mutation, transfer, observation, and destruction rights
+- the admitted object kinds with real authority semantics are mapped onto that
+  vocabulary in one visible surface
+- any documented authority rule that needed new executable proof has one
+  focused validating check
+- no ACL system, capability framework, or dynamic rights algebra is added
+
+Non-goals
+---------
+- generic capability objects or rights algebra
+- dynamic access-control lists
+- security or isolation claims beyond the current flat boot-wired simulation
+  kernel
+- automatic authority inference or policy engines
+- redesign of the current public-endpoint model
+
+Why this is the narrowest honest landing
+---------------------------------------
+- The repo already has enough authority decisions that a shared vocabulary now
+  reduces future drift.
+- The pressure is architectural clarity, not missing mechanism.
+- A compact ownership table creates leverage for later restart, identity, and
+  inspection work while keeping the system explicitly bounded.
+
+Acceptance criteria for this document
+-------------------------------------
+- Phase 209 is explicitly framed as an authority vocabulary and ownership
+  audit, not as a capability-system or security-framework phase.
+- The planned slice keeps the current bounded authority model intact while
+  making it more explicit and reusable.

@@ -1,0 +1,161 @@
+Phase 208 -- Explicit Retained Coordination Comparison And Policy Probe
+======================================================================
+
+Status
+------
+PROPOSED
+
+Purpose
+-------
+Push the retained-state story one step past summary inspection by making one
+explicit coordination comparison and keep-or-clear policy visible before a
+coordinated retained restart is enacted.
+
+This phase is real implementation work.
+It is not a proof-only or documentation-only exercise.
+It should make the current coordinated retained model more explicit without
+ widening into a retained-bundle registry, a service dependency engine, or a
+ general restart framework.
+
+Repository status note
+----------------------
+- The repository already has two admitted coordinated retained restart paths:
+  the workset (`kv_service` plus `queue_service`) and the audit lane
+  (`kv_service` plus `log_service`).
+- Those coordinated retained pairs are currently explicit, fixed-target, and
+  init-owned.
+- The model remains honest because the current retained relationships are few
+  and concrete, but the comparison and policy truth still lives only in code:
+  restart helpers know which owners participate and what gets reloaded, while
+  callers do not have one explicit pre-restart view of that policy.
+
+Problem being solved
+--------------------
+- The current model can tell a caller that a coordinated retained lane exists,
+  and in Phase 206 it should be able to summarize its current state, but it
+  still does not expose one explicit comparison-and-policy step before restart
+  enactment.
+- Without such a step, future retained phases will either keep policy hidden
+  inside `init.mc` helpers or widen too early into a framework that infers
+  retained relationships dynamically.
+- The missing truth is narrow: for one explicit target, which owners are part
+  of the coordinated retained restart, and does the policy keep retained state
+  or clear it when the restart is requested.
+
+Core rule
+---------
+- Make coordinated retained policy visible before making it more powerful.
+- Keep comparison and policy fixed-target and explicit.
+- Prefer one bounded policy contract over a registry or inferred dependency
+  model.
+- Do not widen the retained model into dynamic discovery, generic graphs, or
+  persistence management.
+
+Chosen slice for this phase
+---------------------------
+1. add one bounded shell-visible coordination comparison contract for the
+   admitted coordinated retained targets
+2. expose, for one chosen target at a time, the participating owners and the
+   explicit keep-or-clear policy that would apply on restart
+3. keep the policy data init-owned or topology-owned where that is already the
+   truthful owner
+4. prove that the comparison output matches the actual restart behavior for at
+   least one retained-reload target and one clear-or-replace target if such a
+   target is already admitted honestly in the system
+5. make no compiler, sema, MIR, backend, ABI, target, runtime, stdlib, or
+   `hal` expansion
+
+Planned outcome
+---------------
+- callers can inspect one explicit coordinated retained restart policy before
+  triggering it
+- the repo gains a visible contract for "what will this restart coordinate"
+  and "what retained truth will be kept versus cleared"
+- future retained phases can build on an explicit comparison step instead of
+  encoding more behavior implicitly inside restart helpers
+
+Preferred implementation shape
+------------------------------
+Target model
+- Keep targets fixed and explicit, matching the current shell lifecycle model.
+- Reuse the current compact target vocabulary rather than introducing a new
+  named-object or path-based policy system.
+
+Policy owner path
+- If policy is currently embodied in `init.mc` helper selection, keep that as
+  the owner and expose only a compact projection of that truth.
+- If lifecycle classification already lives in `service_topology.mc`, reuse it
+  rather than duplicating classification in the shell.
+
+Comparison payload path
+- Report only bounded truth already justified by the system:
+  - target identity
+  - participating retained owners
+  - explicit keep-or-clear policy class
+- Do not report speculative future fields such as byte sizes, dependency
+  depth, recovery ordering plans, or inferred dependency reasons.
+
+Suggested execution order
+-------------------------
+1. Choose one compact query and reply shape for coordinated retained policy.
+2. Expose the truthful owner-local policy data through `init.mc` or
+   `service_topology.mc` without inferring any new relationships.
+3. Thread that result through the shell-visible control path.
+4. Add one deterministic scenario showing policy inspection followed by the
+   corresponding restart and then summary verification.
+5. Add one focused reset-lane fixture proving the reported policy matches the
+   enacted behavior.
+6. Update backlog or decision-log entries only if the landed shape explicitly
+   defers a still-larger policy question.
+
+Deliverables
+------------
+- one compact coordinated retained policy inspection contract
+- bounded owner-local policy metadata for the admitted coordinated targets
+- one scenario proof and one reset-lane fixture for policy-to-outcome
+  correspondence
+
+Validation expectations
+-----------------------
+- the tree must continue to build after the policy-inspection wiring lands
+- the new focused reset-lane fixture must pass
+- existing coordinated retained restart and identity fixtures must continue to
+  pass unless their expected outputs intentionally widen to include the new
+  policy truth
+- the grouped kernel reset-lane workflow suite must remain green
+
+Exit criteria
+-------------
+- the admitted coordinated retained targets can each answer one bounded query
+  describing participating owners and keep-or-clear policy
+- the reported policy matches the actual restart behavior in deterministic
+  fixture coverage
+- no registry, dynamic dependency graph, or generalized restart framework is
+  introduced
+- the current explicit init-owned coordinated retained model remains the
+  truthful owner boundary
+
+Non-goals
+---------
+- dynamic dependency discovery
+- a generic retained-bundle framework
+- automatic restart planning or supervision
+- persistent storage policy or durable-schema migration
+- richer graph visualization or operator dashboards
+
+Why this is the narrowest honest landing
+---------------------------------------
+- The repo has already admitted more than one coordinated retained pair, so a
+  visible comparison-and-policy step is now justified.
+- The pressure is still local to explicit retained restart policy, not to a
+  general dependency system.
+- A bounded pre-restart comparison contract creates leverage for future phases
+  without hiding semantics behind a framework.
+
+Acceptance criteria for this document
+-------------------------------------
+- Phase 208 is explicitly framed as a retained coordination comparison and
+  policy visibility probe, not as a service graph or persistence-management
+  phase.
+- The planned slice keeps all coordinated retained relationships fixed-target,
+  explicit, and owner-local.

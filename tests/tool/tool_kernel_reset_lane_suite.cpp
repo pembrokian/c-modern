@@ -122,7 +122,7 @@ void RunKernelResetLaneScenario(const std::filesystem::path& source_root,
     ExpectKernelResetLaneRunSuccess(scenario, run_outcome, run_output);
 }
 
-constexpr std::array<ResetLaneScenario, 35> kResetLaneScenarios = {{
+constexpr std::array<ResetLaneScenario, 36> kResetLaneScenarios = {{
     {"repo project", "", "", "kernel_reset_lane_repo_build", "kernel", "kernel_reset_lane_repo_build_output.txt", "kernel_reset_lane_repo_run_output.txt", "kernel reset lane repo project build", "kernel reset lane repo project run"},
     {"smoke", "tests/smoke/kernel_reset_lane_serial_round_trip", "kernel_reset_lane_smoke_project", "kernel_reset_lane_smoke_build", "app", "kernel_reset_lane_smoke_build_output.txt", "kernel_reset_lane_smoke_run_output.txt", "kernel reset lane smoke build", "kernel reset lane smoke run"},
     {"retained state", "tests/system/kernel_reset_lane_retained_log", "kernel_reset_lane_retained_state_project", "kernel_reset_lane_retained_state_build", "app", "kernel_reset_lane_retained_state_build_output.txt", "kernel_reset_lane_retained_state_run_output.txt", "kernel reset lane retained-state build", "kernel reset lane retained-state run"},
@@ -158,6 +158,7 @@ constexpr std::array<ResetLaneScenario, 35> kResetLaneScenarios = {{
     {"phase 197 retained coordination", "tests/system/kernel_reset_lane_phase197_retained_coordination", "kernel_reset_lane_phase197_retained_coordination_project", "kernel_reset_lane_phase197_retained_coordination_build", "app", "kernel_reset_lane_phase197_retained_coordination_build_output.txt", "kernel_reset_lane_phase197_retained_coordination_run_output.txt", "kernel reset lane phase 197 retained coordination build", "kernel reset lane phase 197 retained coordination run"},
     {"phase 200 workset identity", "tests/system/kernel_reset_lane_phase200_workset_identity", "kernel_reset_lane_phase200_workset_identity_project", "kernel_reset_lane_phase200_workset_identity_build", "app", "kernel_reset_lane_phase200_workset_identity_build_output.txt", "kernel_reset_lane_phase200_workset_identity_run_output.txt", "kernel reset lane phase 200 workset identity build", "kernel reset lane phase 200 workset identity run"},
     {"phase 201 retained audit coordination", "tests/system/kernel_reset_lane_phase201_retained_audit_coordination", "kernel_reset_lane_phase201_retained_audit_coordination_project", "kernel_reset_lane_phase201_retained_audit_coordination_build", "app", "kernel_reset_lane_phase201_retained_audit_coordination_build_output.txt", "kernel_reset_lane_phase201_retained_audit_coordination_run_output.txt", "kernel reset lane phase 201 retained audit coordination build", "kernel reset lane phase 201 retained audit coordination run"},
+    {"phase 206 retained summary", "tests/system/kernel_reset_lane_phase206_retained_summary", "kernel_reset_lane_phase206_retained_summary_project", "kernel_reset_lane_phase206_retained_summary_build", "app", "kernel_reset_lane_phase206_retained_summary_build_output.txt", "kernel_reset_lane_phase206_retained_summary_run_output.txt", "kernel reset lane phase 206 retained summary build", "kernel reset lane phase 206 retained summary run"},
 }};
 
 std::set<std::string> CollectCoveredResetLaneFixturePaths() {

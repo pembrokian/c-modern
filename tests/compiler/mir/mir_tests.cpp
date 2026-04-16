@@ -1666,6 +1666,51 @@ void TestValidatorRejectsAggregateDuplicateNamedField() {
     }
 }
 
+void TestValidatorAcceptsPositionalArrayAggregateInit() {
+    mc::support::DiagnosticSink diagnostics;
+    mc::mir::Module module;
+
+    mc::mir::Function function;
+    function.name = "array_init_ok";
+    function.blocks.push_back({
+        .label = "entry",
+        .instructions = {
+            {
+                .kind = mc::mir::Instruction::Kind::kConst,
+                .result = "%v0",
+                .type = mc::sema::NamedType("u8"),
+                .op = "7",
+            },
+            {
+                .kind = mc::mir::Instruction::Kind::kConst,
+                .result = "%v1",
+                .type = mc::sema::NamedType("u8"),
+                .op = "9",
+            },
+            {
+                .kind = mc::mir::Instruction::Kind::kAggregateInit,
+                .result = "%v2",
+                .type = mc::sema::ArrayType(mc::sema::NamedType("u8"), "2"),
+                .target = "[2]u8",
+                .operands = {"%v0", "%v1"},
+                .field_names = {"_", "_"},
+            },
+        },
+        .terminator = {
+            .kind = mc::mir::Terminator::Kind::kReturn,
+            .values = {},
+        },
+    });
+    module.functions.push_back(std::move(function));
+
+    if (!mc::mir::ValidateModule(module, "<mir-test>", diagnostics)) {
+        Fail("validator should accept positional fixed-array aggregate_init");
+    }
+    if (diagnostics.HasErrors()) {
+        Fail("validator should not diagnose positional fixed-array aggregate_init");
+    }
+}
+
 void TestValidatorRejectsVariantExtractPayloadMismatch() {
     mc::support::DiagnosticSink diagnostics;
     mc::mir::Module module;
@@ -3218,6 +3263,7 @@ int main() {
     TestValidatorRejectsGenericConvertThatShouldBeExplicitFamily();
     TestValidatorRejectsGenericConvertWithDifferentRepresentation();
     TestValidatorRejectsAggregateDuplicateNamedField();
+    TestValidatorAcceptsPositionalArrayAggregateInit();
     TestValidatorRejectsVariantExtractPayloadMismatch();
     TestValidatorRejectsBadSymbolRefType();
     TestValidatorRejectsGenericFunctionSymbolRefTypeMismatch();

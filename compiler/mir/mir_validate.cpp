@@ -1310,14 +1310,15 @@ bool ValidateModule(const Module& module,
                             report("aggregate_init field metadata mismatch in function " + function.name);
                         }
                         const auto builtin_fields = sema::BuiltinAggregateFields(instruction.type);
-                        if (instruction.type.kind != sema::Type::Kind::kNamed && builtin_fields.empty()) {
+                        const bool is_array_aggregate = instruction.type.kind == sema::Type::Kind::kArray;
+                        if (instruction.type.kind != sema::Type::Kind::kNamed && builtin_fields.empty() && !is_array_aggregate) {
                             if (!sema::IsUnknown(instruction.type)) {
                                 report("aggregate_init must produce a named aggregate type in function " + function.name);
                             }
                             break;
                         }
                         const TypeDecl* type_decl = FindMirTypeDecl(module, instruction.type.name);
-                        if (type_decl == nullptr && builtin_fields.empty()) {
+                        if (type_decl == nullptr && builtin_fields.empty() && !is_array_aggregate) {
                             report("aggregate_init references unknown type in function " + function.name + ": " + instruction.type.name);
                         } else {
                             if (!instruction.target.empty() && !MatchesTargetDisplay(instruction.target, instruction.type)) {
@@ -1325,11 +1326,31 @@ bool ValidateModule(const Module& module,
                             }
                             const auto fields =
                                 type_decl != nullptr ? InstantiateMirFields(*type_decl, instruction.type) : std::vector<std::pair<std::string, sema::Type>> {};
+                            const auto array_length = is_array_aggregate ? mc::support::ParseArrayLength(instruction.type.metadata)
+                                                                         : std::optional<std::size_t> {};
                             std::unordered_set<std::string> seen_named_fields;
                             for (std::size_t index = 0; index < instruction.field_names.size() && index < operand_types.size(); ++index) {
                                 const std::string& field_name = instruction.field_names[index];
                                 sema::Type expected_type = sema::UnknownType();
-                                if (field_name == "_") {
+                                if (is_array_aggregate) {
+                                    if (field_name != "_") {
+                                        report("aggregate_init array elements must be positional in function " + function.name);
+                                        continue;
+                                    }
+                                    if (!array_length.has_value()) {
+                                        report("aggregate_init array type must have a fixed length in function " + function.name);
+                                        continue;
+                                    }
+                                    if (index >= *array_length) {
+                                        report("aggregate_init has too many positional fields in function " + function.name);
+                                        continue;
+                                    }
+                                    if (instruction.type.subtypes.empty()) {
+                                        report("aggregate_init array type must have an element type in function " + function.name);
+                                        continue;
+                                    }
+                                    expected_type = instruction.type.subtypes.front();
+                                } else if (field_name == "_") {
                                     const std::size_t field_count = type_decl != nullptr ? fields.size() : builtin_fields.size();
                                     if (index >= field_count) {
                                         report("aggregate_init has too many positional fields in function " + function.name);
@@ -1357,6 +1378,10 @@ bool ValidateModule(const Module& module,
                                     report("aggregate_init field type mismatch in function " + function.name + " for " + field_name + ": expected " +
                                            sema::FormatType(expected_type) + ", got " + sema::FormatType(operand_types[index]));
                                 }
+                            }
+                            if (is_array_aggregate && array_length.has_value() && instruction.operands.size() != *array_length) {
+                                report("aggregate_init array element count mismatch in function " + function.name + ": expected " +
+                                       std::to_string(*array_length) + ", got " + std::to_string(instruction.operands.size()));
                             }
                         }
                         break;

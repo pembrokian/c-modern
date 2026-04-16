@@ -516,6 +516,12 @@ void RunCodegenExecutableCoreSuite(const std::filesystem::path& source_root,
                     3,
                     {});
 
+    RunBuiltFixture(mc_path,
+                    source_root / "tests/compiler/codegen/indirect_call_struct_field.mc",
+                    work_root / "indirect_call_struct_field",
+                    42,
+                    {});
+
     const std::filesystem::path global_source = work_root / "global_counter.mc";
     WriteFile(global_source,
               "var counter: i32 = 7\n"
@@ -1442,6 +1448,12 @@ void RunCodegenExecutableProjectSuite(const std::filesystem::path& source_root,
     RunBuiltFixture(mc_path,
                     source_root / "tests/compiler/codegen/bool_struct_fields.mc",
                     work_root / "bool_struct_fields_build",
+                    0,
+                    {});
+
+    RunBuiltFixture(mc_path,
+                    source_root / "tests/compiler/codegen/array_struct_field_literal.mc",
+                    work_root / "array_struct_field_literal_build",
                     0,
                     {});
 

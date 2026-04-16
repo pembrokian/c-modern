@@ -1,0 +1,197 @@
+Phase 206 -- Retained Service Summary And Restart Outcome Inspection
+===================================================================
+
+Status
+------
+COMPLETED
+
+Purpose
+-------
+Turn the post-Phase-201 retained-state follow-through into one bounded
+inspection wave that makes retained state, coordinated retained lanes, and
+restart outcomes visible through one compact, explicit system summary path.
+
+This phase is real implementation work.
+It is not a proof-only or documentation-only exercise.
+It should improve the inspectability of the already-admitted retained model
+without widening into a bundle registry, persistence subsystem, supervisor,
+ or dynamic dependency graph.
+
+Repository status note
+----------------------
+- The repository already has explicit retained reload for `log_service`,
+  `kv_service`, and `queue_service`.
+- Phase 197 admitted one explicit coordinated retained restart target,
+  the `kv_service` plus `queue_service` workset.
+- Phase 200 admitted one caller-visible coordinated workset identity query,
+  `XIW!`.
+- Phase 201 admitted one second explicit coordinated retained target,
+  the `kv_service` plus `log_service` audit lane.
+- The current model is semantically honest but still fragmented at the user
+  and operator boundary: retained participation, retained identity, and
+  restart outcome are observable only through several separate narrow paths.
+
+Implemented outcome
+-------------------
+- `kernel/src/serial_protocol.mc` now admits one additive lifecycle-summary
+  query, `XS<target>!`, on the existing shell-visible control family.
+- `kernel/src/boot.mc` now carries one explicit audit-lane generation marker
+  beside the existing workset generation marker and records last restart
+  outcomes for the restartable services and coordinated retained lanes.
+- `kernel/src/init.mc` now records whether each explicit restart was an
+  ordinary replacement, a retained reload, or a coordinated retained reload,
+  and coordinated retained restarts now update the participating retained
+  owners as well as the lane marker.
+- `kernel/src/boot_identity.mc` now owns the compact fixed-width retained
+  summary reply packing used by the shell control path.
+- `kernel/src/kernel_dispatch.mc` and `kernel/src/shell_service.mc` now route
+  fixed-target retained summary requests through the existing shell control
+  hop without introducing a second inspection channel or a registry.
+- `kernel/src/scenario_retained_summary.mc` adds one fresh-state scenario that
+  proves ordinary restart, retained restart, workset coordination, and audit-
+  lane coordination through the new summary surface.
+- `tests/system/kernel_reset_lane_phase206_retained_summary/` adds the
+  focused reset-lane fixture for the new summary contract, and the grouped
+  reset-lane workflow suite now owns it.
+- No compiler, sema, MIR, backend, ABI, target, runtime, stdlib, or `hal`
+  expansion was admitted in this phase.
+
+Problem being solved
+--------------------
+- A caller can ask for a specific identity value such as `XIW!`, but there is
+  no single compact summary path that answers the broader retained question:
+  which retained-owning services or coordinated retained lanes currently
+  exist, what generation they are on, and what the most recent restart did.
+- The current restart model distinguishes retained reload from ordinary
+  restart in code, but that distinction is not yet available as one bounded
+  inspection surface.
+- As more retained follow-through phases land, the absence of one summary path
+  will force future phases either to add more ad hoc shell verbs or to rely on
+  internal knowledge of `boot.mc`, `init.mc`, and `kernel_dispatch.mc`.
+
+Core rule
+---------
+- Make retained truth easier to inspect before widening retained policy.
+- Keep the retained model explicit and owner-local.
+- Prefer one compact summary contract over multiple new ad hoc identity or
+  status queries.
+- Do not infer retained bundles dynamically.
+- Do not introduce persistence, durability, or a generic metadata framework.
+
+Chosen slice for this phase
+---------------------------
+1. add one bounded retained-summary inspection contract over the existing
+   shell-visible system-control path
+2. make retained-owning services and the admitted coordinated retained lanes
+   report a compact summary shape that includes retained participation,
+   current generation, and most recent restart outcome classification
+3. keep summary data boot-owned or init-owned where that is already the
+   truthful owner rather than reconstructing it heuristically in the shell
+4. add one fresh-state scenario and one focused reset-lane fixture proving the
+   summary stays correct across ordinary restart, retained restart, and
+   coordinated retained restart
+5. make no compiler, sema, MIR, backend, ABI, target, runtime, stdlib, or
+   `hal` expansion
+
+Planned outcome
+---------------
+- the system gains one compact inspection path for retained-state truth rather
+  than a growing collection of unrelated one-off queries
+- callers can observe whether a service or retained lane participates in the
+  retained model, what identity or generation it currently carries, and
+  whether the last restart reloaded retained state or cleared it
+- future retained-policy phases can build on an already-visible status surface
+  rather than encoding more truth implicitly in restart helpers
+
+Preferred implementation shape
+------------------------------
+Inspection path
+- Keep the external surface compact and shell-visible.
+- Reuse the existing bounded shell control family rather than creating a
+  second user-facing inspection channel.
+- Keep reply shapes fixed-width or otherwise tightly bounded.
+
+Ownership path
+- `boot.mc` should own boot-lived retained summary state when the truth is a
+  boot-owned generation or lane marker.
+- `init.mc` should own last-restart outcome recording when the truth arises
+  from explicit restart enactment there.
+- `shell_service.mc` should remain a parser and reply-shaping owner, not the
+  authority on retained semantics.
+
+Summary content path
+- Include only truth already admitted by the current model:
+  - retained participation
+  - current generation or coordinated generation marker
+  - last restart outcome classification such as ordinary-replaced,
+    retained-reloaded, or coordinated-retained-reloaded
+- Do not include speculative future data such as dependency graphs, byte-size
+  accounting, durability class, or health-check state.
+
+Suggested execution order
+-------------------------
+1. Choose one compact retained-summary reply shape that can represent both
+   single-service retained owners and coordinated retained lanes honestly.
+2. Add the minimum boot-owned or init-owned summary state needed to answer the
+   query without reconstructing retained truth heuristically.
+3. Thread that state through the bounded shell control path.
+4. Add one scenario that exercises ordinary restart, retained restart, and one
+   coordinated retained restart in one deterministic fresh-state sequence.
+5. Add one focused reset-lane fixture proving the summary output remains stable
+   and truthful across those transitions.
+6. Refresh the support statement and backlog only if the landed surface
+   changes the repo's active public claim.
+
+Deliverables
+------------
+- one retained-summary inspection contract on the existing shell-visible
+  control path
+- bounded retained summary state in the truthful owner modules
+- one scenario-level proof and one reset-lane fixture for retained summary and
+  restart outcome visibility
+- follow-through updates to active docs only where the admitted support slice
+  changes materially
+
+Validation expectations
+-----------------------
+- the tree must continue to build after the retained summary wiring lands
+- the focused reset-lane fixture for the new summary contract must pass
+- existing retained restart and coordinated retained identity fixtures must
+  continue to pass unchanged unless an intentional output update is required
+- the grouped workflow suite must still pass its kernel reset-lane slice
+
+Exit criteria
+-------------
+- one bounded shell-visible query can summarize retained participation,
+  generation identity, and last restart outcome for the admitted retained
+  owners and coordinated retained lanes
+- the retained summary is owned explicitly by the same modules that already
+  own retained restart enactment and identity truth
+- no bundle registry, dynamic dependency graph, or persistence framework is
+  introduced
+- the retained model becomes easier to inspect without widening its policy
+  beyond the already admitted owners and coordinated lanes
+
+Non-goals
+---------
+- a generic retained bundle registry
+- persistence or durable-storage semantics
+- dynamic dependency discovery between services
+- supervisor policy, health checks, or automatic restart
+- richer user-facing diagnostics beyond the bounded retained summary contract
+
+Why this is the narrowest honest landing
+---------------------------------------
+- The repository already has enough retained semantics to justify a summary
+  surface, but not enough evidence to justify a framework.
+- Recent phases have made retained identity and coordinated retained restart
+  real, yet those truths remain fragmented across several narrow commands.
+- A compact retained summary reduces future ad hoc inspection pressure without
+  pre-committing the repo to a broader metadata or persistence system.
+
+Acceptance criteria for this document
+-------------------------------------
+- Phase 206 is explicitly framed as retained-state inspection and restart
+  outcome visibility, not as a generic persistence or service-graph phase.
+- The planned slice keeps the current explicit ownership boundaries intact and
+  adds only one bounded summary path over already admitted retained truth.

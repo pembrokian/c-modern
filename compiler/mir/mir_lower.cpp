@@ -825,6 +825,9 @@ class FunctionLowerer {
 
     ValueInfo LowerCalleeExpr(const Expr& expr) {
         if (expr.kind == Expr::Kind::kName) {
+            if (local_types_.contains(expr.text)) {
+                return LoadLocalValue(expr.text);
+            }
             const std::string value = NewValue();
             const sema::Type type = KnownTypeOrError(ExprTypeOrUnknown(expr), expr.span, "callee type for " + expr.text);
             Emit({
@@ -839,6 +842,9 @@ class FunctionLowerer {
             return {value, type};
         }
         if (expr.kind == Expr::Kind::kQualifiedName) {
+            if (InferTargetKindForExpr(expr) != Instruction::TargetKind::kFunction) {
+                return LowerExpr(expr);
+            }
             const std::string qualified_name = CombineQualifiedName(expr);
             const std::string value = NewValue();
             const sema::Type type = KnownTypeOrError(ExprTypeOrUnknown(expr), expr.span, "callee type for " + qualified_name);

@@ -48,6 +48,7 @@ Record one maintained repository position after Phase 197 admitted one explicit 
 Record one maintained repository position after Phase 198 admitted one bounded two-handle transfer follow-through without opening ordinary handle-bearing traffic or compiler surfaces.
 Record one maintained repository position after Phase 200 admitted one bounded coordinated retained workset identity query without opening bundle frameworks or compiler surfaces.
 Record one maintained repository position after Phase 201 admitted one second explicit coordinated retained restart target without opening retained-bundle frameworks or compiler surfaces.
+Record one maintained repository position after Phase 206 admitted one bounded retained-summary inspection contract without opening bundle registries, persistence frameworks, or compiler surfaces.
 Record one maintained repository position after Phase 202 retired the deleted freestanding legacy archive, refreshed active workflow and support docs, and kept reset-lane coverage anchored to the scenario table without opening a new framework or compiler wave.
 Record one maintained repository position after Phase 182 made restart identity explicit as stable routing plus replaced instance generation under the same endpoint and pid.
 Record one maintained repository position after Phase 183 made endpoint ids explicit stable public names and routing keys rather than authority tokens.
@@ -223,6 +224,7 @@ Current repository truth
 - The landed Phase 198 multi-handle transfer follow-through under explicit authority extends the explicit transfer-only path to exactly one two-handle `(log, kv)` pair while keeping ordinary handle-bearing traffic closed; this belongs to the same admitted running-system slice rather than to a broader capability framework, transport redesign, or reopened compiler wave.
 - The landed Phase 200 bounded coordinated retained workset identity query follow-through adds one boot-owned coordinated workset generation counter visible through `XIW!`; this belongs to the same admitted running-system slice rather than to a bundle registry, richer identity framework, or reopened compiler wave.
 - The landed Phase 201 bounded second coordinated retained audit-lane probe adds one second explicit coordinated retained restart target for the `kv_service` plus `log_service` audit lane while keeping coordination flat and init-owned; this belongs to the same admitted running-system slice rather than to a retained-bundle framework, dynamic dependency policy, or reopened compiler wave.
+- The landed Phase 206 retained service summary and restart outcome inspection adds one compact shell-visible `XS<target>!` retained-summary path, one boot-owned audit-lane generation marker, and one init-owned last-restart outcome classification for the admitted retained owners and coordinated lanes; this belongs to the same admitted running-system slice rather than to a bundle registry, persistence framework, richer operator dashboard, or reopened compiler wave.
 - Phase 202 then removed the retired freestanding archive itself, refreshed active docs to the live grouped workflow owners, and added one workflow-suite guard so every checked-in reset-lane fixture with a `build.toml` stays represented in the scenario table; this maintenance step belongs to workflow and documentation honesty rather than to a new runtime or compiler surface.
 - The repository therefore proves that the current language, sema, MIR,
   backend, runtime, and build path are sufficient for one honest small kernel
@@ -252,11 +254,12 @@ It means:
   compact shell-owned hostile-user invalid classification, flat topology
   lookup plus static restart classification over the boot-wired slots,
   endpoint-driven explicit restart over the admitted restartable services,
-  shell-visible lifecycle query or restart or identity control on fixed
-  public targets, explicit retained-state reload for `log_service`,
+  shell-visible lifecycle query or restart or identity or retained-summary
+  control on fixed public targets, explicit retained-state reload for `log_service`,
   `kv_service`, and `queue_service`, one coordinated retained workset restart
   plus workset identity query, one second coordinated retained audit-lane
-  restart, bounded queue peek or count observability, and one explicit
+  restart, one compact retained summary path for retained participation,
+  generation marker, and last restart outcome, bounded queue peek or count observability, and one explicit
   two-handle transfer follow-through are now real inside that slice
 - broader platform, packaging, target-family, loader, namespace, kill, and
   scheduler-completion claims remain out of scope
