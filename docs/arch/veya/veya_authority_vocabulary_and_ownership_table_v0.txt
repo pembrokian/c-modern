@@ -1,0 +1,216 @@
+Veya Authority Vocabulary And Ownership Table
+============================================
+
+Status
+------
+ACTIVE
+
+Purpose
+-------
+Publish one compact repository-owned authority vocabulary for the admitted
+running-system slice and map the current object kinds onto it in one visible
+surface.
+
+This note is intentionally narrow.
+It does not introduce a capability framework, ACL system, dynamic discovery,
+or a rights algebra.
+It names the current authority truth that already exists in the landed kernel
+and active phase notes.
+
+Relationship to companion notes
+-------------------------------
+This note is meant to stay aligned with:
+
+- `docs/plan/active/phase183_endpoint_ownership_and_authority_audit.txt`
+- `docs/plan/active/phase184_capability_propagation_and_leakage_probe.txt`
+- `docs/plan/active/phase185_ipc_shape_reaudit_under_restart_and_retained_state.txt`
+- `docs/plan/active/phase189_bounded_shell_lifecycle_control_follow_through.txt`
+- `docs/plan/active/phase193_bounded_shell_service_identity_query_follow_through.txt`
+- `docs/plan/active/phase197_bounded_cross_service_retained_restart_coordination_probe.txt`
+- `docs/plan/active/phase198_multi_handle_transfer_follow_through_under_explicit_authority.txt`
+- `docs/plan/active/phase200_bounded_coordinated_retained_workset_identity_query_follow_through.txt`
+- `docs/plan/active/phase201_bounded_second_coordinated_retained_audit_lane_probe.txt`
+- `docs/plan/active/phase206_retained_service_summary_and_restart_outcome_inspection.txt`
+- `docs/plan/active/phase208_explicit_retained_coordination_comparison_and_policy_probe.txt`
+- `docs/plan/active/phase209_authority_vocabulary_and_ownership_table_audit.txt`
+- `docs/arch/veya/veya_shell_design.txt`
+- `docs/arch/veya/veya_service_shape_phase146_v0.txt`
+
+Vocabulary
+----------
+Use these words consistently when describing authority in the current
+repository-owned running-system slice.
+
+Owner
+  The module or owner-local path that may define, replace, or retire the
+  object's authoritative state.
+
+Public name
+  A stable identifier that is routable or queryable without itself carrying
+  authority. In the current slice, boot-wired endpoint ids are public names.
+
+Reference
+  The right to name or point at an object in a way the current system admits.
+  Reference is weaker than mutation or transfer.
+
+Mutation
+  The right to change the authoritative state of the object.
+
+Transfer
+  The right to move authority for later use into another holder or path.
+  In the current slice, transfer is explicit, narrow, and exceptional.
+
+Observation
+  The right to inspect current state or policy through an admitted query path.
+
+Destruction
+  The right to consume, clear, replace, retire, or otherwise end the current
+  live instance or retained contents of an object.
+
+Transfer-only exception
+  The single admitted path where authority-bearing received-handle metadata is
+  accepted. Ordinary named traffic rejects it.
+
+Retained lane
+  One explicit retained restart target whose truth spans more than one owner
+  and is enacted by init-owned restart helpers rather than by inference.
+
+Shell control path
+  The bounded shell-visible query or restart family on fixed public targets.
+  It exposes current authority truth; it is not a second capability system.
+
+Core rules
+----------
+- Boot-wired endpoint ids are stable public names and routing keys, not
+  authority tokens.
+- Ordinary named traffic rejects received-handle metadata at the dispatch
+  gateway.
+- Handle-bearing authority exists only on the explicit transfer path.
+- Retained coordination remains fixed-target and init-owned.
+- Shell-visible lifecycle, identity, summary, and policy queries expose
+  already-admitted authority truth; they do not create new ambient authority.
+
+Ownership table
+---------------
+Object kind: boot-wired endpoint ids and service public names
+Owner: `service_topology.mc` owns the static endpoint table; each service owner
+owns the behavior reachable at that public name.
+Reference: any caller that knows a boot-wired endpoint id may reference it as a
+routing key.
+Mutation: no runtime path mutates endpoint identity; topology changes are
+repository-owned source edits.
+Transfer: none. The endpoint id itself is not a transferable authority object.
+Observation: any caller may observe or use the public name; shell-visible
+queries also target the same fixed public ids indirectly.
+Destruction: none at runtime. Explicit service restart replaces the service
+instance behind the same public name rather than destroying the name.
+Notes: Phase 183 is the authority source for this classification.
+
+Object kind: grant tokens and transferred endpoint handles
+Owner: `transfer_grant.mc` owns issued grant-token truth until redemption;
+`transfer_service.mc` owns the retained `(log, kv)` pair after a successful
+explicit bind.
+Reference: only the holder of the attached grant token on the transfer path may
+redeem it.
+Mutation: `transfer_grant.mc` issues and consumes tokens; `transfer_service.mc`
+binds, stores, and uses the retained pair.
+Transfer: yes, but only on the explicit transfer-only exception path through
+`TRANSFER_ENDPOINT_ID`.
+Observation: callers can observe success, stale-token rejection, and downstream
+service effects; ordinary named traffic cannot observe or consume handle-bearing
+metadata as ordinary messages.
+Destruction: successful consume destroys the grant token; stale ids stay
+invalid; explicit restart clears retained transferred authority in
+`transfer_service`.
+Notes: Phase 184 defines the default rejection rule; Phases 185 and 198 define
+the only admitted transfer exception.
+
+Object kind: transfer-service retained pair authority
+Owner: `transfer_service.mc`.
+Reference: callers may reference the retained pair only by sending bounded
+commands to the transfer endpoint.
+Mutation: only `transfer_service` may bind or replace the retained pair.
+Transfer: no general onward transfer is admitted. The retained pair is local to
+the transfer owner.
+Observation: callers observe only reply status and the effects of the bounded
+`B`, `L`, and `K` command family.
+Destruction: explicit restart or replacement clears the retained pair.
+Notes: this is a retained authority cache local to one owner, not a general
+capability registry.
+
+Object kind: single-owner retained service state
+Owner: the service-local state owner (`log_service`, `kv_service`,
+`queue_service`) with explicit restart enactment in `init.mc`.
+Reference: callers reference these owners through their stable public endpoint
+names or shell-routed commands.
+Mutation: the owning service mutates its retained state during ordinary handled
+requests; `init.mc` may replace or reload that state on explicit restart.
+Transfer: none.
+Observation: owner-local bounded queries only. Current admitted examples are log
+tail, key lookup or count, queue count, and queue peek.
+Destruction: owner-local consume or overwrite semantics apply where admitted;
+explicit restart may clear or reload the retained state according to the target.
+Notes: retained state is real, but it remains owner-local rather than becoming a
+generic persistence subsystem.
+
+Object kind: coordinated retained lanes
+Owner: `init.mc` owns restart enactment and policy projection for the workset
+and audit-lane targets; `boot.mc` owns the lane generation markers and last
+restart-outcome summary state.
+Reference: callers reference these lanes only through fixed shell-visible target
+ids such as `W` and `A`.
+Mutation: only the explicit init-owned coordinated restart helpers mutate the
+lane as a lane; participating service owners still own their own retained data.
+Transfer: none.
+Observation: shell-visible identity, summary, and policy queries (`XIW!`,
+`XS<target>!`, `XP<target>!`) expose the lane's current truth.
+Destruction: explicit restart may reload or clear current participating state
+according to the fixed target policy.
+Notes: these lanes are explicit named coordination targets, not inferred bundles
+or a dependency graph.
+
+Object kind: shell-visible lifecycle and inspection control paths
+Owner: `shell_service.mc` owns command parsing and reply-shaping; the underlying
+truth stays with `service_topology.mc`, `boot.mc`, `init.mc`, and the relevant
+service owners; `kernel_dispatch.mc` owns the bounded control hop.
+Reference: callers may use the current fixed control family against admitted
+public targets.
+Mutation: lifecycle restart requests mutate state only through the explicit
+init-owned restart path. Pure inspection queries do not mutate authority state.
+Transfer: none.
+Observation: `XQ`, `XI`, `XS`, `XP`, and `XIW` are observation surfaces over
+already-admitted truth.
+Destruction: `XR` may replace or reload the targeted owner or lane, but only
+through the current fixed target model.
+Notes: the shell path is a compact public control surface, not a privileged
+ambient-authority escape hatch.
+
+Object kind: retained queue entries
+Owner: `queue_service.mc` during ordinary use; `init.mc` during explicit reload
+or clear on restart.
+Reference: callers reference queue state only through the queue endpoint or the
+shell-routed queue verbs.
+Mutation: enqueue and dequeue are queue-owner mutations.
+Transfer: none.
+Observation: bounded queue count and peek are the admitted non-mutating
+observation surfaces.
+Destruction: dequeue consumes one retained entry; explicit restart may clear or
+reload the queue according to the fixed target path.
+Notes: queue retained state is intentionally bounded and owner-local rather than
+becoming a mailbox or iteration framework.
+
+Interpretation rule for later phases
+------------------------------------
+When a future proposal touches an admitted authority surface, answer these six
+questions first:
+
+1. who owns it now
+2. who may reference it now
+3. who may mutate it now
+4. who may transfer it now
+5. who may observe it now
+6. who may destroy or replace it now
+
+If the proposal cannot be described clearly with those six questions, it is
+either changing the authority model and must say so explicitly, or it is trying
+to introduce a broader framework than the current slice justifies.

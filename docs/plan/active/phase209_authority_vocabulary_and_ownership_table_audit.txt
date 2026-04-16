@@ -3,7 +3,57 @@ Phase 209 -- Authority Vocabulary And Ownership Table Audit
 
 Status
 ------
-PROPOSED
+COMPLETED
+
+Outcome
+-------
+Phase 209 completed the authority-shaping step it was intended to land.
+
+The repository now has one reusable authority vocabulary and one explicit
+ownership table for the admitted running-system slice.
+That landing keeps the existing bounded authority model intact:
+
+- boot-wired endpoint ids remain stable public names and routing keys
+- ordinary named traffic still rejects received-handle metadata
+- transfer-bearing authority remains local to the explicit transfer path
+- retained coordination remains fixed-target and init-owned
+- shell-visible lifecycle and inspection control remain bounded public control
+  paths rather than a second capability system
+
+Implemented outcome
+-------------------
+- `docs/arch/veya/veya_authority_vocabulary_and_ownership_table_v0.txt` now
+  publishes the reusable authority vocabulary and the compact ownership table
+  for the admitted object kinds:
+  - boot-wired endpoint names
+  - grant tokens and transferred endpoint handles
+  - transfer-service retained authority
+  - single-owner retained service state
+  - coordinated retained lanes
+  - shell-visible lifecycle and inspection control paths
+  - retained queue entries
+- This Phase 209 note now records the closeout and points later work at that
+  shared authority surface instead of re-explaining authority per phase.
+- `docs/plan/admin/modern_c_veya_readiness_position.txt` now states that the
+  running-system slice includes one explicit authority vocabulary and ownership
+  table rather than only separate authority phase truths.
+- `docs/plan/decision_log.txt` now records the deliberate decision to land the
+  vocabulary and table without widening compiler, runtime, or framework
+  surfaces.
+- `docs/plan/backlog.txt` now carries the forward rule that future authority
+  work should extend the Phase 209 vocabulary rather than add ad hoc authority
+  exceptions.
+- Executable follow-through is reused from the existing repository-owned proof
+  surfaces rather than duplicated in a new audit harness:
+  - Phase 183 proves endpoint ids as public names and routing keys
+  - Phase 185 and Phase 198 prove the narrow transfer-only handle exception
+  - Phase 206 and Phase 208 prove shell-visible retained summary and policy
+    inspection over the fixed target model
+
+Validation
+----------
+- focused authority coverage reused from the existing reset-lane fixtures and
+  grouped workflow suite
 
 Purpose
 -------
@@ -31,6 +81,18 @@ Repository status note
   control, and retained summary or policy inspection.
 - The repo now has real authority semantics, but they are recorded mostly as
   separate phase truths rather than one reusable vocabulary.
+
+Phase result
+------------
+- The repository now has one explicit vocabulary for owner, public name,
+  reference, mutation, transfer, observation, and destruction rights.
+- The current authority-bearing object kinds are mapped onto that vocabulary
+  in one repository-owned architecture note.
+- The current executable follow-through already proves the bounded authority
+  behaviors Phase 209 needed to name, so this phase reuses those proofs rather
+  than inventing a new audit framework.
+- No compiler, sema, MIR, backend, ABI, target, runtime, stdlib, or `hal`
+  expansion was admitted.
 
 Problem being solved
 --------------------
@@ -102,6 +164,16 @@ Executable follow-through path
   otherwise be documenting unverified behavior.
 - Keep tests narrow and behavior-owned rather than inventing a new authority
   audit framework.
+
+Implemented shape
+-----------------
+- The shared vocabulary and ownership table live in one repository-owned
+  architecture note, `docs/arch/veya/veya_authority_vocabulary_and_ownership_table_v0.txt`.
+- This closeout note stays phase-scoped and records why the vocabulary is now a
+  maintained repository truth.
+- Existing reset-lane authority fixtures remain the executable honesty check.
+- The planning surfaces were refreshed so later phases reuse the vocabulary
+  instead of reopening the same authority naming work.
 
 Suggested execution order
 -------------------------
