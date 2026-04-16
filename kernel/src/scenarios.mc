@@ -4,6 +4,7 @@ import boot
 import scenario_audit_coordination
 import scenario_coordination
 import scenario_lifecycle
+import scenario_retained_policy
 import scenario_queue
 import scenario_retained_summary
 import scenario_restart
@@ -43,6 +44,10 @@ func run(state: *boot.KernelBootState) i32 {
         return result
     }
     result = scenario_workset_identity.run_workset_identity_probe(state)
+    if result != 0 {
+        return result
+    }
+    result = scenario_retained_policy.run_retained_policy_probe()
     if result != 0 {
         return result
     }

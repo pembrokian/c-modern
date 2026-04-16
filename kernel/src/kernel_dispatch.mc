@@ -55,7 +55,7 @@ func lifecycle_is_lane_target(target: u8) bool {
 }
 
 func lifecycle_op_supported(op: u8) bool {
-    return op == serial_protocol.CMD_I || op == serial_protocol.CMD_S || op == serial_protocol.CMD_R
+    return op == serial_protocol.CMD_I || op == serial_protocol.CMD_P || op == serial_protocol.CMD_S || op == serial_protocol.CMD_R
 }
 
 func lifecycle_validate(msg: service_effect.Message) u8 {
@@ -88,6 +88,14 @@ func lifecycle_identity_reply(state: *boot.KernelBootState, target: u8) service_
     }
     mark: service_identity.ServiceMark = boot.bootmark_for_endpoint(*state, identity_endpoint)
     return shell_service.lifecycle_identity_effect(syscall.SyscallStatus.Ok, service_identity.mark_generation_payload(mark))
+}
+
+func lifecycle_policy_reply(state: *boot.KernelBootState, target: u8) service_effect.Effect {
+    payload: [4]u8 = init.restart_policy_payload(target)
+    if payload[0] == 0 {
+        return shell_service.invalid_effect(shell_service.SHELL_INVALID_COMMAND)
+    }
+    return shell_service.lifecycle_policy_effect(syscall.SyscallStatus.Ok, payload)
 }
 
 func lifecycle_summary_reply(state: *boot.KernelBootState, target: u8) service_effect.Effect {
@@ -165,6 +173,8 @@ func lifecycle_route(op: u8) LifecycleRoute {
     switch op {
     case serial_protocol.CMD_I:
         return LifecycleRoute{ op: op, reply: lifecycle_identity_reply }
+    case serial_protocol.CMD_P:
+        return LifecycleRoute{ op: op, reply: lifecycle_policy_reply }
     case serial_protocol.CMD_S:
         return LifecycleRoute{ op: op, reply: lifecycle_summary_reply }
     case serial_protocol.CMD_R:

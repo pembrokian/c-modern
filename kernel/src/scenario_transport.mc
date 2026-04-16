@@ -47,6 +47,10 @@ func cmd_lifecycle_identity(target: u8) syscall.ReceiveObservation {
     return serial_obs(DEFAULT_SERIAL_ROUTE.endpoint, DEFAULT_SERIAL_ROUTE.pid, serial_protocol.encode_lifecycle_identity(target))
 }
 
+func cmd_lifecycle_policy(target: u8) syscall.ReceiveObservation {
+    return serial_obs(DEFAULT_SERIAL_ROUTE.endpoint, DEFAULT_SERIAL_ROUTE.pid, serial_protocol.encode_lifecycle_policy(target))
+}
+
 func cmd_lifecycle_summary(target: u8) syscall.ReceiveObservation {
     return serial_obs(DEFAULT_SERIAL_ROUTE.endpoint, DEFAULT_SERIAL_ROUTE.pid, serial_protocol.encode_lifecycle_summary(target))
 }

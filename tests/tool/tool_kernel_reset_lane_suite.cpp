@@ -1,5 +1,8 @@
 #include <array>
+#include <chrono>
 #include <filesystem>
+#include <iostream>
+#include <sstream>
 #include <set>
 #include <string>
 #include <string_view>
@@ -28,7 +31,74 @@ struct ResetLaneScenario {
     std::string_view run_output_name;
     std::string_view build_context;
     std::string_view run_context;
+    bool requires_clean_build = false;
 };
+
+struct ResetLaneScenarioTiming {
+    std::string label;
+    std::chrono::milliseconds build_duration {};
+    std::chrono::milliseconds run_duration {};
+};
+
+std::string FormatDuration(std::chrono::milliseconds duration) {
+    std::ostringstream stream;
+    stream << duration.count() << "ms";
+    return stream.str();
+}
+
+std::string LoadKernelResetLaneFixtureFile(const std::filesystem::path& source_root,
+                                          const std::filesystem::path& fixture_root,
+                                          const std::filesystem::path& relative_path) {
+    constexpr std::string_view kKernelNewSourcePlaceholder = "__KERNEL_NEW_SRC__";
+
+    std::string text = ReadFile(fixture_root / relative_path);
+    if (relative_path != std::filesystem::path{"build.toml"}) {
+        return text;
+    }
+
+    if (text.find(kKernelNewSourcePlaceholder) == std::string::npos) {
+        Fail("kernel reset-lane fixture build.toml is missing the kernel_new source placeholder");
+    }
+
+    const std::string kernel_src = (source_root / "kernel" / "src").generic_string();
+    size_t pos = 0;
+    while ((pos = text.find(kKernelNewSourcePlaceholder, pos)) != std::string::npos) {
+        text.replace(pos, kKernelNewSourcePlaceholder.size(), kernel_src);
+        pos += kernel_src.size();
+    }
+    return text;
+}
+
+void WriteFileIfChanged(const std::filesystem::path& path,
+                        std::string_view contents) {
+    if (std::filesystem::exists(path) && ReadFile(path) == contents) {
+        return;
+    }
+    WriteFile(path, contents);
+}
+
+void RemoveExtraneousFixtureProjectEntries(const std::filesystem::path& fixture_root,
+                                          const std::filesystem::path& project_root) {
+    if (!std::filesystem::exists(project_root)) {
+        return;
+    }
+
+    std::vector<std::filesystem::path> stale_entries;
+    for (const auto& entry : std::filesystem::recursive_directory_iterator(project_root)) {
+        const std::filesystem::path relative_path = std::filesystem::relative(entry.path(), project_root);
+        if (!std::filesystem::exists(fixture_root / relative_path)) {
+            stale_entries.push_back(entry.path());
+        }
+    }
+
+    std::sort(stale_entries.begin(), stale_entries.end(), [](const auto& lhs, const auto& rhs) {
+        return lhs.generic_string().size() > rhs.generic_string().size();
+    });
+    stale_entries.erase(std::unique(stale_entries.begin(), stale_entries.end()), stale_entries.end());
+    for (const auto& stale_entry : stale_entries) {
+        std::filesystem::remove_all(stale_entry);
+    }
+}
 
 std::set<std::string> CollectResetLaneFixtureRelativePaths(const std::filesystem::path& source_root,
                                                            const std::filesystem::path& relative_root) {
@@ -53,25 +123,25 @@ std::set<std::string> CollectResetLaneFixtureRelativePaths(const std::filesystem
 std::filesystem::path InstallKernelResetLaneFixtureProject(const std::filesystem::path& source_root,
                                                            const std::filesystem::path& fixture_root,
                                                            const std::filesystem::path& project_root) {
-    constexpr std::string_view kKernelNewSourcePlaceholder = "__KERNEL_NEW_SRC__";
+    std::filesystem::create_directories(project_root);
+    RemoveExtraneousFixtureProjectEntries(fixture_root, project_root);
 
-    std::filesystem::remove_all(project_root);
-    CopyDirectoryTree(fixture_root, project_root);
+    for (const auto& entry : std::filesystem::recursive_directory_iterator(fixture_root)) {
+        const std::filesystem::path relative_path = std::filesystem::relative(entry.path(), fixture_root);
+        const std::filesystem::path destination_path = project_root / relative_path;
+        if (entry.is_directory()) {
+            std::filesystem::create_directories(destination_path);
+            continue;
+        }
+        if (!entry.is_regular_file()) {
+            continue;
+        }
 
-    const std::filesystem::path build_toml_path = project_root / "build.toml";
-    std::string build_toml_text = ReadFile(build_toml_path);
-    if (build_toml_text.find(kKernelNewSourcePlaceholder) == std::string::npos) {
-        Fail("kernel reset-lane fixture build.toml is missing the kernel_new source placeholder");
+        WriteFileIfChanged(destination_path,
+                           LoadKernelResetLaneFixtureFile(source_root, fixture_root, relative_path));
     }
 
-    const std::string kernel_src = (source_root / "kernel" / "src").generic_string();
-    size_t pos = 0;
-    while ((pos = build_toml_text.find(kKernelNewSourcePlaceholder, pos)) != std::string::npos) {
-        build_toml_text.replace(pos, kKernelNewSourcePlaceholder.size(), kernel_src);
-        pos += kernel_src.size();
-    }
-    WriteFile(build_toml_path, build_toml_text);
-    return build_toml_path;
+    return project_root / "build.toml";
 }
 
 void ExpectKernelResetLaneRunSuccess(const ResetLaneScenario& scenario,
@@ -83,10 +153,10 @@ void ExpectKernelResetLaneRunSuccess(const ResetLaneScenario& scenario,
     }
 }
 
-void RunKernelResetLaneScenario(const std::filesystem::path& source_root,
-                                const std::filesystem::path& binary_root,
-                                const std::filesystem::path& mc_path,
-                                const ResetLaneScenario& scenario) {
+ResetLaneScenarioTiming RunKernelResetLaneScenario(const std::filesystem::path& source_root,
+                                                   const std::filesystem::path& binary_root,
+                                                   const std::filesystem::path& mc_path,
+                                                   const ResetLaneScenario& scenario) {
     std::filesystem::path project_path;
     if (scenario.fixture_relative_path.empty()) {
         project_path = source_root / "kernel" / "build.toml";
@@ -97,13 +167,17 @@ void RunKernelResetLaneScenario(const std::filesystem::path& source_root,
     }
 
     const std::filesystem::path build_dir = binary_root / std::string(scenario.build_dir_name);
-    std::filesystem::remove_all(build_dir);
+    if (scenario.requires_clean_build) {
+        std::filesystem::remove_all(build_dir);
+    }
+    const auto build_start = std::chrono::steady_clock::now();
     BuildProjectTargetAndExpectSuccess(mc_path,
                                        project_path,
                                        build_dir,
                                        scenario.target_name,
                                        scenario.build_output_name,
                                        std::string(scenario.build_context));
+    const auto build_end = std::chrono::steady_clock::now();
 
     std::vector<std::string> command = {mc_path.generic_string(),
                                         "run",
@@ -116,13 +190,23 @@ void RunKernelResetLaneScenario(const std::filesystem::path& source_root,
     command.push_back("--build-dir");
     command.push_back(build_dir.generic_string());
 
+    const auto run_start = std::chrono::steady_clock::now();
     const auto [run_outcome, run_output] = RunCommandCapture(command,
                                                              build_dir / std::string(scenario.run_output_name),
                                                              std::string(scenario.run_context));
+    const auto run_end = std::chrono::steady_clock::now();
     ExpectKernelResetLaneRunSuccess(scenario, run_outcome, run_output);
+
+    return {
+        .label = std::string(scenario.label),
+        .build_duration =
+            std::chrono::duration_cast<std::chrono::milliseconds>(build_end - build_start),
+        .run_duration =
+            std::chrono::duration_cast<std::chrono::milliseconds>(run_end - run_start),
+    };
 }
 
-constexpr std::array<ResetLaneScenario, 36> kResetLaneScenarios = {{
+constexpr std::array<ResetLaneScenario, 37> kResetLaneScenarios = {{
     {"repo project", "", "", "kernel_reset_lane_repo_build", "kernel", "kernel_reset_lane_repo_build_output.txt", "kernel_reset_lane_repo_run_output.txt", "kernel reset lane repo project build", "kernel reset lane repo project run"},
     {"smoke", "tests/smoke/kernel_reset_lane_serial_round_trip", "kernel_reset_lane_smoke_project", "kernel_reset_lane_smoke_build", "app", "kernel_reset_lane_smoke_build_output.txt", "kernel_reset_lane_smoke_run_output.txt", "kernel reset lane smoke build", "kernel reset lane smoke run"},
     {"retained state", "tests/system/kernel_reset_lane_retained_log", "kernel_reset_lane_retained_state_project", "kernel_reset_lane_retained_state_build", "app", "kernel_reset_lane_retained_state_build_output.txt", "kernel_reset_lane_retained_state_run_output.txt", "kernel reset lane retained-state build", "kernel reset lane retained-state run"},
@@ -159,6 +243,7 @@ constexpr std::array<ResetLaneScenario, 36> kResetLaneScenarios = {{
     {"phase 200 workset identity", "tests/system/kernel_reset_lane_phase200_workset_identity", "kernel_reset_lane_phase200_workset_identity_project", "kernel_reset_lane_phase200_workset_identity_build", "app", "kernel_reset_lane_phase200_workset_identity_build_output.txt", "kernel_reset_lane_phase200_workset_identity_run_output.txt", "kernel reset lane phase 200 workset identity build", "kernel reset lane phase 200 workset identity run"},
     {"phase 201 retained audit coordination", "tests/system/kernel_reset_lane_phase201_retained_audit_coordination", "kernel_reset_lane_phase201_retained_audit_coordination_project", "kernel_reset_lane_phase201_retained_audit_coordination_build", "app", "kernel_reset_lane_phase201_retained_audit_coordination_build_output.txt", "kernel_reset_lane_phase201_retained_audit_coordination_run_output.txt", "kernel reset lane phase 201 retained audit coordination build", "kernel reset lane phase 201 retained audit coordination run"},
     {"phase 206 retained summary", "tests/system/kernel_reset_lane_phase206_retained_summary", "kernel_reset_lane_phase206_retained_summary_project", "kernel_reset_lane_phase206_retained_summary_build", "app", "kernel_reset_lane_phase206_retained_summary_build_output.txt", "kernel_reset_lane_phase206_retained_summary_run_output.txt", "kernel reset lane phase 206 retained summary build", "kernel reset lane phase 206 retained summary run"},
+    {"phase 208 retained policy", "tests/system/kernel_reset_lane_phase208_retained_policy", "kernel_reset_lane_phase208_retained_policy_project", "kernel_reset_lane_phase208_retained_policy_build", "app", "kernel_reset_lane_phase208_retained_policy_build_output.txt", "kernel_reset_lane_phase208_retained_policy_run_output.txt", "kernel reset lane phase 208 retained policy build", "kernel reset lane phase 208 retained policy run"},
 }};
 
 std::set<std::string> CollectCoveredResetLaneFixturePaths() {
@@ -205,10 +290,33 @@ namespace mc::tool_tests {
 void RunWorkflowKernelResetLaneSuite(const std::filesystem::path& source_root,
                                      const std::filesystem::path& binary_root,
                                      const std::filesystem::path& mc_path) {
+    const auto coverage_start = std::chrono::steady_clock::now();
     ValidateResetLaneScenarioCoverage(source_root);
+    const auto coverage_end = std::chrono::steady_clock::now();
+
+    std::vector<ResetLaneScenarioTiming> timings;
+    timings.reserve(kResetLaneScenarios.size());
+    std::chrono::milliseconds total_build_duration {};
+    std::chrono::milliseconds total_run_duration {};
+
     for (const auto& scenario : kResetLaneScenarios) {
-        RunKernelResetLaneScenario(source_root, binary_root, mc_path, scenario);
+        ResetLaneScenarioTiming timing =
+            RunKernelResetLaneScenario(source_root, binary_root, mc_path, scenario);
+        total_build_duration += timing.build_duration;
+        total_run_duration += timing.run_duration;
+        std::cout << "kernel-reset-lane: " << timing.label << " build="
+                  << FormatDuration(timing.build_duration) << " run="
+                  << FormatDuration(timing.run_duration) << '\n';
+        timings.push_back(std::move(timing));
     }
+
+    const std::chrono::milliseconds coverage_duration =
+        std::chrono::duration_cast<std::chrono::milliseconds>(coverage_end - coverage_start);
+    std::cout << "kernel-reset-lane: coverage=" << FormatDuration(coverage_duration)
+              << " scenarios=" << timings.size() << " total-build="
+              << FormatDuration(total_build_duration) << " total-run="
+              << FormatDuration(total_run_duration) << " total="
+              << FormatDuration(coverage_duration + total_build_duration + total_run_duration) << '\n';
 }
 
 }  // namespace mc::tool_tests

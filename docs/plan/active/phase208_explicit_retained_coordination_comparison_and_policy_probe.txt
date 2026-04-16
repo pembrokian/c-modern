@@ -3,7 +3,7 @@ Phase 208 -- Explicit Retained Coordination Comparison And Policy Probe
 
 Status
 ------
-PROPOSED
+COMPLETED
 
 Purpose
 -------
@@ -28,6 +28,26 @@ Repository status note
   and concrete, but the comparison and policy truth still lives only in code:
   restart helpers know which owners participate and what gets reloaded, while
   callers do not have one explicit pre-restart view of that policy.
+
+Implemented outcome
+-------------------
+- `kernel/src/serial_protocol.mc` now admits one additive lifecycle policy
+  query, `XP<target>!`, on the existing shell-visible lifecycle family.
+- `kernel/src/init.mc` now owns one compact target-local policy projection for
+  the admitted restartable targets: target identity, up to two participating
+  owners, and one explicit keep-versus-clear policy byte.
+- `kernel/src/kernel_dispatch.mc` and `kernel/src/shell_service.mc` now route
+  that policy inspection through the same bounded shell control hop already
+  used for lifecycle query, identity, summary, and restart.
+- `kernel/src/scenario_retained_policy.mc` now proves that the workset and the
+  audit lane both report the correct coordinated retained owners and keep
+  policy before restart, and that `echo_service` reports clear policy before
+  ordinary replacement.
+- `tests/system/kernel_reset_lane_phase208_retained_policy/` adds the focused
+  reset-lane fixture for policy-to-outcome correspondence, and the grouped
+  reset-lane workflow suite now owns it.
+- No compiler, sema, MIR, backend, ABI, target, runtime, stdlib, or `hal`
+  expansion was admitted in this phase.
 
 Problem being solved
 --------------------
@@ -114,6 +134,22 @@ Deliverables
 - bounded owner-local policy metadata for the admitted coordinated targets
 - one scenario proof and one reset-lane fixture for policy-to-outcome
   correspondence
+
+Landed contract
+---------------
+- Request: `XP<target>!`
+- Reply payload bytes:
+  - byte 0: queried target id
+  - byte 1: first participating owner target id
+  - byte 2: second participating owner target id, or `N` when the target is a
+    single-owner restart path
+  - byte 3: policy class, `K` for keep retained state or `C` for clear and
+    replace
+- Admitted target policy surface:
+  - workset: `W K Q K`
+  - audit lane: `A K L K`
+  - retained single-owner services: `<target> <target> N K`
+  - ordinary reset-style services: `<target> <target> N C`
 
 Validation expectations
 -----------------------

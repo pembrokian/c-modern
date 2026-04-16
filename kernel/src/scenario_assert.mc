@@ -62,6 +62,29 @@ func expect_identity(effect: service_effect.Effect, status: syscall.SyscallStatu
     return true
 }
 
+func expect_policy(effect: service_effect.Effect, status: syscall.SyscallStatus, target: u8, owner0: u8, owner1: u8, policy: u8) bool {
+    if service_effect.effect_reply_status(effect) != status {
+        return false
+    }
+    if service_effect.effect_reply_payload_len(effect) != 4 {
+        return false
+    }
+    payload: [4]u8 = service_effect.effect_reply_payload(effect)
+    if payload[0] != target {
+        return false
+    }
+    if payload[1] != owner0 {
+        return false
+    }
+    if payload[2] != owner1 {
+        return false
+    }
+    if payload[3] != policy {
+        return false
+    }
+    return true
+}
+
 func expect_generation_payload(effect: service_effect.Effect, status: syscall.SyscallStatus, generation: u32) bool {
     if service_effect.effect_reply_status(effect) != status {
         return false

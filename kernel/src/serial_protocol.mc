@@ -14,6 +14,7 @@
 //   Q C ! !         — queue count (returns count as reply_payload_len)
 //   Q P ! !         — queue peek
 //   X Q <target> !  — lifecycle query
+//   X P <target> !  — lifecycle policy query
 //   X S <target> !  — retained summary query
 //   X R <target> !  — explicit restart
 //
@@ -51,6 +52,10 @@ const TARGET_ECHO: u8 = 69      // 'E'
 const TARGET_TRANSFER: u8 = 80  // 'P'
 const TARGET_TICKET: u8 = 84    // 'T'
 
+const PARTICIPANT_NONE: u8 = 78  // 'N'
+const POLICY_CLEAR: u8 = 67      // 'C'
+const POLICY_KEEP: u8 = 75       // 'K'
+
 const LIFECYCLE_NONE: u8 = 78    // 'N'
 const LIFECYCLE_RESET: u8 = 82   // 'R'
 const LIFECYCLE_RELOAD: u8 = 76  // 'L'
@@ -85,6 +90,10 @@ func encode_lifecycle_query(target: u8) [4]u8 {
 
 func encode_lifecycle_identity(target: u8) [4]u8 {
     return ipc.payload_byte(CMD_X, CMD_I, target, CMD_BANG)
+}
+
+func encode_lifecycle_policy(target: u8) [4]u8 {
+    return ipc.payload_byte(CMD_X, CMD_P, target, CMD_BANG)
 }
 
 func encode_lifecycle_summary(target: u8) [4]u8 {

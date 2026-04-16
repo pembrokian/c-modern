@@ -18,9 +18,58 @@ import echo_service
 import kv_service
 import log_service
 import queue_service
+import serial_protocol
 import service_topology
 import ticket_service
 import transfer_service
+
+struct RestartPolicyInfo {
+    target: u8
+    owner0: u8
+    owner1: u8
+    policy: u8
+}
+
+func restart_policy_single(target: u8, policy: u8) RestartPolicyInfo {
+    return RestartPolicyInfo{ target: target, owner0: target, owner1: serial_protocol.PARTICIPANT_NONE, policy: policy }
+}
+
+func restart_policy_pair(target: u8, owner0: u8, owner1: u8, policy: u8) RestartPolicyInfo {
+    return RestartPolicyInfo{ target: target, owner0: owner0, owner1: owner1, policy: policy }
+}
+
+func restart_policy_for_target(target: u8) RestartPolicyInfo {
+    switch target {
+    case serial_protocol.TARGET_WORKSET:
+        return restart_policy_pair(target, serial_protocol.TARGET_KV, serial_protocol.TARGET_QUEUE, serial_protocol.POLICY_KEEP)
+    case serial_protocol.TARGET_AUDIT:
+        return restart_policy_pair(target, serial_protocol.TARGET_KV, serial_protocol.TARGET_LOG, serial_protocol.POLICY_KEEP)
+    case serial_protocol.TARGET_LOG:
+        return restart_policy_single(target, serial_protocol.POLICY_KEEP)
+    case serial_protocol.TARGET_KV:
+        return restart_policy_single(target, serial_protocol.POLICY_KEEP)
+    case serial_protocol.TARGET_QUEUE:
+        return restart_policy_single(target, serial_protocol.POLICY_KEEP)
+    case serial_protocol.TARGET_ECHO:
+        return restart_policy_single(target, serial_protocol.POLICY_CLEAR)
+    case serial_protocol.TARGET_TRANSFER:
+        return restart_policy_single(target, serial_protocol.POLICY_CLEAR)
+    case serial_protocol.TARGET_TICKET:
+        return restart_policy_single(target, serial_protocol.POLICY_CLEAR)
+    default:
+        return RestartPolicyInfo{ target: 0, owner0: serial_protocol.PARTICIPANT_NONE, owner1: serial_protocol.PARTICIPANT_NONE, policy: serial_protocol.PARTICIPANT_NONE }
+    }
+}
+
+func restart_policy_payload(target: u8) [4]u8 {
+    info: RestartPolicyInfo = restart_policy_for_target(target)
+    payload: [4]u8
+    payload[0] = info.target
+    payload[1] = info.owner0
+    payload[2] = info.owner1
+    payload[3] = info.policy
+    return payload
+}
 
 func restart(state: boot.KernelBootState, endpoint: u32) boot.KernelBootState {
     if !service_topology.service_can_restart(endpoint) {
