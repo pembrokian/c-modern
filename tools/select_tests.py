@@ -14,6 +14,122 @@ from typing import Iterable
 import re
 
 
+@dataclass(frozen=True)
+class ToolCaseDescriptor:
+    name: str
+    family: str
+    runner: str
+    selector: str
+    function: str
+    descriptor_path: str
+    roots: tuple[str, ...]
+
+
+def parse_tool_case_descriptor(descriptor_path: Path) -> ToolCaseDescriptor:
+    values: dict[str, str] = {}
+    arrays: dict[str, list[str]] = {}
+    current_array: str | None = None
+
+    for raw_line in descriptor_path.read_text().splitlines():
+        line = raw_line.split("#", 1)[0].strip()
+        if not line:
+            continue
+
+        if current_array is not None:
+            if line == "]":
+                current_array = None
+                continue
+            match = re.fullmatch(r'"([^"]+)",?', line)
+            if not match:
+                raise ValueError(f"invalid array entry in {descriptor_path}: {raw_line}")
+            arrays[current_array].append(match.group(1))
+            continue
+
+        string_match = re.fullmatch(r'([a-z_]+)\s*=\s*"([^"]+)"', line)
+        if string_match:
+            values[string_match.group(1)] = string_match.group(2)
+            continue
+
+        array_start_match = re.fullmatch(r'([a-z_]+)\s*=\s*\[', line)
+        if array_start_match:
+            current_array = array_start_match.group(1)
+            arrays[current_array] = []
+            continue
+
+        raise ValueError(f"unsupported descriptor line in {descriptor_path}: {raw_line}")
+
+    if current_array is not None:
+        raise ValueError(f"unterminated array '{current_array}' in {descriptor_path}")
+
+    required_fields = ("name", "family", "runner", "selector", "function")
+    missing = [field for field in required_fields if field not in values]
+    if missing:
+        raise ValueError(f"missing descriptor fields {missing} in {descriptor_path}")
+
+    if values["name"] != values["selector"]:
+        raise ValueError(f"descriptor {descriptor_path} must keep name and selector identical")
+
+    if descriptor_path.parent.name != values["name"]:
+        raise ValueError(
+            f"descriptor {descriptor_path} must match its directory name '{descriptor_path.parent.name}'"
+        )
+
+    return ToolCaseDescriptor(
+        name=values["name"],
+        family=values["family"],
+        runner=values["runner"],
+        selector=values["selector"],
+        function=values["function"],
+        descriptor_path=descriptor_path.relative_to(SCRIPT_SOURCE_ROOT).as_posix(),
+        roots=tuple(arrays.get("roots", [])),
+    )
+
+
+def load_tool_case_descriptors(source_root: Path, relative_root: str, expected_family: str, expected_runner: str) -> list[ToolCaseDescriptor]:
+    descriptor_paths = sorted((source_root / relative_root).glob("*/case.toml"))
+    if not descriptor_paths:
+        raise ValueError(f"no tool case descriptors found under {relative_root}")
+
+    descriptors: list[ToolCaseDescriptor] = []
+    for descriptor_path in descriptor_paths:
+        descriptor = parse_tool_case_descriptor(descriptor_path)
+        if descriptor.family != expected_family:
+            raise ValueError(
+                f"descriptor {descriptor_path} has family '{descriptor.family}', expected '{expected_family}'"
+            )
+        if descriptor.runner != expected_runner:
+            raise ValueError(
+                f"descriptor {descriptor_path} has runner '{descriptor.runner}', expected '{expected_runner}'"
+            )
+        descriptors.append(descriptor)
+    return descriptors
+
+
+def ctest_name_for_descriptor(descriptor: ToolCaseDescriptor) -> str:
+    if descriptor.family == "tool-workflow":
+        prefix = "mc_tool_workflow_"
+    elif descriptor.family == "tool-real-project":
+        prefix = "mc_tool_real_project_"
+    else:
+        raise ValueError(f"unsupported tool case family: {descriptor.family}")
+    return prefix + descriptor.selector.replace("-", "_") + "_unit"
+
+
+SCRIPT_SOURCE_ROOT = Path(__file__).resolve().parent.parent
+WORKFLOW_CASES = load_tool_case_descriptors(
+    SCRIPT_SOURCE_ROOT,
+    "tests/tool/workflow",
+    "tool-workflow",
+    "mc_tool_workflow_tests",
+)
+REAL_PROJECT_CASES = load_tool_case_descriptors(
+    SCRIPT_SOURCE_ROOT,
+    "tests/tool/real_projects",
+    "tool-real-project",
+    "mc_tool_real_project_tests",
+)
+
+
 CORE_COMPILER_TESTS = [
     "mc_parser_fixture_unit",
     "mc_sema_fixture_unit",
@@ -29,29 +145,9 @@ ALL_EXECUTABLE_CODEGEN_TESTS = [
     "mc_codegen_executable_project_unit",
 ]
 
-ALL_WORKFLOW_TESTS = [
-    "mc_tool_workflow_help_unit",
-    "mc_tool_workflow_test_command_unit",
-    "mc_tool_workflow_project_validation_unit",
-    "mc_tool_workflow_multifile_module_unit",
-    "mc_tool_workflow_kernel_reset_lane_unit",
-]
+ALL_WORKFLOW_TESTS = [ctest_name_for_descriptor(descriptor) for descriptor in WORKFLOW_CASES]
 
-ALL_REAL_PROJECT_TESTS = [
-    "mc_tool_real_project_grep_lite_unit",
-    "mc_tool_real_project_file_walker_unit",
-    "mc_tool_real_project_hash_tool_unit",
-    "mc_tool_real_project_arena_expr_unit",
-    "mc_tool_real_project_worker_queue_unit",
-    "mc_tool_real_project_pipe_handoff_unit",
-    "mc_tool_real_project_pipe_ready_unit",
-    "mc_tool_real_project_line_filter_relay_unit",
-    "mc_tool_real_project_evented_echo_unit",
-    "mc_tool_real_project_review_board_unit",
-    "mc_tool_real_project_issue_rollup_unit",
-    "mc_tool_real_project_issue_rollup_imported_aggregate_const_unit",
-    "mc_tool_real_project_module_set_imported_const_unit",
-]
+ALL_REAL_PROJECT_TESTS = [ctest_name_for_descriptor(descriptor) for descriptor in REAL_PROJECT_CASES]
 
 SMOKE_AND_AUDIT_TESTS = [
     "mc_help_smoke",
@@ -102,13 +198,7 @@ RULES = [
     Rule(("tests/tool/tool_workflow_tests.cpp",
           "tests/tool/tool_workflow_orchestrator.cpp",
           "tests/tool/tool_workflow_suite_internal.h"), tuple(ALL_WORKFLOW_TESTS), "workflow suite ownership"),
-    Rule(("tests/tool/tool_help_suite.cpp",), ("mc_tool_workflow_help_unit",), "workflow help ownership"),
-    Rule(("tests/tool/tool_test_command_suite.cpp",), ("mc_tool_workflow_test_command_unit",), "workflow test-command ownership"),
-    Rule(("tests/tool/tool_project_validation_suite.cpp",), ("mc_tool_workflow_project_validation_unit",), "workflow project-validation ownership"),
-    Rule(("tests/tool/tool_multifile_module_suite.cpp",), ("mc_tool_workflow_multifile_module_unit",), "workflow multifile-module ownership"),
-    Rule(("tests/tool/tool_kernel_reset_lane_suite.cpp",), ("mc_tool_workflow_kernel_reset_lane_unit",), "workflow kernel-reset-lane ownership"),
     Rule(("tests/tool/tool_build_state_tests.cpp", "tests/tool/tool_build_state_suite.cpp"), ("mc_tool_build_state_unit",), "build-state suite ownership"),
-    Rule(("tests/tool/tool_real_project_tests.cpp", "tests/tool/tool_real_project_suite.cpp"), tuple(ALL_REAL_PROJECT_TESTS), "real-project suite ownership"),
     Rule(("tests/tool/tool_suite_common.cpp", "tests/tool/tool_suite_common.h"), tuple(ALL_TOOL_TESTS), "shared tool helper ownership"),
     Rule(("compiler/lex/", "compiler/parse/", "compiler/ast/"), tuple(CORE_COMPILER_TESTS), "frontend syntax-layer ownership"),
     Rule(("compiler/resolve/", "compiler/sema/"), ("mc_sema_fixture_unit", "mc_mir_fixture_unit", "mc_mir_unit", "mc_codegen_fixture_unit", "mc_codegen_llvm_unit", *ALL_EXECUTABLE_CODEGEN_TESTS), "semantic-layer ownership"),
@@ -118,6 +208,20 @@ RULES = [
     Rule(("tests/support/",), tuple(FULL_LOCAL_UNIT_SET), "shared test harness ownership"),
     Rule(("CMakeLists.txt",), tuple(FULL_LOCAL_UNIT_SET), "build graph ownership"),
 ]
+
+for descriptor in WORKFLOW_CASES:
+    RULES.append(
+        Rule((descriptor.descriptor_path, *descriptor.roots), (ctest_name_for_descriptor(descriptor),), f"workflow {descriptor.selector} ownership")
+    )
+
+RULES.append(
+    Rule(("tests/tool/tool_real_project_tests.cpp", "tests/tool/tool_real_project_suite.cpp"), tuple(ALL_REAL_PROJECT_TESTS), "real-project suite ownership")
+)
+
+for descriptor in REAL_PROJECT_CASES:
+    RULES.append(
+        Rule((descriptor.descriptor_path, *descriptor.roots), (ctest_name_for_descriptor(descriptor),), f"real-project {descriptor.selector} ownership")
+    )
 
 
 def parse_args() -> argparse.Namespace:
@@ -267,6 +371,19 @@ def owned_inputs_for_test(test_name: str, source_root: Path) -> list[Path]:
         "tests/support/",
     ]
 
+    workflow_common_inputs = [
+        "tests/tool/tool_workflow_tests.cpp",
+        "tests/tool/tool_workflow_orchestrator.cpp",
+        "tests/tool/tool_workflow_suite_internal.h",
+        *common_tool_inputs,
+    ]
+
+    real_project_common_inputs = [
+        "tests/tool/tool_real_project_tests.cpp",
+        "tests/tool/tool_real_project_suite.cpp",
+        *common_tool_inputs,
+    ]
+
     explicit_inputs = {
         "mc_parser_fixture_unit": ["tests/compiler/parser/", "compiler/lex/", "compiler/parse/", "compiler/ast/", "tests/support/"],
         "mc_sema_fixture_unit": ["tests/compiler/sema/", "compiler/lex/", "compiler/parse/", "compiler/ast/", "compiler/resolve/", "compiler/sema/", "tests/support/"],
@@ -277,25 +394,7 @@ def owned_inputs_for_test(test_name: str, source_root: Path) -> list[Path]:
         "mc_codegen_executable_core_unit": ["tests/compiler/codegen/", "compiler/codegen_llvm/", "compiler/mir/", "compiler/sema/", "tests/compiler/codegen/codegen_executable_tests.cpp"],
         "mc_codegen_executable_stdlib_unit": ["tests/compiler/codegen/", "compiler/codegen_llvm/", "compiler/mir/", "compiler/sema/", "stdlib/", "tests/compiler/codegen/codegen_executable_tests.cpp"],
         "mc_codegen_executable_project_unit": ["tests/compiler/codegen/", "compiler/codegen_llvm/", "compiler/mir/", "compiler/sema/", "examples/", "tests/compiler/codegen/codegen_executable_tests.cpp"],
-        "mc_tool_workflow_help_unit": ["tests/tool/tool_workflow_tests.cpp", "tests/tool/tool_workflow_orchestrator.cpp", "tests/tool/tool_workflow_suite_internal.h", "tests/tool/tool_help_suite.cpp", "tests/tool/tool_suite_common.cpp", "tests/tool/tool_suite_common.h", "compiler/driver/", "compiler/support/", "compiler/mci/", "tests/support/"],
-        "mc_tool_workflow_test_command_unit": ["tests/tool/tool_workflow_tests.cpp", "tests/tool/tool_workflow_orchestrator.cpp", "tests/tool/tool_workflow_suite_internal.h", "tests/tool/tool_test_command_suite.cpp", "tests/tool/tool_suite_common.cpp", "tests/tool/tool_suite_common.h", "compiler/driver/", "compiler/support/", "compiler/mci/", "tests/support/"],
-        "mc_tool_workflow_project_validation_unit": ["tests/tool/tool_workflow_tests.cpp", "tests/tool/tool_workflow_orchestrator.cpp", "tests/tool/tool_workflow_suite_internal.h", "tests/tool/tool_project_validation_suite.cpp", "tests/tool/tool_suite_common.cpp", "tests/tool/tool_suite_common.h", "compiler/driver/", "compiler/support/", "compiler/mci/", "tests/support/"],
-        "mc_tool_workflow_multifile_module_unit": ["tests/tool/tool_workflow_tests.cpp", "tests/tool/tool_workflow_orchestrator.cpp", "tests/tool/tool_workflow_suite_internal.h", "tests/tool/tool_multifile_module_suite.cpp", "tests/tool/tool_suite_common.cpp", "tests/tool/tool_suite_common.h", "compiler/driver/", "compiler/support/", "compiler/mci/", "tests/support/"],
-        "mc_tool_workflow_kernel_reset_lane_unit": ["tests/tool/tool_workflow_tests.cpp", "tests/tool/tool_workflow_orchestrator.cpp", "tests/tool/tool_workflow_suite_internal.h", "tests/tool/tool_kernel_reset_lane_suite.cpp", "tests/tool/tool_suite_common.cpp", "tests/tool/tool_suite_common.h", "compiler/driver/", "compiler/support/", "compiler/mci/", "tests/support/", "kernel/", "stdlib/"],
         "mc_tool_build_state_unit": ["tests/tool/tool_build_state_tests.cpp", "tests/tool/tool_build_state_suite.cpp", "tests/tool/tool_suite_common.cpp", "tests/tool/tool_suite_common.h", "compiler/driver/", "compiler/support/", "compiler/mci/", "tests/support/"],
-        "mc_tool_real_project_grep_lite_unit": ["tests/tool/tool_real_project_tests.cpp", "tests/tool/tool_real_project_suite.cpp", "tests/tool/tool_suite_common.cpp", "tests/tool/tool_suite_common.h", "compiler/driver/", "compiler/support/", "compiler/mci/", "examples/real/grep_lite/", "tests/support/"],
-        "mc_tool_real_project_file_walker_unit": ["tests/tool/tool_real_project_tests.cpp", "tests/tool/tool_real_project_suite.cpp", "tests/tool/tool_suite_common.cpp", "tests/tool/tool_suite_common.h", "compiler/driver/", "compiler/support/", "compiler/mci/", "examples/real/file_walker/", "tests/support/"],
-        "mc_tool_real_project_hash_tool_unit": ["tests/tool/tool_real_project_tests.cpp", "tests/tool/tool_real_project_suite.cpp", "tests/tool/tool_suite_common.cpp", "tests/tool/tool_suite_common.h", "compiler/driver/", "compiler/support/", "compiler/mci/", "examples/real/hash_tool/", "tests/support/"],
-        "mc_tool_real_project_arena_expr_unit": ["tests/tool/tool_real_project_tests.cpp", "tests/tool/tool_real_project_suite.cpp", "tests/tool/tool_suite_common.cpp", "tests/tool/tool_suite_common.h", "compiler/driver/", "compiler/support/", "compiler/mci/", "examples/real/arena_expr/", "tests/support/"],
-        "mc_tool_real_project_worker_queue_unit": ["tests/tool/tool_real_project_tests.cpp", "tests/tool/tool_real_project_suite.cpp", "tests/tool/tool_suite_common.cpp", "tests/tool/tool_suite_common.h", "compiler/driver/", "compiler/support/", "compiler/mci/", "examples/real/worker_queue/", "tests/support/"],
-        "mc_tool_real_project_pipe_handoff_unit": ["tests/tool/tool_real_project_tests.cpp", "tests/tool/tool_real_project_suite.cpp", "tests/tool/tool_suite_common.cpp", "tests/tool/tool_suite_common.h", "compiler/driver/", "compiler/support/", "compiler/mci/", "examples/real/pipe_handoff/", "tests/support/"],
-        "mc_tool_real_project_pipe_ready_unit": ["tests/tool/tool_real_project_tests.cpp", "tests/tool/tool_real_project_suite.cpp", "tests/tool/tool_suite_common.cpp", "tests/tool/tool_suite_common.h", "compiler/driver/", "compiler/support/", "compiler/mci/", "examples/real/pipe_ready/", "tests/support/"],
-        "mc_tool_real_project_line_filter_relay_unit": ["tests/tool/tool_real_project_tests.cpp", "tests/tool/tool_real_project_suite.cpp", "tests/tool/tool_suite_common.cpp", "tests/tool/tool_suite_common.h", "compiler/driver/", "compiler/support/", "compiler/mci/", "examples/real/line_filter_relay/", "tests/support/"],
-        "mc_tool_real_project_evented_echo_unit": ["tests/tool/tool_real_project_tests.cpp", "tests/tool/tool_real_project_suite.cpp", "tests/tool/tool_suite_common.cpp", "tests/tool/tool_suite_common.h", "compiler/driver/", "compiler/support/", "compiler/mci/", "examples/real/evented_echo/", "tests/support/"],
-        "mc_tool_real_project_review_board_unit": ["tests/tool/tool_real_project_tests.cpp", "tests/tool/tool_real_project_suite.cpp", "tests/tool/tool_suite_common.cpp", "tests/tool/tool_suite_common.h", "compiler/driver/", "compiler/support/", "compiler/mci/", "examples/real/review_board/", "tests/support/"],
-        "mc_tool_real_project_issue_rollup_unit": ["tests/tool/tool_real_project_tests.cpp", "tests/tool/tool_real_project_suite.cpp", "tests/tool/tool_suite_common.cpp", "tests/tool/tool_suite_common.h", "compiler/driver/", "compiler/support/", "compiler/mci/", "examples/real/issue_rollup/", "tests/support/"],
-        "mc_tool_real_project_issue_rollup_imported_aggregate_const_unit": ["tests/tool/tool_real_project_tests.cpp", "tests/tool/tool_real_project_suite.cpp", "tests/tool/tool_suite_common.cpp", "tests/tool/tool_suite_common.h", "compiler/driver/", "compiler/support/", "compiler/mci/", "examples/real/issue_rollup/", "tests/support/"],
-        "mc_tool_real_project_module_set_imported_const_unit": ["tests/tool/tool_real_project_tests.cpp", "tests/tool/tool_real_project_suite.cpp", "tests/tool/tool_suite_common.cpp", "tests/tool/tool_suite_common.h", "compiler/driver/", "compiler/support/", "compiler/mci/", "examples/real/issue_rollup/", "tests/support/"],
         "mc_help_smoke": ["compiler/driver/", "compiler/support/", "README.md"],
         "mc_check_smoke": ["tests/cases/", "compiler/driver/", "compiler/support/", "compiler/parse/", "compiler/sema/", "compiler/mir/"],
         "mc_check_stdlib_import_smoke": ["stdlib/", "compiler/driver/", "compiler/support/", "compiler/sema/", "compiler/mir/"],
@@ -310,6 +409,12 @@ def owned_inputs_for_test(test_name: str, source_root: Path) -> list[Path]:
         "mc_v0_2_gate": ["tests/cmake/run_v0_2_gate.cmake", "docs/", "README.md", "tests/cases/"],
         "mc_release_snapshot_prep": ["tests/cmake/run_release_snapshot_prep.cmake", "docs/", "README.md"],
     }
+
+    for descriptor in WORKFLOW_CASES:
+        explicit_inputs[ctest_name_for_descriptor(descriptor)] = [*workflow_common_inputs, descriptor.descriptor_path, *descriptor.roots]
+
+    for descriptor in REAL_PROJECT_CASES:
+        explicit_inputs[ctest_name_for_descriptor(descriptor)] = [*real_project_common_inputs, descriptor.descriptor_path, *descriptor.roots]
 
     return iter_owned_files(source_root, explicit_inputs.get(test_name, []))
 

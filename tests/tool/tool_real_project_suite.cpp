@@ -2477,9 +2477,7 @@ struct RealProjectTestCase {
 };
 
 constexpr RealProjectTestCase kRealProjectTestCases[] = {
-#define REAL_PROJECT_CASE(selector, function_name) {#selector, &function_name},
-#include "tests/tool/tool_real_project_cases.def"
-#undef REAL_PROJECT_CASE
+#include "tool_real_project_cases.inc"
 };
 
 const RealProjectTestCase* FindRealProjectTestCase(std::string_view case_name) {
@@ -2498,19 +2496,9 @@ void RunRealProjectToolSuite(const std::filesystem::path& source_root,
                              const std::filesystem::path& mc_path) {
     const std::filesystem::path suite_root = binary_root / "tool" / "real_projects";
 
-    TestRealGrepLiteProject(source_root, suite_root, mc_path);
-    TestRealFileWalkerProject(source_root, suite_root, mc_path);
-    TestRealHashToolProject(source_root, suite_root, mc_path);
-    TestRealArenaExprToolProject(source_root, suite_root, mc_path);
-    TestRealWorkerQueueProject(source_root, suite_root, mc_path);
-    TestRealPipeHandoffProject(source_root, suite_root, mc_path);
-    TestRealPipeReadyProject(source_root, suite_root, mc_path);
-    TestRealLineFilterRelayProject(source_root, suite_root, mc_path);
-    TestRealEventedEchoProject(source_root, suite_root, mc_path);
-    TestRealReviewBoardProject(source_root, suite_root, mc_path);
-    TestRealIssueRollupProject(source_root, suite_root, mc_path);
-    TestIssueRollupImportedAggregateConstPressure(source_root, suite_root, mc_path);
-    TestModuleSetImportedConstFollowThrough(source_root, suite_root, mc_path);
+    for (const auto& test_case : kRealProjectTestCases) {
+        test_case.fn(source_root, suite_root, mc_path);
+    }
 }
 
 void RunRealProjectToolSuiteCase(const std::filesystem::path& source_root,
@@ -2521,7 +2509,8 @@ void RunRealProjectToolSuiteCase(const std::filesystem::path& source_root,
     if (test_case == nullptr) {
         Fail("unknown real-project case selector: " + std::string(case_name));
     }
-    test_case->fn(source_root, binary_root, mc_path);
+    const std::filesystem::path suite_root = binary_root / "tool" / "real_projects";
+    test_case->fn(source_root, suite_root, mc_path);
 }
 
 }  // namespace mc::tool_tests

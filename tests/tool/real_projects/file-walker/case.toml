@@ -1,0 +1,8 @@
+name = "file-walker"
+family = "tool-real-project"
+runner = "mc_tool_real_project_tests"
+selector = "file-walker"
+function = "TestRealFileWalkerProject"
+roots = [
+  "examples/real/file_walker/",
+]

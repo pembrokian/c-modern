@@ -1,0 +1,105 @@
+Phase 203 -- Discovery-Driven Test Registration
+===============================================
+
+Status
+------
+COMPLETED
+
+Purpose
+-------
+Replace the remaining hand-kept grouped tool and real-project case registries
+with one checked-in descriptor per case so the repository derives case
+identity from the tree itself instead of repeating the same case names in
+parallel CMake, C++, and Python surfaces.
+
+This phase is real implementation work.
+It is not a proof-only or documentation-only exercise.
+It lands the actual registration model for the active grouped tool families.
+
+Repository status note
+----------------------
+- Before this phase, grouped workflow and real-project case identity lived in
+  three separate places:
+  - `tests/tool/tool_workflow_cases.def` and
+    `tests/tool/tool_real_project_cases.def` for CMake registration and grouped
+    C++ runner case tables
+  - hand-kept case-name inventories in `tools/select_tests.py`
+  - explicit all-suite call lists inside the grouped runner implementations
+- Phase 202 had already removed stale freestanding workflow ownership, but it
+  did not remove this case-identity duplication.
+- The architectural target had already been written down in
+  `docs/arch/c-lang/tools/discovery_driven_test_registration_spec.txt`; the
+  repository just had not implemented it yet.
+
+Implemented outcome
+-------------------
+- `tests/tool/workflow/<case-name>/case.toml` now owns grouped workflow case
+  identity.
+- `tests/tool/real_projects/<case-name>/case.toml` now owns grouped
+  real-project case identity.
+- `CMakeLists.txt` now discovers those descriptors at configure time,
+  registers per-case CTest targets from them, and generates grouped-runner
+  case tables from the same descriptor data.
+- `tests/tool/tool_workflow_orchestrator.cpp` now runs both whole-suite and
+  case-filtered workflow execution from descriptor-derived case tables instead
+  of a parallel `.def` include and a second handwritten all-suite call list.
+- `tests/tool/tool_real_project_suite.cpp` now runs both whole-suite and
+  case-filtered real-project execution from descriptor-derived case tables
+  instead of a parallel `.def` include and a second handwritten all-suite call
+  list.
+- `tools/select_tests.py` now derives grouped workflow and real-project case
+  names plus per-case owned roots from the checked-in descriptors instead of
+  keeping hard-coded parallel inventories.
+- The old `.def` files have been deleted.
+
+Chosen slice for this phase
+---------------------------
+1. one adjacent descriptor per grouped workflow case
+2. one adjacent descriptor per grouped real-project case
+3. one configure-time CMake discovery path for those descriptors
+4. one grouped-runner dispatch path generated from those descriptors
+5. one local-test-selector refresh to the same descriptor source
+6. no compiler, sema, MIR, backend, ABI, target, runtime, or `hal` expansion
+
+What this phase intentionally does not do
+----------------------------------------
+- It does not add hidden dependency inference.
+- It does not replace the explicit shared-layer ownership rules in
+  `tools/select_tests.py` for `compiler/driver/`, `compiler/support/`,
+  `tests/support/`, or other cross-cutting surfaces where the filesystem alone
+  is not enough.
+- It does not widen discovery-driven registration to every unrelated test
+  family in the repository without the same repeated registration pressure.
+- It does not introduce a new test framework or assertion DSL.
+
+Why this is the narrowest honest landing
+---------------------------------------
+- The real maintenance drag was duplicate case identity, not missing assertion
+  abstraction.
+- The active grouped tool families were already homogeneous enough to derive
+  registration from the tree without hiding behavior-specific assertions.
+- Shared compiler and harness ownership is still semantic rather than purely
+  structural, so keeping those mappings explicit in `tools/select_tests.py`
+  is more honest than pretending descriptor discovery solves every ownership
+  question.
+
+Documentation follow-through
+----------------------------
+- The discovery-driven registration spec now records the Phase 203 landed
+  scope instead of presenting the model as only planned.
+- `docs/agent/prompts/repo_map.md` and `tests/tool/README.md` now point at the
+  checked-in case descriptors as the grouped-case source of truth.
+- The decision log records the choice to keep this phase bounded to grouped
+  case identity and to avoid widening into broader compiler or framework work.
+- The backlog now carries the forward rule: extend descriptor-driven discovery
+  only to other homogeneous families that accumulate the same repeated
+  registration pressure.
+
+What this phase proves
+----------------------
+- that the repository can make grouped case identity come from the tree itself
+  with one adjacent descriptor per case
+- that CMake, grouped C++ runners, and local changed-path selection can share
+  that case identity without another hand-kept registry
+- that the repository can reduce registration duplication without turning test
+  ownership into a hidden or magical system

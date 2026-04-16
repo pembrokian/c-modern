@@ -1,0 +1,8 @@
+name = "pipe-handoff"
+family = "tool-real-project"
+runner = "mc_tool_real_project_tests"
+selector = "pipe-handoff"
+function = "TestRealPipeHandoffProject"
+roots = [
+  "examples/real/pipe_handoff/",
+]

@@ -2,15 +2,15 @@ Modern C - Planned Discovery-Driven Test Registration Specification
 
 Status
 
-PLANNED, NOT YET IMPLEMENTED.
+LANDED FOR GROUPED TOOL AND REAL-PROJECT CASES IN PHASE 203.
 
 Purpose
 
-This document defines the intended long-term direction for a smaller,
-filesystem-driven, Rob-Pike-like repository test registration model.
-It does not change the current repository contract today.
-Its role is to state what the fuller rearchitecture should look like when the
-repository is ready to replace more of the hand-kept registration surface.
+This document defines the repository-owned discovery-driven test registration
+model for grouped tool and real-project cases.
+Phase 203 lands the first real implementation of this shape.
+It also continues to state the direction for extending the same model to other
+homogeneous families when real pressure justifies it.
 
 Scope
 
@@ -30,8 +30,22 @@ than maintaining parallel registries in CMake, C++ runner tables, and Python.
 
 Current non-goal
 
-This planned architecture does not require a general graph engine, remote
-cache, or hidden dependency discovery system.
+This architecture does not require a general graph engine, remote cache, or
+hidden dependency discovery system.
+
+Current landed scope
+
+- `tests/tool/workflow/<case-name>/case.toml` is now the canonical checked-in
+  source of truth for grouped workflow case identity.
+- `tests/tool/real_projects/<case-name>/case.toml` is now the canonical
+  checked-in source of truth for grouped real-project case identity.
+- `CMakeLists.txt` now discovers those descriptors at configure time and
+  derives per-case CTest registration from them.
+- the grouped C++ runners now dispatch from generated case data derived from
+  those descriptors instead of hand-kept `.def` files.
+- `tools/select_tests.py` now derives tool and real-project case lists and
+  per-case owned roots from those descriptors instead of maintaining parallel
+  hard-coded case-name inventories.
 
 1. Design Bias
 
@@ -176,13 +190,11 @@ Reason:
 
 10. Current Interim Pattern
 
-The repository may use a smaller shared-definition intermediate pattern before
-full directory-driven discovery lands.
+The repository previously used a smaller shared-definition intermediate pattern
+before full directory-driven discovery landed.
 
-That intermediate pattern is acceptable if:
-- it already removes duplicate CMake and C++ case-name tables
-- it keeps selectors and target names stable
-- it does not pretend the fuller discovery model has already landed
+Phase 203 replaces that `.def`-driven intermediate pattern for grouped tool
+and real-project cases.
 
 11. Non-Goals
 
@@ -194,8 +206,9 @@ This planned architecture does not require:
 
 Bottom line
 
-The fuller rearchitecture should make repository-owned case identity come from
-the tree itself or from one small adjacent descriptor, with CMake and grouped
-runners deriving their registration from that source.
-Semantic ownership selection may still remain explicit where the filesystem is
+Repository-owned grouped tool and real-project case identity now comes from
+the tree itself through one adjacent descriptor per case, with CMake, grouped
+runners, and local selection deriving their registration or identity from that
+source.
+Semantic ownership selection still remains explicit where the filesystem is
 not enough.

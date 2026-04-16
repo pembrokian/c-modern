@@ -1,0 +1,8 @@
+name = "worker-queue"
+family = "tool-real-project"
+runner = "mc_tool_real_project_tests"
+selector = "worker-queue"
+function = "TestRealWorkerQueueProject"
+roots = [
+  "examples/real/worker_queue/",
+]

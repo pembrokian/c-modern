@@ -1,0 +1,8 @@
+name = "grep-lite"
+family = "tool-real-project"
+runner = "mc_tool_real_project_tests"
+selector = "grep-lite"
+function = "TestRealGrepLiteProject"
+roots = [
+  "examples/real/grep_lite/",
+]

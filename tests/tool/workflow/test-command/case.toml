@@ -1,0 +1,8 @@
+name = "test-command"
+family = "tool-workflow"
+runner = "mc_tool_workflow_tests"
+selector = "test-command"
+function = "RunWorkflowTestCommandCase"
+roots = [
+  "tests/tool/tool_test_command_suite.cpp",
+]

@@ -1,0 +1,8 @@
+name = "multifile-module"
+family = "tool-workflow"
+runner = "mc_tool_workflow_tests"
+selector = "multifile-module"
+function = "RunWorkflowMultifileModuleCase"
+roots = [
+  "tests/tool/tool_multifile_module_suite.cpp",
+]

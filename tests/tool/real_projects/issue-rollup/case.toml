@@ -1,0 +1,8 @@
+name = "issue-rollup"
+family = "tool-real-project"
+runner = "mc_tool_real_project_tests"
+selector = "issue-rollup"
+function = "TestRealIssueRollupProject"
+roots = [
+  "examples/real/issue_rollup/",
+]

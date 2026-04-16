@@ -1,0 +1,8 @@
+name = "help"
+family = "tool-workflow"
+runner = "mc_tool_workflow_tests"
+selector = "help"
+function = "RunWorkflowHelpCase"
+roots = [
+  "tests/tool/tool_help_suite.cpp",
+]

@@ -1,0 +1,8 @@
+name = "project-validation"
+family = "tool-workflow"
+runner = "mc_tool_workflow_tests"
+selector = "project-validation"
+function = "RunWorkflowProjectValidationCase"
+roots = [
+  "tests/tool/tool_project_validation_suite.cpp",
+]

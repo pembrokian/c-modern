@@ -1,0 +1,8 @@
+name = "issue-rollup-imported-aggregate-const"
+family = "tool-real-project"
+runner = "mc_tool_real_project_tests"
+selector = "issue-rollup-imported-aggregate-const"
+function = "TestIssueRollupImportedAggregateConstPressure"
+roots = [
+  "examples/real/issue_rollup/",
+]

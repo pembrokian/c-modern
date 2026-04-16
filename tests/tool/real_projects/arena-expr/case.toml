@@ -1,0 +1,8 @@
+name = "arena-expr"
+family = "tool-real-project"
+runner = "mc_tool_real_project_tests"
+selector = "arena-expr"
+function = "TestRealArenaExprToolProject"
+roots = [
+  "examples/real/arena_expr/",
+]

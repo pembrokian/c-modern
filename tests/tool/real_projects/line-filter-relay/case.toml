@@ -1,0 +1,8 @@
+name = "line-filter-relay"
+family = "tool-real-project"
+runner = "mc_tool_real_project_tests"
+selector = "line-filter-relay"
+function = "TestRealLineFilterRelayProject"
+roots = [
+  "examples/real/line_filter_relay/",
+]

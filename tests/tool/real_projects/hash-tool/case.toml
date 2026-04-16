@@ -1,0 +1,8 @@
+name = "hash-tool"
+family = "tool-real-project"
+runner = "mc_tool_real_project_tests"
+selector = "hash-tool"
+function = "TestRealHashToolProject"
+roots = [
+  "examples/real/hash_tool/",
+]

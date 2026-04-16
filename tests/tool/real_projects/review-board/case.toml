@@ -1,0 +1,8 @@
+name = "review-board"
+family = "tool-real-project"
+runner = "mc_tool_real_project_tests"
+selector = "review-board"
+function = "TestRealReviewBoardProject"
+roots = [
+  "examples/real/review_board/",
+]

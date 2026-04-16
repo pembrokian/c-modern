@@ -118,6 +118,7 @@ This file is a fast orientation map for agents working in this repository.
     - `tests/tool/tool_suite_common.cpp`: shared grouped tool helpers
     - `tests/tool/tool_workflow_tests.cpp`: workflow validation driver
     - `tests/tool/tool_workflow_orchestrator.cpp`: thin workflow suite entry that dispatches the behavior-owned workflow families
+    - `tests/tool/workflow/<case-name>/case.toml`: checked-in workflow case descriptors; CMake registration, grouped-runner dispatch, and `tools/select_tests.py` now derive grouped case identity from these descriptors
     - `tests/tool/tool_help_suite.cpp`: help text, mode selection, and direct-source versus project workflow validation
     - `tests/tool/tool_test_command_suite.cpp`: ordinary test and `mc test` workflow validation
     - `tests/tool/tool_project_validation_suite.cpp`: target selection, import-root, duplicate-root, and project-graph validation
@@ -127,6 +128,7 @@ This file is a fast orientation map for agents working in this repository.
     - `tests/tool/tool_build_state_suite.cpp`: build-state grouped implementation
     - `tests/tool/tool_real_project_tests.cpp`: real-project workflow driver
     - `tests/tool/tool_real_project_suite.cpp`: real-project grouped implementation
+    - `tests/tool/real_projects/<case-name>/case.toml`: checked-in real-project descriptors; CMake registration, grouped-runner dispatch, and `tools/select_tests.py` now derive grouped case identity from these descriptors
     - `tests/tool/README.md`: local structure and validation note for the tool test family
     - `docs/plan/active/phase202_legacy_archive_retirement_and_reset_lane_maintenance_refresh.txt`: records the completed retirement of the old freestanding proof archive and the live reset-lane maintenance boundary
   - if freestanding or Veya coverage grows further, prefer more focused suite filenames under `tests/tool/` before adding a deeper folder split

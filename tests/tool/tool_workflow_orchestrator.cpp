@@ -46,9 +46,7 @@ struct WorkflowTestCase {
 };
 
 constexpr WorkflowTestCase kWorkflowTestCases[] = {
-#define WORKFLOW_CASE(selector, function_name) {#selector, &function_name},
-#include "tests/tool/tool_workflow_cases.def"
-#undef WORKFLOW_CASE
+#include "tool_workflow_cases.inc"
 };
 
 const WorkflowTestCase* FindWorkflowTestCase(std::string_view case_name) {
@@ -67,11 +65,9 @@ void RunWorkflowToolSuite(const std::filesystem::path& source_root,
                           const std::filesystem::path& mc_path) {
     const std::filesystem::path suite_root = binary_root / "tool" / "workflow";
 
-    RunWorkflowHelpSuite(suite_root, mc_path);
-    RunWorkflowTestCommandSuite(suite_root, mc_path);
-    RunWorkflowProjectValidationSuite(source_root, suite_root, mc_path);
-    RunWorkflowMultifileModuleSuite(suite_root, mc_path);
-    RunWorkflowKernelResetLaneSuite(source_root, suite_root, mc_path);
+    for (const auto& test_case : kWorkflowTestCases) {
+        test_case.fn(source_root, suite_root, mc_path);
+    }
 }
 
 void RunWorkflowToolSuiteCase(const std::filesystem::path& source_root,

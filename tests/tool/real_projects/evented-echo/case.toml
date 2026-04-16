@@ -1,0 +1,8 @@
+name = "evented-echo"
+family = "tool-real-project"
+runner = "mc_tool_real_project_tests"
+selector = "evented-echo"
+function = "TestRealEventedEchoProject"
+roots = [
+  "examples/real/evented_echo/",
+]
