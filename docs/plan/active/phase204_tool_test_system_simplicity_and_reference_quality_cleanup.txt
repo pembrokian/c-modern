@@ -1,0 +1,205 @@
+Phase 204 -- Tool Test System Simplicity And Reference-Quality Cleanup
+=====================================================================
+
+Status
+------
+PLANNED
+
+Purpose
+-------
+Turn the post-Phase-203 audit into one bounded implementation wave that makes
+the build and test system smaller, more reference-quality, and more aligned
+with the repository's own "small and visible" test-infrastructure rule.
+
+This phase is real implementation work.
+It is not a proof-only or documentation-only exercise.
+It should remove specific maintenance distortions that still remain after
+Phase 203 rather than reopening the test model broadly.
+
+Repository status note
+----------------------
+- Phase 203 removed the hand-kept grouped workflow and real-project case-name
+  registries by making adjacent `case.toml` descriptors the checked-in source
+  of truth for grouped case identity.
+- That landing materially improved registration clarity, but it deliberately
+  stopped short of wider cleanup:
+  - descriptor parsing still exists twice, once in `CMakeLists.txt` and once
+    in `tools/select_tests.py`
+  - `tests/tool/tool_real_project_suite.cpp` still concentrates many distinct
+    real-project behaviors in one monolithic implementation file
+  - the root build-and-test registration surface and the surrounding docs are
+    still heavier and less reference-quality than the repository's own design
+    principles prefer
+- The architectural target remains the one stated in
+  `docs/arch/c-lang/tools/discovery_driven_test_registration_spec.txt` and
+  `docs/arch/c-lang/tools/test_design_principles.txt`: one visible source of
+  truth where structure is sufficient, explicit semantic ownership where it is
+  not, and only the minimum machinery needed for discovery, registration, and
+  local iteration.
+
+Problem being solved
+--------------------
+- The current grouped tool registration model has one canonical case identity
+  source, but not one canonical descriptor-semantics implementation. Two
+  independent parsers still validate the same descriptor contract.
+- The real-project grouped suite is functionally correct, but its current file
+  shape is too large to serve as a good reference owner for contributors.
+- The build-and-test documentation is directionally right but still too spread
+  out to act as a compact operator-facing reference for adding or modifying a
+  grouped tool test.
+- The root `CMakeLists.txt` still carries more build-and-test registration
+  detail than is ideal for quick review, even though not all of that detail is
+  wrong.
+
+Core rule
+---------
+- Remove duplicated registration mechanics before widening discovery again.
+- Keep grouped case identity descriptor-driven.
+- Keep semantic ownership mapping explicit where structure alone is not enough.
+- Prefer one obvious implementation path over parallel parsers or parallel
+  registries.
+- Prefer behavior-owned suite files over catalog-sized implementation files.
+- Improve the operator-facing reference surface without replacing the current
+  CMake + CTest model or introducing a test framework.
+
+Chosen slice for this phase
+---------------------------
+1. collapse grouped tool descriptor parsing onto one repository-owned
+   implementation path
+2. split the monolithic real-project grouped suite into smaller behavior-owned
+   implementation files
+3. reduce root build-and-test registration clutter by moving the grouped tool
+   registration helpers into a smaller focused surface
+4. publish one short operator-facing reference for the grouped tool and
+   real-project test system, with the longer architecture notes kept as
+   companion material rather than the first stop
+5. make no compiler, sema, MIR, backend, ABI, target, runtime, stdlib, or
+   `hal` expansion
+
+Planned outcome
+---------------
+- grouped workflow and real-project descriptor parsing no longer lives in two
+  separately maintained implementations
+- `tools/select_tests.py`, grouped-runner generation, and CMake registration
+  all consume descriptor data through one repository-owned path
+- `tests/tool/tool_real_project_suite.cpp` becomes a thin grouped dispatch
+  owner plus shared helpers, while real-project case implementations move into
+  smaller focused files
+- the grouped tool build-and-test registration logic is easier to review in
+  one focused place than in the middle of the root build graph
+- contributors gain one short reference document that answers:
+  - where grouped tool case identity lives
+  - how to add a grouped workflow case
+  - how to add a grouped real-project case
+  - which surfaces remain explicitly hand-kept and why
+
+Preferred implementation shape
+------------------------------
+Descriptor path
+- Introduce one repository-owned descriptor loader or generator in the tooling
+  surface that validates `case.toml` once and emits the small derived outputs
+  needed by CMake and the grouped runners.
+- Keep the output generated rather than checking in generated manifests.
+- Do not replace explicit semantic ownership rules in `tools/select_tests.py`
+  for shared compiler, support, and harness layers.
+
+Grouped runner path
+- Keep descriptor-driven case dispatch.
+- Mirror the workflow-family decomposition pattern from Phase 184B on the
+  real-project family: one thin grouped dispatcher plus smaller behavior-owned
+  implementation files.
+- Keep shared subprocess, filesystem, and output-assertion helpers explicit in
+  the local test-support layer rather than inventing metadata-driven
+  assertions.
+
+Reference path
+- Add one concise tool-test reference note aimed at contributors doing local
+  maintenance.
+- Update `tests/tool/README.md` and the architecture notes to point at that
+  short reference instead of making every user reconstruct the system from the
+  longer rationale documents.
+- Keep long-form rationale documents for architecture and phase history;
+  do not try to compress all design reasoning into the short reference.
+
+Suggested execution order
+-------------------------
+1. Choose and land one repository-owned descriptor implementation path that
+   CMake and `tools/select_tests.py` can both consume without parallel parsing.
+2. Regenerate grouped runner case tables from that single path and keep current
+   CTest target names stable.
+3. Split `tests/tool/tool_real_project_suite.cpp` into smaller files by case
+   or small case clusters, keeping one thin grouped dispatch owner.
+4. Move grouped tool registration helpers out of the root `CMakeLists.txt`
+   into one smaller focused registration surface while keeping the overall
+   build graph unchanged.
+5. Add the short operator-facing reference and refresh the nearby docs so the
+   current truth is discoverable quickly.
+6. Rerun the grouped workflow, build-state, and real-project suites plus the
+   local test selector checks.
+
+Deliverables
+------------
+- one active implementation path for grouped tool descriptor parsing and
+  validation
+- updated grouped-runner generation and selector integration using that same
+  descriptor path
+- decomposed real-project grouped suite implementation files under
+  `tests/tool/`
+- a smaller focused grouped-tool registration surface for CMake
+- one short contributor-facing reference note for the grouped tool test system
+- bounded follow-through updates to:
+  - `docs/agent/prompts/repo_map.md`
+  - `tests/tool/README.md`
+  - `docs/arch/c-lang/tools/discovery_driven_test_registration_spec.txt`
+    if the implementation shape changes materially
+  - `docs/plan/backlog.txt` and `docs/plan/decision_log.txt` only if the
+    landed shape intentionally defers or fixes an adjacent pressure point
+
+Exit criteria
+-------------
+- the repository no longer maintains two independent grouped tool descriptor
+  parsers
+- grouped workflow and real-project CTest registration keeps the Phase 203
+  descriptor-driven identity model without requiring duplicated parser logic
+- `tests/tool/tool_real_project_suite.cpp` is no longer a catalog-sized owner
+  for most real-project behaviors
+- contributors can identify the grouped tool registration flow and the steps
+  to add a case from one short reference without reconstructing it from
+  multiple long documents
+- the resulting system is smaller and more reviewable without adding hidden
+  dependency inference, a graph engine, or a new test framework
+
+Non-goals
+---------
+- discovery-driven registration for every unrelated test family in the
+  repository
+- automatic semantic ownership inference for shared compiler or harness layers
+- replacing CMake + CTest with another build or test system
+- collapsing compiler fixtures, smoke or audit helpers, and grouped tool cases
+  into one universal metadata model
+- changing public CTest target names unless a concrete correctness problem
+  forces it
+- rewriting every historical design note under `docs/arch/c-lang/tools/`
+
+Why this is the narrowest honest landing
+---------------------------------------
+- Phase 203 already solved the largest repeated case-identity duplication.
+  The remaining pressure is now about duplicated mechanics and reference
+  quality, not about missing discovery-driven identity.
+- The monolithic real-project suite is a localized maintainability problem;
+  it does not justify a framework or metadata-driven assertion layer.
+- The repository still benefits from explicit semantic ownership in
+  `tools/select_tests.py`; that should be preserved rather than hidden behind
+  structural heuristics.
+- A short operator-facing reference is warranted because the current docs are
+  valuable architecture notes but are heavier than needed for day-to-day
+  maintenance.
+
+Acceptance criteria for this document
+-------------------------------------
+- Phase 204 is explicitly framed as a post-Phase-203 simplicity and
+  reference-quality cleanup, not as a broader test-model redesign.
+- The phase keeps the descriptor-driven identity model intact while targeting
+  the three concrete remaining distortions: duplicated descriptor parsing,
+  monolithic real-project implementation ownership, and diffuse build-and-test
+  reference material.
