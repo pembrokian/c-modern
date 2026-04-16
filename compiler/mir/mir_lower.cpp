@@ -276,6 +276,72 @@ class FunctionLowerer {
         return {value, field_type};
     }
 
+    std::vector<std::string> FieldPathForUpdate(const ast::FieldInit& field_init) const {
+        if (!field_init.field_path.empty()) {
+            return field_init.field_path;
+        }
+        if (field_init.has_name) {
+            return {field_init.name};
+        }
+        return {};
+    }
+
+    ValueInfo LowerNestedRecordUpdate(const ValueInfo& base,
+                                      const sema::Type& type,
+                                      const std::vector<const ast::FieldInit*>& updates,
+                                      const mc::support::SourceSpan& span,
+                                      std::size_t depth) {
+        const auto field_source = ResolveAggregateFieldTypes(type);
+        if (field_source.empty()) {
+            Report(span, "record update requires aggregate field metadata");
+            return base;
+        }
+
+        std::vector<std::string> operands;
+        std::vector<std::string> field_names;
+        operands.reserve(field_source.size());
+        field_names.reserve(field_source.size());
+        for (const auto& field : field_source) {
+            const ast::FieldInit* direct_update = nullptr;
+            std::vector<const ast::FieldInit*> nested_updates;
+            for (const auto* update : updates) {
+                if (update == nullptr) {
+                    continue;
+                }
+                const std::vector<std::string> path = FieldPathForUpdate(*update);
+                if (path.size() <= depth || path[depth] != field.first) {
+                    continue;
+                }
+                if (path.size() == depth + 1) {
+                    direct_update = update;
+                } else {
+                    nested_updates.push_back(update);
+                }
+            }
+
+            if (direct_update != nullptr && direct_update->value != nullptr) {
+                operands.push_back(LowerExpr(*direct_update->value).value);
+            } else if (!nested_updates.empty()) {
+                const auto preserved = EmitRecordUpdatePreservedField(base, field.first, field.second, span);
+                operands.push_back(LowerNestedRecordUpdate(preserved, field.second, nested_updates, span, depth + 1).value);
+            } else {
+                operands.push_back(EmitRecordUpdatePreservedField(base, field.first, field.second, span).value);
+            }
+            field_names.push_back(field.first);
+        }
+
+        const std::string value = NewValue();
+        Emit({
+            .kind = Instruction::Kind::kAggregateInit,
+            .result = value,
+            .type = type,
+            .target = sema::FormatType(type),
+            .operands = std::move(operands),
+            .field_names = std::move(field_names),
+        });
+        return {value, type};
+    }
+
     sema::Type ExprTypeOrUnknown(const Expr& expr) const {
         if (const sema::Type* type = sema::FindExprType(sema_module_, expr); type != nullptr) {
             return *type;
@@ -1674,43 +1740,22 @@ class FunctionLowerer {
             case Expr::Kind::kRecordUpdate: {
                 const auto base = LowerExpr(*expr.left);
                 const sema::Type type = KnownTypeOrError(ExprTypeOrUnknown(expr), expr.span, "record update type");
+                std::vector<const ast::FieldInit*> updates;
+                updates.reserve(expr.field_inits.size());
+                for (const auto& field_init : expr.field_inits) {
+                    if (field_init.has_name && field_init.value != nullptr) {
+                        updates.push_back(&field_init);
+                    }
+                }
+                if (updates.empty()) {
+                    return base;
+                }
                 const auto field_source = ResolveAggregateFieldTypes(type);
                 if (field_source.empty()) {
                     Report(expr.span, "record update requires aggregate field metadata");
                     return {base.value, type};
                 }
-
-                std::unordered_map<std::string, const ast::FieldInit*> updated_fields;
-                for (const auto& field_init : expr.field_inits) {
-                    if (field_init.has_name) {
-                        updated_fields[field_init.name] = &field_init;
-                    }
-                }
-
-                std::vector<std::string> operands;
-                std::vector<std::string> field_names;
-                operands.reserve(field_source.size());
-                field_names.reserve(field_source.size());
-                for (const auto& field : field_source) {
-                    const auto found = updated_fields.find(field.first);
-                    if (found != updated_fields.end() && found->second != nullptr && found->second->value != nullptr) {
-                        operands.push_back(LowerExpr(*found->second->value).value);
-                    } else {
-                        operands.push_back(EmitRecordUpdatePreservedField(base, field.first, field.second, expr.span).value);
-                    }
-                    field_names.push_back(field.first);
-                }
-
-                const std::string value = NewValue();
-                Emit({
-                    .kind = Instruction::Kind::kAggregateInit,
-                    .result = value,
-                    .type = type,
-                    .target = sema::FormatType(type),
-                    .operands = std::move(operands),
-                    .field_names = std::move(field_names),
-                });
-                return {value, type};
+                return LowerNestedRecordUpdate(base, type, updates, expr.span, 0);
             }
             case Expr::Kind::kParen:
                 return LowerExpr(*expr.left);

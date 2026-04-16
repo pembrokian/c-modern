@@ -634,7 +634,7 @@ std::unique_ptr<Expr> Parser::ParsePostfixExpr() {
             SkipNewlines();
             if (!Check(TokenKind::kRBrace)) {
                 do {
-                    node->field_inits.push_back(ParseFieldInit());
+                    node->field_inits.push_back(ParseFieldInit(true));
                     SkipNewlines();
                 } while (Match(TokenKind::kComma) && (SkipNewlines(), true));
             }
@@ -649,14 +649,44 @@ std::unique_ptr<Expr> Parser::ParsePostfixExpr() {
     return expr;
 }
 
-FieldInit Parser::ParseFieldInit() {
+FieldInit Parser::ParseFieldInit(bool allow_dotted_name) {
     FieldInit init;
     init.span.begin = Current().span.begin;
     if (Check(TokenKind::kIdentifier) && Peek(1).kind == TokenKind::kColon) {
         init.has_name = true;
         init.name = Current().lexeme;
+        init.field_path.push_back(init.name);
         Advance();
         Advance();
+    } else if (allow_dotted_name && Check(TokenKind::kIdentifier)) {
+        std::vector<std::string> path;
+        path.push_back(Current().lexeme);
+        std::size_t offset = 1;
+        while (Peek(offset).kind == TokenKind::kDot && Peek(offset + 1).kind == TokenKind::kIdentifier) {
+            path.push_back(Peek(offset + 1).lexeme);
+            offset += 2;
+        }
+        if (Peek(offset).kind == TokenKind::kColon && path.size() > 1) {
+            init.has_name = true;
+            init.field_path = path;
+            init.name.clear();
+            for (std::size_t index = 0; index < path.size(); ++index) {
+                if (index > 0) {
+                    init.name += ".";
+                }
+                init.name += path[index];
+            }
+            Advance();
+            while (Match(TokenKind::kDot)) {
+                if (Check(TokenKind::kIdentifier)) {
+                    Advance();
+                    continue;
+                }
+                ReportError(Current(), "expected field name after '.' in record update path");
+                break;
+            }
+            Advance();
+        }
     }
     init.value = ParseExpr();
     init.span.end = init.value->span.end;

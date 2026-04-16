@@ -76,6 +76,7 @@ struct ParamDecl : Node {
 struct FieldInit : Node {
     bool has_name = false;
     std::string name;
+    std::vector<std::string> field_path;
     std::unique_ptr<Expr> value;
 };
 

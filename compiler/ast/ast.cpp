@@ -288,7 +288,17 @@ void DumpFieldInit(const FieldInit& init, std::ostringstream& stream, Indent ind
     WriteIndent(stream, indent);
     stream << "FieldInit";
     if (init.has_name) {
-        stream << " name=" << init.name;
+        stream << " name=";
+        if (!init.field_path.empty()) {
+            for (std::size_t index = 0; index < init.field_path.size(); ++index) {
+                if (index > 0) {
+                    stream << '.';
+                }
+                stream << init.field_path[index];
+            }
+        } else {
+            stream << init.name;
+        }
     }
     stream << '\n';
     if (init.value != nullptr) {

@@ -5,6 +5,24 @@
 
 namespace mc::mir {
 
+namespace {
+
+std::string RenderFieldInitName(const ast::FieldInit& init) {
+    if (!init.field_path.empty()) {
+        std::ostringstream stream;
+        for (std::size_t index = 0; index < init.field_path.size(); ++index) {
+            if (index > 0) {
+                stream << '.';
+            }
+            stream << init.field_path[index];
+        }
+        return stream.str();
+    }
+    return init.name;
+}
+
+}  // namespace
+
 using mc::ast::Expr;
 
 constexpr std::string_view kTypeDeclKindNames[] = {"struct", "enum", "distinct", "alias"};
@@ -275,7 +293,7 @@ std::string RenderExprInline(const Expr& expr) {
                     stream << ", ";
                 }
                 if (expr.field_inits[index].has_name) {
-                    stream << expr.field_inits[index].name << ": ";
+                    stream << RenderFieldInitName(expr.field_inits[index]) << ": ";
                 }
                 stream << RenderExprInline(*expr.field_inits[index].value);
             }
@@ -290,7 +308,7 @@ std::string RenderExprInline(const Expr& expr) {
                     stream << ", ";
                 }
                 if (expr.field_inits[index].has_name) {
-                    stream << expr.field_inits[index].name << ": ";
+                    stream << RenderFieldInitName(expr.field_inits[index]) << ": ";
                 }
                 stream << RenderExprInline(*expr.field_inits[index].value);
             }

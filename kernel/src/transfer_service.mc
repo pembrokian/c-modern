@@ -39,29 +39,19 @@ func transfer_badarg(s: TransferServiceState) TransferResult {
     return TransferResult{ state: s, effect: service_effect.effect_reply(syscall.SyscallStatus.InvalidArgument, 0, primitives.zero_payload()) }
 }
 
+func transfer_endpoint_ok(endpoint: u32) bool {
+    return endpoint == service_topology.LOG_ENDPOINT_ID || endpoint == service_topology.KV_ENDPOINT_ID
+}
+
+func transfer_has(s: TransferServiceState, endpoint: u32) bool {
+    return s.left == endpoint || s.right == endpoint
+}
+
 func transfer_pair_ok(left: u32, right: u32) bool {
-    if left == 0 {
+    if !transfer_endpoint_ok(left) || !transfer_endpoint_ok(right) {
         return false
     }
-    if right == 0 {
-        return false
-    }
-    if left == right {
-        return false
-    }
-    if left != service_topology.LOG_ENDPOINT_ID && left != service_topology.KV_ENDPOINT_ID {
-        return false
-    }
-    if right != service_topology.LOG_ENDPOINT_ID && right != service_topology.KV_ENDPOINT_ID {
-        return false
-    }
-    if left == service_topology.LOG_ENDPOINT_ID && right != service_topology.KV_ENDPOINT_ID {
-        return false
-    }
-    if left == service_topology.KV_ENDPOINT_ID && right != service_topology.LOG_ENDPOINT_ID {
-        return false
-    }
-    return true
+    return left != right
 }
 
 func transfer_bind(s: TransferServiceState, m: service_effect.Message) TransferResult {
@@ -91,7 +81,7 @@ func transfer_direct(s: TransferServiceState, m: service_effect.Message) Transfe
 }
 
 func transfer_log(s: TransferServiceState, m: service_effect.Message) TransferResult {
-    if s.left != service_topology.LOG_ENDPOINT_ID && s.right != service_topology.LOG_ENDPOINT_ID {
+    if !transfer_has(s, service_topology.LOG_ENDPOINT_ID) {
         return transfer_invalid(s)
     }
     if m.payload_len < 2 {
@@ -101,7 +91,7 @@ func transfer_log(s: TransferServiceState, m: service_effect.Message) TransferRe
 }
 
 func transfer_kv(s: TransferServiceState, m: service_effect.Message) TransferResult {
-    if s.left != service_topology.KV_ENDPOINT_ID && s.right != service_topology.KV_ENDPOINT_ID {
+    if !transfer_has(s, service_topology.KV_ENDPOINT_ID) {
         return transfer_invalid(s)
     }
     if m.payload_len < 3 {
@@ -117,22 +107,20 @@ func handle(s: TransferServiceState, m: service_effect.Message) TransferResult {
     if m.received_handle_count == 1 {
         return transfer_direct(s, m)
     }
+    if m.payload_len == 0 {
+        return transfer_badarg(s)
+    }
+    cmd: u8 = m.payload[0]
     if m.received_handle_count != 0 {
-        if m.payload_len == 0 {
-            return transfer_badarg(s)
-        }
-        if m.payload[0] != TRANSFER_CMD_BIND {
+        if cmd != TRANSFER_CMD_BIND {
             return transfer_badarg(s)
         }
         return transfer_bind(s, m)
     }
-    if m.payload_len == 0 {
-        return transfer_badarg(s)
-    }
-    if m.payload[0] == TRANSFER_CMD_LOG {
+    if cmd == TRANSFER_CMD_LOG {
         return transfer_log(s, m)
     }
-    if m.payload[0] == TRANSFER_CMD_KV {
+    if cmd == TRANSFER_CMD_KV {
         return transfer_kv(s, m)
     }
     return transfer_badarg(s)

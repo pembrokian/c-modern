@@ -1,0 +1,18 @@
+SourceFile
+  ModuleKind=ordinary
+  FuncDecl name=rewrite
+    ParamDecl name=outer
+      NamedType name=Outer
+    returns:
+      NamedType name=Outer
+    body:
+      BlockStmt
+        statements:
+          ReturnStmt
+            exprs:
+              RecordUpdateExpr
+                left:
+                  NameExpr text=outer
+                inits:
+                  FieldInit name=inner.value
+                    LiteralExpr text=7 kind=int_lit

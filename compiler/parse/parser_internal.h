@@ -138,7 +138,7 @@ class Parser {
     std::unique_ptr<Expr> ParseBraceAggregateInitExpr();
     std::unique_ptr<Expr> ParseUnaryExpr();
     std::unique_ptr<Expr> ParsePostfixExpr();
-    FieldInit ParseFieldInit();
+    FieldInit ParseFieldInit(bool allow_dotted_name = false);
     std::unique_ptr<Expr> ParseAssignmentTarget();
     std::unique_ptr<Expr> ParsePrimaryExpr();
 

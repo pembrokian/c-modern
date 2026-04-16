@@ -68,6 +68,24 @@ std::string RenderTypeInline(const ast::TypeExpr& type) {
     return "<?>";
 }
 
+namespace {
+
+std::string RenderFieldInitName(const ast::FieldInit& init) {
+    if (!init.field_path.empty()) {
+        std::ostringstream stream;
+        for (std::size_t index = 0; index < init.field_path.size(); ++index) {
+            if (index > 0) {
+                stream << '.';
+            }
+            stream << init.field_path[index];
+        }
+        return stream.str();
+    }
+    return init.name;
+}
+
+}  // namespace
+
 std::string RenderExprInline(const ast::Expr& expr) {
     switch (expr.kind) {
         case ast::Expr::Kind::kName:
@@ -140,7 +158,7 @@ std::string RenderExprInline(const ast::Expr& expr) {
                     stream << ", ";
                 }
                 if (expr.field_inits[index].has_name) {
-                    stream << expr.field_inits[index].name << ": ";
+                    stream << RenderFieldInitName(expr.field_inits[index]) << ": ";
                 }
                 stream << RenderExprInline(*expr.field_inits[index].value);
             }

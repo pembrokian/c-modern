@@ -1,0 +1,10 @@
+SemanticModule
+  TypeDecl name=Inner kind=struct
+    Field name=value type=i32
+    Field name=flag type=bool
+    Layout size=8 align=4 offsets=[0, 4]
+  TypeDecl name=Outer kind=struct
+    Field name=left type=i32
+    Field name=inner type=Inner
+    Layout size=12 align=4 offsets=[0, 4]
+  Function name=rewrite params=[Outer] returns=[Outer]

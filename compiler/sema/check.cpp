@@ -258,6 +258,29 @@ std::string_view ToString(Decl::Kind kind) {
     return "decl";
 }
 
+std::string JoinFieldPath(const std::vector<std::string>& path) {
+    std::ostringstream stream;
+    for (std::size_t index = 0; index < path.size(); ++index) {
+        if (index > 0) {
+            stream << '.';
+        }
+        stream << path[index];
+    }
+    return stream.str();
+}
+
+bool HasFieldPathPrefix(const std::vector<std::string>& lhs, const std::vector<std::string>& rhs) {
+    if (lhs.size() > rhs.size()) {
+        return false;
+    }
+    for (std::size_t index = 0; index < lhs.size(); ++index) {
+        if (lhs[index] != rhs[index]) {
+            return false;
+        }
+    }
+    return true;
+}
+
 void WriteIndent(std::ostringstream& stream, int indent) {
     for (int count = 0; count < indent; ++count) {
         stream << "  ";
@@ -2603,7 +2626,7 @@ class Checker {
                     fields[field.first] = field.second;
                 }
 
-                std::unordered_set<std::string> updated_fields;
+                std::vector<std::vector<std::string>> updated_paths;
                 for (const auto& field_init : expr.field_inits) {
                     if (field_init.value == nullptr) {
                         continue;
@@ -2613,25 +2636,65 @@ class Checker {
                         Report(field_init.span, "record update requires named fields");
                         continue;
                     }
-                    if (!updated_fields.insert(field_init.name).second) {
+
+                    const std::vector<std::string> field_path = field_init.field_path.empty()
+                        ? std::vector<std::string> {field_init.name}
+                        : field_init.field_path;
+                    const std::string path_text = JoinFieldPath(field_path);
+                    const auto duplicate = std::find(updated_paths.begin(), updated_paths.end(), field_path);
+                    if (duplicate != updated_paths.end()) {
                         (void)AnalyzeExpr(*field_init.value);
-                        Report(field_init.span, "duplicate record update field: " + field_init.name);
+                        Report(field_init.span, "duplicate record update field: " + path_text);
                         continue;
                     }
 
-                    const auto found = fields.find(field_init.name);
-                    if (found == fields.end()) {
+                    const auto conflict = std::find_if(updated_paths.begin(), updated_paths.end(), [&](const auto& prior_path) {
+                        return HasFieldPathPrefix(prior_path, field_path) || HasFieldPathPrefix(field_path, prior_path);
+                    });
+                    if (conflict != updated_paths.end()) {
                         (void)AnalyzeExpr(*field_init.value);
-                        Report(field_init.span, "type " + FormatType(normalized_base) + " has no field named " + field_init.name);
-                        continue;
-                    }
-
-                    ApplyExpectedAggregateType(*field_init.value, found->second);
-                    const Type value_type = AnalyzeExpr(*field_init.value);
-                    if (!IsAssignable(found->second, value_type, *module_)) {
                         Report(field_init.span,
-                               "record update field type mismatch for " + field_init.name + ": expected " +
-                                   FormatType(found->second) + ", got " + FormatType(value_type));
+                               "conflicting record update field paths: " + JoinFieldPath(*conflict) + " and " + path_text);
+                        continue;
+                    }
+                    updated_paths.push_back(field_path);
+
+                    Type current_type = base_type;
+                    bool resolved_path = true;
+                    for (std::size_t index = 0; index < field_path.size(); ++index) {
+                        const Type current_normalized = NormalizeAggregateExpectedType(current_type);
+                        const auto current_fields = ResolveAggregateFieldTypes(current_type);
+                        if (current_fields.empty()) {
+                            (void)AnalyzeExpr(*field_init.value);
+                            Report(field_init.span,
+                                   "record update path segment requires a record-typed field: " +
+                                       JoinFieldPath(std::vector<std::string>(field_path.begin(), field_path.begin() + index)));
+                            resolved_path = false;
+                            break;
+                        }
+
+                        const auto found = std::find_if(current_fields.begin(), current_fields.end(), [&](const auto& field) {
+                            return field.first == field_path[index];
+                        });
+                        if (found == current_fields.end()) {
+                            (void)AnalyzeExpr(*field_init.value);
+                            Report(field_init.span,
+                                   "type " + FormatType(current_normalized) + " has no field named " + field_path[index]);
+                            resolved_path = false;
+                            break;
+                        }
+                        current_type = found->second;
+                    }
+                    if (!resolved_path) {
+                        continue;
+                    }
+
+                    ApplyExpectedAggregateType(*field_init.value, current_type);
+                    const Type value_type = AnalyzeExpr(*field_init.value);
+                    if (!IsAssignable(current_type, value_type, *module_)) {
+                        Report(field_init.span,
+                               "record update field type mismatch for " + path_text + ": expected " +
+                                   FormatType(current_type) + ", got " + FormatType(value_type));
                     }
                 }
                 return record(base_type);

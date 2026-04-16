@@ -3,7 +3,7 @@ Phase 199 -- Nested Record-Update Field-Path Follow-Through
 
 Status
 ------
-PLANNED
+COMPLETED
 
 Purpose
 -------
@@ -58,11 +58,33 @@ Core rule
 - Allow only named field paths through record-typed segments.
 - Preserve the result type of the base expression.
 - Do not widen into hidden mutation, array or slice element updates,
+  overlapping subtree-plus-descendant updates in one `with` block,
   collection transforms, object methods, or state frameworks.
+
+Implemented result
+------------------
+Phase 199 lands one bounded nested record-update follow-through:
+
+1. `base with { outer.inner: value }` now parses as a record update whose
+  update entry carries a dotted field path rather than only one shallow field
+  name
+2. semantic checking walks each path segment through record-typed fields,
+  validates the terminal replacement type, rejects unknown fields, rejects
+  non-record intermediate segments, rejects duplicate paths, and rejects
+  overlapping subtree-plus-descendant paths such as `cell` together with
+  `cell.state` in the same update
+3. MIR lowering stays explicit and deterministic by recursively rebuilding
+  only the affected aggregate chain from preserved field projections plus the
+  new terminal replacement values; no new MIR mutation instruction was added
+4. the feature is spent immediately in `kernel/src/boot_update.mc`, replacing
+  the remaining `ServiceCell<T>` inner-record reconstruction sites with
+  direct nested updates such as `log.state: log` and `log.generation: ...`
+5. focused parser, sema, MIR, and reset-lane workflow coverage now exercise
+  the syntax, validation boundary, lowering shape, and live kernel consumer
 
 Chosen syntax and scope
 -----------------------
-Chosen shape for this phase:
+The landed shape for this phase is:
 
 1. extend the landed record-update form to allow one dotted field path such as
    `base with { outer.inner: value }`
@@ -72,7 +94,8 @@ Chosen shape for this phase:
 4. rebuild only the explicit nested record chain needed to preserve
    immutability
 5. reject unknown fields, invalid non-record path segments, duplicate update
-   paths, and type-mismatched replacements
+  paths, overlapping subtree-plus-descendant paths, and type-mismatched
+  replacements
 
 Why this is the right next step
 -------------------------------
@@ -85,7 +108,7 @@ Why this is the right next step
 
 Required implementation surfaces
 --------------------------------
-The likely owning implementation surfaces for this phase are:
+The landed owning implementation surfaces for this phase are:
 
 1. `compiler/ast/ast.h`
    - extend the record-update representation only enough to carry nested field
@@ -124,6 +147,8 @@ What this phase should not do
 -----------------------------
 - no hidden mutation or in-place update
 - no array, slice, map, or buffer element updates
+- no overlapping subtree-plus-descendant update precedence such as
+  `base with { child: next, child.field: value }`
 - no arbitrary computed paths
 - no struct embedding, property promotion, or object methods
 - no broader compile-time execution, reflection, or pattern-matching work
@@ -146,3 +171,13 @@ What this phase should prove
   remaining explicit and immutable
 - that active kernel code becomes clearer exactly where the current language
   still forces manual inner aggregate reconstruction
+
+Validation result
+-----------------
+- `mc_parser_fixture_unit` passed with new nested-path AST coverage
+- `mc_sema_fixture_unit` passed with positive and negative nested-path typing
+  coverage
+- `mc_mir_fixture_unit` passed with nested aggregate-rebuild lowering coverage
+- `mc_tool_workflow_unit` passed after the live `kernel/src/boot_update.mc`
+  spend, confirming the reset-lane project still builds and runs through the
+  active workflow suite
