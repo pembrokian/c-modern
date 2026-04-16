@@ -1,0 +1,152 @@
+Phase 217 -- Retained Versus Durable State Boundary
+===================================================
+
+Status
+------
+PROPOSED
+
+Purpose
+-------
+Make the first explicit maintained boundary between restart-retained in-memory
+state and any future durable or named persistent state so later storage or
+filesystem work does not blur the two.
+
+This phase is primarily architecture-shaping implementation and boundary work.
+It may land a small executable follow-through if needed, but its main outcome
+is to define and publish the boundary clearly before broader persistence work
+begins.
+
+Repository status note
+----------------------
+- The current running-system slice already has explicit retained reload for
+  several owners and explicit coordinated retained restart for two fixed
+  retained lanes.
+- Phases 206 and 208 made retained summary and retained policy visible.
+- Earlier and current planning intentionally avoided persistence, durable-
+  storage semantics, and filesystem frameworks while the retained-state model
+  was still being clarified.
+- The repo now has enough retained-state clarity that the next larger frontier
+  can be named honestly: what counts as retained state, and what would count
+  as durable state if the system later admits it.
+
+Problem being solved
+--------------------
+- The repository has a real retained-state model but no explicit durable-state
+  boundary yet.
+- Without that boundary, later filesystem or storage work could accidentally
+  reuse retained-state vocabulary for durable persistence, or vice versa.
+- The missing work is not to implement a filesystem now; it is to state and,
+  where needed, lightly prove the current boundary between retained and durable
+  truth.
+
+Core rule
+---------
+- Define the boundary before implementing the next continent.
+- Keep retained-state semantics separate from future durable-state semantics.
+- Prefer one maintained boundary note and one bounded executable truth check
+  over premature storage mechanism work.
+- Do not introduce filesystems, mountable namespaces, durable logs, or
+  persistence frameworks as part of this phase.
+
+Chosen slice for this phase
+---------------------------
+1. publish one maintained boundary document or equivalent active planning
+   surface distinguishing retained in-memory state from future durable state
+2. define the current retained-state contract in terms that do not imply
+   durability, naming persistence, or storage recovery beyond explicit restart
+   reload in the current boot image
+3. define what future durable state would need to add before it can be treated
+   as something other than retained state
+4. add one bounded executable or support-surface follow-through only if a
+   current retained behavior is easy to misread as durable without it
+5. make no compiler, sema, MIR, backend, ABI, target, runtime, stdlib, or
+   `hal` expansion into storage mechanisms or persistence frameworks
+
+Planned outcome
+---------------
+- the repository gains one explicit maintained boundary between retained and
+  durable state
+- later filesystem, naming, or storage phases can build on a clear prior
+  contract instead of reopening retained-state semantics implicitly
+- the current running-system slice remains honest about what restart-retained
+  state is and what it is not
+
+Preferred implementation shape
+------------------------------
+Boundary path
+- Prefer one maintained architecture or planning note that future phases can
+  cite directly.
+- Keep the boundary factual and grounded in current running-system behavior.
+
+Contract path
+- State clearly that retained state is:
+  - explicit owner-local in-memory state
+  - optionally reloaded across explicit restart in the current boot image
+  - not yet durable, named persistent storage
+- State clearly that durable state would require additional guarantees such as
+  persistence beyond current in-memory restart context, explicit naming or
+  addressing, and recovery semantics beyond current retained reload.
+
+Executable honesty path
+- Reuse existing retained-summary and retained-policy proofs where possible.
+- Add at most one focused support or workflow check only if the boundary would
+  otherwise leave a misleading active public claim.
+
+Suggested execution order
+-------------------------
+1. Enumerate the current retained-state truths that are already admitted.
+2. Write the retained-versus-durable boundary in one maintained surface.
+3. Identify any current support statement or phase note that would remain
+   misleading without refresh.
+4. Add one bounded follow-through check only if necessary for honesty.
+5. Refresh backlog and future-frontier planning to route filesystem or storage
+   work through the new boundary rather than around it.
+
+Deliverables
+------------
+- one explicit maintained retained-versus-durable boundary surface
+- aligned support or planning-surface updates so later work reuses that
+  boundary
+- focused validation only if needed to keep current claims honest
+
+Validation expectations
+-----------------------
+- the tree must continue to build after any minimal follow-through lands
+- any newly added focused validation must pass
+- existing retained-summary, retained-policy, and service-state inspection
+  proofs must remain green
+
+Exit criteria
+-------------
+- the repository has one explicit maintained boundary between current retained
+  state and future durable state
+- active support and planning surfaces no longer blur retained reload with
+  durable persistence
+- any current retained behavior that could be misread as durable has a narrow
+  clarified contract or validation hook
+- no filesystem, storage, namespace, or persistence framework is introduced
+
+Non-goals
+---------
+- filesystem implementation
+- directory or path naming systems
+- durable logs or append-only storage
+- mountable namespaces
+- persistent object identifiers or file-handle frameworks
+
+Why this is the narrowest honest landing
+---------------------------------------
+- The repo now has enough retained-state clarity to define what retained state
+  is without yet building storage.
+- The next larger frontier should start with a crisp boundary rather than a
+  mechanism wave.
+- One maintained boundary reduces the risk that later storage work distorts or
+  overclaims the current retained model.
+
+Acceptance criteria for this document
+-------------------------------------
+- Phase 217 is explicitly framed as a retained-versus-durable boundary phase,
+  not as a filesystem or persistence implementation phase.
+- The planned slice keeps storage and naming mechanisms out of scope while
+  making the current retained-state contract clearer and more durable as a
+  planning surface.

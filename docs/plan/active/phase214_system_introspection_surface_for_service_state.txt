@@ -1,0 +1,156 @@
+Phase 214 -- System Introspection Surface For Service State
+===========================================================
+
+Status
+------
+PROPOSED
+
+Purpose
+-------
+Unify the already-landed narrow inspection truths into one compact system-
+introspection surface covering lifecycle class, restartability, retained
+participation, identity generation, policy class, and bounded service-local
+metadata where that metadata is already honestly admitted.
+
+This phase is real implementation work.
+It is not a proof-only or documentation-only exercise.
+It should consolidate inspection truth without replacing owner-local semantics
+with a framework or a second system model.
+
+Repository status note
+----------------------
+- The running-system slice already has several narrow inspection surfaces:
+  lifecycle query, service identity query, retained summary, coordinated
+  retained policy, and the authority vocabulary plus any Phase 212 runtime
+  authority inspection follow-through.
+- Those surfaces are individually honest but collectively fragmented.
+- The system now has enough inspection truth that the next leverage point is
+  composition rather than more one-off queries.
+
+Problem being solved
+--------------------
+- Callers and maintainers can inspect pieces of current service truth, but not
+  yet one coherent service-state summary.
+- Without one compact introspection surface, later phases will either keep
+  adding ad hoc queries or force readers to mentally compose several separate
+  fixed-target replies.
+- The missing work is not new semantics; it is one explicit service-state view
+  over already-admitted lifecycle, retained, identity, policy, and bounded
+  local metadata truth.
+
+Core rule
+---------
+- Consolidate existing inspection truth before widening service-state
+  semantics.
+- Keep introspection fixed-target and compact.
+- Reuse owner-local truth rather than inventing a new system registry.
+- Do not add discovery graphs, dynamic metadata stores, or a diagnostic
+  framework.
+
+Chosen slice for this phase
+---------------------------
+1. add one compact fixed-target service-state introspection query on the
+   existing shell-visible inspection or control path
+2. combine already-admitted truths into one bounded reply:
+   - lifecycle class
+   - restartability or restart mode
+   - retained participation
+   - relevant identity generation marker
+   - retained policy class where already admitted
+   - bounded service-local metadata such as queue count only where a service
+     already owns and exposes that truth honestly
+3. keep each piece of introspected truth owned by its current module rather
+   than rebuilding semantics in the shell
+4. add one deterministic scenario and one focused reset-lane fixture proving
+   the composed reply remains truthful across representative targets
+5. make no compiler, sema, MIR, backend, ABI, target, runtime, stdlib, or
+   `hal` expansion beyond the inspection surface itself
+
+Planned outcome
+---------------
+- the running system gains one coherent service-state inspection surface
+- the repo starts to expose a more legible operating-system personality rather
+  than only a collection of separate narrow inspection verbs
+- future pressure phases can ask how queue pressure, stalls, or retained state
+  should appear in one unified service-state view
+
+Preferred implementation shape
+------------------------------
+Introspection path
+- Reuse the current bounded shell-visible control family if possible.
+- Keep reply shapes fixed-width or otherwise tightly bounded.
+- Keep the surface per-target rather than introducing discovery of arbitrary
+  services.
+
+Composition path
+- Pull lifecycle, retained, identity, and policy truth from the modules that
+  already own those semantics.
+- Include service-local metadata only where that data already exists as an
+  honest admitted query or owner-local state.
+
+Metadata boundary
+- Admit bounded queue metadata only where the current queue owner already has
+  the authority and semantics to expose it.
+- Do not include speculative fields such as health checks, scheduler state,
+  memory quotas, or dependency graphs.
+
+Suggested execution order
+-------------------------
+1. Choose one compact reply shape that can carry the currently admitted shared
+   service-state fields.
+2. Thread existing owner-local truth into that one composed inspection path.
+3. Choose a minimal set of representative targets spanning ordinary restart,
+   retained-owner restart, and coordinated retained control.
+4. Add one scenario and one focused reset-lane fixture for those targets.
+5. Refresh planning or support notes only where the active public slice needs
+   to name the new introspection surface.
+
+Deliverables
+------------
+- one compact service-state introspection contract
+- bounded owner-local wiring for composed lifecycle, retained, identity, and
+  policy truth
+- one scenario proof and one reset-lane fixture for the composed service-state
+  surface
+
+Validation expectations
+-----------------------
+- the tree must continue to build after the introspection surface lands
+- the new service-state introspection fixture must pass
+- existing lifecycle, identity, retained-summary, retained-policy, and any
+  Phase 212 authority-inspection fixtures must remain green
+- the grouped kernel reset-lane workflow suite must remain green
+
+Exit criteria
+-------------
+- one bounded query can summarize the admitted service-state truth for the
+  representative fixed targets
+- the reply composes already-admitted truths without introducing a registry or
+  second semantic owner
+- bounded service-local metadata is included only where already justified by
+  the current owner model
+- no discovery framework, dynamic metadata store, or diagnostic subsystem is
+  introduced
+
+Non-goals
+---------
+- arbitrary runtime service discovery
+- health-check or watchdog frameworks
+- scheduler-state inspection
+- dynamic dependency or topology graphs
+- large human-readable diagnostics channels
+
+Why this is the narrowest honest landing
+---------------------------------------
+- The repository already has enough separate inspection truths that
+  consolidation now yields real leverage.
+- The current pressure is coherence, not missing mechanism.
+- One compact introspection surface makes later queue-pressure and stall work
+  easier to explain without widening the current system model.
+
+Acceptance criteria for this document
+-------------------------------------
+- Phase 214 is explicitly framed as a consolidation of already-admitted
+  inspection truths into one service-state surface.
+- The phase keeps semantics owner-local and adds no discovery or registry
+  framework.

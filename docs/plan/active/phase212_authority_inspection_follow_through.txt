@@ -1,0 +1,159 @@
+Phase 212 -- Authority Inspection Follow-Through
+================================================
+
+Status
+------
+PROPOSED
+
+Purpose
+-------
+Spend the Phase 209 authority vocabulary and ownership table on one bounded
+running-system inspection path so a caller can ask what authority a service
+currently holds, exposes, or is acting through without widening into a
+capability framework, ACL system, or dynamic policy engine.
+
+This phase is real implementation work.
+It is not a proof-only or documentation-only exercise.
+It should add one compact executable authority-inspection surface over the
+already-admitted authority model rather than reopening authority design.
+
+Repository status note
+----------------------
+- Phase 209 landed one reusable authority vocabulary and one explicit
+  ownership table for the admitted running-system slice.
+- That landing made the authority model easier to name and audit, but it did
+  not yet expose one caller-visible inspection query for the current running
+  system.
+- The current executable proofs still validate authority behavior indirectly:
+  endpoint routing, transfer-only exceptions, retained control paths, and
+  fixed-target shell control all exist as behavior-owned truths.
+- The next honest step is not more vocabulary, but one bounded way to inspect
+  that already-admitted authority shape at runtime.
+
+Problem being solved
+--------------------
+- The repository now has a maintained authority table in documentation, but a
+  caller cannot yet ask one compact system question such as: what authority is
+  this service exercising, holding, or exposing on this path.
+- Without one bounded inspection surface, future authority work risks either
+  re-explaining authority from documentation only or adding ad hoc exceptions
+  without a visible runtime counterpart.
+- The missing truth is narrow: report current authority class and bounded
+  ownership exposure for one fixed target at a time.
+
+Core rule
+---------
+- Inspect existing authority truth before widening authority mechanics.
+- Keep authority inspection fixed-target and tightly bounded.
+- Reuse the Phase 209 vocabulary rather than inventing a second one.
+- Do not introduce generic capabilities, rights algebra, dynamic ACLs, or
+  inferred policy.
+
+Chosen slice for this phase
+---------------------------
+1. add one compact fixed-target authority inspection query on the existing
+   shell-visible inspection or control path
+2. report only already-admitted authority classes such as public endpoint,
+   transfer-only authority, retained-owner authority, coordinated-retained
+   control authority, or shell-visible control authority
+3. keep authority truth owned by the same modules and architecture notes that
+   already own those authority semantics
+4. add one focused scenario and one reset-lane fixture proving that the
+   reported authority shape matches existing bounded authority behavior
+5. make no compiler, sema, MIR, backend, ABI, target, runtime, stdlib, or
+   `hal` expansion beyond the narrow inspection surface
+
+Planned outcome
+---------------
+- callers can inspect one bounded authority summary for an admitted target
+- the runtime grows one compact executable counterpart to the Phase 209
+  authority vocabulary and ownership table
+- future authority phases can build on an inspectable surface rather than only
+  on phase notes and architecture documents
+
+Preferred implementation shape
+------------------------------
+Inspection path
+- Reuse the bounded shell-visible control family if that remains the smallest
+  honest user-facing surface.
+- Keep reply shapes fixed-width and compact.
+- Prefer one query family over multiple ad hoc service-specific inspection
+  commands.
+
+Ownership path
+- Keep authority classification owner-local.
+- If the truth is topology-owned, keep it in `service_topology.mc`.
+- If the truth is transfer-path-owned or init-owned, expose only a compact
+  projection rather than reconstructing it heuristically in the shell.
+
+Payload path
+- Report only bounded current truth such as:
+  - queried target id
+  - authority class
+  - whether the path exposes transfer-bearing authority
+  - whether the path is retained-owner or coordinated-control scoped
+- Do not report speculative future fields such as dynamic grants, inferred
+  policy graphs, or security labels.
+
+Suggested execution order
+-------------------------
+1. Choose one compact authority inspection reply shape derived directly from
+   the Phase 209 vocabulary.
+2. Add the minimum owner-local state or classification helpers needed to
+   answer that query without inference.
+3. Route the query through the bounded shell-visible control hop.
+4. Add one deterministic scenario proving the reported authority classes match
+   the admitted target surfaces.
+5. Add one focused reset-lane fixture proving authority-inspection truth for a
+   representative public endpoint, a retained-control target, and the transfer
+   path if that remains the narrowest honest spread.
+
+Deliverables
+------------
+- one fixed-target authority inspection contract
+- bounded owner-local authority classification support where needed
+- one scenario proof and one reset-lane fixture for authority inspection
+- follow-through planning or support-doc updates only where the active public
+  claim changes materially
+
+Validation expectations
+-----------------------
+- the tree must continue to build after the inspection surface lands
+- the new focused authority-inspection fixture must pass
+- existing endpoint, transfer, retained-summary, and retained-policy fixtures
+  must continue to pass unless expected outputs intentionally widen
+- the grouped kernel reset-lane workflow suite must remain green
+
+Exit criteria
+-------------
+- one bounded query can report the admitted authority class for the relevant
+  fixed targets
+- the reply shape is defined in terms of the Phase 209 authority vocabulary
+- the reported authority matches existing bounded runtime behavior in
+  deterministic fixture coverage
+- no capability framework, ACL system, dynamic rights algebra, or inferred
+  authority policy is introduced
+
+Non-goals
+---------
+- generic capability objects
+- dynamic ACLs or security labels
+- per-caller policy differentiation
+- security hardening beyond the current bounded running-system slice
+- redesign of public endpoint routing or transfer semantics
+
+Why this is the narrowest honest landing
+---------------------------------------
+- Phase 209 already did the naming work, so the next honest step is to make
+  that naming executable rather than broadening authority again.
+- The current running system already has real authority distinctions, but they
+  are not yet inspectable through one compact path.
+- One bounded inspection surface creates leverage for later introspection work
+  without widening the authority model itself.
+
+Acceptance criteria for this document
+-------------------------------------
+- Phase 212 is explicitly framed as runtime authority inspection over already-
+  admitted authority truth, not as a capability-system expansion.
+- The phase keeps the current bounded authority model intact and adds only one
+  compact inspection path.

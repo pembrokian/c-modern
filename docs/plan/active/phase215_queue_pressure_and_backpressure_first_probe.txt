@@ -1,0 +1,141 @@
+Phase 215 -- Queue Pressure And Backpressure First Probe
+=======================================================
+
+Status
+------
+PROPOSED
+
+Purpose
+-------
+Move the running-system story from inspection into pressure by defining one
+honest bounded queue-pressure and backpressure contract, including what
+happens when an admitted queue-owning path reaches capacity and what visible
+consequence callers observe.
+
+This phase is real implementation work.
+It is not a proof-only or documentation-only exercise.
+It should add one narrow pressure behavior over an already-admitted queue
+owner rather than reopening scheduler, mailbox, or concurrency frameworks.
+
+Repository status note
+----------------------
+- The running-system slice already has a retained queue owner and bounded queue
+  observability through count and peek.
+- Current phases have made restart, retained state, policy, authority, and
+  service-state inspection more explicit.
+- What the system still does not answer clearly is what happens under queue
+  pressure: when a queue is full, which bounded policy applies, and how that
+  truth becomes visible to callers.
+
+Problem being solved
+--------------------
+- Current queue semantics describe capacity and observation, but not yet one
+  explicit bounded pressure contract.
+- Without one pressure phase, future work on service stalls, timeouts, or
+  richer execution behavior risks being built on an unspecified scarcity model.
+- The missing truth is narrow: when one admitted queue reaches capacity, does
+  the system reject, drop, or defer, and how does that show up to callers and
+  inspection surfaces.
+
+Core rule
+---------
+- Apply pressure to one real owner before widening execution semantics.
+- Keep queue-pressure behavior explicit, deterministic, and owner-local.
+- Prefer one bounded caller-visible consequence over generic backpressure
+  infrastructure.
+- Do not introduce scheduler frameworks, blocking queues, subscriptions, or
+  mailbox systems.
+
+Chosen slice for this phase
+---------------------------
+1. choose one admitted queue-owning path as the pressure owner
+2. define one explicit full-queue policy such as reject or bounded drop,
+   whichever is the narrowest honest policy for that owner
+3. expose the caller-visible consequence through the existing bounded protocol
+   and, if appropriate, the system-introspection surface
+4. add one deterministic scenario and one focused reset-lane fixture proving
+   full-queue behavior and its visible consequence
+5. make no compiler, sema, MIR, backend, ABI, target, runtime, stdlib, or
+   `hal` expansion beyond the narrow pressure contract
+
+Planned outcome
+---------------
+- the running system gains its first explicit scarcity or backpressure truth
+- queue-owning services no longer rely on implicit capacity behavior
+- later stall and timeout work can refer to a real bounded pressure model
+  rather than an unspecified queue-full condition
+
+Preferred implementation shape
+------------------------------
+Owner path
+- Keep the chosen queue owner responsible for full-queue semantics.
+- Keep policy local to that owner and its direct protocol consequences.
+
+Policy path
+- Prefer one of the current narrow policy classes:
+  - explicit reject with visible failure
+  - explicit bounded drop with visible observation
+- Avoid retry loops, blocking semantics, or general buffering layers.
+
+Inspection path
+- If queue pressure should surface in system introspection, report only a small
+  bounded consequence marker or count-derived truth.
+- Do not widen into deep queue statistics or historical telemetry.
+
+Suggested execution order
+-------------------------
+1. Choose the narrowest honest queue owner and full-capacity policy.
+2. Implement the policy in the owner-local service path.
+3. Thread the caller-visible consequence through the existing protocol.
+4. Add one deterministic scenario that drives the queue to capacity and proves
+   the chosen policy.
+5. Add one focused reset-lane fixture and any narrow inspection update needed
+   to keep the policy visible.
+
+Deliverables
+------------
+- one explicit bounded queue-pressure policy for one admitted queue owner
+- one caller-visible consequence path for the chosen policy
+- one scenario proof and one reset-lane fixture for full-queue behavior
+- bounded inspection-surface follow-through only if needed for honesty
+
+Validation expectations
+-----------------------
+- the tree must continue to build after the queue-pressure behavior lands
+- the focused queue-pressure fixture must pass
+- existing queue observability, retained-summary, retained-policy, and service-
+  state introspection fixtures must remain green unless expected outputs
+  intentionally widen
+
+Exit criteria
+-------------
+- at least one admitted queue-owning path has an explicit deterministic full-
+  capacity policy
+- callers can observe the consequence of that policy through an existing
+  bounded protocol or inspection surface
+- the behavior is proved in deterministic fixture coverage
+- no scheduler, blocking-queue, mailbox, or generic backpressure framework is
+  introduced
+
+Non-goals
+---------
+- general scheduler policy
+- blocking dequeue or blocking send semantics
+- mailbox or subscription systems
+- queue history, telemetry, or large statistical surfaces
+- multi-owner global pressure coordination
+
+Why this is the narrowest honest landing
+---------------------------------------
+- The repo now has enough inspection and retained clarity that a first real
+  scarcity contract will teach more than another naming-only phase.
+- Queue pressure is a real local owner problem and does not require reopening
+  execution or concurrency frameworks yet.
+- One bounded policy gives later stall and timeout phases a concrete base.
+
+Acceptance criteria for this document
+-------------------------------------
+- Phase 215 is explicitly framed as one owner-local queue-pressure probe, not
+  as a general backpressure or scheduler phase.
+- The phase keeps pressure deterministic, protocol-visible, and tightly
+  bounded.

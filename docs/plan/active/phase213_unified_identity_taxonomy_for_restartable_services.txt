@@ -1,0 +1,156 @@
+Phase 213 -- Unified Identity Taxonomy For Restartable Services
+===============================================================
+
+Status
+------
+PROPOSED
+
+Purpose
+-------
+Consolidate the scattered restartable-service identity story into one explicit
+maintained taxonomy covering stable public identity, restart generation
+identity, coordinated retained-lane identity, and other already-admitted
+restart-visible identity markers.
+
+This phase is primarily architecture-shaping implementation and audit work.
+It may land small executable follow-through where needed, but its main outcome
+is to give the repository one explicit identity vocabulary that later running-
+system phases can reuse.
+
+Repository status note
+----------------------
+- The current running-system slice already distinguishes more than one kind of
+  identity:
+  - stable public endpoint identity
+  - service-instance generation identity
+  - coordinated workset identity
+  - coordinated audit-lane identity
+  - last-restart outcome state closely related to identity continuity
+- Phase 206 made retained summary and restart outcome visible.
+- Phase 208 made coordinated retained policy visible.
+- Phase 209 made authority naming explicit, but identity naming still remains
+  spread across kernel code, phase notes, and several compact shell-visible
+  query families.
+
+Problem being solved
+--------------------
+- The repository now has multiple real identity surfaces, but no single
+  maintained taxonomy explaining how they relate.
+- Without one taxonomy, future phases risk mixing stable identity with
+  restart-visible instance identity, or coordinated-lane identity with single-
+  service generation, in ways that blur the system model.
+- The missing work is not more identity mechanism; it is one explicit mapping
+  of admitted identity classes and their owner boundaries.
+
+Core rule
+---------
+- Name existing identity truth before widening identity features.
+- Keep identity classes small, explicit, and grounded in current running-
+  system behavior.
+- Prefer one maintained taxonomy over repeated ad hoc identity explanations.
+- Do not introduce discovery frameworks, ambient object ids, or persistence
+  naming systems as part of this phase.
+
+Chosen slice for this phase
+---------------------------
+1. publish one repository-owned identity taxonomy for the admitted restartable
+   service system
+2. map each current identity-bearing surface onto one explicit identity class
+3. align active phase notes and support statements so they reuse the new
+   taxonomy rather than restating identity per phase
+4. add executable follow-through only if one existing identity behavior lacks
+   a direct bounded proof under the new taxonomy
+5. make no compiler, sema, MIR, backend, ABI, target, runtime, stdlib, or
+   `hal` expansion beyond the minimum needed to keep the taxonomy honest
+
+Planned outcome
+---------------
+- the repository gains one maintained identity vocabulary for restartable
+  services and coordinated retained lanes
+- later phases can refer to stable identity, restart generation identity, and
+  coordinated-lane identity precisely rather than loosely
+- system inspection and state introspection work can build on a shared set of
+  identity terms rather than parallel local definitions
+
+Preferred implementation shape
+------------------------------
+Taxonomy path
+- Prefer one short architecture note or other maintained doc surface over many
+  repeated paragraphs in unrelated phase notes.
+- Keep the taxonomy factual and current-owner focused.
+
+Identity-class path
+- Admit only already-justified classes such as:
+  - stable public identity
+  - restart generation identity
+  - coordinated retained-lane identity
+  - derived inspection identity where the value is a compact projection of one
+    of the above rather than a new independent identity source
+- Do not add speculative future classes such as filesystem object ids, session
+  ids, or package-distribution identities.
+
+Executable honesty path
+- Reuse existing retained summary, retained policy, and service identity proof
+  surfaces where possible.
+- Add at most one focused check only if the taxonomy would otherwise document
+  unproved identity behavior.
+
+Suggested execution order
+-------------------------
+1. Enumerate the currently admitted identity-bearing surfaces in the running
+   system.
+2. Define one compact taxonomy and map each current surface onto it.
+3. Identify any identity rule that remains ambiguous or lacks direct proof.
+4. Add the smallest focused validation needed for that gap.
+5. Refresh support, backlog, or decision-log surfaces only where the new
+   taxonomy changes how later work should be framed.
+
+Deliverables
+------------
+- one maintained identity taxonomy for the admitted running-system slice
+- one mapping from the current identity-bearing surfaces onto that taxonomy
+- focused validation for any newly clarified but previously unproved identity
+  rule
+- bounded doc refreshes so later phases reuse the shared taxonomy
+
+Validation expectations
+-----------------------
+- the tree must continue to build after any small follow-through checks land
+- any new focused identity checks must pass
+- existing service-identity, retained-summary, and retained-policy fixtures
+  must remain green
+
+Exit criteria
+-------------
+- the repository has one explicit maintained taxonomy for the admitted
+  restartable-service identity classes
+- the current identity-bearing surfaces are mapped onto that taxonomy in one
+  visible maintained surface
+- any identity behavior newly clarified by the taxonomy has direct bounded
+  proof if one was previously missing
+- no framework-level discovery, persistence naming, or dynamic object-id
+  system is introduced
+
+Non-goals
+---------
+- new runtime identity mechanisms unrelated to current restartable services
+- dynamic object-id allocation frameworks
+- filesystem or durable-storage naming
+- session frameworks or discovery registries
+- broader package, artifact, or distribution identity systems
+
+Why this is the narrowest honest landing
+---------------------------------------
+- The repo already has multiple real identity surfaces, so one shared taxonomy
+  now reduces drift and ambiguity.
+- The current pressure is naming and consistency, not missing identity
+  mechanism.
+- A compact taxonomy creates leverage for the next system-introspection phase
+  without turning identity into a framework.
+
+Acceptance criteria for this document
+-------------------------------------
+- Phase 213 is explicitly framed as identity taxonomy and alignment work over
+  already-admitted running-system identity truth.
+- The planned slice keeps identity bounded to the current restartable-service
+  model and does not widen into persistence or discovery frameworks.

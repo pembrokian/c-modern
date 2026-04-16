@@ -1,0 +1,150 @@
+Phase 216 -- Timeout And Stalled-Service Consequence Probe
+==========================================================
+
+Status
+------
+PROPOSED
+
+Purpose
+-------
+Define one bounded visible consequence for lack of progress on an admitted
+running-system path so the repository can answer a narrower question than
+"build a scheduler": what truth becomes visible when a service or queue-owned
+workflow stalls or times out.
+
+This phase is real implementation work.
+It is not a proof-only or documentation-only exercise.
+It should add one narrow consequence model over a real wait-or-progress path
+rather than widening into scheduler, supervision, or generalized timeout
+frameworks.
+
+Repository status note
+----------------------
+- The running-system slice already has explicit restart, retained, policy,
+  authority, and introspection surfaces.
+- A queue-pressure phase should already have named at least one scarcity or
+  lack-of-progress condition locally and explicitly.
+- The repository still deliberately avoids broader live receive, mailbox, or
+  scheduling frameworks, so any timeout or stall work must stay tied to one
+  real admitted owner and one bounded visible consequence.
+
+Problem being solved
+--------------------
+- The current system can describe structure and bounded retained policy, but it
+  still does not clearly say what a caller or operator should observe when a
+  path fails to make progress.
+- Without one bounded stall consequence, later execution or resource phases
+  will either remain underspecified or jump too early into general scheduling
+  and supervision mechanisms.
+- The missing truth is narrow: classify one stalled or timed-out consequence in
+  a deterministic way on one admitted path.
+
+Core rule
+---------
+- Make one lack-of-progress consequence explicit before widening execution
+  semantics.
+- Keep the chosen stall or timeout model owner-local and deterministic.
+- Prefer one visible consequence over generic timing or scheduling machinery.
+- Do not introduce watchdog frameworks, supervision trees, or broad timer-
+  driven cancellation.
+
+Chosen slice for this phase
+---------------------------
+1. choose one admitted path where lack of progress can be expressed honestly
+2. define one explicit bounded consequence class such as timeout, stalled, or
+   abandoned follow-through
+3. expose that consequence through the current bounded protocol and, if
+   warranted, the service-state introspection surface
+4. add one deterministic scenario and one focused reset-lane fixture proving
+   the chosen consequence model
+5. make no compiler, sema, MIR, backend, ABI, target, runtime, stdlib, or
+   `hal` expansion beyond the narrow consequence path
+
+Planned outcome
+---------------
+- the running system gains its first explicit consequence contract for lack of
+  progress
+- future execution or scheduling phases can build on one real admitted stall
+  truth rather than an unspecified "service did not respond" story
+- inspection surfaces can begin to name one honest blocked or timed-out state
+  without becoming a generic diagnostics framework
+
+Preferred implementation shape
+------------------------------
+Owner path
+- Choose the smallest honest owner that already has a real progress contract.
+- Keep timeout or stall classification local to that owner and its direct
+  caller-visible protocol.
+
+Consequence path
+- Prefer one of the current narrow consequence classes:
+  - explicit timeout
+  - explicit stalled
+  - explicit abandoned follow-through
+- Avoid automatic recovery, retries, or policy engines.
+
+Inspection path
+- If the consequence should appear in service-state introspection, expose only
+  a compact consequence marker.
+- Do not widen into historical traces, retry counters, or scheduler-state
+  inspection.
+
+Suggested execution order
+-------------------------
+1. Choose one admitted progress path whose lack-of-progress semantics are real
+   enough to name explicitly.
+2. Implement one bounded consequence class in that owner-local path.
+3. Thread the consequence through the caller-visible protocol.
+4. Add one deterministic scenario driving the chosen stalled or timeout state.
+5. Add one focused reset-lane fixture and any minimal inspection follow-
+   through needed for honesty.
+
+Deliverables
+------------
+- one explicit bounded consequence model for lack of progress on one admitted
+  path
+- one caller-visible protocol consequence for that model
+- one scenario proof and one reset-lane fixture for the chosen stall or
+  timeout path
+
+Validation expectations
+-----------------------
+- the tree must continue to build after the consequence path lands
+- the focused stall or timeout fixture must pass
+- existing queue-pressure, service-state introspection, retained-summary, and
+  retained-policy fixtures must remain green unless expected outputs
+  intentionally widen
+
+Exit criteria
+-------------
+- one admitted progress path has an explicit deterministic timeout or stall
+  consequence
+- callers can observe that consequence through an existing bounded protocol or
+  inspection surface
+- the behavior is proved in deterministic fixture coverage
+- no scheduler, watchdog, supervision, or generic timeout framework is
+  introduced
+
+Non-goals
+---------
+- scheduler frameworks
+- generic timeout libraries or cross-system timers
+- retry policies or supervisory restart policy
+- historical telemetry or blocked-task graphs
+- multicore or SMP execution work
+
+Why this is the narrowest honest landing
+---------------------------------------
+- The system needs one real visible lack-of-progress contract before broader
+  execution or resource work can be discussed clearly.
+- One deterministic owner-local consequence reveals more useful truth than a
+  premature general scheduling phase.
+- The phase stays aligned with the repo's current bias toward bounded,
+  explicit owner-local semantics.
+
+Acceptance criteria for this document
+-------------------------------------
+- Phase 216 is explicitly framed as one bounded lack-of-progress consequence
+  probe, not as a scheduler or supervision phase.
+- The planned slice keeps timeout or stall semantics deterministic, explicit,
+  and tied to one real owner.
