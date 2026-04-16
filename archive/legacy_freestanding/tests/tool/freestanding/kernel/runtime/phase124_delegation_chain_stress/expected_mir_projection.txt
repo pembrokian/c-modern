@@ -1,3 +1,0 @@
-  TypeDecl kind=struct name=debug.Phase124DelegationChainAudit
-  Function name=bootstrap_audit.build_phase124_delegation_chain_audit returns=[debug.Phase124DelegationChainAudit]
-  Function name=debug.validate_phase124_delegation_chain_stress returns=[bool]

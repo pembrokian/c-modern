@@ -1,3 +1,0 @@
-  TypeDecl kind=struct name=debug.Phase123NextPlateauAudit
-  Function name=bootstrap_audit.build_phase123_next_plateau_audit returns=[debug.Phase123NextPlateauAudit]
-  Function name=debug.validate_phase123_next_plateau_audit returns=[bool]

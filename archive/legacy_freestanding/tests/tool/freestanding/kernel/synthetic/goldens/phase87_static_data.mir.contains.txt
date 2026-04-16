@@ -1,7 +1,0 @@
-ConstGlobal names=[BOOT_TASK_TEMPLATE] type=Task
-ConstGlobal names=[EMPTY_TASK_TEMPLATE] type=Task
-VarGlobal names=[ACTIVE_TASK] type=Task
-VarGlobal names=[CHILD_TASK] type=Task
-VarGlobal names=[WAIT_STATUS] type=i32
-store_target target=ACTIVE_TASK target_kind=global target_name=ACTIVE_TASK
-target=WAIT_STATUS target_kind=global target_name=WAIT_STATUS

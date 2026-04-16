@@ -55,7 +55,7 @@ Build layout rule
 - Treat Veya outputs as disposable artifacts produced by `mc` inside the
   existing build tree.
 - Repository-owned Veya regression outputs should continue to live under
-  suite-owned roots such as `build/debug/tool/freestanding/...`.
+  suite-owned roots such as `build/debug/tool/workflow/...`.
 - Manual Veya experiments should prefer roots such as
   `build/debug/probes/veya/...` or `build/debug/tmp/veya/...`.
 
@@ -65,8 +65,8 @@ Test layout rule
 - Keep active Veya proof coverage under `tests/tool/` because the current
   ownership question is still primarily about driver, build, and freestanding
   integration truth.
-- The current home for Veya-facing execution proofs is the freestanding
-  tool suite.
+- The current home for Veya-facing execution proofs is the grouped workflow
+  suite, especially `mc_tool_workflow_kernel_reset_lane_unit` for the active reset-lane lane.
 - If that suite grows substantially, split by focused suite files under
   `tests/tool/` before introducing a deeper subtree. For example:
   - `freestanding/kernel/suite.cpp`
@@ -79,7 +79,7 @@ Test layout rule
 Validation policy
 -----------------
 - During Veya-focused iteration, run the narrowest owning Veya-facing
-  checks first, especially `mc_tool_workflow_unit` for the active reset-lane
+  checks first, especially `mc_tool_workflow_kernel_reset_lane_unit` for the active reset-lane
   kernel and the narrowest compiler suite that owns the touched layer.
 - If a change touches compiler ownership directly, also run the narrowest
   relevant compiler suites for that layer, such as parser, sema, MIR, or other

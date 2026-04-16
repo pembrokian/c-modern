@@ -13,7 +13,7 @@ Convenience entrypoint
   - override arguments when needed, for example:
     `make select-tests SELECT_TESTS_ARGS='--changed kernel/src/kernel_dispatch.mc --changed compiler/driver/builder.cpp --run --cache'`
 
-Legacy archive note
+Legacy retirement note
 
-- the retired freestanding proof suite, `kernel_old/`, and related maintenance scripts now live under `archive/legacy_freestanding/`
-- active `kernel/` work should route through `kernel/build.toml`, `tests/tool/tool_workflow_suite.cpp`, and the ordinary grouped tool suites
+- the retired freestanding proof suite and related maintenance scripts have been removed from the live repository surface
+- active `kernel/` work should route through `kernel/build.toml`, `tests/tool/tool_workflow_orchestrator.cpp`, and the ordinary grouped tool suites

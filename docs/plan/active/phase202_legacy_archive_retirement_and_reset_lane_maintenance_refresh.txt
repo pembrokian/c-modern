@@ -1,0 +1,110 @@
+Phase 202 -- Legacy Archive Retirement And Reset-Lane Maintenance Refresh
+=========================================================================
+
+Status
+------
+COMPLETED
+
+Purpose
+-------
+Finish the freestanding-archive retirement that earlier reset-lane cleanup
+phases intentionally deferred, keep reset-lane workflow coverage growing
+through the existing table-driven shape instead of drifting back toward
+handwritten runners, and refresh support and public docs so the repository's
+current claims match the live validation surface.
+
+This phase is intentionally maintenance-shaped.
+It does not add new kernel semantics, new compiler features, or a new
+freestanding proof lane.
+It removes maintenance drag and stale claims from the already-landed system.
+
+Repository status note
+----------------------
+- Phase 145 retired the freestanding legacy suite from the live build and
+  selector contract, but kept the old harness under
+  `archive/legacy_freestanding/` as a temporary holding area.
+- Phase 184B split the active workflow suite by behavior family and made the
+  reset-lane path table-driven under `tests/tool/tool_kernel_reset_lane_suite.cpp`.
+- The backlog still carried three open maintenance items after Phase 201:
+  delete the archived freestanding legacy suite once any durable facts were
+  harvested, keep growing reset-lane workflow coverage through the shared
+  scenario table, and refresh support statements when active claims change.
+- Active public docs still referenced the deleted workflow lane indirectly:
+  `archive/legacy_freestanding/`, `build/debug/tool/freestanding/...`, the
+  stale `tests/tool/tool_workflow_suite.cpp` filename, and the removed
+  `make freestanding-support-audit` command all still appeared in current
+  notes.
+
+Implemented outcome
+-------------------
+- `tests/tool/tool_kernel_reset_lane_suite.cpp` now validates that every
+  checked-in `tests/smoke/kernel_reset_lane_*` and
+  `tests/system/kernel_reset_lane_*` fixture with a `build.toml` is covered
+  by the reset-lane scenario table before the workflow suite runs.
+- `tools/select_tests.py` now maps workflow ownership to the actual split
+  workflow-suite files (`tool_workflow_orchestrator.cpp`,
+  `tool_help_suite.cpp`, `tool_test_command_suite.cpp`,
+  `tool_project_validation_suite.cpp`, `tool_multifile_module_suite.cpp`,
+  and `tool_kernel_reset_lane_suite.cpp`) instead of the stale deleted
+  `tool_workflow_suite.cpp` path.
+- Active docs now point at the live reset-lane owners:
+  `kernel/build.toml`, `mc_tool_workflow_unit`, the grouped workflow suite,
+  and `build/debug/tool/workflow/...`.
+- The old `archive/legacy_freestanding/` tree has been deleted after
+  harvesting the only durable current-owner facts into active docs and this
+  phase note.
+- The old freestanding support note is retained only as historical context;
+  it is no longer presented as an active supported or regressed workflow lane.
+- No compiler, sema, MIR, backend, ABI, target, runtime, or `hal` expansion
+  was admitted in this phase.
+
+Chosen slice for this phase
+---------------------------
+1. one workflow-table guard preventing unchecked reset-lane fixture drift
+2. one local-test-selector refresh to the actual split workflow owners
+3. one public-doc and support-statement refresh to current live paths
+4. one final deletion of the retired archive tree
+5. no new runtime semantics and no replacement freestanding framework
+
+Consciously harvested versus consciously dropped
+-----------------------------------------------
+Harvested:
+- the active reset-lane validation owner is `mc_tool_workflow_unit` over the
+  repository-owned `kernel/build.toml` path plus the checked-in reset-lane
+  smoke and system fixtures
+- the live disposable output root for that work is the grouped workflow tree,
+  not a freestanding-specific output subtree
+- the pre-reset-lane freestanding harness is historical context only and
+  should not be recreated piecemeal
+
+Consciously dropped:
+- the archived freestanding proof descriptors, goldens, and maintenance
+  scripts
+- the archive-local migration note and archive-local README as current-facing
+  documentation surfaces
+- the removed `make freestanding-support-audit` command and the idea that the
+  old proof lane is still part of the live acceptance contract
+
+Parallel validation posture
+---------------------------
+- The canonical full-suite path remains `ctest --test-dir build/debug -j4
+  --output-on-failure`.
+- `CMakeLists.txt` still serializes only the shared smoke-output writers
+  (`mc_first_use_smoke`, `mc_public_cut_smoke`, `mc_release_readiness_audit`,
+  `mc_release_snapshot_prep`, and `mc_v0_2_gate`) through one
+  `RESOURCE_LOCK audit_smoke_dirs` so parallel CTest runs do not race on the
+  same directories.
+- The grouped workflow suite remains one independent CTest target and still
+  runs correctly inside the `-j4` full-suite path.
+
+What this phase proves
+----------------------
+- that the repository can finish retiring the old freestanding proof lane
+  without reopening a new framework or preserving a dead archive tree as a
+  pseudo-product surface
+- that the reset-lane workflow table is now the enforced ownership boundary
+  for checked-in reset-lane fixtures instead of a convention that can drift
+  silently
+- that current support and public docs can stay honest about the live running-
+  system slice without pretending the removed archive remains part of active
+  validation

@@ -3,13 +3,18 @@ Freestanding Proof Slice Support Note
 
 Status
 ------
-PUBLISHED (repository-bounded proof statement, support-statement split, and tooling audit)
+HISTORICAL (retired proof-lane note; no active workflow or audit contract)
 
 Purpose
 -------
-Record the current admitted freestanding proof slice separately from the hosted
-`v0.2` release-hardening note so the repository can state what the landed
-Phase 81 through Phase 94 work does and does not support.
+Record the historical admitted freestanding proof slice separately from the
+current hosted and Veya running-system notes so the repository can preserve
+what the landed Phase 81 through Phase 94 work proved without pretending that
+the old freestanding workflow lane is still active.
+
+Phase 202 retired the archived freestanding legacy suite and the old focused
+freestanding support audit command.
+This note now remains for historical context only.
 
 This note is intentionally narrower than the hosted release-hardening note.
 It does not claim general freestanding release readiness, broad non-hosted
@@ -122,11 +127,7 @@ Supported command pattern for the admitted freestanding proof slice:
 build/debug/mc build --project <build.toml> --target <name> --build-dir <dir>
 ```
 
-Repo-owned audit entrypoint for this support statement:
-
-```sh
-make freestanding-support-audit
-```
+There is no current repo-owned audit entrypoint for this historical note.
 
 Artifact expectations
 ---------------------
@@ -135,9 +136,9 @@ Artifact expectations
 - `build/` is disposable generated state
 - command-local `--build-dir` trees are disposable generated state and should
   be treated as build outputs, not source inputs
-- `make freestanding-support-audit` is the repo-owned convenience wrapper for
-  the focused documentation audit that keeps this note, the hosted note, and
-  README aligned around the admitted freestanding proof slice
+- this note is retained as historical context only; active support claims now
+  live in the hosted release-hardening note and the Veya running-system
+  support statement
 
 Known limitations
 -----------------

@@ -1,4 +1,0 @@
-  TypeDecl kind=struct name=debug.Phase132BackpressureAudit
-  Function name=syscall.perform_send_with_backpressure returns=[syscall.BackpressureSendResult]
-  Function name=syscall.perform_receive_with_backpressure returns=[syscall.BackpressureReceiveResult]
-  Function name=debug.validate_phase132_backpressure_and_blocking returns=[bool]

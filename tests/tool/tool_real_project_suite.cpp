@@ -2477,19 +2477,9 @@ struct RealProjectTestCase {
 };
 
 constexpr RealProjectTestCase kRealProjectTestCases[] = {
-    {"grep-lite", &TestRealGrepLiteProject},
-    {"file-walker", &TestRealFileWalkerProject},
-    {"hash-tool", &TestRealHashToolProject},
-    {"arena-expr", &TestRealArenaExprToolProject},
-    {"worker-queue", &TestRealWorkerQueueProject},
-    {"pipe-handoff", &TestRealPipeHandoffProject},
-    {"pipe-ready", &TestRealPipeReadyProject},
-    {"line-filter-relay", &TestRealLineFilterRelayProject},
-    {"evented-echo", &TestRealEventedEchoProject},
-    {"review-board", &TestRealReviewBoardProject},
-    {"issue-rollup", &TestRealIssueRollupProject},
-    {"issue-rollup-imported-aggregate-const", &TestIssueRollupImportedAggregateConstPressure},
-    {"module-set-imported-const", &TestModuleSetImportedConstFollowThrough},
+#define REAL_PROJECT_CASE(selector, function_name) {#selector, &function_name},
+#include "tests/tool/tool_real_project_cases.def"
+#undef REAL_PROJECT_CASE
 };
 
 const RealProjectTestCase* FindRealProjectTestCase(std::string_view case_name) {
@@ -2520,6 +2510,7 @@ void RunRealProjectToolSuite(const std::filesystem::path& source_root,
     TestRealReviewBoardProject(source_root, suite_root, mc_path);
     TestRealIssueRollupProject(source_root, suite_root, mc_path);
     TestIssueRollupImportedAggregateConstPressure(source_root, suite_root, mc_path);
+    TestModuleSetImportedConstFollowThrough(source_root, suite_root, mc_path);
 }
 
 void RunRealProjectToolSuiteCase(const std::filesystem::path& source_root,

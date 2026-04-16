@@ -1,4 +1,0 @@
-  TypeDecl kind=struct name=debug.Phase148AuthorityErgonomicsAudit
-  Function name=bootstrap_audit.build_phase148_authority_ergonomics_audit returns=[debug.Phase148AuthorityErgonomicsAudit]
-  Function name=capability.handle_carries_endpoint_authority returns=[bool]
-  Function name=debug.validate_phase148_authority_ergonomics_under_reuse returns=[bool]

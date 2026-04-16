@@ -206,11 +206,30 @@ add_executable(mc_sema_fixture_tests
 target_include_directories(mc_sema_fixture_tests PRIVATE ${CMAKE_CURRENT_SOURCE_DIR})
 target_link_libraries(mc_sema_fixture_tests PRIVATE mc_sema_bootstrap mc_frontend_stub mc_support mc_test_support)
 
+function(add_tool_workflow_case_test test_name selector)
+    add_test(NAME ${test_name}
+        COMMAND mc_tool_workflow_tests ${CMAKE_CURRENT_SOURCE_DIR} ${CMAKE_CURRENT_BINARY_DIR} ${selector})
+endfunction()
+
+function(add_tool_real_project_case_test test_name selector)
+    add_test(NAME ${test_name}
+        COMMAND mc_tool_real_project_tests ${CMAKE_CURRENT_SOURCE_DIR} ${CMAKE_CURRENT_BINARY_DIR} ${selector})
+endfunction()
+
+function(register_tool_case_tests_from_def def_file macro_name target_prefix add_case_function)
+    file(STRINGS ${def_file} case_lines REGEX "^${macro_name}\\(.+\\)$")
+    foreach(case_line IN LISTS case_lines)
+        string(REGEX REPLACE "^${macro_name}\\(([^,]+),[ ]*([^)]+)\\)$" "\\1" selector "${case_line}")
+        string(REPLACE "-" "_" selector_suffix "${selector}")
+        cmake_language(CALL ${add_case_function} ${target_prefix}${selector_suffix}_unit ${selector})
+    endforeach()
+endfunction()
+
 add_test(NAME mc_bootstrap_unit COMMAND mc_bootstrap_tests)
 add_test(NAME mc_codegen_llvm_unit COMMAND mc_codegen_llvm_tests)
-add_test(NAME mc_tool_workflow_unit COMMAND mc_tool_workflow_tests ${CMAKE_CURRENT_SOURCE_DIR} ${CMAKE_CURRENT_BINARY_DIR})
+register_tool_case_tests_from_def(${CMAKE_CURRENT_SOURCE_DIR}/tests/tool/tool_workflow_cases.def WORKFLOW_CASE mc_tool_workflow_ add_tool_workflow_case_test)
 add_test(NAME mc_tool_build_state_unit COMMAND mc_tool_build_state_tests ${CMAKE_CURRENT_SOURCE_DIR} ${CMAKE_CURRENT_BINARY_DIR})
-add_test(NAME mc_tool_real_project_unit COMMAND mc_tool_real_project_tests ${CMAKE_CURRENT_SOURCE_DIR} ${CMAKE_CURRENT_BINARY_DIR})
+register_tool_case_tests_from_def(${CMAKE_CURRENT_SOURCE_DIR}/tests/tool/tool_real_project_cases.def REAL_PROJECT_CASE mc_tool_real_project_ add_tool_real_project_case_test)
 add_test(NAME mc_codegen_fixture_unit COMMAND mc_codegen_fixture_tests ${CMAKE_CURRENT_SOURCE_DIR})
 add_test(NAME mc_codegen_executable_core_unit COMMAND mc_codegen_executable_core_tests ${CMAKE_CURRENT_SOURCE_DIR} ${CMAKE_CURRENT_BINARY_DIR})
 add_test(NAME mc_codegen_executable_stdlib_unit COMMAND mc_codegen_executable_stdlib_tests ${CMAKE_CURRENT_SOURCE_DIR} ${CMAKE_CURRENT_BINARY_DIR})
@@ -292,14 +311,21 @@ add_test(NAME mc_release_snapshot_prep
          -DBINARY_DIR=${CMAKE_CURRENT_BINARY_DIR}
          -P ${CMAKE_CURRENT_SOURCE_DIR}/tests/cmake/run_release_snapshot_prep.cmake)
 
-# These tests internally invoke the same smoke scripts which write to shared
-# output directories (${BINARY_DIR}/audit/first_use_smoke/ and
-# ${BINARY_DIR}/audit/public_cut_smoke/).  Serialise them so that parallel
-# ctest runs (-j4) do not race on those directories.
+# Only tests that share the first-use or public-cut audit roots need locking.
+# `mc_release_snapshot_prep` writes under ${BINARY_DIR}/release/ and can run in
+# parallel with the smoke/audit lane.
 set_tests_properties(
     mc_first_use_smoke
+    PROPERTIES RESOURCE_LOCK first_use_smoke_dir)
+
+set_tests_properties(
     mc_public_cut_smoke
+    PROPERTIES RESOURCE_LOCK public_cut_smoke_dir)
+
+set_tests_properties(
     mc_release_readiness_audit
-    mc_release_snapshot_prep
+    PROPERTIES RESOURCE_LOCK "first_use_smoke_dir;public_cut_smoke_dir")
+
+set_tests_properties(
     mc_v0_2_gate
-    PROPERTIES RESOURCE_LOCK audit_smoke_dirs)
+    PROPERTIES RESOURCE_LOCK "first_use_smoke_dir;public_cut_smoke_dir")

@@ -58,9 +58,9 @@ build/debug/bin/mc check tests/cases/hello.mc
 build/debug/bin/mc check tests/cases/hello.mc --dump-mir --build-dir build/debug
 ctest --test-dir build/debug -R mc_sema_fixture_unit --output-on-failure
 ctest --test-dir build/debug -R mc_mir_fixture_unit --output-on-failure
-ctest --test-dir build/debug -R mc_tool_workflow_unit --output-on-failure
+ctest --test-dir build/debug -R 'mc_tool_workflow_.*_unit' --output-on-failure
 ctest --test-dir build/debug -R mc_tool_build_state_unit --output-on-failure
-ctest --test-dir build/debug -R mc_tool_real_project_unit --output-on-failure
+ctest --test-dir build/debug -R 'mc_tool_real_project_.*_unit' --output-on-failure
 make select-tests
 ```
 
@@ -87,7 +87,7 @@ Active grouped regression layout:
 - `tests/tool/tool_real_project_suite.cpp`: real-project grouped implementation
 - local changed-path selection now lives in `tools/select_tests.py` and the `make select-tests` wrapper; use that for narrow local iteration before wider gates
 - `kernel/build.toml`: repository-owned hosted reset-lane project manifest used by the active workflow suite
-- `archive/legacy_freestanding/`: retired freestanding proof harness, `kernel_old/`, and related maintenance helpers preserved for historical reference only
+- `docs/plan/active/phase202_legacy_archive_retirement_and_reset_lane_maintenance_refresh.txt`: records the completed retirement of the old freestanding proof archive and the current reset-lane maintenance boundary
 - `tests/tool/tool_suite_tests.cpp` and `tests/tool/phase7_tool_tests.cpp`: compatibility runners only, not the active implementation owners
 - `tests/compiler/codegen/codegen_executable_tests.cpp`: shared grouped codegen executable implementation
 - primary build products now belong under `build/debug/bin/...` and `build/debug/lib/...`
@@ -120,6 +120,6 @@ If you add a feature that changes compiler-visible behavior, update the narrowes
 - Import handling currently lives in bootstrap sema and is intentionally simpler than a future interface-artifact system.
 - Layout support exists, but it is still first-cut bootstrap behavior and not full ABI completion.
 - The build tree under `build/` is disposable.
-- Do not reactivate or extend the archived freestanding proof harness under `archive/legacy_freestanding/`; new validation belongs on the active hosted kernel or grouped workflow surfaces.
+- Do not recreate the retired freestanding proof harness as a live suite; new validation belongs on the active hosted kernel or grouped workflow surfaces.
 - Do not reintroduce fresh top-level `build/debug/phase*` regression output trees for repository-owned tests; prefer the semantic `audit`, `probes`, `tmp`, `tool`, or grouped suite work roots already in use.
 - If you need to tidy an existing build tree in place, prefer `make clean-legacy-build-debris` over ad hoc manual deletion.

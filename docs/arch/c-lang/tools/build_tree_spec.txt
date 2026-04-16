@@ -159,6 +159,21 @@ cmake --build build/debug -j4
 ctest --test-dir build/debug --output-on-failure
 ```
 
+Explicit parallel full-suite path:
+
+```text
+ctest --test-dir build/debug -j4 --output-on-failure
+```
+
+Useful focused local iteration paths:
+
+```text
+ctest --test-dir build/debug -R 'mc_tool_workflow_.*_unit' --output-on-failure
+ctest --test-dir build/debug -R mc_tool_build_state_unit --output-on-failure
+ctest --test-dir build/debug -R 'mc_tool_real_project_.*_unit' --output-on-failure
+make select-tests
+```
+
 This supported path should stay obvious even if the repository also uses
 additional build-tree namespaces for audits or probes.
 

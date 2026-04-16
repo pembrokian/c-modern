@@ -1,4 +1,0 @@
-  TypeDecl kind=struct name=debug.Phase149RestartSemanticsFirstClassPatternAudit
-  Function name=bootstrap_audit.build_phase149_restart_semantics_first_class_pattern_audit returns=[debug.Phase149RestartSemanticsFirstClassPatternAudit]
-  Function name=bootstrap_services.execute_phase145_service_restart_shell_command returns=[bootstrap_services.Phase142ShellCommandRouteResult]
-  Function name=debug.validate_phase149_restart_semantics_first_class_pattern returns=[bool]

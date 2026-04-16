@@ -68,7 +68,7 @@ import strings
 
 func test_grep_finds_match() Error {
     result, err = os.run({
-        program: "build/checked/grep",
+        program: "build/debug/bin/grep",
         args: ["needle", "tests/data/corpus.txt"],
     })
     if err != nil {
@@ -113,7 +113,7 @@ What this demonstrates:
 File:
 
 ```text
-compiler/tests/compile_fail/distinct_mismatch.mc
+tests/compiler/sema/distinct_mismatch.mc
 ```
 
 Sketch:
@@ -142,7 +142,7 @@ What this demonstrates:
 File:
 
 ```text
-compiler/tests/run_output/hello_world.mc
+tests/compiler/codegen/hello_world.mc
 ```
 
 Sketch:
@@ -174,7 +174,7 @@ What this demonstrates:
 File:
 
 ```text
-compiler/tests/mir/wrap_add.mc
+tests/compiler/mir/wrap_add.mc
 ```
 
 Sketch:

@@ -29,6 +29,30 @@ ALL_EXECUTABLE_CODEGEN_TESTS = [
     "mc_codegen_executable_project_unit",
 ]
 
+ALL_WORKFLOW_TESTS = [
+    "mc_tool_workflow_help_unit",
+    "mc_tool_workflow_test_command_unit",
+    "mc_tool_workflow_project_validation_unit",
+    "mc_tool_workflow_multifile_module_unit",
+    "mc_tool_workflow_kernel_reset_lane_unit",
+]
+
+ALL_REAL_PROJECT_TESTS = [
+    "mc_tool_real_project_grep_lite_unit",
+    "mc_tool_real_project_file_walker_unit",
+    "mc_tool_real_project_hash_tool_unit",
+    "mc_tool_real_project_arena_expr_unit",
+    "mc_tool_real_project_worker_queue_unit",
+    "mc_tool_real_project_pipe_handoff_unit",
+    "mc_tool_real_project_pipe_ready_unit",
+    "mc_tool_real_project_line_filter_relay_unit",
+    "mc_tool_real_project_evented_echo_unit",
+    "mc_tool_real_project_review_board_unit",
+    "mc_tool_real_project_issue_rollup_unit",
+    "mc_tool_real_project_issue_rollup_imported_aggregate_const_unit",
+    "mc_tool_real_project_module_set_imported_const_unit",
+]
+
 SMOKE_AND_AUDIT_TESTS = [
     "mc_help_smoke",
     "mc_check_smoke",
@@ -49,9 +73,9 @@ DEFAULT_BASE_CANDIDATES = ["origin/main", "main", "origin/master", "master"]
 CACHE_VERSION = 1
 
 ALL_TOOL_TESTS = [
-    "mc_tool_workflow_unit",
+    *ALL_WORKFLOW_TESTS,
     "mc_tool_build_state_unit",
-    "mc_tool_real_project_unit",
+    *ALL_REAL_PROJECT_TESTS,
 ]
 
 FULL_LOCAL_UNIT_SET = [
@@ -75,9 +99,16 @@ RULES = [
     Rule(("tests/compiler/sema/",), ("mc_sema_fixture_unit",), "semantic fixture ownership"),
     Rule(("tests/compiler/mir/",), ("mc_mir_fixture_unit", "mc_mir_unit"), "MIR fixture ownership"),
     Rule(("tests/compiler/codegen/",), ("mc_codegen_fixture_unit", "mc_codegen_llvm_unit", *ALL_EXECUTABLE_CODEGEN_TESTS), "codegen fixture ownership"),
-    Rule(("tests/tool/tool_workflow_tests.cpp", "tests/tool/tool_workflow_suite.cpp"), ("mc_tool_workflow_unit",), "workflow suite ownership"),
+    Rule(("tests/tool/tool_workflow_tests.cpp",
+          "tests/tool/tool_workflow_orchestrator.cpp",
+          "tests/tool/tool_workflow_suite_internal.h"), tuple(ALL_WORKFLOW_TESTS), "workflow suite ownership"),
+    Rule(("tests/tool/tool_help_suite.cpp",), ("mc_tool_workflow_help_unit",), "workflow help ownership"),
+    Rule(("tests/tool/tool_test_command_suite.cpp",), ("mc_tool_workflow_test_command_unit",), "workflow test-command ownership"),
+    Rule(("tests/tool/tool_project_validation_suite.cpp",), ("mc_tool_workflow_project_validation_unit",), "workflow project-validation ownership"),
+    Rule(("tests/tool/tool_multifile_module_suite.cpp",), ("mc_tool_workflow_multifile_module_unit",), "workflow multifile-module ownership"),
+    Rule(("tests/tool/tool_kernel_reset_lane_suite.cpp",), ("mc_tool_workflow_kernel_reset_lane_unit",), "workflow kernel-reset-lane ownership"),
     Rule(("tests/tool/tool_build_state_tests.cpp", "tests/tool/tool_build_state_suite.cpp"), ("mc_tool_build_state_unit",), "build-state suite ownership"),
-    Rule(("tests/tool/tool_real_project_tests.cpp", "tests/tool/tool_real_project_suite.cpp"), ("mc_tool_real_project_unit",), "real-project suite ownership"),
+    Rule(("tests/tool/tool_real_project_tests.cpp", "tests/tool/tool_real_project_suite.cpp"), tuple(ALL_REAL_PROJECT_TESTS), "real-project suite ownership"),
     Rule(("tests/tool/tool_suite_common.cpp", "tests/tool/tool_suite_common.h"), tuple(ALL_TOOL_TESTS), "shared tool helper ownership"),
     Rule(("compiler/lex/", "compiler/parse/", "compiler/ast/"), tuple(CORE_COMPILER_TESTS), "frontend syntax-layer ownership"),
     Rule(("compiler/resolve/", "compiler/sema/"), ("mc_sema_fixture_unit", "mc_mir_fixture_unit", "mc_mir_unit", "mc_codegen_fixture_unit", "mc_codegen_llvm_unit", *ALL_EXECUTABLE_CODEGEN_TESTS), "semantic-layer ownership"),
@@ -145,11 +176,11 @@ def resolve_base_ref(source_root: Path, requested_base_ref: str) -> str:
 
 def classify_kernel_path(path: str) -> tuple[list[str], str] | None:
     if path.startswith("kernel/"):
-        return (["mc_tool_workflow_unit"], "kernel workflow ownership")
+        return (["mc_tool_workflow_kernel_reset_lane_unit"], "kernel workflow ownership")
 
     if path.startswith("stdlib/"):
-        return (["mc_tool_workflow_unit",
-                 "mc_tool_real_project_unit",
+        return (["mc_tool_workflow_kernel_reset_lane_unit",
+                 *ALL_REAL_PROJECT_TESTS,
                  "mc_codegen_executable_stdlib_unit",
                  "mc_check_stdlib_import_smoke"],
                 "stdlib ownership")
@@ -167,7 +198,7 @@ def classify_path(path: str) -> tuple[list[str], str] | None:
                 "shared case-fixture ownership")
 
     if path.startswith("tests/stdlib/") or path.startswith("examples/"):
-        return (["mc_codegen_executable_stdlib_unit", "mc_codegen_executable_project_unit", "mc_tool_real_project_unit"],
+        return (["mc_codegen_executable_stdlib_unit", "mc_codegen_executable_project_unit", *ALL_REAL_PROJECT_TESTS],
                 "stdlib example and real-project ownership")
 
     if path.startswith("tests/cmake/"):
@@ -246,9 +277,25 @@ def owned_inputs_for_test(test_name: str, source_root: Path) -> list[Path]:
         "mc_codegen_executable_core_unit": ["tests/compiler/codegen/", "compiler/codegen_llvm/", "compiler/mir/", "compiler/sema/", "tests/compiler/codegen/codegen_executable_tests.cpp"],
         "mc_codegen_executable_stdlib_unit": ["tests/compiler/codegen/", "compiler/codegen_llvm/", "compiler/mir/", "compiler/sema/", "stdlib/", "tests/compiler/codegen/codegen_executable_tests.cpp"],
         "mc_codegen_executable_project_unit": ["tests/compiler/codegen/", "compiler/codegen_llvm/", "compiler/mir/", "compiler/sema/", "examples/", "tests/compiler/codegen/codegen_executable_tests.cpp"],
-        "mc_tool_workflow_unit": ["tests/tool/tool_workflow_tests.cpp", "tests/tool/tool_workflow_suite.cpp", "tests/tool/tool_suite_common.cpp", "tests/tool/tool_suite_common.h", "compiler/driver/", "compiler/support/", "compiler/mci/", "tests/support/"],
+        "mc_tool_workflow_help_unit": ["tests/tool/tool_workflow_tests.cpp", "tests/tool/tool_workflow_orchestrator.cpp", "tests/tool/tool_workflow_suite_internal.h", "tests/tool/tool_help_suite.cpp", "tests/tool/tool_suite_common.cpp", "tests/tool/tool_suite_common.h", "compiler/driver/", "compiler/support/", "compiler/mci/", "tests/support/"],
+        "mc_tool_workflow_test_command_unit": ["tests/tool/tool_workflow_tests.cpp", "tests/tool/tool_workflow_orchestrator.cpp", "tests/tool/tool_workflow_suite_internal.h", "tests/tool/tool_test_command_suite.cpp", "tests/tool/tool_suite_common.cpp", "tests/tool/tool_suite_common.h", "compiler/driver/", "compiler/support/", "compiler/mci/", "tests/support/"],
+        "mc_tool_workflow_project_validation_unit": ["tests/tool/tool_workflow_tests.cpp", "tests/tool/tool_workflow_orchestrator.cpp", "tests/tool/tool_workflow_suite_internal.h", "tests/tool/tool_project_validation_suite.cpp", "tests/tool/tool_suite_common.cpp", "tests/tool/tool_suite_common.h", "compiler/driver/", "compiler/support/", "compiler/mci/", "tests/support/"],
+        "mc_tool_workflow_multifile_module_unit": ["tests/tool/tool_workflow_tests.cpp", "tests/tool/tool_workflow_orchestrator.cpp", "tests/tool/tool_workflow_suite_internal.h", "tests/tool/tool_multifile_module_suite.cpp", "tests/tool/tool_suite_common.cpp", "tests/tool/tool_suite_common.h", "compiler/driver/", "compiler/support/", "compiler/mci/", "tests/support/"],
+        "mc_tool_workflow_kernel_reset_lane_unit": ["tests/tool/tool_workflow_tests.cpp", "tests/tool/tool_workflow_orchestrator.cpp", "tests/tool/tool_workflow_suite_internal.h", "tests/tool/tool_kernel_reset_lane_suite.cpp", "tests/tool/tool_suite_common.cpp", "tests/tool/tool_suite_common.h", "compiler/driver/", "compiler/support/", "compiler/mci/", "tests/support/", "kernel/", "stdlib/"],
         "mc_tool_build_state_unit": ["tests/tool/tool_build_state_tests.cpp", "tests/tool/tool_build_state_suite.cpp", "tests/tool/tool_suite_common.cpp", "tests/tool/tool_suite_common.h", "compiler/driver/", "compiler/support/", "compiler/mci/", "tests/support/"],
-        "mc_tool_real_project_unit": ["tests/tool/tool_real_project_tests.cpp", "tests/tool/tool_real_project_suite.cpp", "tests/tool/tool_suite_common.cpp", "tests/tool/tool_suite_common.h", "compiler/driver/", "compiler/support/", "compiler/mci/", "examples/", "tests/support/"],
+        "mc_tool_real_project_grep_lite_unit": ["tests/tool/tool_real_project_tests.cpp", "tests/tool/tool_real_project_suite.cpp", "tests/tool/tool_suite_common.cpp", "tests/tool/tool_suite_common.h", "compiler/driver/", "compiler/support/", "compiler/mci/", "examples/real/grep_lite/", "tests/support/"],
+        "mc_tool_real_project_file_walker_unit": ["tests/tool/tool_real_project_tests.cpp", "tests/tool/tool_real_project_suite.cpp", "tests/tool/tool_suite_common.cpp", "tests/tool/tool_suite_common.h", "compiler/driver/", "compiler/support/", "compiler/mci/", "examples/real/file_walker/", "tests/support/"],
+        "mc_tool_real_project_hash_tool_unit": ["tests/tool/tool_real_project_tests.cpp", "tests/tool/tool_real_project_suite.cpp", "tests/tool/tool_suite_common.cpp", "tests/tool/tool_suite_common.h", "compiler/driver/", "compiler/support/", "compiler/mci/", "examples/real/hash_tool/", "tests/support/"],
+        "mc_tool_real_project_arena_expr_unit": ["tests/tool/tool_real_project_tests.cpp", "tests/tool/tool_real_project_suite.cpp", "tests/tool/tool_suite_common.cpp", "tests/tool/tool_suite_common.h", "compiler/driver/", "compiler/support/", "compiler/mci/", "examples/real/arena_expr/", "tests/support/"],
+        "mc_tool_real_project_worker_queue_unit": ["tests/tool/tool_real_project_tests.cpp", "tests/tool/tool_real_project_suite.cpp", "tests/tool/tool_suite_common.cpp", "tests/tool/tool_suite_common.h", "compiler/driver/", "compiler/support/", "compiler/mci/", "examples/real/worker_queue/", "tests/support/"],
+        "mc_tool_real_project_pipe_handoff_unit": ["tests/tool/tool_real_project_tests.cpp", "tests/tool/tool_real_project_suite.cpp", "tests/tool/tool_suite_common.cpp", "tests/tool/tool_suite_common.h", "compiler/driver/", "compiler/support/", "compiler/mci/", "examples/real/pipe_handoff/", "tests/support/"],
+        "mc_tool_real_project_pipe_ready_unit": ["tests/tool/tool_real_project_tests.cpp", "tests/tool/tool_real_project_suite.cpp", "tests/tool/tool_suite_common.cpp", "tests/tool/tool_suite_common.h", "compiler/driver/", "compiler/support/", "compiler/mci/", "examples/real/pipe_ready/", "tests/support/"],
+        "mc_tool_real_project_line_filter_relay_unit": ["tests/tool/tool_real_project_tests.cpp", "tests/tool/tool_real_project_suite.cpp", "tests/tool/tool_suite_common.cpp", "tests/tool/tool_suite_common.h", "compiler/driver/", "compiler/support/", "compiler/mci/", "examples/real/line_filter_relay/", "tests/support/"],
+        "mc_tool_real_project_evented_echo_unit": ["tests/tool/tool_real_project_tests.cpp", "tests/tool/tool_real_project_suite.cpp", "tests/tool/tool_suite_common.cpp", "tests/tool/tool_suite_common.h", "compiler/driver/", "compiler/support/", "compiler/mci/", "examples/real/evented_echo/", "tests/support/"],
+        "mc_tool_real_project_review_board_unit": ["tests/tool/tool_real_project_tests.cpp", "tests/tool/tool_real_project_suite.cpp", "tests/tool/tool_suite_common.cpp", "tests/tool/tool_suite_common.h", "compiler/driver/", "compiler/support/", "compiler/mci/", "examples/real/review_board/", "tests/support/"],
+        "mc_tool_real_project_issue_rollup_unit": ["tests/tool/tool_real_project_tests.cpp", "tests/tool/tool_real_project_suite.cpp", "tests/tool/tool_suite_common.cpp", "tests/tool/tool_suite_common.h", "compiler/driver/", "compiler/support/", "compiler/mci/", "examples/real/issue_rollup/", "tests/support/"],
+        "mc_tool_real_project_issue_rollup_imported_aggregate_const_unit": ["tests/tool/tool_real_project_tests.cpp", "tests/tool/tool_real_project_suite.cpp", "tests/tool/tool_suite_common.cpp", "tests/tool/tool_suite_common.h", "compiler/driver/", "compiler/support/", "compiler/mci/", "examples/real/issue_rollup/", "tests/support/"],
+        "mc_tool_real_project_module_set_imported_const_unit": ["tests/tool/tool_real_project_tests.cpp", "tests/tool/tool_real_project_suite.cpp", "tests/tool/tool_suite_common.cpp", "tests/tool/tool_suite_common.h", "compiler/driver/", "compiler/support/", "compiler/mci/", "examples/real/issue_rollup/", "tests/support/"],
         "mc_help_smoke": ["compiler/driver/", "compiler/support/", "README.md"],
         "mc_check_smoke": ["tests/cases/", "compiler/driver/", "compiler/support/", "compiler/parse/", "compiler/sema/", "compiler/mir/"],
         "mc_check_stdlib_import_smoke": ["stdlib/", "compiler/driver/", "compiler/support/", "compiler/sema/", "compiler/mir/"],
@@ -307,12 +354,12 @@ def update_cache_after_run(cache_payload: dict[str, object], run_tests: list[str
         cache_tests[test_name] = {"fingerprint": fingerprints[test_name], "status": "failed"}
 
 
-def run_selected_tests(source_root: Path, build_dir: Path, tests: list[str]) -> None:
+def run_selected_tests(source_root: Path, build_dir: Path, tests: list[str], jobs: int) -> None:
     if not tests:
         print("No CTest targets selected; nothing to run.")
         return
     regex = "^(" + "|".join(re.escape(test) for test in tests) + ")$"
-    subprocess.run(["ctest", "--test-dir", str(build_dir), "-R", regex, "--output-on-failure"], cwd=source_root, check=True)
+    subprocess.run(["ctest", "--test-dir", str(build_dir), f"-j{jobs}", "-R", regex, "--output-on-failure"], cwd=source_root, check=True)
 
 
 def main() -> int:
@@ -404,7 +451,7 @@ def main() -> int:
         build_selected(source_root, build_dir, args.jobs)
     if args.run:
         try:
-            run_selected_tests(source_root, build_dir, tests_to_run)
+            run_selected_tests(source_root, build_dir, tests_to_run, args.jobs)
         except subprocess.CalledProcessError:
             if args.cache and cache_payload is not None and cache_file is not None:
                 update_cache_after_run(cache_payload, tests_to_run, skipped_tests, fingerprints, success=False)

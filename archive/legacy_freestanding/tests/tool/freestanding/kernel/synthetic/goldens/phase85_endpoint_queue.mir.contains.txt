@@ -1,5 +1,0 @@
-TypeDecl kind=enum name=MessageTag
-TypeDecl kind=struct name=EndpointMessage
-TypeDecl kind=struct name=EndpointQueue
-aggregate_init %v
-target_base=[4]u8

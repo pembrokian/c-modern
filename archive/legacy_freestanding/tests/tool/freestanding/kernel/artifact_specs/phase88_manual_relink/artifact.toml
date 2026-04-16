@@ -1,7 +1,0 @@
-label = "phase88_manual_relink"
-kind = "standalone_manual_relink"
-project_name = "phase88-kernel-build-integration"
-main_source = "main.mc"
-driver_support_source = "driver_support.c"
-manual_support_source = "manual_support.c"
-expected_exit_code = 89

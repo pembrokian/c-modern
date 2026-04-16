@@ -1,3 +1,0 @@
-  TypeDecl kind=struct name=debug.Phase122TargetSurfaceAudit
-  Function name=bootstrap_audit.build_phase122_target_surface_audit returns=[debug.Phase122TargetSurfaceAudit]
-  Function name=debug.validate_phase122_target_surface_audit returns=[bool]

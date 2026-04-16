@@ -1,6 +1,0 @@
-label = "phase114_plan_note"
-source = "docs/plan/archive/phase114_address_space_and_mmu_ownership_split.txt"
-context = "phase114 plan note descriptor audit"
-contains = [
-  "Phase 114 -- Address-Space And MMU Ownership Split",
-]

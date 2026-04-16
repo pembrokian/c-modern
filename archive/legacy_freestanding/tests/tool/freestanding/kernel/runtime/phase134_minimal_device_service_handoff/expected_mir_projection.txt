@@ -1,5 +1,0 @@
-  TypeDecl kind=struct name=debug.Phase134MinimalDeviceServiceHandoffAudit
-  Function name=ipc.publish_runtime_byte returns=[ipc.RuntimePublishResult]
-  Function name=uart.handle_receive_interrupt returns=[uart.UartInterruptResult]
-  Function name=bootstrap_services.execute_serial_service_receive_and_exit returns=[bootstrap_services.SerialServiceExecutionResult]
-  Function name=debug.validate_phase134_minimal_device_service_handoff returns=[bool]

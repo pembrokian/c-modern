@@ -1,4 +1,0 @@
-  TypeDecl kind=struct name=debug.Phase147IpcShapeAudit
-  Function name=bootstrap_audit.build_phase147_ipc_shape_audit returns=[debug.Phase147IpcShapeAudit]
-  Function name=bootstrap_services.phase147_ipc_shape_workflow_result returns=[bootstrap_services.Phase147IpcShapeWorkflowResult]
-  Function name=debug.validate_phase147_ipc_shape_audit_under_real_usage returns=[bool]

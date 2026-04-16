@@ -24,8 +24,8 @@ Compiler-validation owners:
 
 Legacy archive rule:
 
-- the retired freestanding proof harness now lives under `archive/legacy_freestanding/`
-- do not add new active coverage there; new behavior work belongs in `smoke/`, `system/`, or the grouped `tests/tool/` workflow suites
+- the retired freestanding proof harness is no longer present in the repository
+- do not recreate that old lane; new behavior work belongs in `smoke/`, `system/`, or the grouped `tests/tool/` workflow suites
 
 The shared support layer currently covers fixture helpers plus the common
 process, socket, timeout, and temporary-file helpers used by grouped
@@ -87,9 +87,9 @@ The large integration areas are now split by behavior family instead of one exec
 
 The active grouped tool CTest targets use semantic names:
 
-- `mc_tool_workflow_unit`
+- `mc_tool_workflow_(help|test_command|project_validation|multifile_module|kernel_reset_lane)_unit`
 - `mc_tool_build_state_unit`
-- `mc_tool_real_project_unit`
+- `mc_tool_real_project_.*_unit`
 
 When those grouped tool suites generate disposable outputs, they now root them
 under semantic suite directories such as `build/debug/tool/workflow/...`,

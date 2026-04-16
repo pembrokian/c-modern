@@ -1,3 +1,0 @@
-  TypeDecl kind=struct name=debug.Phase130ExplicitRestartOrReplacementAudit
-  Function name=bootstrap_audit.build_phase130_explicit_restart_or_replacement_audit returns=[debug.Phase130ExplicitRestartOrReplacementAudit]
-  Function name=debug.validate_phase130_explicit_restart_or_replacement returns=[bool]

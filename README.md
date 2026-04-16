@@ -55,9 +55,9 @@ This summary mirrors the current statement in `docs/plan/admin/veya_running_syst
 - admitted proof set: Phases 109–201 (see `docs/plan/admin/veya_running_system_support_statement.txt` for the full list)
 - unsupported today: dynamic discovery, dynamic loading, a service manager, broader init policy, freestanding `mc run` or `mc test`, broader target-family admission, multicore, general packaging, struct embedding, and const functions
 
-Supported freestanding v0.3 slice:
+Historical freestanding v0.3 proof slice:
 
-This summary mirrors the first admitted freestanding `v0.3` slice statement in `docs/plan/freestanding_support_statement.txt`.
+This summary records the historical first admitted freestanding `v0.3` slice note in `docs/plan/admin/freestanding_support_statement.txt`.
 
 - supported compiler host and produced proof-artifact target family: Darwin arm64 bootstrap target family only
 - admitted runtime environment: freestanding project `exe` targets with explicit `env = "freestanding"`
@@ -148,7 +148,7 @@ Artifact expectations:
 - repository-owned smoke and audit runs should prefer `build/debug/audit/...`
 - manual probes should prefer `build/debug/probes/...`
 - short-lived scratch runs should prefer `build/debug/tmp/...`
-- the grouped tool regression suites now root disposable outputs under semantic suite directories such as `build/debug/tool/workflow/...`, `build/debug/tool/build_state/...`, `build/debug/tool/real_projects/...`, and `build/debug/tool/freestanding/...`
+- the grouped tool regression suites now root disposable outputs under semantic suite directories such as `build/debug/tool/workflow/...`, `build/debug/tool/build_state/...`, and `build/debug/tool/real_projects/...`
 - the grouped codegen executable suites now keep disposable executable proof trees under nested semantic work roots such as `build/debug/stage5_exec_stdlib_tests/...` and `build/debug/stage5_exec_project_tests/...` rather than creating fresh top-level `phase*` trees
 - remaining top-level `build/debug/phase*` entries are reserved for intentionally preserved manual or probe work, not active repository-owned regression outputs
 - `make build` and `make test` are convenience wrappers around the same CMake-based path, not a separate supported installation story
@@ -156,7 +156,7 @@ Artifact expectations:
 - `make public-cut-smoke` is the repo-owned convenience wrapper for the broader current public-cut smoke audit covering both the admitted hosted slice and the admitted Veya running-system build step
 - `make release-readiness-audit` is the repo-owned convenience wrapper for the current aggregate release-readiness re-audit on the admitted hosted slice
 - `make v0_2_gate` is the repo-owned convenience wrapper for the final documented `v0.2` gate outcome on the admitted hosted slice
-- the retired freestanding proof harness now lives under `archive/legacy_freestanding/`; active kernel validation routes through `kernel/build.toml` and `mc_tool_workflow_unit`
+- the retired freestanding proof lane is now historical only; active kernel validation routes through `kernel/build.toml` and `mc_tool_workflow_kernel_reset_lane_unit`, and the retirement boundary is recorded in `docs/plan/active/phase202_legacy_archive_retirement_and_reset_lane_maintenance_refresh.txt`
 - `make release-snapshot-prep` is the repo-owned convenience wrapper for the real maintainer release-snapshot preparation path after the final gate passes
 - `build/debug/release/v0.2-snapshot.txt` is disposable generated state capturing the exact reviewed commit hash plus the suggested `git tag -a v0.2 ...` command for the current release snapshot candidate
 
@@ -169,7 +169,6 @@ make first-use-smoke
 make public-cut-smoke
 make release-readiness-audit
 make v0_2_gate
-make freestanding-support-audit
 make release-snapshot-prep
 make dump-paths FILE=tests/cases/hello.mc
 make check FILE=tests/cases/hello.mc
@@ -210,10 +209,10 @@ build/debug/mc build --project kernel/build.toml --target kernel --build-dir bui
 
 Grouped regression targets:
 
-- tool workflow validation: `mc_tool_workflow_unit`
+- tool workflow validation: `mc_tool_workflow_(help|test_command|project_validation|multifile_module|kernel_reset_lane)_unit`
 - tool build-state and incremental rebuild validation: `mc_tool_build_state_unit`
-- tool real-project workflow validation: `mc_tool_real_project_unit`
-- archived freestanding proof history: `archive/legacy_freestanding/` only; it is no longer part of the live regression target set
+- tool real-project workflow validation: `mc_tool_real_project_.*_unit`
+- reset-lane repo-project plus checked-in fixture workflow validation: `mc_tool_workflow_kernel_reset_lane_unit`
 - codegen stdlib executable validation: `mc_codegen_executable_stdlib_unit`
 - codegen project executable validation: `mc_codegen_executable_project_unit`
 
@@ -284,13 +283,13 @@ Notes:
 - the current repository Phase 8 work now covers the admitted first-pass closure described in `docs/plan/phase8_implementation_summary.txt`, but the broader long-term architecture-specified Phase 8 surface remains open.
 - `docs/plan/phase65_language_surface_plateau_decision.txt` now records that the admitted v0.2 core is semantically complete enough for repository-bounded release hardening; remaining work should be read as support hardening, portability, or adjacent-surface follow-through unless a new admitted core-language owner gap is found.
 - the current hosted release-hardening statement is recorded in `docs/plan/release_hardening_hosted_slice.txt`; keep that note and this README aligned whenever the supported slice changes.
-- the separate freestanding proof statement is recorded in `docs/plan/freestanding_support_statement.txt`; keep that note, the hosted note, and this README aligned whenever the admitted freestanding proof slice changes.
+- the older freestanding proof statement is retained as historical context in `docs/plan/admin/freestanding_support_statement.txt`; do not treat it as an active workflow or support contract.
 - the documented supported first-use path is now also automated through `make first-use-smoke` and the `mc_first_use_smoke` CTest entry; keep those aligned with the written install-and-usage guidance.
 - the documented current public-cut smoke path is now also automated through `make public-cut-smoke` and the `mc_public_cut_smoke` CTest entry; keep those aligned with the written public-cut audit commands.
 - the documented current release-readiness re-audit is now also automated through `make release-readiness-audit` and the `mc_release_readiness_audit` CTest entry; keep those aligned with the written release-readiness statement.
 - the documented current `v0.2` gate is now also automated through `make v0_2_gate` and the `mc_v0_2_gate` CTest entry; keep those aligned with the written tag-or-defer outcome.
 - the documented release-snapshot preparation path is now also automated through `make release-snapshot-prep`, validated through the `mc_release_snapshot_prep` audit entry, and writes `build/debug/release/v0.2-snapshot.txt`; keep those aligned with the written maintainer release-execution path.
-- the grouped tool test implementation is now split across `tests/tool/tool_suite_common.cpp`, `tests/tool/tool_workflow_suite.cpp`, `tests/tool/tool_build_state_suite.cpp`, and `tests/tool/tool_real_project_suite.cpp`; `tests/tool/tool_suite_tests.cpp` and `tests/tool/phase7_tool_tests.cpp` remain only as thin compatibility runners for older references in archived notes.
-- the retired freestanding proof harness and `kernel_old/` now live under `archive/legacy_freestanding/`; the active reset-lane kernel is exercised directly through `kernel/build.toml` in `mc_tool_workflow_unit`.
+- the grouped tool test implementation is now split across `tests/tool/tool_suite_common.cpp`, `tests/tool/tool_help_suite.cpp`, `tests/tool/tool_test_command_suite.cpp`, `tests/tool/tool_project_validation_suite.cpp`, `tests/tool/tool_multifile_module_suite.cpp`, `tests/tool/tool_kernel_reset_lane_suite.cpp`, `tests/tool/tool_workflow_orchestrator.cpp`, `tests/tool/tool_build_state_suite.cpp`, and `tests/tool/tool_real_project_suite.cpp`; `tests/tool/tool_suite_tests.cpp` and `tests/tool/phase7_tool_tests.cpp` remain only as thin compatibility runners for older references.
+- the active reset-lane kernel is exercised directly through `kernel/build.toml` in `mc_tool_workflow_kernel_reset_lane_unit`; the retired freestanding archive has been deleted.
 - known limitations remain explicit: the supported host target is still Darwin arm64 only, the admitted freestanding slice is still only a repository-bounded proof path rather than a general non-hosted workflow claim, the admitted networking surface remains narrow IPv4 TCP plus poller support rather than a broader async or portability claim, the admitted hosted `sync` slice still excludes public compare-exchange, exchange, fetch-add, schedulers, and broader portability claims even though `condvar_broadcast(...)` is implemented, and the admitted `time` plus `path` helper slice still stops short of sleep, wall-clock, timezone, normalization, or broader platform APIs.
 - `make` is a thin convenience wrapper around the canonical CMake workflow above.

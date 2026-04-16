@@ -1,5 +1,6 @@
 #include <array>
 #include <filesystem>
+#include <set>
 #include <string>
 #include <string_view>
 #include <vector>
@@ -28,6 +29,26 @@ struct ResetLaneScenario {
     std::string_view build_context;
     std::string_view run_context;
 };
+
+std::set<std::string> CollectResetLaneFixtureRelativePaths(const std::filesystem::path& source_root,
+                                                           const std::filesystem::path& relative_root) {
+    std::set<std::string> fixture_paths;
+    const std::filesystem::path root = source_root / relative_root;
+    for (const auto& entry : std::filesystem::directory_iterator(root)) {
+        if (!entry.is_directory()) {
+            continue;
+        }
+        const std::string name = entry.path().filename().generic_string();
+        if (!name.starts_with("kernel_reset_lane_")) {
+            continue;
+        }
+        if (!std::filesystem::exists(entry.path() / "build.toml")) {
+            continue;
+        }
+        fixture_paths.insert((relative_root / name).generic_string());
+    }
+    return fixture_paths;
+}
 
 std::filesystem::path InstallKernelResetLaneFixtureProject(const std::filesystem::path& source_root,
                                                            const std::filesystem::path& fixture_root,
@@ -139,6 +160,43 @@ constexpr std::array<ResetLaneScenario, 35> kResetLaneScenarios = {{
     {"phase 201 retained audit coordination", "tests/system/kernel_reset_lane_phase201_retained_audit_coordination", "kernel_reset_lane_phase201_retained_audit_coordination_project", "kernel_reset_lane_phase201_retained_audit_coordination_build", "app", "kernel_reset_lane_phase201_retained_audit_coordination_build_output.txt", "kernel_reset_lane_phase201_retained_audit_coordination_run_output.txt", "kernel reset lane phase 201 retained audit coordination build", "kernel reset lane phase 201 retained audit coordination run"},
 }};
 
+std::set<std::string> CollectCoveredResetLaneFixturePaths() {
+    std::set<std::string> covered_paths;
+    for (const auto& scenario : kResetLaneScenarios) {
+        if (scenario.fixture_relative_path.empty()) {
+            continue;
+        }
+        covered_paths.insert(std::string(scenario.fixture_relative_path));
+    }
+    return covered_paths;
+}
+
+void ValidateResetLaneScenarioCoverage(const std::filesystem::path& source_root) {
+    std::set<std::string> expected_paths =
+        CollectResetLaneFixtureRelativePaths(source_root, "tests/smoke");
+    const std::set<std::string> system_paths =
+        CollectResetLaneFixtureRelativePaths(source_root, "tests/system");
+    expected_paths.insert(system_paths.begin(), system_paths.end());
+
+    const std::set<std::string> covered_paths = CollectCoveredResetLaneFixturePaths();
+
+    std::vector<std::string> missing_paths;
+    for (const auto& expected_path : expected_paths) {
+        if (!covered_paths.contains(expected_path)) {
+            missing_paths.push_back(expected_path);
+        }
+    }
+
+    if (!missing_paths.empty()) {
+        std::string message =
+            "reset-lane workflow table is missing fixture coverage for:";
+        for (const auto& missing_path : missing_paths) {
+            message += "\n- " + missing_path;
+        }
+        Fail(message);
+    }
+}
+
 }  // namespace
 
 namespace mc::tool_tests {
@@ -146,6 +204,7 @@ namespace mc::tool_tests {
 void RunWorkflowKernelResetLaneSuite(const std::filesystem::path& source_root,
                                      const std::filesystem::path& binary_root,
                                      const std::filesystem::path& mc_path) {
+    ValidateResetLaneScenarioCoverage(source_root);
     for (const auto& scenario : kResetLaneScenarios) {
         RunKernelResetLaneScenario(source_root, binary_root, mc_path, scenario);
     }

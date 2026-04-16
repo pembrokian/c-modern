@@ -128,7 +128,7 @@ This file is a fast orientation map for agents working in this repository.
     - `tests/tool/tool_real_project_tests.cpp`: real-project workflow driver
     - `tests/tool/tool_real_project_suite.cpp`: real-project grouped implementation
     - `tests/tool/README.md`: local structure and validation note for the tool test family
-    - `archive/legacy_freestanding/`: retired freestanding proof harness and `kernel_old/`, preserved outside the live build and selector contract
+    - `docs/plan/active/phase202_legacy_archive_retirement_and_reset_lane_maintenance_refresh.txt`: records the completed retirement of the old freestanding proof archive and the live reset-lane maintenance boundary
   - if freestanding or Veya coverage grows further, prefer more focused suite filenames under `tests/tool/` before adding a deeper folder split
   - `tests/tool/tool_suite_tests.cpp` and `tests/tool/phase7_tool_tests.cpp` are thin compatibility runners only
 
@@ -151,7 +151,7 @@ This file is a fast orientation map for agents working in this repository.
 - Full Phase 3 from `docs/plan/plan.txt` is still not complete.
 - Primary build products now belong under `build/debug/bin/...` and `build/debug/lib/...`.
 - Repository-owned smoke and regression outputs should prefer semantic build-tree roots such as `build/debug/audit/...`, `build/debug/probes/...`, `build/debug/tmp/...`, `build/debug/tool/...`, and `build/debug/codegen/executable/...`.
-- Veya-specific disposable outputs should stay under those same roots, usually beneath `build/debug/tool/freestanding/...` for repo-owned regressions or `build/debug/probes/veya/...` for manual experiments.
+- Veya-specific disposable outputs should stay under those same roots, usually beneath `build/debug/tool/workflow/...` for repo-owned regressions or `build/debug/probes/veya/...` for manual experiments.
 - Remaining top-level `build/debug/phase*` paths are preserved manual or probe areas rather than active regression output policy.
 
 ## Where To Change Things
@@ -186,7 +186,7 @@ This file is a fast orientation map for agents working in this repository.
 
 Focused grouped-suite checks that are often enough for tool or workflow work:
 
-- `ctest --test-dir build/debug -R mc_tool_workflow_unit --output-on-failure`
+- `ctest --test-dir build/debug -R 'mc_tool_workflow_.*_unit' --output-on-failure`
 - `ctest --test-dir build/debug -R mc_tool_build_state_unit --output-on-failure`
-- `ctest --test-dir build/debug -R mc_tool_real_project_unit --output-on-failure`
+- `ctest --test-dir build/debug -R 'mc_tool_real_project_.*_unit' --output-on-failure`
 - `ctest --test-dir build/debug -R 'mc_tool_(workflow|build_state|real_project)_unit' --output-on-failure`

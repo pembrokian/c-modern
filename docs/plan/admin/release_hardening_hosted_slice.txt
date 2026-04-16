@@ -21,10 +21,11 @@ This note is the repository-bounded realization of the original bootstrap-plan
 Phase 9 release-hardening work. It is not a claim that the entire language,
 toolchain, or long-term architecture roadmap is finished.
 
-This note is intentionally separate from the first admitted freestanding
-`v0.3` slice recorded in `docs/plan/freestanding_support_statement.txt`.
-That separate freestanding note does not widen the hosted `v0.2` support claim
-recorded here.
+This note is intentionally separate from the historical first admitted
+freestanding `v0.3` slice recorded in
+`docs/plan/admin/freestanding_support_statement.txt`.
+That historical note does not widen the hosted `v0.2` support claim recorded
+here.
 
 Frozen support matrix
 ---------------------
@@ -327,4 +328,4 @@ parser, sema, MIR, or backend distortion is found on the already admitted
 slice.
 
 For the separate first admitted freestanding `v0.3` slice statement, see
-`docs/plan/freestanding_support_statement.txt`.
+`docs/plan/admin/freestanding_support_statement.txt`.

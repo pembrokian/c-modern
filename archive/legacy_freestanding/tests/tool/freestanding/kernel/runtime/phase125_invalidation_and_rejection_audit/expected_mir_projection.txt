@@ -1,3 +1,0 @@
-  TypeDecl kind=struct name=debug.Phase125InvalidationAudit
-  Function name=bootstrap_audit.build_phase125_invalidation_audit returns=[debug.Phase125InvalidationAudit]
-  Function name=debug.validate_phase125_invalidation_and_rejection_audit returns=[bool]

@@ -14,9 +14,14 @@ Current state
 - repository tests are increasingly organized around explicit ownership slices:
   parser, sema, MIR, codegen, tool workflow, tool build-state, tool
   real-project, and the higher-level smoke/audit helpers
-- the retired freestanding proof harness now lives under
-  `archive/legacy_freestanding/` and is no longer part of the active
-  ownership-based selection contract
+- the grouped tool workflow and real-project suites are now split into
+  focused CTest targets rather than one monolithic workflow target and one
+  monolithic real-project target
+- `make select-tests` is the low-friction wrapper for
+  `tools/select_tests.py` during narrow local iteration
+- the retired freestanding proof harness has been removed from the live
+  repository surface and is no longer part of the active ownership-based
+  selection contract
 
 Design position
 
@@ -36,6 +41,7 @@ Why this is the right first step
 Canonical first tool
 
 - `tools/select_tests.py`
+- `make select-tests` as the repository-facing wrapper
 
 Behavior
 
@@ -59,7 +65,7 @@ Ownership mapping guidance
 - syntax-layer compiler changes should route to parser, sema, MIR, and narrow
   codegen validation
 - driver and support-layer changes should route to the grouped tool suites
-- active `kernel/` changes should route to `mc_tool_workflow_unit`, which now
+- active `kernel/` changes should route to `mc_tool_workflow_kernel_reset_lane_unit`, which now
   builds and runs the repository-owned `kernel/build.toml` directly
 - unknown executable-path changes should fall back conservatively rather than
   silently selecting nothing
@@ -67,10 +73,16 @@ Ownership mapping guidance
 Examples
 
 - changing `kernel/src/kernel_dispatch.mc` should select
-  `mc_tool_workflow_unit`
+  `mc_tool_workflow_kernel_reset_lane_unit`
 - changing `tests/tool/tool_real_project_suite.cpp` should select
-  `mc_tool_real_project_unit`
+  `mc_tool_real_project_.*_unit`
 - changing `compiler/driver/` should select the grouped tool suites
+
+Current focused rerun commands
+
+- workflow family: `ctest --test-dir build/debug -R 'mc_tool_workflow_.*_unit' --output-on-failure`
+- build-state family: `ctest --test-dir build/debug -R mc_tool_build_state_unit --output-on-failure`
+- real-project family: `ctest --test-dir build/debug -R 'mc_tool_real_project_.*_unit' --output-on-failure`
 
 Current bounded cache model
 

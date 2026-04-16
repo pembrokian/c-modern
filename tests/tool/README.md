@@ -27,7 +27,7 @@ Current structure
   owned real-project workflow coverage.
 - `tool_suite_tests.cpp` and `phase7_tool_tests.cpp`: compatibility runners
   only, kept for older references.
-- `archive/legacy_freestanding/`: retired freestanding proof harness, `kernel_old/`, and maintenance helpers preserved for history only.
+- the retired freestanding proof harness has been deleted; do not recreate it as a live suite.
 
 Layout rule
 
@@ -39,6 +39,6 @@ Layout rule
 Validation rule
 
 - During focused iteration, run the narrowest owning tool test target.
-- For active reset-lane kernel changes, prefer `mc_tool_workflow_unit`; it now builds and runs the repository-owned `kernel/build.toml` directly.
+- For active reset-lane kernel changes, prefer `mc_tool_workflow_kernel_reset_lane_unit`; it now builds and runs the repository-owned `kernel/build.toml` directly.
 - For cross-cutting driver or build changes, rerun the broader tool suite set
   before closing the change.

@@ -1,6 +1,0 @@
-label = "phase108_manual_kernel_image"
-kind = "kernel_manual_relink"
-output_stem = "kernel_phase108_artifacts"
-build_context = "freestanding kernel phase108 artifact descriptor build"
-run_context = "freestanding kernel phase108 artifact descriptor run"
-run_golden = "expected_run.contains.txt"

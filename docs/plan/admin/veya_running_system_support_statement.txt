@@ -48,8 +48,11 @@ Repository status note
   authority-ergonomics under reuse, restart semantics, and one rebuilt-system
   clean second pass.
 - Phase 151 reduced main.mc to init plus one scenario call.
-- Phase 152–152c introduced the kernel behavioral reset lane; kernel_old/ is
-  now frozen under archive/legacy_freestanding/; kernel/ is the live tree.
+- Phase 152–152c introduced the kernel behavioral reset lane; the older
+  proof-shaped predecessor is historical only and kernel/ is the live tree.
+- Phase 202 deleted the retired freestanding archive, refreshed active docs
+  to the live workflow owners, and kept reset-lane fixture coverage anchored
+  to the table-driven workflow suite.
 - Phase 153 established the shared service_effect execution contract across
   shell, log, kv, and serial services.
 - Phase 154 formalized service identity and addressing as plain ServiceRef
@@ -260,7 +263,7 @@ build/debug/bin/mc build --project kernel/build.toml --target kernel --build-dir
 Repo-owned regression entrypoint for this support statement:
 
 ```sh
-ctest --test-dir build/debug -R mc_tool_workflow_unit --output-on-failure
+ctest --test-dir build/debug -R mc_tool_workflow_kernel_reset_lane_unit --output-on-failure
 ```
 
 Aggregate public-cut smoke covering both the hosted and running-system
@@ -278,7 +281,7 @@ Artifact expectations
 - command-local `--build-dir` trees are disposable generated state and should
   be treated as build outputs, not source inputs
 - grouped kernel proof outputs should prefer semantic suite roots such as
-  `build/debug/tool/freestanding/...`
+  `build/debug/tool/workflow/...`
 
 Known limitations
 -----------------

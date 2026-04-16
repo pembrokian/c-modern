@@ -1,8 +1,0 @@
-label = "repo_map_kernel_surfaces"
-source = "docs/agent/prompts/repo_map.md"
-context = "kernel repo map descriptor audit"
-contains = [
-  "tests/tool/freestanding/kernel/runtime/",
-  "tests/tool/freestanding/kernel/docs/",
-  "tests/tool/freestanding/kernel/artifact_specs/",
-]

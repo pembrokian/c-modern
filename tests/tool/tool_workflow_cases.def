@@ -1,0 +1,5 @@
+WORKFLOW_CASE(help, RunWorkflowHelpCase)
+WORKFLOW_CASE(test-command, RunWorkflowTestCommandCase)
+WORKFLOW_CASE(project-validation, RunWorkflowProjectValidationCase)
+WORKFLOW_CASE(multifile-module, RunWorkflowMultifileModuleCase)
+WORKFLOW_CASE(kernel-reset-lane, RunWorkflowKernelResetLaneCase)

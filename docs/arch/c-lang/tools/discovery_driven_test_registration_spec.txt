@@ -1,0 +1,201 @@
+Modern C - Planned Discovery-Driven Test Registration Specification
+
+Status
+
+PLANNED, NOT YET IMPLEMENTED.
+
+Purpose
+
+This document defines the intended long-term direction for a smaller,
+filesystem-driven, Rob-Pike-like repository test registration model.
+It does not change the current repository contract today.
+Its role is to state what the fuller rearchitecture should look like when the
+repository is ready to replace more of the hand-kept registration surface.
+
+Scope
+
+This document is about repository-owned build and test registration for:
+- grouped tool tests
+- real-project tests
+- future adjacent compiler or audit families that fit the same shape
+
+It is not a promise to remove all semantic ownership mapping from local test
+selection.
+
+Core position
+
+The repository should eventually prefer one canonical checked-in source of
+truth per test case, derived from the filesystem and adjacent metadata, rather
+than maintaining parallel registries in CMake, C++ runner tables, and Python.
+
+Current non-goal
+
+This planned architecture does not require a general graph engine, remote
+cache, or hidden dependency discovery system.
+
+1. Design Bias
+
+If forced to choose, prefer:
+- directories and adjacent files over duplicated hand-maintained lists
+- one obvious case descriptor over multiple partial registries
+- explicit metadata for exceptional cases over clever inference
+- generated registration outputs over checked-in generated manifests
+- semantic ownership rules only where structure is not enough
+
+2. Canonical Case Identity
+
+Rule:
+- each repository-owned discoverable case should have one canonical identity
+- that identity should come from the checked-in case directory or adjacent
+  descriptor, not from repeated hard-coded strings in multiple implementation
+  layers
+
+Canonical case name rule:
+- case names should be stable kebab-case identifiers
+- the same case name should be reused for runner selection, CTest naming
+  suffixes, and local iteration reporting unless a documented exception exists
+
+3. Canonical Case Shape
+
+Preferred default shape:
+
+```text
+tests/tool/real_projects/<case-name>/
+  case.toml
+  ...owned inputs...
+```
+
+or, for families that keep implementation in `.cpp` files rather than
+directory-owned project inputs:
+
+```text
+tests/tool/workflow/<case-name>/
+  case.toml
+```
+
+Rule:
+- the checked-in case directory or descriptor is the source of truth
+- build and test registration should be derived from it
+
+4. Descriptor Contract
+
+If a case needs metadata beyond its name, it should declare that metadata in a
+small adjacent descriptor rather than requiring another registry.
+
+Illustrative descriptor shape:
+
+```text
+name = "kernel-reset-lane"
+family = "tool-workflow"
+runner = "mc_tool_workflow_tests"
+selector = "kernel-reset-lane"
+roots = ["kernel/", "stdlib/"]
+output_root = "build/debug/tool/workflow"
+```
+
+Required fields should stay small:
+- `name`
+- `family`
+- `runner`
+- `selector`
+
+Optional fields may cover:
+- owned roots or owned inputs
+- special output roots
+- resource-lock requirements
+- tags for audit or smoke families
+
+5. Build-System Rule
+
+Rule:
+- CMake should discover cases from checked-in directories or descriptors at
+  configure time
+- CTest registration should be derived from that discovered set
+- the repository should not require manually repeating the same case list in
+  `add_test(...)` blocks once a family has moved to the discovery-driven model
+
+Consequence:
+- case addition should usually mean adding one directory or descriptor, not
+  editing multiple registration lists
+
+6. Runner Rule
+
+Rule:
+- grouped C++ runners should dispatch from the same discovered case source
+  rather than maintaining a second independent hard-coded case table
+
+Allowed implementations:
+- generated include data at configure time
+- runtime parsing of checked-in descriptors
+- a small checked-in definition file consumed by both CMake and C++ as an
+  intermediate migration step
+
+Disallowed end state:
+- one case list in CMake and a separate case list in C++ with no shared source
+  of truth
+
+7. Selector Rule
+
+Rule:
+- local iteration tools such as `tools/select_tests.py` should consume shared
+  family and case identity data when that data is structural
+- they may still keep explicit semantic ownership rules where structure alone
+  is insufficient
+
+Important limit:
+- filesystem discovery does not replace semantic ownership reasoning for
+  shared compiler layers such as `compiler/driver/`, `compiler/support/`, or
+  `tests/support/`
+- those mappings may remain explicit even after case discovery becomes
+  filesystem-driven
+
+8. Registry Reduction Goal
+
+The long-term goal is to reduce repository-maintained duplication to:
+- one checked-in case directory or descriptor per discoverable case
+- one small number of explicit semantic ownership rules for shared layers
+
+The long-term goal is not:
+- zero explicit rules anywhere
+- magical dependency inference
+- hidden test selection heuristics that contributors cannot audit quickly
+
+9. Migration Order
+
+Recommended migration order:
+
+1. remove duplicate case-name registries while preserving current target names
+2. move homogeneous families to directory or descriptor discovery
+3. teach CMake to register those families directly from the discovered cases
+4. teach grouped runners to consume the same discovered data
+5. only then consider reducing Python-side family-name duplication
+
+Reason:
+- this keeps target names, local habits, and validation behavior stable while
+  simplifying one layer at a time
+
+10. Current Interim Pattern
+
+The repository may use a smaller shared-definition intermediate pattern before
+full directory-driven discovery lands.
+
+That intermediate pattern is acceptable if:
+- it already removes duplicate CMake and C++ case-name tables
+- it keeps selectors and target names stable
+- it does not pretend the fuller discovery model has already landed
+
+11. Non-Goals
+
+This planned architecture does not require:
+- a second build language
+- mandatory code generation checked into the repository
+- hidden metadata databases outside the source tree
+- replacement of broad release or audit gates by local discovery alone
+
+Bottom line
+
+The fuller rearchitecture should make repository-owned case identity come from
+the tree itself or from one small adjacent descriptor, with CMake and grouped
+runners deriving their registration from that source.
+Semantic ownership selection may still remain explicit where the filesystem is
+not enough.

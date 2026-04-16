@@ -17,6 +17,13 @@ Core position
 Tests in Modern C should be ordinary Modern C code.
 The build tool may provide a small amount of discovery and runner generation, but the semantics of a test should remain visible and unsurprising.
 
+Current repository note:
+- the repository's compiler and tool regression surface currently runs
+  primarily through named CTest targets built by CMake
+- `mc test` remains the intended language-facing test entrypoint, but it is
+  not yet the dominant repository validation surface for compiler and tool
+  bring-up work
+
 In practical terms:
 - test files are normal source files
 - test functions are normal functions
@@ -198,6 +205,12 @@ Why serial by default:
 Possible future extension:
 - optional parallel test execution by command-line flag
 - not the default, and not required in v0.2
+
+Repository validation note:
+- repository-owned CTest suites may still be launched in parallel with
+  `ctest -jN` when that improves local latency
+- this does not change the serial, deterministic execution bias for any one
+  generated `mc test` runner or one grouped executable's internal ordering
 
 9. Result Model
 
