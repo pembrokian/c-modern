@@ -3,7 +3,7 @@ Phase 204 -- Tool Test System Simplicity And Reference-Quality Cleanup
 
 Status
 ------
-PLANNED
+LANDED
 
 Purpose
 -------
@@ -93,6 +93,30 @@ Planned outcome
   - how to add a grouped real-project case
   - which surfaces remain explicitly hand-kept and why
 
+Landed shape
+------------
+- `tools/tool_case_manifest.py` is now the one repository-owned grouped tool
+  descriptor implementation path.
+- `cmake/ToolTestRegistration.cmake` owns grouped workflow and real-project
+  CTest registration and keeps that logic out of the root build graph.
+- `tools/select_tests.py` imports the shared descriptor implementation path
+  for grouped case identity and owned roots while preserving explicit
+  semantic ownership rules for shared layers.
+- `tests/tool/tool_real_project_suite.cpp` is now a thin grouped dispatcher.
+- real-project implementations now live in smaller behavior-owned files:
+  - `tests/tool/tool_real_project_simple_tools_suite.cpp`
+  - `tests/tool/tool_real_project_process_suite.cpp`
+  - `tests/tool/tool_real_project_review_board_suite.cpp`
+  - `tests/tool/tool_real_project_issue_rollup_suite.cpp`
+- case-local real-project implementation files are allowed for self-contained
+  slices; `tests/tool/real_projects/evented-echo/test.cpp` is the first
+  landed example.
+- `docs/arch/c-lang/tools/grouped_tool_test_operator_reference.txt` is the
+  short operator-facing maintenance note for grouped tool and real-project
+  tests.
+- no compiler, sema, MIR, backend, ABI, target, runtime, stdlib, or `hal`
+  expansion was made.
+
 Preferred implementation shape
 ------------------------------
 Descriptor path
@@ -136,6 +160,10 @@ Suggested execution order
    current truth is discoverable quickly.
 6. Rerun the grouped workflow, build-state, and real-project suites plus the
    local test selector checks.
+7. Where a real-project case is self-contained, allow the implementation to
+  live beside its adjacent `case.toml` and have the runner target compile
+  those case-local `.cpp` files through filesystem discovery rather than
+  growing the central grouped suite owners.
 
 Deliverables
 ------------
@@ -154,6 +182,13 @@ Deliverables
     if the implementation shape changes materially
   - `docs/plan/backlog.txt` and `docs/plan/decision_log.txt` only if the
     landed shape intentionally defers or fixes an adjacent pressure point
+
+Validation completed
+--------------------
+- CMake build completed successfully after the grouped descriptor-path and
+  real-project suite split changes.
+- Focused grouped workflow, build-state, and real-project CTest targets all
+  passed on the landed tree.
 
 Exit criteria
 -------------

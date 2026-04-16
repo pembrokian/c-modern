@@ -3,6 +3,8 @@ Modern C - Planned Discovery-Driven Test Registration Specification
 Status
 
 LANDED FOR GROUPED TOOL AND REAL-PROJECT CASES IN PHASE 203.
+PHASE 204 REMOVED THE REMAINING PARALLEL DESCRIPTOR PARSERS AND MOVED THE
+GROUPED REGISTRATION HELPERS TO ONE FOCUSED TOOLING PATH.
 
 Purpose
 
@@ -39,13 +41,18 @@ Current landed scope
   source of truth for grouped workflow case identity.
 - `tests/tool/real_projects/<case-name>/case.toml` is now the canonical
   checked-in source of truth for grouped real-project case identity.
-- `CMakeLists.txt` now discovers those descriptors at configure time and
-  derives per-case CTest registration from them.
+- `tools/tool_case_manifest.py` is now the one repository-owned descriptor
+  implementation path used for grouped workflow and real-project descriptor
+  semantics.
+- `cmake/ToolTestRegistration.cmake` now calls that shared descriptor path at
+  configure time and derives per-case CTest registration from it.
 - the grouped C++ runners now dispatch from generated case data derived from
   those descriptors instead of hand-kept `.def` files.
 - `tools/select_tests.py` now derives tool and real-project case lists and
   per-case owned roots from those descriptors instead of maintaining parallel
   hard-coded case-name inventories.
+- `tests/tool/tool_real_project_suite.cpp` is now a thin grouped dispatcher,
+  with real-project behavior moved into smaller behavior-owned suite files.
 
 1. Design Bias
 
@@ -207,8 +214,8 @@ This planned architecture does not require:
 Bottom line
 
 Repository-owned grouped tool and real-project case identity now comes from
-the tree itself through one adjacent descriptor per case, with CMake, grouped
-runners, and local selection deriving their registration or identity from that
-source.
+the tree itself through one adjacent descriptor per case, with one shared
+descriptor implementation path feeding CMake registration, grouped-runner
+dispatch, and local selector identity.
 Semantic ownership selection still remains explicit where the filesystem is
 not enough.

@@ -1,0 +1,90 @@
+Modern C - Grouped Tool Test Operator Reference
+
+Purpose
+
+This is the short maintenance note for grouped tool and real-project tests.
+Use it when you need to add, move, or wire one case.
+Use the longer architecture notes for rationale, not for day-to-day edits.
+
+What owns grouped case identity
+
+- `tests/tool/workflow/<case-name>/case.toml` owns grouped workflow case
+  identity.
+- `tests/tool/real_projects/<case-name>/case.toml` owns grouped real-project
+  case identity.
+- `tools/tool_case_manifest.py` is the one repository-owned descriptor
+  implementation path. It validates descriptors, emits grouped runner include
+  fragments, and emits CTest registration fragments.
+
+What stays explicit
+
+- `tools/select_tests.py` still keeps explicit semantic ownership rules for
+  shared compiler, support, and harness layers.
+- Grouped assertions stay in C++ suite files. The repository does not use a
+  metadata-driven assertion layer or a general test DSL.
+
+How grouped registration works
+
+1. Add or edit one adjacent `case.toml`.
+2. `cmake/ToolTestRegistration.cmake` calls
+   `tools/tool_case_manifest.py` during configure.
+3. The generated include fragment feeds the grouped C++ dispatcher table.
+4. The generated CTest fragment keeps the stable per-case CTest names.
+5. `tools/select_tests.py` imports the same descriptor implementation path for
+   grouped case identity and owned roots.
+
+How to add a grouped workflow case
+
+1. Create `tests/tool/workflow/<case-name>/case.toml`.
+2. Add the behavior implementation to the owning workflow suite file under
+   `tests/tool/`.
+3. Add the exported function declaration if the grouped dispatcher needs it.
+4. Reconfigure or rebuild so CMake regenerates the grouped registration and
+   runner include data.
+5. Run the owning workflow test target and `tools/select_tests.py` if the new
+   case adds or changes owned roots.
+
+How to add a grouped real-project case
+
+1. Create `tests/tool/real_projects/<case-name>/case.toml`.
+2. Put the implementation in the smallest sensible owner:
+  - a case-local `.cpp` file beside `case.toml` when the case is
+    self-contained
+  - otherwise the smallest behavior-owned real-project suite file under
+    `tests/tool/`
+3. Add the exported function declaration to
+   `tests/tool/tool_real_project_suite_internal.h`.
+4. Reconfigure or rebuild so CMake regenerates the grouped registration and
+   runner include data.
+5. Run the owning real-project CTest and `tools/select_tests.py` if the new
+   case changes owned roots.
+
+Where to put real-project implementations
+
+- Keep `tests/tool/tool_real_project_suite.cpp` thin. It owns grouped
+  dispatch, generated table inclusion, and case lookup only.
+- For self-contained cases, a local source file beside `case.toml` is
+  preferred over growing a central suite owner.
+- Put simple tool projects in
+  `tests/tool/tool_real_project_simple_tools_suite.cpp`.
+- Put shared process and relay cases in
+  `tests/tool/tool_real_project_process_suite.cpp`.
+- Put review-board rebuild-state coverage in
+  `tests/tool/tool_real_project_review_board_suite.cpp`.
+- Put issue-rollup and related grouped-package coverage in
+  `tests/tool/tool_real_project_issue_rollup_suite.cpp`.
+
+Validation
+
+- Build the tree.
+- Run the narrow owning grouped CTest target.
+- For registration or selector work, rerun the grouped workflow and
+  real-project suites plus `tools/select_tests.py`.
+
+Non-goals
+
+- No hidden dependency inference.
+- No graph engine.
+- No universal metadata model for all repository tests.
+- No compiler, sema, MIR, backend, ABI, target, runtime, stdlib, or `hal`
+  expansion as part of grouped tool maintenance.

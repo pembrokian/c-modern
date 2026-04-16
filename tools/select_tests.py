@@ -5,114 +5,15 @@ from __future__ import annotations
 import argparse
 import hashlib
 import json
+import re
 import subprocess
 import sys
 from collections import defaultdict
 from dataclasses import dataclass
 from pathlib import Path, PurePosixPath
 from typing import Iterable
-import re
 
-
-@dataclass(frozen=True)
-class ToolCaseDescriptor:
-    name: str
-    family: str
-    runner: str
-    selector: str
-    function: str
-    descriptor_path: str
-    roots: tuple[str, ...]
-
-
-def parse_tool_case_descriptor(descriptor_path: Path) -> ToolCaseDescriptor:
-    values: dict[str, str] = {}
-    arrays: dict[str, list[str]] = {}
-    current_array: str | None = None
-
-    for raw_line in descriptor_path.read_text().splitlines():
-        line = raw_line.split("#", 1)[0].strip()
-        if not line:
-            continue
-
-        if current_array is not None:
-            if line == "]":
-                current_array = None
-                continue
-            match = re.fullmatch(r'"([^"]+)",?', line)
-            if not match:
-                raise ValueError(f"invalid array entry in {descriptor_path}: {raw_line}")
-            arrays[current_array].append(match.group(1))
-            continue
-
-        string_match = re.fullmatch(r'([a-z_]+)\s*=\s*"([^"]+)"', line)
-        if string_match:
-            values[string_match.group(1)] = string_match.group(2)
-            continue
-
-        array_start_match = re.fullmatch(r'([a-z_]+)\s*=\s*\[', line)
-        if array_start_match:
-            current_array = array_start_match.group(1)
-            arrays[current_array] = []
-            continue
-
-        raise ValueError(f"unsupported descriptor line in {descriptor_path}: {raw_line}")
-
-    if current_array is not None:
-        raise ValueError(f"unterminated array '{current_array}' in {descriptor_path}")
-
-    required_fields = ("name", "family", "runner", "selector", "function")
-    missing = [field for field in required_fields if field not in values]
-    if missing:
-        raise ValueError(f"missing descriptor fields {missing} in {descriptor_path}")
-
-    if values["name"] != values["selector"]:
-        raise ValueError(f"descriptor {descriptor_path} must keep name and selector identical")
-
-    if descriptor_path.parent.name != values["name"]:
-        raise ValueError(
-            f"descriptor {descriptor_path} must match its directory name '{descriptor_path.parent.name}'"
-        )
-
-    return ToolCaseDescriptor(
-        name=values["name"],
-        family=values["family"],
-        runner=values["runner"],
-        selector=values["selector"],
-        function=values["function"],
-        descriptor_path=descriptor_path.relative_to(SCRIPT_SOURCE_ROOT).as_posix(),
-        roots=tuple(arrays.get("roots", [])),
-    )
-
-
-def load_tool_case_descriptors(source_root: Path, relative_root: str, expected_family: str, expected_runner: str) -> list[ToolCaseDescriptor]:
-    descriptor_paths = sorted((source_root / relative_root).glob("*/case.toml"))
-    if not descriptor_paths:
-        raise ValueError(f"no tool case descriptors found under {relative_root}")
-
-    descriptors: list[ToolCaseDescriptor] = []
-    for descriptor_path in descriptor_paths:
-        descriptor = parse_tool_case_descriptor(descriptor_path)
-        if descriptor.family != expected_family:
-            raise ValueError(
-                f"descriptor {descriptor_path} has family '{descriptor.family}', expected '{expected_family}'"
-            )
-        if descriptor.runner != expected_runner:
-            raise ValueError(
-                f"descriptor {descriptor_path} has runner '{descriptor.runner}', expected '{expected_runner}'"
-            )
-        descriptors.append(descriptor)
-    return descriptors
-
-
-def ctest_name_for_descriptor(descriptor: ToolCaseDescriptor) -> str:
-    if descriptor.family == "tool-workflow":
-        prefix = "mc_tool_workflow_"
-    elif descriptor.family == "tool-real-project":
-        prefix = "mc_tool_real_project_"
-    else:
-        raise ValueError(f"unsupported tool case family: {descriptor.family}")
-    return prefix + descriptor.selector.replace("-", "_") + "_unit"
+from tool_case_manifest import ToolCaseDescriptor, ctest_name_for_descriptor, load_tool_case_descriptors
 
 
 SCRIPT_SOURCE_ROOT = Path(__file__).resolve().parent.parent
@@ -199,7 +100,15 @@ RULES = [
           "tests/tool/tool_workflow_orchestrator.cpp",
           "tests/tool/tool_workflow_suite_internal.h"), tuple(ALL_WORKFLOW_TESTS), "workflow suite ownership"),
     Rule(("tests/tool/tool_build_state_tests.cpp", "tests/tool/tool_build_state_suite.cpp"), ("mc_tool_build_state_unit",), "build-state suite ownership"),
-    Rule(("tests/tool/tool_suite_common.cpp", "tests/tool/tool_suite_common.h"), tuple(ALL_TOOL_TESTS), "shared tool helper ownership"),
+        Rule(("tests/tool/tool_suite_common.cpp", "tests/tool/tool_suite_common.h"), tuple(ALL_TOOL_TESTS), "shared tool helper ownership"),
+        Rule(("tests/tool/tool_real_project_tests.cpp",
+            "tests/tool/tool_real_project_suite.cpp",
+            "tests/tool/tool_real_project_suite_internal.h",
+            "tests/tool/tool_real_project_simple_tools_suite.cpp",
+            "tests/tool/tool_real_project_process_suite.cpp",
+            "tests/tool/tool_real_project_review_board_suite.cpp",
+            "tests/tool/tool_real_project_issue_rollup_suite.cpp"), tuple(ALL_REAL_PROJECT_TESTS), "real-project suite ownership"),
+        Rule(("tools/tool_case_manifest.py", "cmake/ToolTestRegistration.cmake"), tuple(ALL_TOOL_TESTS), "grouped tool descriptor registration ownership"),
     Rule(("compiler/lex/", "compiler/parse/", "compiler/ast/"), tuple(CORE_COMPILER_TESTS), "frontend syntax-layer ownership"),
     Rule(("compiler/resolve/", "compiler/sema/"), ("mc_sema_fixture_unit", "mc_mir_fixture_unit", "mc_mir_unit", "mc_codegen_fixture_unit", "mc_codegen_llvm_unit", *ALL_EXECUTABLE_CODEGEN_TESTS), "semantic-layer ownership"),
     Rule(("compiler/mir/",), ("mc_mir_fixture_unit", "mc_mir_unit", "mc_codegen_fixture_unit", "mc_codegen_llvm_unit", *ALL_EXECUTABLE_CODEGEN_TESTS), "MIR-layer ownership"),
@@ -214,13 +123,13 @@ for descriptor in WORKFLOW_CASES:
         Rule((descriptor.descriptor_path, *descriptor.roots), (ctest_name_for_descriptor(descriptor),), f"workflow {descriptor.selector} ownership")
     )
 
-RULES.append(
-    Rule(("tests/tool/tool_real_project_tests.cpp", "tests/tool/tool_real_project_suite.cpp"), tuple(ALL_REAL_PROJECT_TESTS), "real-project suite ownership")
-)
-
 for descriptor in REAL_PROJECT_CASES:
     RULES.append(
-        Rule((descriptor.descriptor_path, *descriptor.roots), (ctest_name_for_descriptor(descriptor),), f"real-project {descriptor.selector} ownership")
+        Rule((str(PurePosixPath(descriptor.descriptor_path).parent) + "/",
+              descriptor.descriptor_path,
+              *descriptor.roots),
+             (ctest_name_for_descriptor(descriptor),),
+             f"real-project {descriptor.selector} ownership")
     )
 
 

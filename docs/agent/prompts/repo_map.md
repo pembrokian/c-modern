@@ -127,12 +127,26 @@ This file is a fast orientation map for agents working in this repository.
     - `tests/tool/tool_build_state_tests.cpp`: build-state and incremental rebuild driver
     - `tests/tool/tool_build_state_suite.cpp`: build-state grouped implementation
     - `tests/tool/tool_real_project_tests.cpp`: real-project workflow driver
-    - `tests/tool/tool_real_project_suite.cpp`: real-project grouped implementation
+    - `tests/tool/tool_real_project_suite.cpp`: thin real-project grouped dispatcher and generated case-table owner
+    - `tests/tool/tool_real_project_suite_internal.h`: exported real-project case declarations shared by the grouped dispatcher and behavior-owned suite files
+    - `tests/tool/tool_real_project_simple_tools_suite.cpp`: simple-tools real-project behavior owner
+    - `tests/tool/tool_real_project_process_suite.cpp`: process, relay, and evented real-project behavior owner
+    - `tests/tool/tool_real_project_review_board_suite.cpp`: review-board rebuild-state behavior owner
+    - `tests/tool/tool_real_project_issue_rollup_suite.cpp`: issue-rollup and grouped-package rebuild-state behavior owner
     - `tests/tool/real_projects/<case-name>/case.toml`: checked-in real-project descriptors; CMake registration, grouped-runner dispatch, and `tools/select_tests.py` now derive grouped case identity from these descriptors
     - `tests/tool/README.md`: local structure and validation note for the tool test family
+    - `docs/arch/c-lang/tools/grouped_tool_test_operator_reference.txt`: short operator-facing maintenance reference for grouped tool and real-project case wiring
     - `docs/plan/active/phase202_legacy_archive_retirement_and_reset_lane_maintenance_refresh.txt`: records the completed retirement of the old freestanding proof archive and the live reset-lane maintenance boundary
   - if freestanding or Veya coverage grows further, prefer more focused suite filenames under `tests/tool/` before adding a deeper folder split
   - `tests/tool/tool_suite_tests.cpp` and `tests/tool/phase7_tool_tests.cpp` are thin compatibility runners only
+
+- `cmake/ToolTestRegistration.cmake`
+  - focused grouped tool and real-project CTest registration surface
+  - calls the shared descriptor tool instead of keeping parser logic in the root build graph
+
+- `tools/tool_case_manifest.py`
+  - repository-owned grouped tool descriptor implementation path
+  - validates `case.toml`, emits grouped runner include data, and emits CTest registration fragments
 
 - `tests/support`
   - local test harness support code

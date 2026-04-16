@@ -3,6 +3,7 @@ cmake_minimum_required(VERSION 3.24)
 project(c_modern VERSION 0.1.0 LANGUAGES CXX)
 
 include(CTest)
+include(cmake/ToolTestRegistration.cmake)
 
 set(CMAKE_CXX_STANDARD 20)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
@@ -142,10 +143,18 @@ add_executable(mc_tool_build_state_tests
 target_include_directories(mc_tool_build_state_tests PRIVATE ${CMAKE_CURRENT_SOURCE_DIR})
 target_link_libraries(mc_tool_build_state_tests PRIVATE mc_support mc_test_support)
 
+file(GLOB tool_real_project_case_sources CONFIGURE_DEPENDS
+    "${CMAKE_CURRENT_SOURCE_DIR}/tests/tool/real_projects/*/*.cpp")
+
 add_executable(mc_tool_real_project_tests
     tests/tool/tool_real_project_tests.cpp
     tests/tool/tool_suite_common.cpp
+    tests/tool/tool_real_project_issue_rollup_suite.cpp
+    tests/tool/tool_real_project_process_suite.cpp
+    tests/tool/tool_real_project_review_board_suite.cpp
+    tests/tool/tool_real_project_simple_tools_suite.cpp
     tests/tool/tool_real_project_suite.cpp
+    ${tool_real_project_case_sources}
 )
 
 target_include_directories(mc_tool_real_project_tests PRIVATE ${CMAKE_CURRENT_SOURCE_DIR})
@@ -208,91 +217,11 @@ add_executable(mc_sema_fixture_tests
 target_include_directories(mc_sema_fixture_tests PRIVATE ${CMAKE_CURRENT_SOURCE_DIR})
 target_link_libraries(mc_sema_fixture_tests PRIVATE mc_sema_bootstrap mc_frontend_stub mc_support mc_test_support)
 
-function(add_tool_workflow_case_test test_name selector)
-    add_test(NAME ${test_name}
-        COMMAND mc_tool_workflow_tests ${CMAKE_CURRENT_SOURCE_DIR} ${CMAKE_CURRENT_BINARY_DIR} ${selector})
-endfunction()
-
-function(add_tool_real_project_case_test test_name selector)
-    add_test(NAME ${test_name}
-        COMMAND mc_tool_real_project_tests ${CMAKE_CURRENT_SOURCE_DIR} ${CMAKE_CURRENT_BINARY_DIR} ${selector})
-endfunction()
-
-function(parse_tool_case_descriptor descriptor_path expected_family expected_runner out_name out_selector out_function)
-    file(READ ${descriptor_path} descriptor_text)
-
-    string(REGEX MATCH "(^|\n)name[ ]*=[ ]*\"([^\"]+)\"" _name_match "${descriptor_text}")
-    if(NOT CMAKE_MATCH_2)
-        message(FATAL_ERROR "missing name in tool case descriptor: ${descriptor_path}")
-    endif()
-    set(case_name "${CMAKE_MATCH_2}")
-
-    string(REGEX MATCH "(^|\n)family[ ]*=[ ]*\"([^\"]+)\"" _family_match "${descriptor_text}")
-    if(NOT CMAKE_MATCH_2)
-        message(FATAL_ERROR "missing family in tool case descriptor: ${descriptor_path}")
-    endif()
-    if(NOT "${CMAKE_MATCH_2}" STREQUAL "${expected_family}")
-        message(FATAL_ERROR "tool case descriptor ${descriptor_path} has family '${CMAKE_MATCH_2}', expected '${expected_family}'")
-    endif()
-
-    string(REGEX MATCH "(^|\n)runner[ ]*=[ ]*\"([^\"]+)\"" _runner_match "${descriptor_text}")
-    if(NOT CMAKE_MATCH_2)
-        message(FATAL_ERROR "missing runner in tool case descriptor: ${descriptor_path}")
-    endif()
-    if(NOT "${CMAKE_MATCH_2}" STREQUAL "${expected_runner}")
-        message(FATAL_ERROR "tool case descriptor ${descriptor_path} has runner '${CMAKE_MATCH_2}', expected '${expected_runner}'")
-    endif()
-
-    string(REGEX MATCH "(^|\n)selector[ ]*=[ ]*\"([^\"]+)\"" _selector_match "${descriptor_text}")
-    if(NOT CMAKE_MATCH_2)
-        message(FATAL_ERROR "missing selector in tool case descriptor: ${descriptor_path}")
-    endif()
-    set(case_selector "${CMAKE_MATCH_2}")
-
-    string(REGEX MATCH "(^|\n)function[ ]*=[ ]*\"([^\"]+)\"" _function_match "${descriptor_text}")
-    if(NOT CMAKE_MATCH_2)
-        message(FATAL_ERROR "missing function in tool case descriptor: ${descriptor_path}")
-    endif()
-    set(case_function "${CMAKE_MATCH_2}")
-
-    if(NOT "${case_name}" STREQUAL "${case_selector}")
-        message(FATAL_ERROR "tool case descriptor ${descriptor_path} must keep name and selector identical")
-    endif()
-
-    get_filename_component(descriptor_dir ${descriptor_path} DIRECTORY)
-    get_filename_component(directory_name ${descriptor_dir} NAME)
-    if(NOT "${directory_name}" STREQUAL "${case_name}")
-        message(FATAL_ERROR "tool case descriptor ${descriptor_path} must match its directory name '${directory_name}'")
-    endif()
-
-    set(${out_name} "${case_name}" PARENT_SCOPE)
-    set(${out_selector} "${case_selector}" PARENT_SCOPE)
-    set(${out_function} "${case_function}" PARENT_SCOPE)
-endfunction()
-
-function(register_tool_case_tests_from_descriptors case_root expected_family expected_runner target_prefix add_case_function generated_file)
-    file(GLOB descriptor_paths CONFIGURE_DEPENDS "${case_root}/*/case.toml")
-    list(SORT descriptor_paths)
-    if(NOT descriptor_paths)
-        message(FATAL_ERROR "no tool case descriptors found under: ${case_root}")
-    endif()
-
-    set(generated_entries "")
-    foreach(descriptor_path IN LISTS descriptor_paths)
-        parse_tool_case_descriptor(${descriptor_path} ${expected_family} ${expected_runner} case_name selector function_name)
-        string(REPLACE "-" "_" selector_suffix "${selector}")
-        cmake_language(CALL ${add_case_function} ${target_prefix}${selector_suffix}_unit ${selector})
-        string(APPEND generated_entries "{\"${selector}\", &${function_name}},\n")
-    endforeach()
-
-    file(WRITE ${generated_file} "${generated_entries}")
-endfunction()
-
 add_test(NAME mc_bootstrap_unit COMMAND mc_bootstrap_tests)
 add_test(NAME mc_codegen_llvm_unit COMMAND mc_codegen_llvm_tests)
-register_tool_case_tests_from_descriptors(${CMAKE_CURRENT_SOURCE_DIR}/tests/tool/workflow tool-workflow mc_tool_workflow_tests mc_tool_workflow_ add_tool_workflow_case_test ${CMAKE_CURRENT_BINARY_DIR}/tool_workflow_cases.inc)
+register_tool_case_tests(tests/tool/workflow tool-workflow mc_tool_workflow_tests ${CMAKE_CURRENT_BINARY_DIR}/tool_workflow_cases.inc ${CMAKE_CURRENT_BINARY_DIR}/tool_workflow_tests.cmake)
 add_test(NAME mc_tool_build_state_unit COMMAND mc_tool_build_state_tests ${CMAKE_CURRENT_SOURCE_DIR} ${CMAKE_CURRENT_BINARY_DIR})
-register_tool_case_tests_from_descriptors(${CMAKE_CURRENT_SOURCE_DIR}/tests/tool/real_projects tool-real-project mc_tool_real_project_tests mc_tool_real_project_ add_tool_real_project_case_test ${CMAKE_CURRENT_BINARY_DIR}/tool_real_project_cases.inc)
+register_tool_case_tests(tests/tool/real_projects tool-real-project mc_tool_real_project_tests ${CMAKE_CURRENT_BINARY_DIR}/tool_real_project_cases.inc ${CMAKE_CURRENT_BINARY_DIR}/tool_real_project_tests.cmake)
 add_test(NAME mc_codegen_fixture_unit COMMAND mc_codegen_fixture_tests ${CMAKE_CURRENT_SOURCE_DIR})
 add_test(NAME mc_codegen_executable_core_unit COMMAND mc_codegen_executable_core_tests ${CMAKE_CURRENT_SOURCE_DIR} ${CMAKE_CURRENT_BINARY_DIR})
 add_test(NAME mc_codegen_executable_stdlib_unit COMMAND mc_codegen_executable_stdlib_tests ${CMAKE_CURRENT_SOURCE_DIR} ${CMAKE_CURRENT_BINARY_DIR})

@@ -1,0 +1,214 @@
+Phase 205 -- Real-Project Case-Local Migration Completion
+=========================================================
+
+Status
+------
+PLANNED
+
+Purpose
+-------
+Finish the next bounded step after Phase 204 by migrating the remaining
+real-project grouped test implementations out of the shared suite-owner files
+and into case-local source files beside their adjacent `case.toml`
+descriptors.
+
+This phase is real implementation work.
+It is not a proof-only or documentation-only exercise.
+It should complete the case-local migration path that Phase 204 introduced,
+without reopening the grouped runner model or introducing a new test
+framework.
+
+Repository status note
+----------------------
+- Phase 204 landed the first case-local real-project implementation at
+  `tests/tool/real_projects/evented-echo/test.cpp`.
+- The real-project runner target now supports filesystem discovery of
+  case-local `.cpp` files under `tests/tool/real_projects/*/`.
+- The selector now maps case-local paths back to their owning real-project
+  CTest through the descriptor directory.
+- Despite that landed path, most real-project behavior still remains in the
+  four shared suite-owner files:
+  - `tests/tool/tool_real_project_simple_tools_suite.cpp`
+  - `tests/tool/tool_real_project_process_suite.cpp`
+  - `tests/tool/tool_real_project_review_board_suite.cpp`
+  - `tests/tool/tool_real_project_issue_rollup_suite.cpp`
+
+Problem being solved
+--------------------
+- The repository now has a working case-local model, but it is applied only to
+  one real-project case.
+- The remaining suite-owner files still mix multiple independent real-project
+  behaviors into shared implementation surfaces.
+- Contributors can localize metadata through adjacent `case.toml` files, but
+  most real-project behavior is still maintained elsewhere.
+- That split keeps the system correct, but it is not yet the smallest or most
+  visible maintenance shape available under the current CMake + CTest model.
+
+Core rule
+---------
+- Prefer one case directory as the maintenance owner for one real-project case
+  whenever the case is self-contained.
+- Keep the current grouped runner, descriptor-driven identity, and CTest names
+  intact.
+- Move code, not semantics: do not redesign the assertions, subprocess model,
+  build workflow, or project fixtures as part of this phase.
+- Avoid replacing explicit C++ test logic with a metadata DSL or generic graph
+  engine.
+- Keep shared helpers shared only when they are genuinely reused across cases.
+
+Chosen slice for this phase
+---------------------------
+1. migrate the remaining simple-tools real-project cases into case-local
+   source files
+2. migrate the remaining process-family real-project cases into case-local
+   source files
+3. migrate the review-board and issue-rollup family cases into case-local
+   source files
+4. shrink the shared suite-owner files down to truly shared helpers or remove
+   them where they no longer earn their place
+5. refresh the local operator-facing docs so the case-local path is presented
+   as the normal maintenance shape for real-project tests
+6. make no compiler, sema, MIR, backend, ABI, target, runtime, stdlib, or
+   `hal` expansion
+
+Concrete migration scope
+------------------------
+Already migrated in Phase 204
+- `evented-echo`
+
+Planned Phase 205 migrations
+- from `tests/tool/tool_real_project_simple_tools_suite.cpp`:
+  - `grep-lite`
+  - `file-walker`
+  - `hash-tool`
+  - `arena-expr`
+- from `tests/tool/tool_real_project_process_suite.cpp`:
+  - `worker-queue`
+  - `pipe-handoff`
+  - `pipe-ready`
+  - `line-filter-relay`
+- from `tests/tool/tool_real_project_review_board_suite.cpp`:
+  - `review-board`
+- from `tests/tool/tool_real_project_issue_rollup_suite.cpp`:
+  - `issue-rollup`
+  - `issue-rollup-imported-aggregate-const`
+  - `module-set-imported-const`
+
+Planned outcome
+---------------
+- every real-project grouped case has a local implementation owner beside its
+  adjacent descriptor
+- the shared suite-owner files no longer hold case-specific behavior that can
+  live in the case directory instead
+- the runner target continues to compile real-project cases through
+  filesystem-discovered case-local `.cpp` files
+- `tools/select_tests.py` continues to map case-local changes to the narrow
+  owning real-project CTest target
+- contributors can add or edit a real-project case by working primarily inside
+  one directory rather than splitting attention between a descriptor and a
+  distant suite file
+
+Preferred implementation shape
+------------------------------
+Case-local path
+- Each real-project case directory should own:
+  - `case.toml`
+  - one case-local `.cpp` file when the case has bespoke behavior
+- Keep the exported function declaration in
+  `tests/tool/tool_real_project_suite_internal.h` until a narrower generated
+  declaration path is justified by concrete pressure.
+
+Shared helper path
+- Keep only helpers that are genuinely reused across multiple cases in shared
+  suite-owner files or shared support surfaces.
+- If a helper becomes case-specific during migration, move it with the case.
+- Do not invent generic abstractions just to avoid a few repeated lines.
+
+Build and dispatch path
+- Keep the current grouped dispatcher thin.
+- Keep descriptor-driven case-table generation and CTest registration intact.
+- Keep per-case build integration based on filesystem discovery of
+  `tests/tool/real_projects/*/*.cpp`.
+
+Suggested execution order
+-------------------------
+1. Migrate the simple-tools cases first because they are the narrowest,
+   smallest, and least coupled examples.
+2. Migrate the remaining process-family cases next, keeping truly shared
+   socket or subprocess helpers only where reuse is real.
+3. Migrate `review-board` after that, preserving its rebuild-state checks
+   without widening the helper layer.
+4. Migrate the `issue-rollup`,
+   `issue-rollup-imported-aggregate-const`, and
+   `module-set-imported-const` cases last because they are the heaviest
+   grouped-package and rebuild-state slices.
+5. Remove or reduce the old suite-owner files once their remaining content is
+   clearly shared infrastructure rather than case ownership.
+6. Refresh the nearby docs to present the case-local path as the default
+   maintenance model.
+7. Rerun focused real-project CTests and the local test selector after each
+   migration wave, then rerun the grouped real-project suite at the end.
+
+Deliverables
+------------
+- case-local real-project implementation files for each remaining real-project
+  case directory under `tests/tool/real_projects/`
+- reduced or removed shared suite-owner files where case-specific behavior has
+  been migrated out
+- updated operator-facing docs that describe case-local ownership as the
+  normal real-project maintenance path
+- bounded follow-through updates to:
+  - `tests/tool/README.md`
+  - `docs/arch/c-lang/tools/grouped_tool_test_operator_reference.txt`
+  - `docs/agent/prompts/repo_map.md` if the file layout changes materially
+  - `docs/plan/decision_log.txt` and `docs/plan/backlog.txt` only if a
+    concrete migration blocker or intentional limitation is discovered
+
+Validation expectations
+-----------------------
+- the tree must continue to build after each migration wave
+- each migrated case should pass its narrow owning CTest target
+- `tools/select_tests.py` should continue to map a localized case source file
+  to the narrow owning real-project CTest target
+- the grouped real-project suite should still pass after the full migration
+
+Exit criteria
+-------------
+- no remaining real-project case implementation is owned primarily by:
+  - `tests/tool/tool_real_project_simple_tools_suite.cpp`
+  - `tests/tool/tool_real_project_process_suite.cpp`
+  - `tests/tool/tool_real_project_review_board_suite.cpp`
+  - `tests/tool/tool_real_project_issue_rollup_suite.cpp`
+- each real-project case directory under `tests/tool/real_projects/` has a
+  local implementation owner when the case contains bespoke test behavior
+- the grouped dispatcher and registration flow remain stable and reviewable
+  without adding a new framework or hidden inference layer
+- local maintenance of a real-project case is primarily directory-local
+
+Non-goals
+---------
+- redesigning grouped tool discovery, registration, or dispatch again
+- replacing explicit C++ assertions with metadata-driven assertions
+- changing public real-project CTest names without a correctness reason
+- collapsing all shared helpers into one mega-support layer
+- expanding compiler or runtime scope while doing test migration work
+
+Why this is the narrowest honest landing
+---------------------------------------
+- Phase 204 already proved the case-local path with `evented-echo`.
+- The remaining work is straightforward ownership migration, not architectural
+  invention.
+- Finishing the migration now removes an obvious inconsistency: the repository
+  supports local case ownership, but still keeps most real-project behavior in
+  central suite files.
+- This keeps the repo on the user's preferred path: simple, visible,
+  directory-local maintenance instead of a larger verification system.
+
+Acceptance criteria for this document
+-------------------------------------
+- Phase 205 is explicitly framed as completion of the case-local real-project
+  migration path opened by Phase 204.
+- The phase names the actual remaining migration scope across the four shared
+  suite-owner files.
+- The phase preserves the current grouped runner architecture while shifting
+  case ownership to the adjacent real-project directories.
