@@ -292,6 +292,80 @@ void WriteLine(std::ostringstream& stream, int indent, const std::string& text) 
     stream << text << '\n';
 }
 
+class TopLevelSummaryBuilder {
+    public:
+        struct Context {
+                const ast::SourceFile& source_file;
+                const ImportedModules* imported_modules;
+                Module& module;
+                std::unordered_map<std::string, Decl::Kind>& value_symbols;
+                std::unordered_map<std::string, Decl::Kind>& type_symbols;
+                std::unordered_map<std::string, ValueBinding>& global_symbols;
+                std::function<void(const mc::support::SourceSpan&, const std::string&)> report;
+                std::function<const Module*(std::string_view)> find_imported_module;
+                std::function<FunctionSignature(const Decl&)> build_function_signature;
+                std::function<TypeDeclSummary(const Decl&)> build_type_decl_summary;
+                std::function<Type(const ast::TypeExpr*, const std::vector<std::string>&)> semantic_type_from_ast;
+        };
+
+        explicit TopLevelSummaryBuilder(const Context& context) : context_(context) {}
+
+        void SeedImportedSymbols();
+        void CollectTopLevelDecls();
+
+    private:
+        Context context_;
+};
+
+class ConstExprEvaluator {
+    public:
+        struct Context {
+                mc::support::SourceSpan source_span;
+                const Module& module;
+                std::unordered_map<std::string, ConstValue>& const_eval_cache;
+                std::function<void(const mc::support::SourceSpan&, const std::string&)> report;
+                std::function<std::optional<std::pair<const Decl*, std::size_t>>(std::string_view, Decl::Kind)> find_top_level_binding_decl;
+                std::function<const Module*(std::string_view)> find_imported_module;
+                std::function<void(const ast::TypeExpr*, const std::vector<std::string>&, const mc::support::SourceSpan&)> validate_type_expr;
+                std::function<std::vector<std::string>()> current_type_params;
+                std::function<Type(const ast::TypeExpr*, const std::vector<std::string>&)> semantic_type_from_ast;
+                std::function<Type(const Expr&)> resolve_aggregate_init_type;
+                std::function<void(Expr&, const Type&)> apply_nested_aggregate_type_hints;
+                std::function<std::optional<ConstValue>(Type, const ConstValue&)> convert_const_value;
+                std::function<const TypeDeclSummary*(std::string_view)> lookup_local_type_decl;
+                std::function<const TypeDeclSummary*(const Type&)> lookup_struct_type;
+        };
+
+        explicit ConstExprEvaluator(const Context& context) : context_(context) {}
+
+        std::optional<ConstValue> EvaluateConstExpr(const Expr& expr,
+                                                                                                bool report_errors,
+                                                                                                std::unordered_set<std::string>& active_names);
+        std::optional<std::size_t> EvaluateArrayLength(const Expr* expr, bool report_errors);
+
+    private:
+        struct EnumConstDesignator {
+                Type enum_type;
+                std::string variant_name;
+                std::vector<std::pair<std::string, Type>> payload_fields;
+                std::size_t variant_index = 0;
+        };
+
+        std::optional<ConstValue> EvaluateTopLevelConst(std::string_view name,
+                                                                                                        bool report_errors,
+                                                                                                        std::unordered_set<std::string>& active_names);
+        std::optional<ConstValue> EvaluateConstBinaryExpr(const Expr& expr,
+                                                                                                            bool report_errors,
+                                                                                                            std::unordered_set<std::string>& active_names);
+        std::optional<EnumConstDesignator> ResolveEnumConstDesignator(const Expr& expr, bool report_errors);
+        std::optional<ConstValue> EvaluateEnumConst(const Expr& designator,
+                                                                                                const std::vector<std::unique_ptr<Expr>>* payload_args,
+                                                                                                bool report_errors,
+                                                                                                std::unordered_set<std::string>& active_names);
+
+        Context context_;
+};
+
 class Checker {
   public:
     Checker(const ast::SourceFile& source_file,
@@ -322,9 +396,11 @@ class Checker {
         }
 
         // Checker phase ordering matters:
-        //   1. SeedImportedSymbols  — must run first; populates value_symbols_
-        //      and type_symbols_ from imported modules so that CollectTopLevelDecls
-        //      can detect conflicts with exported names.
+        //   1. SeedImportedSymbols  — must run first; seeds imported type
+        //      declarations into type_symbols_ so that CollectTopLevelDecls can
+        //      detect conflicts with local exported names. Imported value
+        //      lookups remain module-surface queries rather than pre-seeded
+        //      value_symbols_.
         //   2. CollectTopLevelDecls — populates the module's top-level summaries.
         //      Type and function lookup before this point is incomplete.
         //   3. BuildCheckerLookupMaps — refreshes checker-private O(1) lookups
@@ -335,8 +411,9 @@ class Checker {
         //   6. ValidateGlobals     — checks global const/var declarations.
         //   7. ValidateFunctions   — type-checks function bodies using the fully
         //      populated module summary.
-        SeedImportedSymbols();
-        CollectTopLevelDecls();
+        auto top_level_builder = MakeTopLevelSummaryBuilder();
+        top_level_builder.SeedImportedSymbols();
+        top_level_builder.CollectTopLevelDecls();
         BuildCheckerLookupMaps();
         ValidateDeclVisibility();
         ValidateTypeDecls();
@@ -563,39 +640,6 @@ class Checker {
         }
     }
 
-    std::optional<ConstValue> EvaluateTopLevelConst(std::string_view name, bool report_errors,
-                                                    std::unordered_set<std::string>& active_names) {
-        const std::string key(name);
-        // active_names is scoped to a single top-level initializer walk so
-        // recursive references diagnose cycles without polluting later const
-        // evaluations for unrelated globals.
-        if (!active_names.insert(key).second) {
-            if (report_errors) {
-                Report(source_file_.span, "compile-time constant cycle detected for " + key);
-            }
-            return std::nullopt;
-        }
-
-        const auto cached = const_eval_cache_.find(key);
-        if (cached != const_eval_cache_.end()) {
-            active_names.erase(key);
-            return cached->second;
-        }
-
-        const auto binding = FindTopLevelBindingDecl(name, Decl::Kind::kConst);
-        if (!binding.has_value() || binding->decl == nullptr) {
-            active_names.erase(key);
-            return std::nullopt;
-        }
-
-        const auto value = EvaluateConstExpr(*binding->decl->values[binding->index], report_errors, active_names);
-        if (value.has_value()) {
-            const_eval_cache_[key] = *value;
-        }
-        active_names.erase(key);
-        return value;
-    }
-
     std::optional<ConstValue> ConvertConstValue(Type target_type, const ConstValue& value) {
         const Type canonical_target = CanonicalizeBuiltinType(StripType(std::move(target_type), *module_, TypeStripMode::kAliasesAndDistinct));
         if (canonical_target.kind == Type::Kind::kBool) {
@@ -643,423 +687,17 @@ class Checker {
         return std::nullopt;
     }
 
-    std::optional<ConstValue> EvaluateConstBinaryExpr(const Expr& expr,
-                                                      bool report_errors,
-                                                      std::unordered_set<std::string>& active_names) {
-        if (expr.left == nullptr || expr.right == nullptr) {
-            return std::nullopt;
-        }
-        if (expr.text == "&&" || expr.text == "||") {
-            const auto left = EvaluateConstExpr(*expr.left, report_errors, active_names);
-            if (!left.has_value() || left->kind != ConstValue::Kind::kBool) {
-                return std::nullopt;
-            }
-            if (expr.text == "&&" && !left->bool_value) {
-                return MakeConstValue(false);
-            }
-            if (expr.text == "||" && left->bool_value) {
-                return MakeConstValue(true);
-            }
-            const auto right = EvaluateConstExpr(*expr.right, report_errors, active_names);
-            if (!right.has_value()) {
-                return std::nullopt;
-            }
-            return EvaluateConstBinaryOp(expr.text, *left, *right);
-        }
-
-        const auto left = EvaluateConstExpr(*expr.left, report_errors, active_names);
-        const auto right = EvaluateConstExpr(*expr.right, report_errors, active_names);
-        if (!left.has_value() || !right.has_value()) {
-            return std::nullopt;
-        }
-        return EvaluateConstBinaryOp(expr.text, *left, *right);
-    }
-
-    struct EnumConstDesignator {
-        Type enum_type;
-        std::string variant_name;
-        std::vector<std::pair<std::string, Type>> payload_fields;
-        std::size_t variant_index = 0;
-    };
-
-    std::optional<EnumConstDesignator> ResolveEnumConstDesignator(const Expr& expr, bool report_errors) {
-        const Expr* type_expr = nullptr;
-        std::string enum_name;
-        std::string variant_name;
-
-        if (expr.kind == Expr::Kind::kQualifiedName) {
-            type_expr = &expr;
-            enum_name = expr.text;
-            variant_name = expr.secondary_text;
-        } else if (expr.kind == Expr::Kind::kField && expr.left != nullptr &&
-                   (expr.left->kind == Expr::Kind::kName || expr.left->kind == Expr::Kind::kQualifiedName)) {
-            type_expr = expr.left.get();
-            enum_name = CombineQualifiedName(*expr.left);
-            variant_name = expr.text;
-        } else {
-            return std::nullopt;
-        }
-
-        const TypeDeclSummary* type_decl = LookupLocalTypeDecl(enum_name);
-        if (type_decl == nullptr || type_decl->kind != Decl::Kind::kEnum || type_expr == nullptr) {
-            return std::nullopt;
-        }
-
-        const std::size_t expected = type_decl->type_params.size();
-        const std::size_t actual = type_expr->type_args.size();
-        if (expected != actual) {
-            if (report_errors && actual != 0) {
-                Report(expr.span,
-                       "generic type " + enum_name + " expects " + std::to_string(expected) +
-                           " type arguments but got " + std::to_string(actual));
-            }
-            if (expected != 0 || actual != 0) {
-                return std::nullopt;
-            }
-        }
-
-        Type enum_type = NamedType(type_decl->name);
-        enum_type.subtypes.reserve(actual);
-        for (const auto& type_arg : type_expr->type_args) {
-            ValidateTypeExpr(type_arg.get(), CurrentTypeParams(), type_arg->span);
-            enum_type.subtypes.push_back(SemanticTypeFromAst(type_arg.get(), CurrentTypeParams()));
-        }
-
-        for (std::size_t index = 0; index < type_decl->variants.size(); ++index) {
-            if (type_decl->variants[index].name != variant_name) {
-                continue;
-            }
-            return EnumConstDesignator {
-                .enum_type = enum_type,
-                .variant_name = variant_name,
-                .payload_fields = InstantiateVariantSummary(type_decl->variants[index], *type_decl, enum_type).payload_fields,
-                .variant_index = index,
-            };
-        }
-
-        return std::nullopt;
-    }
-
-    std::optional<ConstValue> EvaluateEnumConst(const Expr& designator,
-                                                const std::vector<std::unique_ptr<Expr>>* payload_args,
-                                                bool report_errors,
-                                                std::unordered_set<std::string>& active_names) {
-        const auto resolved = ResolveEnumConstDesignator(designator, report_errors);
-        if (!resolved.has_value()) {
-            return std::nullopt;
-        }
-
-        const std::size_t arg_count = payload_args != nullptr ? payload_args->size() : 0;
-        if (resolved->payload_fields.size() != arg_count) {
-            if (report_errors) {
-                Report(designator.span,
-                       "enum constant " + FormatType(resolved->enum_type) + '.' + resolved->variant_name +
-                           " expects " + std::to_string(resolved->payload_fields.size()) +
-                           " payload values but got " + std::to_string(arg_count));
-            }
-            return std::nullopt;
-        }
-
-        std::vector<std::string> field_names;
-        std::vector<ConstValue> elements;
-        field_names.reserve(arg_count);
-        elements.reserve(arg_count);
-        for (std::size_t index = 0; index < arg_count; ++index) {
-            const auto field_value = EvaluateConstExpr(*(*payload_args)[index], report_errors, active_names);
-            if (!field_value.has_value()) {
-                return std::nullopt;
-            }
-            field_names.push_back(resolved->payload_fields[index].first);
-            elements.push_back(*field_value);
-        }
-
-        return MakeEnumConstValue(resolved->enum_type,
-                                  resolved->variant_name,
-                                  static_cast<std::int64_t>(resolved->variant_index),
-                                  std::move(field_names),
-                                  std::move(elements));
-    }
-
-    bool IsConstExpr(const Expr& expr, bool report_errors, std::unordered_set<std::string>& active_names) {
-        if (EvaluateConstExpr(expr, report_errors, active_names).has_value()) {
-            return true;
-        }
-
-        switch (expr.kind) {
-            case Expr::Kind::kAggregateInit:
-                for (const auto& field_init : expr.field_inits) {
-                    if (field_init.value == nullptr || !IsConstExpr(*field_init.value, report_errors, active_names)) {
-                        return false;
-                    }
-                }
-                return true;
-            case Expr::Kind::kParen:
-                return expr.left != nullptr && IsConstExpr(*expr.left, report_errors, active_names);
-            default:
-                return false;
-        }
-    }
-
     std::optional<ConstValue> EvaluateConstExpr(const Expr& expr, bool report_errors,
                                                 std::unordered_set<std::string>& active_names) {
-        switch (expr.kind) {
-            case Expr::Kind::kName:
-                return EvaluateTopLevelConst(expr.text, report_errors, active_names);
-            case Expr::Kind::kQualifiedName:
-                if (const Module* imported_module = FindImportedModule(expr.text); imported_module != nullptr) {
-                    if (const auto* global = FindGlobalSummary(*imported_module, expr.secondary_text); global != nullptr) {
-                        return ParseGlobalConstValue(*global, expr.secondary_text);
-                    }
-                }
-                return EvaluateEnumConst(expr, nullptr, report_errors, active_names);
-            case Expr::Kind::kLiteral:
-                return ParseLiteralConstValue(expr);
-            case Expr::Kind::kUnary: {
-                if (expr.left == nullptr) {
-                    return std::nullopt;
-                }
-                const auto operand = EvaluateConstExpr(*expr.left, report_errors, active_names);
-                if (!operand.has_value()) {
-                    return std::nullopt;
-                }
-                return EvaluateConstUnaryOp(expr.text, *operand);
-            }
-            case Expr::Kind::kBinary: {
-                return EvaluateConstBinaryExpr(expr, report_errors, active_names);
-            }
-            case Expr::Kind::kCall: {
-                if (expr.type_target == nullptr && expr.left != nullptr) {
-                    if (const auto enum_const = EvaluateEnumConst(*expr.left, &expr.args, report_errors, active_names);
-                        enum_const.has_value()) {
-                        return enum_const;
-                    }
-                }
-                if (expr.type_target == nullptr || expr.args.size() != 1) {
-                    return std::nullopt;
-                }
-                const auto operand = EvaluateConstExpr(*expr.args.front(), report_errors, active_names);
-                if (!operand.has_value()) {
-                    return std::nullopt;
-                }
-                ValidateTypeExpr(expr.type_target.get(), CurrentTypeParams(), expr.type_target->span);
-                const Type target_type = SemanticTypeFromAst(expr.type_target.get(), CurrentTypeParams());
-                if (expr.bare_type_target_syntax) {
-                    const Type stripped_target = CanonicalizeBuiltinType(StripType(target_type, *module_, TypeStripMode::kAliasesAndDistinct));
-                    if (!mc::sema::IsIntegerType(stripped_target) || operand->kind != ConstValue::Kind::kInteger) {
-                        return std::nullopt;
-                    }
-                }
-                return ConvertConstValue(target_type, *operand);
-            }
-            case Expr::Kind::kField:
-                return EvaluateEnumConst(expr, nullptr, report_errors, active_names);
-            case Expr::Kind::kAggregateInit: {
-                Type aggregate_type = ResolveAggregateInitType(expr);
-                if (IsUnknown(aggregate_type)) {
-                    return std::nullopt;
-                }
-
-                ApplyNestedAggregateTypeHints(const_cast<Expr&>(expr), aggregate_type);
-
-                const Type resolved_aggregate = StripType(aggregate_type, *module_, TypeStripMode::kAliasesOnly);
-                if (resolved_aggregate.kind == Type::Kind::kArray) {
-                    if (resolved_aggregate.subtypes.empty()) {
-                        return std::nullopt;
-                    }
-                    const auto length = mc::support::ParseArrayLength(resolved_aggregate.metadata);
-                    if (!length.has_value() || *length != expr.field_inits.size()) {
-                        return std::nullopt;
-                    }
-
-                    ConstValue result;
-                    result.kind = ConstValue::Kind::kAggregate;
-                    result.elements.reserve(expr.field_inits.size());
-                    for (const auto& field_init : expr.field_inits) {
-                        if (field_init.has_name || field_init.value == nullptr) {
-                            return std::nullopt;
-                        }
-                        const auto field_value = EvaluateConstExpr(*field_init.value, report_errors, active_names);
-                        if (!field_value.has_value()) {
-                            return std::nullopt;
-                        }
-                        result.elements.push_back(*field_value);
-                    }
-                    result.text = RenderConstValue(result);
-                    return result;
-                }
-
-                const TypeDeclSummary* type_decl = LookupStructType(resolved_aggregate);
-                const auto builtin_fields = BuiltinAggregateFields(resolved_aggregate);
-                const auto instantiated_fields =
-                    type_decl != nullptr ? InstantiateTypeDeclFields(*type_decl, resolved_aggregate)
-                                         : std::vector<std::pair<std::string, Type>> {};
-                const auto& field_source = type_decl != nullptr ? instantiated_fields : builtin_fields;
-                if (type_decl == nullptr && field_source.empty()) {
-                    return std::nullopt;
-                }
-
-                std::vector<std::optional<ConstValue>> ordered_values(field_source.size());
-                std::vector<std::string> ordered_names(field_source.size());
-                for (std::size_t index = 0; index < field_source.size(); ++index) {
-                    ordered_names[index] = field_source[index].first;
-                }
-
-                for (std::size_t index = 0; index < expr.field_inits.size(); ++index) {
-                    const auto& field_init = expr.field_inits[index];
-                    if (field_init.value == nullptr) {
-                        return std::nullopt;
-                    }
-                    const auto field_value = EvaluateConstExpr(*field_init.value, report_errors, active_names);
-                    if (!field_value.has_value()) {
-                        return std::nullopt;
-                    }
-
-                    std::size_t target_index = index;
-                    if (field_init.has_name) {
-                        const auto found = std::find_if(field_source.begin(), field_source.end(), [&](const auto& field) {
-                            return field.first == field_init.name;
-                        });
-                        if (found == field_source.end()) {
-                            return std::nullopt;
-                        }
-                        target_index = static_cast<std::size_t>(std::distance(field_source.begin(), found));
-                    } else if (target_index >= field_source.size()) {
-                        return std::nullopt;
-                    }
-
-                    if (target_index >= ordered_values.size() || ordered_values[target_index].has_value()) {
-                        return std::nullopt;
-                    }
-                    ordered_values[target_index] = *field_value;
-                }
-
-                ConstValue result;
-                result.kind = ConstValue::Kind::kAggregate;
-                result.field_names = std::move(ordered_names);
-                result.elements.reserve(ordered_values.size());
-                for (const auto& field_value : ordered_values) {
-                    if (!field_value.has_value()) {
-                        return std::nullopt;
-                    }
-                    result.elements.push_back(*field_value);
-                }
-                result.text = RenderConstValue(result);
-                return result;
-            }
-            case Expr::Kind::kRecordUpdate: {
-                if (expr.left == nullptr) {
-                    return std::nullopt;
-                }
-
-                const auto base_value = EvaluateConstExpr(*expr.left, report_errors, active_names);
-                if (!base_value.has_value() || base_value->kind != ConstValue::Kind::kAggregate || base_value->field_names.empty()) {
-                    return std::nullopt;
-                }
-
-                std::vector<std::optional<ConstValue>> ordered_values(base_value->elements.size());
-                for (std::size_t index = 0; index < base_value->elements.size(); ++index) {
-                    ordered_values[index] = base_value->elements[index];
-                }
-
-                std::unordered_set<std::string> updated_fields;
-                for (const auto& field_init : expr.field_inits) {
-                    if (!field_init.has_name || field_init.value == nullptr) {
-                        return std::nullopt;
-                    }
-                    if (!updated_fields.insert(field_init.name).second) {
-                        return std::nullopt;
-                    }
-
-                    const auto found = std::find(base_value->field_names.begin(), base_value->field_names.end(), field_init.name);
-                    if (found == base_value->field_names.end()) {
-                        return std::nullopt;
-                    }
-
-                    const auto field_value = EvaluateConstExpr(*field_init.value, report_errors, active_names);
-                    if (!field_value.has_value()) {
-                        return std::nullopt;
-                    }
-
-                    const std::size_t target_index = static_cast<std::size_t>(std::distance(base_value->field_names.begin(), found));
-                    ordered_values[target_index] = *field_value;
-                }
-
-                ConstValue result;
-                result.kind = ConstValue::Kind::kAggregate;
-                result.field_names = base_value->field_names;
-                result.elements.reserve(ordered_values.size());
-                for (const auto& field_value : ordered_values) {
-                    if (!field_value.has_value()) {
-                        return std::nullopt;
-                    }
-                    result.elements.push_back(*field_value);
-                }
-                result.text = RenderConstValue(result);
-                return result;
-            }
-            case Expr::Kind::kParen:
-                return expr.left != nullptr ? EvaluateConstExpr(*expr.left, report_errors, active_names) : std::nullopt;
-            default:
-                return std::nullopt;
-        }
+        return MakeConstExprEvaluator().EvaluateConstExpr(expr, report_errors, active_names);
     }
 
     std::optional<std::size_t> EvaluateArrayLength(const Expr* expr, bool report_errors) {
-        if (expr == nullptr) {
-            return std::nullopt;
-        }
-        std::unordered_set<std::string> active_names;
-        const auto value = EvaluateConstExpr(*expr, report_errors, active_names);
-        if (!value.has_value() || value->kind != ConstValue::Kind::kInteger || value->integer_value < 0) {
-            return std::nullopt;
-        }
-        return static_cast<std::size_t>(value->integer_value);
+        return MakeConstExprEvaluator().EvaluateArrayLength(expr, report_errors);
     }
 
     void SeedImportedSymbols() {
-        if (imported_modules_ == nullptr) {
-            return;
-        }
-
-        const auto lookup_seeded_type = [&](std::string_view name) -> const TypeDeclSummary* {
-            for (const auto& type_decl : module_->type_decls) {
-                if (type_decl.name == name) {
-                    return &type_decl;
-                }
-            }
-            return nullptr;
-        };
-
-        std::unordered_set<std::string> seen_import_names;
-        for (const auto& import_decl : source_file_.imports) {
-            if (!seen_import_names.insert(import_decl.module_name).second) {
-                Report(import_decl.span, "duplicate import module: " + import_decl.module_name);
-                continue;
-            }
-            const Module* imported_module = FindImportedModule(import_decl.module_name);
-            if (imported_module == nullptr) {
-                Report(import_decl.span, "internal error: missing checked import module: " + import_decl.module_name);
-                continue;
-            }
-
-            std::unordered_set<std::string> imported_type_names;
-            for (const auto& type_decl : imported_module->type_decls) {
-                imported_type_names.insert(type_decl.name);
-            }
-
-            for (const auto& type_decl : imported_module->type_decls) {
-                TypeDeclSummary qualified_type = RewriteImportedTypeDecl(type_decl, import_decl.module_name, imported_type_names);
-                if (!type_symbols_.emplace(qualified_type.name, qualified_type.kind).second) {
-                    const TypeDeclSummary* existing_type = lookup_seeded_type(qualified_type.name);
-                    if (existing_type != nullptr && EquivalentTypeDeclSummary(*existing_type, qualified_type)) {
-                        continue;
-                    }
-                    Report(import_decl.span, "duplicate imported type symbol: " + qualified_type.name);
-                    continue;
-                }
-                module_->type_decls.push_back(std::move(qualified_type));
-            }
-        }
+        MakeTopLevelSummaryBuilder().SeedImportedSymbols();
     }
 
     const Module* FindImportedModule(std::string_view name) const {
@@ -1075,47 +713,7 @@ class Checker {
     }
 
     void CollectTopLevelDecls() {
-        for (const auto& decl : source_file_.decls) {
-            switch (decl.kind) {
-                case Decl::Kind::kFunc:
-                case Decl::Kind::kExternFunc:
-                    if (!value_symbols_.emplace(decl.name, decl.kind).second) {
-                        Report(decl.span, "duplicate top-level value symbol: " + decl.name);
-                        break;
-                    }
-                    module_->functions.push_back(BuildFunctionSignature(decl));
-                    break;
-                case Decl::Kind::kStruct:
-                case Decl::Kind::kEnum:
-                case Decl::Kind::kDistinct:
-                case Decl::Kind::kTypeAlias:
-                    if (!type_symbols_.emplace(decl.name, decl.kind).second) {
-                        Report(decl.span, "duplicate top-level type symbol: " + decl.name);
-                        break;
-                    }
-                    module_->type_decls.push_back(BuildTypeDeclSummary(decl));
-                    break;
-                case Decl::Kind::kConst:
-                case Decl::Kind::kVar: {
-                    GlobalSummary global;
-                    global.is_const = decl.kind == Decl::Kind::kConst;
-                    global.type = SemanticTypeFromAst(decl.type_ann.get(), {});
-                    for (const auto& name : decl.pattern.names) {
-                        if (!value_symbols_.emplace(name, decl.kind).second) {
-                            Report(decl.span, "duplicate top-level value symbol: " + name);
-                            continue;
-                        }
-                        global.names.push_back(name);
-                        global_symbols_[name] = {
-                            .type = global.type,
-                            .is_mutable = decl.kind == Decl::Kind::kVar,
-                        };
-                    }
-                    module_->globals.push_back(std::move(global));
-                    break;
-                }
-            }
-        }
+        MakeTopLevelSummaryBuilder().CollectTopLevelDecls();
     }
 
     void ValidateDeclVisibility() {
@@ -1547,9 +1145,6 @@ class Checker {
                 std::unordered_set<std::string> active_names;
                 const auto const_value = EvaluateConstExpr(*decl.values[index], true, active_names);
                 if (!const_value.has_value()) {
-                    active_names.clear();
-                }
-                if (!const_value.has_value() && !IsConstExpr(*decl.values[index], true, active_names)) {
                     Report(decl.values[index]->span,
                            std::string("top-level ") + (decl.kind == Decl::Kind::kConst ? "const" : "var") +
                                " initializer must be a compile-time constant");
@@ -1594,9 +1189,12 @@ class Checker {
             loop_depth_ = 0;
             scopes_.clear();
             PushScope();
-            for (std::size_t index = 0; index < decl.params.size(); ++index) {
+            for (std::size_t index = 0; index < decl.params.size() && index < signature->param_types.size(); ++index) {
                 ValidateTypeExpr(decl.params[index].type.get(), signature->type_params, decl.params[index].span);
                 BindValue(decl.params[index].name, signature->param_types[index], false, decl.params[index].span);
+            }
+            if (decl.params.size() != signature->param_types.size()) {
+                Report(decl.span, "internal error: function signature parameter summary mismatch for " + decl.name);
             }
             for (const auto& return_type : decl.return_types) {
                 ValidateTypeExpr(return_type.get(), signature->type_params, return_type->span);
@@ -3132,6 +2730,80 @@ class Checker {
         }
     }
 
+    TopLevelSummaryBuilder MakeTopLevelSummaryBuilder() {
+        return TopLevelSummaryBuilder(TopLevelSummaryBuilder::Context {
+            .source_file = source_file_,
+            .imported_modules = imported_modules_,
+            .module = *module_,
+            .value_symbols = value_symbols_,
+            .type_symbols = type_symbols_,
+            .global_symbols = global_symbols_,
+            .report = [this](const mc::support::SourceSpan& span, const std::string& message) {
+                Report(span, message);
+            },
+            .find_imported_module = [this](std::string_view name) {
+                return FindImportedModule(name);
+            },
+            .build_function_signature = [this](const Decl& decl) {
+                return BuildFunctionSignature(decl);
+            },
+            .build_type_decl_summary = [this](const Decl& decl) {
+                return BuildTypeDeclSummary(decl);
+            },
+            .semantic_type_from_ast = [this](const ast::TypeExpr* type_expr, const std::vector<std::string>& type_params) {
+                return SemanticTypeFromAst(type_expr, type_params);
+            },
+        });
+    }
+
+    ConstExprEvaluator MakeConstExprEvaluator() {
+        return ConstExprEvaluator(ConstExprEvaluator::Context {
+            .source_span = source_file_.span,
+            .module = *module_,
+            .const_eval_cache = const_eval_cache_,
+            .report = [this](const mc::support::SourceSpan& span, const std::string& message) {
+                Report(span, message);
+            },
+            .find_top_level_binding_decl = [this](std::string_view name, Decl::Kind kind)
+                -> std::optional<std::pair<const Decl*, std::size_t>> {
+                const auto binding = FindTopLevelBindingDecl(name, kind);
+                if (!binding.has_value() || binding->decl == nullptr) {
+                    return std::nullopt;
+                }
+                return std::pair<const Decl*, std::size_t> {binding->decl, binding->index};
+            },
+            .find_imported_module = [this](std::string_view name) {
+                return FindImportedModule(name);
+            },
+            .validate_type_expr = [this](const ast::TypeExpr* type_expr,
+                                         const std::vector<std::string>& type_params,
+                                         const mc::support::SourceSpan& span) {
+                ValidateTypeExpr(type_expr, type_params, span);
+            },
+            .current_type_params = [this]() {
+                return CurrentTypeParams();
+            },
+            .semantic_type_from_ast = [this](const ast::TypeExpr* type_expr, const std::vector<std::string>& type_params) {
+                return SemanticTypeFromAst(type_expr, type_params);
+            },
+            .resolve_aggregate_init_type = [this](const Expr& expr) {
+                return ResolveAggregateInitType(expr);
+            },
+            .apply_nested_aggregate_type_hints = [this](Expr& expr, const Type& aggregate_type) {
+                ApplyNestedAggregateTypeHints(expr, aggregate_type);
+            },
+            .convert_const_value = [this](Type target_type, const ConstValue& value) {
+                return ConvertConstValue(std::move(target_type), value);
+            },
+            .lookup_local_type_decl = [this](std::string_view name) {
+                return LookupLocalTypeDecl(name);
+            },
+            .lookup_struct_type = [this](const Type& type) {
+                return LookupStructType(type);
+            },
+        });
+    }
+
     const ast::SourceFile& source_file_;
     std::filesystem::path file_path_;
     std::optional<std::string> current_package_identity_;
@@ -3153,6 +2825,478 @@ class Checker {
     const FunctionSignature* current_function_ = nullptr;
     int loop_depth_ = 0;
 };
+
+void TopLevelSummaryBuilder::SeedImportedSymbols() {
+    if (context_.imported_modules == nullptr) {
+        return;
+    }
+
+    const auto lookup_seeded_type = [&](std::string_view name) -> const TypeDeclSummary* {
+        for (const auto& type_decl : context_.module.type_decls) {
+            if (type_decl.name == name) {
+                return &type_decl;
+            }
+        }
+        return nullptr;
+    };
+
+    std::unordered_set<std::string> seen_import_names;
+    for (const auto& import_decl : context_.source_file.imports) {
+        if (!seen_import_names.insert(import_decl.module_name).second) {
+            context_.report(import_decl.span, "duplicate import module: " + import_decl.module_name);
+            continue;
+        }
+        const Module* imported_module = context_.find_imported_module(import_decl.module_name);
+        if (imported_module == nullptr) {
+            context_.report(import_decl.span, "internal error: missing checked import module: " + import_decl.module_name);
+            continue;
+        }
+
+        std::unordered_set<std::string> imported_type_names;
+        for (const auto& type_decl : imported_module->type_decls) {
+            imported_type_names.insert(type_decl.name);
+        }
+
+        for (const auto& type_decl : imported_module->type_decls) {
+            TypeDeclSummary qualified_type = RewriteImportedTypeDecl(type_decl, import_decl.module_name, imported_type_names);
+            if (!context_.type_symbols.emplace(qualified_type.name, qualified_type.kind).second) {
+                const TypeDeclSummary* existing_type = lookup_seeded_type(qualified_type.name);
+                if (existing_type != nullptr && EquivalentTypeDeclSummary(*existing_type, qualified_type)) {
+                    continue;
+                }
+                context_.report(import_decl.span, "duplicate imported type symbol: " + qualified_type.name);
+                continue;
+            }
+            context_.module.type_decls.push_back(std::move(qualified_type));
+        }
+    }
+}
+
+void TopLevelSummaryBuilder::CollectTopLevelDecls() {
+    for (const auto& decl : context_.source_file.decls) {
+        switch (decl.kind) {
+            case Decl::Kind::kFunc:
+            case Decl::Kind::kExternFunc:
+                if (!context_.value_symbols.emplace(decl.name, decl.kind).second) {
+                    context_.report(decl.span, "duplicate top-level value symbol: " + decl.name);
+                    break;
+                }
+                context_.module.functions.push_back(context_.build_function_signature(decl));
+                break;
+            case Decl::Kind::kStruct:
+            case Decl::Kind::kEnum:
+            case Decl::Kind::kDistinct:
+            case Decl::Kind::kTypeAlias:
+                if (!context_.type_symbols.emplace(decl.name, decl.kind).second) {
+                    context_.report(decl.span, "duplicate top-level type symbol: " + decl.name);
+                    break;
+                }
+                context_.module.type_decls.push_back(context_.build_type_decl_summary(decl));
+                break;
+            case Decl::Kind::kConst:
+            case Decl::Kind::kVar: {
+                GlobalSummary global;
+                global.is_const = decl.kind == Decl::Kind::kConst;
+                global.type = context_.semantic_type_from_ast(decl.type_ann.get(), {});
+                for (const auto& name : decl.pattern.names) {
+                    if (!context_.value_symbols.emplace(name, decl.kind).second) {
+                        context_.report(decl.span, "duplicate top-level value symbol: " + name);
+                        continue;
+                    }
+                    global.names.push_back(name);
+                    context_.global_symbols[name] = {
+                        .type = global.type,
+                        .is_mutable = decl.kind == Decl::Kind::kVar,
+                    };
+                }
+                context_.module.globals.push_back(std::move(global));
+                break;
+            }
+        }
+    }
+}
+
+std::optional<ConstValue> ConstExprEvaluator::EvaluateTopLevelConst(std::string_view name,
+                                                                    bool report_errors,
+                                                                    std::unordered_set<std::string>& active_names) {
+    const std::string key(name);
+    if (!active_names.insert(key).second) {
+        if (report_errors) {
+            context_.report(context_.source_span, "compile-time constant cycle detected for " + key);
+        }
+        return std::nullopt;
+    }
+
+    const auto cached = context_.const_eval_cache.find(key);
+    if (cached != context_.const_eval_cache.end()) {
+        active_names.erase(key);
+        return cached->second;
+    }
+
+    const auto binding = context_.find_top_level_binding_decl(name, Decl::Kind::kConst);
+    if (!binding.has_value() || binding->first == nullptr) {
+        active_names.erase(key);
+        return std::nullopt;
+    }
+
+    const auto value = EvaluateConstExpr(*binding->first->values[binding->second], report_errors, active_names);
+    if (value.has_value()) {
+        context_.const_eval_cache[key] = *value;
+    }
+    active_names.erase(key);
+    return value;
+}
+
+std::optional<ConstValue> ConstExprEvaluator::EvaluateConstBinaryExpr(const Expr& expr,
+                                                                      bool report_errors,
+                                                                      std::unordered_set<std::string>& active_names) {
+    if (expr.left == nullptr || expr.right == nullptr) {
+        return std::nullopt;
+    }
+    if (expr.text == "&&" || expr.text == "||") {
+        const auto left = EvaluateConstExpr(*expr.left, report_errors, active_names);
+        if (!left.has_value() || left->kind != ConstValue::Kind::kBool) {
+            return std::nullopt;
+        }
+        if (expr.text == "&&" && !left->bool_value) {
+            return MakeConstValue(false);
+        }
+        if (expr.text == "||" && left->bool_value) {
+            return MakeConstValue(true);
+        }
+        const auto right = EvaluateConstExpr(*expr.right, report_errors, active_names);
+        if (!right.has_value()) {
+            return std::nullopt;
+        }
+        return EvaluateConstBinaryOp(expr.text, *left, *right);
+    }
+
+    const auto left = EvaluateConstExpr(*expr.left, report_errors, active_names);
+    const auto right = EvaluateConstExpr(*expr.right, report_errors, active_names);
+    if (!left.has_value() || !right.has_value()) {
+        return std::nullopt;
+    }
+    return EvaluateConstBinaryOp(expr.text, *left, *right);
+}
+
+std::optional<ConstExprEvaluator::EnumConstDesignator> ConstExprEvaluator::ResolveEnumConstDesignator(const Expr& expr,
+                                                                                                       bool report_errors) {
+    const Expr* type_expr = nullptr;
+    std::string enum_name;
+    std::string variant_name;
+
+    if (expr.kind == Expr::Kind::kQualifiedName) {
+        type_expr = &expr;
+        enum_name = expr.text;
+        variant_name = expr.secondary_text;
+    } else if (expr.kind == Expr::Kind::kField && expr.left != nullptr &&
+               (expr.left->kind == Expr::Kind::kName || expr.left->kind == Expr::Kind::kQualifiedName)) {
+        type_expr = expr.left.get();
+        enum_name = CombineQualifiedName(*expr.left);
+        variant_name = expr.text;
+    } else {
+        return std::nullopt;
+    }
+
+    const TypeDeclSummary* type_decl = context_.lookup_local_type_decl(enum_name);
+    if (type_decl == nullptr || type_decl->kind != Decl::Kind::kEnum || type_expr == nullptr) {
+        return std::nullopt;
+    }
+
+    const std::size_t expected = type_decl->type_params.size();
+    const std::size_t actual = type_expr->type_args.size();
+    if (expected != actual) {
+        if (report_errors && actual != 0) {
+            context_.report(expr.span,
+                            "generic type " + enum_name + " expects " + std::to_string(expected) +
+                                " type arguments but got " + std::to_string(actual));
+        }
+        if (expected != 0 || actual != 0) {
+            return std::nullopt;
+        }
+    }
+
+    Type enum_type = NamedType(type_decl->name);
+    enum_type.subtypes.reserve(actual);
+    for (const auto& type_arg : type_expr->type_args) {
+        const auto current_type_params = context_.current_type_params();
+        context_.validate_type_expr(type_arg.get(), current_type_params, type_arg->span);
+        enum_type.subtypes.push_back(context_.semantic_type_from_ast(type_arg.get(), current_type_params));
+    }
+
+    for (std::size_t index = 0; index < type_decl->variants.size(); ++index) {
+        if (type_decl->variants[index].name != variant_name) {
+            continue;
+        }
+        return EnumConstDesignator {
+            .enum_type = enum_type,
+            .variant_name = variant_name,
+            .payload_fields = InstantiateVariantSummary(type_decl->variants[index], *type_decl, enum_type).payload_fields,
+            .variant_index = index,
+        };
+    }
+
+    return std::nullopt;
+}
+
+std::optional<ConstValue> ConstExprEvaluator::EvaluateEnumConst(const Expr& designator,
+                                                                const std::vector<std::unique_ptr<Expr>>* payload_args,
+                                                                bool report_errors,
+                                                                std::unordered_set<std::string>& active_names) {
+    const auto resolved = ResolveEnumConstDesignator(designator, report_errors);
+    if (!resolved.has_value()) {
+        return std::nullopt;
+    }
+
+    const std::size_t arg_count = payload_args != nullptr ? payload_args->size() : 0;
+    if (resolved->payload_fields.size() != arg_count) {
+        if (report_errors) {
+            context_.report(designator.span,
+                            "enum constant " + FormatType(resolved->enum_type) + '.' + resolved->variant_name +
+                                " expects " + std::to_string(resolved->payload_fields.size()) +
+                                " payload values but got " + std::to_string(arg_count));
+        }
+        return std::nullopt;
+    }
+
+    std::vector<std::string> field_names;
+    std::vector<ConstValue> elements;
+    field_names.reserve(arg_count);
+    elements.reserve(arg_count);
+    for (std::size_t index = 0; index < arg_count; ++index) {
+        const auto field_value = EvaluateConstExpr(*(*payload_args)[index], report_errors, active_names);
+        if (!field_value.has_value()) {
+            return std::nullopt;
+        }
+        field_names.push_back(resolved->payload_fields[index].first);
+        elements.push_back(*field_value);
+    }
+
+    return MakeEnumConstValue(resolved->enum_type,
+                              resolved->variant_name,
+                              static_cast<std::int64_t>(resolved->variant_index),
+                              std::move(field_names),
+                              std::move(elements));
+}
+
+std::optional<ConstValue> ConstExprEvaluator::EvaluateConstExpr(const Expr& expr,
+                                                                bool report_errors,
+                                                                std::unordered_set<std::string>& active_names) {
+    switch (expr.kind) {
+        case Expr::Kind::kName:
+            return EvaluateTopLevelConst(expr.text, report_errors, active_names);
+        case Expr::Kind::kQualifiedName:
+            if (const Module* imported_module = context_.find_imported_module(expr.text); imported_module != nullptr) {
+                if (const auto* global = FindGlobalSummary(*imported_module, expr.secondary_text);
+                    global != nullptr && global->is_const) {
+                    return ParseGlobalConstValue(*global, expr.secondary_text);
+                }
+            }
+            return EvaluateEnumConst(expr, nullptr, report_errors, active_names);
+        case Expr::Kind::kLiteral:
+            return ParseLiteralConstValue(expr);
+        case Expr::Kind::kUnary: {
+            if (expr.left == nullptr) {
+                return std::nullopt;
+            }
+            const auto operand = EvaluateConstExpr(*expr.left, report_errors, active_names);
+            if (!operand.has_value()) {
+                return std::nullopt;
+            }
+            return EvaluateConstUnaryOp(expr.text, *operand);
+        }
+        case Expr::Kind::kBinary:
+            return EvaluateConstBinaryExpr(expr, report_errors, active_names);
+        case Expr::Kind::kCall: {
+            if (expr.type_target == nullptr && expr.left != nullptr) {
+                if (const auto enum_const = EvaluateEnumConst(*expr.left, &expr.args, report_errors, active_names);
+                    enum_const.has_value()) {
+                    return enum_const;
+                }
+            }
+            if (expr.type_target == nullptr || expr.args.size() != 1) {
+                return std::nullopt;
+            }
+            const auto operand = EvaluateConstExpr(*expr.args.front(), report_errors, active_names);
+            if (!operand.has_value()) {
+                return std::nullopt;
+            }
+            const auto current_type_params = context_.current_type_params();
+            context_.validate_type_expr(expr.type_target.get(), current_type_params, expr.type_target->span);
+            const Type target_type = context_.semantic_type_from_ast(expr.type_target.get(), current_type_params);
+            if (expr.bare_type_target_syntax) {
+                const Type stripped_target = CanonicalizeBuiltinType(
+                    StripType(target_type, context_.module, TypeStripMode::kAliasesAndDistinct));
+                if (!mc::sema::IsIntegerType(stripped_target) || operand->kind != ConstValue::Kind::kInteger) {
+                    return std::nullopt;
+                }
+            }
+            return context_.convert_const_value(target_type, *operand);
+        }
+        case Expr::Kind::kField:
+            return EvaluateEnumConst(expr, nullptr, report_errors, active_names);
+        case Expr::Kind::kAggregateInit: {
+            Type aggregate_type = context_.resolve_aggregate_init_type(expr);
+            if (IsUnknown(aggregate_type)) {
+                return std::nullopt;
+            }
+
+            context_.apply_nested_aggregate_type_hints(const_cast<Expr&>(expr), aggregate_type);
+
+            const Type resolved_aggregate = StripType(aggregate_type, context_.module, TypeStripMode::kAliasesOnly);
+            if (resolved_aggregate.kind == Type::Kind::kArray) {
+                if (resolved_aggregate.subtypes.empty()) {
+                    return std::nullopt;
+                }
+                const auto length = mc::support::ParseArrayLength(resolved_aggregate.metadata);
+                if (!length.has_value() || *length != expr.field_inits.size()) {
+                    return std::nullopt;
+                }
+
+                ConstValue result;
+                result.kind = ConstValue::Kind::kAggregate;
+                result.elements.reserve(expr.field_inits.size());
+                for (const auto& field_init : expr.field_inits) {
+                    if (field_init.has_name || field_init.value == nullptr) {
+                        return std::nullopt;
+                    }
+                    const auto field_value = EvaluateConstExpr(*field_init.value, report_errors, active_names);
+                    if (!field_value.has_value()) {
+                        return std::nullopt;
+                    }
+                    result.elements.push_back(*field_value);
+                }
+                result.text = RenderConstValue(result);
+                return result;
+            }
+
+            const TypeDeclSummary* type_decl = context_.lookup_struct_type(resolved_aggregate);
+            const auto builtin_fields = BuiltinAggregateFields(resolved_aggregate);
+            const auto instantiated_fields =
+                type_decl != nullptr ? InstantiateTypeDeclFields(*type_decl, resolved_aggregate)
+                                     : std::vector<std::pair<std::string, Type>> {};
+            const auto& field_source = type_decl != nullptr ? instantiated_fields : builtin_fields;
+            if (type_decl == nullptr && field_source.empty()) {
+                return std::nullopt;
+            }
+
+            std::vector<std::optional<ConstValue>> ordered_values(field_source.size());
+            std::vector<std::string> ordered_names(field_source.size());
+            for (std::size_t index = 0; index < field_source.size(); ++index) {
+                ordered_names[index] = field_source[index].first;
+            }
+
+            for (std::size_t index = 0; index < expr.field_inits.size(); ++index) {
+                const auto& field_init = expr.field_inits[index];
+                if (field_init.value == nullptr) {
+                    return std::nullopt;
+                }
+                const auto field_value = EvaluateConstExpr(*field_init.value, report_errors, active_names);
+                if (!field_value.has_value()) {
+                    return std::nullopt;
+                }
+
+                std::size_t target_index = index;
+                if (field_init.has_name) {
+                    const auto found = std::find_if(field_source.begin(), field_source.end(), [&](const auto& field) {
+                        return field.first == field_init.name;
+                    });
+                    if (found == field_source.end()) {
+                        return std::nullopt;
+                    }
+                    target_index = static_cast<std::size_t>(std::distance(field_source.begin(), found));
+                } else if (target_index >= field_source.size()) {
+                    return std::nullopt;
+                }
+
+                if (target_index >= ordered_values.size() || ordered_values[target_index].has_value()) {
+                    return std::nullopt;
+                }
+                ordered_values[target_index] = *field_value;
+            }
+
+            ConstValue result;
+            result.kind = ConstValue::Kind::kAggregate;
+            result.field_names = std::move(ordered_names);
+            result.elements.reserve(ordered_values.size());
+            for (const auto& field_value : ordered_values) {
+                if (!field_value.has_value()) {
+                    return std::nullopt;
+                }
+                result.elements.push_back(*field_value);
+            }
+            result.text = RenderConstValue(result);
+            return result;
+        }
+        case Expr::Kind::kRecordUpdate: {
+            if (expr.left == nullptr) {
+                return std::nullopt;
+            }
+
+            const auto base_value = EvaluateConstExpr(*expr.left, report_errors, active_names);
+            if (!base_value.has_value() || base_value->kind != ConstValue::Kind::kAggregate || base_value->field_names.empty()) {
+                return std::nullopt;
+            }
+
+            std::vector<std::optional<ConstValue>> ordered_values(base_value->elements.size());
+            for (std::size_t index = 0; index < base_value->elements.size(); ++index) {
+                ordered_values[index] = base_value->elements[index];
+            }
+
+            std::unordered_set<std::string> updated_fields;
+            for (const auto& field_init : expr.field_inits) {
+                if (!field_init.has_name || field_init.value == nullptr) {
+                    return std::nullopt;
+                }
+                if (!updated_fields.insert(field_init.name).second) {
+                    return std::nullopt;
+                }
+
+                const auto found = std::find(base_value->field_names.begin(), base_value->field_names.end(), field_init.name);
+                if (found == base_value->field_names.end()) {
+                    return std::nullopt;
+                }
+
+                const auto field_value = EvaluateConstExpr(*field_init.value, report_errors, active_names);
+                if (!field_value.has_value()) {
+                    return std::nullopt;
+                }
+
+                const std::size_t target_index = static_cast<std::size_t>(std::distance(base_value->field_names.begin(), found));
+                ordered_values[target_index] = *field_value;
+            }
+
+            ConstValue result;
+            result.kind = ConstValue::Kind::kAggregate;
+            result.field_names = base_value->field_names;
+            result.elements.reserve(ordered_values.size());
+            for (const auto& field_value : ordered_values) {
+                if (!field_value.has_value()) {
+                    return std::nullopt;
+                }
+                result.elements.push_back(*field_value);
+            }
+            result.text = RenderConstValue(result);
+            return result;
+        }
+        case Expr::Kind::kParen:
+            return expr.left != nullptr ? EvaluateConstExpr(*expr.left, report_errors, active_names) : std::nullopt;
+        default:
+            return std::nullopt;
+    }
+}
+
+std::optional<std::size_t> ConstExprEvaluator::EvaluateArrayLength(const Expr* expr, bool report_errors) {
+    if (expr == nullptr) {
+        return std::nullopt;
+    }
+    std::unordered_set<std::string> active_names;
+    const auto value = EvaluateConstExpr(*expr, report_errors, active_names);
+    if (!value.has_value() || value->kind != ConstValue::Kind::kInteger || value->integer_value < 0) {
+        return std::nullopt;
+    }
+    return static_cast<std::size_t>(value->integer_value);
+}
 
 std::unique_ptr<ast::SourceFile> ParseFile(const std::filesystem::path& path, support::DiagnosticSink& diagnostics) {
     std::ifstream input(path, std::ios::binary);

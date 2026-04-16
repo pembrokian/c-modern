@@ -1,0 +1,291 @@
+COMPILER CRITIQUE — check.cpp
+Phase: phase207
+Reviewer: Ken Thompson / Rob Pike style pass
+Date: 2026-04-16
+
+File: compiler/sema/check.cpp
+Role: Semantic checking, const evaluation, visibility validation, function and global analysis
+
+─────────────────────────────────────────────────────────────────────────────
+1. OVERVIEW
+─────────────────────────────────────────────────────────────────────────────
+
+This file has good local structure in a few places: phase ordering is written
+down, helper names are mostly direct, and the checker still reads like one
+program instead of a maze of abstractions. The trouble is that a few key paths
+violate their own contracts. The result is not complexity for its own sake;
+it is worse than that. It is code that looks simpler than it really is because
+the invariants are not enforced where they matter.
+
+The strongest concerns are correctness and robustness, but there is also a
+real architectural issue: the file is starting to bundle too many semantic
+subsystems behind one mutable owner.
+
+─────────────────────────────────────────────────────────────────────────────
+2. FINDINGS
+─────────────────────────────────────────────────────────────────────────────
+
+1. HIGH — imported mutable globals can be treated as compile-time constants.
+
+   In EvaluateConstExpr, the qualified-name path accepts any imported global
+   and immediately calls ParseGlobalConstValue:
+
+     compiler/sema/check.cpp:806-812
+
+   That helper only checks whether a cached constant value exists for the named
+   slot. It does not check whether the imported global is actually declared as
+   const:
+
+     compiler/sema/const_eval.cpp:415-424
+
+   This matters because ValidateGlobals populates constant_values for both
+   const and var initializers:
+
+     compiler/sema/check.cpp:1516-1560
+
+   The file itself already treats is_const as a required part of the contract
+   in other const-only paths. Array-length resolution is the obvious example:
+
+     compiler/sema/check.cpp:3541-3553
+
+   Failure mode:
+   An imported `var` with a foldable initializer can be accepted in const-only
+   contexts as if it were a real compile-time constant. That is a semantic
+   contract bug, not just a missing guard.
+
+
+2. HIGH — ValidateGlobals can dereference an empty optional after its fallback
+   const-ness check.
+
+   The global-initializer path first tries to fully fold the expression:
+
+     const auto const_value = EvaluateConstExpr(...)
+
+   If that fails, it falls back to IsConstExpr and accepts the initializer if
+   it is syntactically const-looking:
+
+     compiler/sema/check.cpp:1548-1556
+
+   But the code then unconditionally stores `*const_value`:
+
+     compiler/sema/check.cpp:1558-1560
+
+   That is unsafe because IsConstExpr is weaker than EvaluateConstExpr. For
+   aggregate initializers, IsConstExpr only proves that child expressions are
+   constant-shaped:
+
+     compiler/sema/check.cpp:783-797
+
+   The real evaluator rejects malformed aggregate layouts, duplicate field
+   placement, and other structural problems later in the path:
+
+     compiler/sema/check.cpp:910-931
+
+   Failure mode:
+   A malformed aggregate initializer can pass the fallback predicate but still
+   leave const_value empty, which gives this path an empty-optional
+   dereference instead of a clean diagnostic.
+
+
+3. MEDIUM — ValidateFunctions assumes signature vectors and source vectors stay
+   perfectly aligned, but it does not defend that invariant where it indexes.
+
+   The parameter-binding loop is bounded by decl.params.size(), but indexes
+   directly into signature->param_types:
+
+     compiler/sema/check.cpp:1598-1601
+
+   A few lines later, this same file is defensive about the exact same shape
+   invariant in ValidateFunctionParamAttributes by using a dual bound:
+
+     compiler/sema/check.cpp:1613-1633
+
+   That mismatch is the problem. Either the invariant is hard enough that both
+   sites can rely on it, or it is soft enough that both sites need bounds. The
+   current version says both at once.
+
+   Failure mode:
+   Today this likely works because signatures are built from the same Decl.
+   But it is brittle. Any partial signature construction or future refactor in
+   signature building turns this into an out-of-bounds read.
+
+
+4. LOW — the phase-order comment overstates what SeedImportedSymbols actually
+   does.
+
+   The comment says SeedImportedSymbols populates both value_symbols_ and
+   type_symbols_ from imported modules so that later phases can detect
+   conflicts:
+
+     compiler/sema/check.cpp:324-337
+
+   The implementation only seeds imported type declarations:
+
+     compiler/sema/check.cpp:1019-1056
+
+   That may be stale commentary or an intentionally deferred behavior, but the
+   file does not say which. In a checker this large, wrong comments are worse
+   than missing comments because they teach the reader the wrong invariant.
+
+
+5. MEDIUM — the Checker class now owns too many different semantic jobs to be
+   the simplest architectural unit.
+
+   The single-use Checker object is not inherently bad. A bootstrap compiler
+   can absolutely get good mileage from one context object plus a linear set of
+   passes. The problem is size and mixed ownership. This class now owns:
+
+   - import-visible symbol seeding
+   - type-expression validation
+   - aggregate hint propagation
+   - constant evaluation
+   - expression type analysis
+   - statement checking
+   - visibility validation
+   - module fact recording
+
+   You can see the concentration directly in the major method anchors:
+
+     compiler/sema/check.cpp:312        Checker::Run
+     compiler/sema/check.cpp:2304       AnalyzeExpr
+     compiler/sema/check.cpp:2758       CheckStmt
+
+   This is the part of the file that does not feel Pike/Thompson-simple. Not
+   because it is object-oriented, but because one owner now carries several
+   different semantic machines with different invariants.
+
+   The better direction is not "make everything stateless". The better
+   direction is to keep one explicit context object and split the behavior into
+   a few smaller owners with honest boundaries, such as:
+
+   - top-level declaration collection and module summary building
+   - const evaluation
+   - expression and statement checking
+   - import-surface adaptation
+
+   That would preserve the file's current direct style without pretending that
+   all the shared state can be wished away.
+
+─────────────────────────────────────────────────────────────────────────────
+3. SIMPLICITY NOTES
+─────────────────────────────────────────────────────────────────────────────
+
+- The numbered phase ordering in Checker::Run() is useful and should stay.
+  It gives the file one honest spine.
+
+- The code is strongest when it uses direct helpers with narrow jobs,
+  especially around visibility checking and lookup map rebuilding.
+
+- The weak spots come from implicit contracts:
+  imported-global const rules,
+  aggregate const-eval fallback semantics,
+  vector shape invariants shared across builder and checker paths.
+
+- The const_cast-based aggregate hinting paths are a maintenance smell,
+  but they are not the strongest issue in this pass because the more urgent
+  problems are real semantic and robustness faults.
+
+─────────────────────────────────────────────────────────────────────────────
+4. ARCHITECTURE EVALUATION OF SUGGESTED IDEAS
+─────────────────────────────────────────────────────────────────────────────
+
+1. GOOD, WITH A CORRECTION — reduce the size of the mutable owner.
+
+  The outside suggestion is directionally right that the file has too much
+  ambient state. But "replace Checker with independent stateless functions"
+  goes too far for this code. Expression analysis, statement checking, scope
+  handling, module fact recording, and const caching are mutually recursive
+  and naturally share context.
+
+  The right critique is smaller: keep an explicit context, but split the
+  semantic subsystems so one class is not the owner of everything.
+
+
+2. MOSTLY NOT GOOD — replace major AST switches with dispatch tables.
+
+  In this file, the large switches over Expr::Kind and Stmt::Kind are
+  readable, local, and compiler-checked for exhaustiveness. Replacing them
+  with handler tables in bootstrap C++ would hide control flow, spread logic
+  across declarations and registries, and make debugging worse.
+
+  A narrow table-driven treatment for small operator families could be fine.
+  A wholesale dispatch-table rewrite would not be a simplicity win here.
+
+
+3. PARTLY GOOD — make error flow more explicit at the leaves, not everywhere.
+
+  The public API already passes an explicit DiagnosticSink into checking:
+
+    compiler/sema/check.cpp:3179-3320
+
+  So the file is not using hidden global error state. The real issue is that
+  once inside Checker, diagnostics become ambient again through the member
+  sink. There is room to make leaf helpers clearer by returning small result
+  objects or threading the sink explicitly in a few hot spots.
+
+  But a full Go-style "every helper returns err" rewrite would be noisy in a
+  compiler that intentionally accumulates multiple diagnostics per pass.
+
+
+4. PARTLY GOOD, BUT NOT A PHASE207 FINDING — move filesystem import plumbing
+  farther out of sema over time.
+
+  This is a reasonable long-term architectural direction, but it is not an
+  honest immediate critique unless it is stated with the repo boundary in
+  view. The file already has an injected-import path for project mode and a
+  fallback direct-source path only when imports were not pre-resolved:
+
+    compiler/sema/check.cpp:3179-3290
+
+  The repository guidance also says bootstrap import handling currently lives
+  in sema on purpose. So the good finding is narrower: the fallback filesystem
+  path still clutters the file, but it is already isolated at the top-level
+  orchestration layer rather than smeared through expression checking.
+
+
+5. NOT A GOOD FINDING — replace std::string and streams with arenas or fixed
+  buffers.
+
+  There is no evidence in this review that string construction is a dominant
+  problem in this file. The architectural pressure here comes from semantic
+  ownership and invariants, not from JoinPaths or stream formatting. Pushing a
+  buffer-or-arena critique here would be cargo-cult performance talk.
+
+─────────────────────────────────────────────────────────────────────────────
+5. RECOMMENDED FOLLOW-UP
+─────────────────────────────────────────────────────────────────────────────
+
+1. Make imported qualified-name const evaluation require `global.is_const`
+   before accepting ParseGlobalConstValue.
+
+2. In ValidateGlobals, never dereference const_value after the fallback
+   IsConstExpr path unless a real folded value exists. If the checker wants to
+   accept structurally constant-but-unrendered forms, it needs a separate
+   representation or a separate branch.
+
+3. Harden vector-shape assumptions at indexing sites, even if the builder is
+   currently trusted. The file already shows this style in one nearby path;
+   use it consistently.
+
+4. Split the Checker ownership surface before adding more behavior. Keep one
+  explicit context if needed, but move const evaluation and top-level summary
+  construction out of the same behavioral owner as full expression and
+  statement checking.
+
+5. Fix or delete stale phase-order commentary so the reader can trust the
+   file's stated invariants.
+
+─────────────────────────────────────────────────────────────────────────────
+6. BOTTOM LINE
+─────────────────────────────────────────────────────────────────────────────
+
+This is still a workable bootstrap checker. It is not overengineered. The main
+problems are:
+
+- some important semantic rules are enforced only by habit and file ordering
+  rather than by the code sitting at the boundary
+- one class is now carrying more semantic ownership than is healthy
+
+That is the part that fails the Thompson/Pike simplicity test. The answer is
+not cleverer abstraction. It is fewer mixed responsibilities and firmer local
+contracts.

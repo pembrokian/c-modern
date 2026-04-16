@@ -230,6 +230,81 @@ void TestFloatToIntConstConversionHonorsInt64Bounds() {
     }
 }
 
+void TestImportedMutableGlobalDoesNotFoldAsConst() {
+    mc::support::DiagnosticSink diagnostics;
+    const auto parsed = ParseText(
+        "import dep\n"
+        "\n"
+        "const COPY: i32 = dep.RUNTIME\n"
+        "\n"
+        "func main() i32 {\n"
+        "    return 0\n"
+        "}\n",
+        "<imported-mutable-global>",
+        diagnostics);
+    if (!parsed.ok) {
+        mc::test_support::Fail("imported mutable global fixture should parse successfully:\n" + diagnostics.Render());
+    }
+
+    mc::sema::Module imported_dep;
+    mc::sema::ConstValue runtime_value;
+    runtime_value.kind = mc::sema::ConstValue::Kind::kInteger;
+    runtime_value.integer_value = 7;
+    imported_dep.globals.push_back({
+        .is_const = false,
+        .names = {"RUNTIME"},
+        .type = mc::sema::NamedType("i32"),
+        .constant_values = {runtime_value},
+    });
+
+    std::unordered_map<std::string, mc::sema::Module> imported_modules;
+    imported_modules.emplace("dep", std::move(imported_dep));
+
+    mc::sema::CheckOptions options;
+    options.imported_modules = &imported_modules;
+    const auto checked = mc::sema::CheckProgram(*parsed.source_file, "<imported-mutable-global>", options, diagnostics);
+    if (checked.ok) {
+        mc::test_support::Fail("imported mutable globals should not be accepted as compile-time constants");
+    }
+    if (diagnostics.Render().find("top-level const initializer must be a compile-time constant") == std::string::npos) {
+        mc::test_support::Fail("imported mutable globals should be rejected by const evaluation");
+    }
+
+    const auto* copy = mc::sema::FindGlobalSummary(*checked.module, "COPY");
+    if (copy == nullptr || copy->constant_values.empty() || copy->constant_values.front().has_value()) {
+        mc::test_support::Fail("rejected imported mutable globals should not materialize a constant value");
+    }
+}
+
+void TestMalformedAggregateGlobalDoesNotStoreEmptyConstValue() {
+    mc::support::DiagnosticSink diagnostics;
+    const auto checked = CheckText(
+        "struct Pair {\n"
+        "    left: i32\n"
+        "    right: i32\n"
+        "}\n"
+        "\n"
+        "const BAD: Pair = { left: 1, left: 2 }\n"
+        "\n"
+        "func main() i32 {\n"
+        "    return 0\n"
+        "}\n",
+        "<malformed-aggregate-global>",
+        diagnostics);
+
+    if (checked.ok) {
+        mc::test_support::Fail("malformed aggregate globals should fail semantic checking");
+    }
+    if (diagnostics.Render().find("top-level const initializer must be a compile-time constant") == std::string::npos) {
+        mc::test_support::Fail("malformed aggregate globals should report a constant-evaluation failure instead of dereferencing an empty optional");
+    }
+
+    const auto* bad = mc::sema::FindGlobalSummary(*checked.module, "BAD");
+    if (bad == nullptr || bad->constant_values.empty() || bad->constant_values.front().has_value()) {
+        mc::test_support::Fail("malformed aggregate globals should not record a constant value");
+    }
+}
+
 }  // namespace
 
 int main(int argc, char** argv) {
@@ -269,6 +344,8 @@ int main(int argc, char** argv) {
     TestImportedModuleSurfaceQualifiesNamedTypes();
     TestDuplicateBindingOrAssignDoesNotRecordInvalidFact();
     TestFloatToIntConstConversionHonorsInt64Bounds();
+    TestImportedMutableGlobalDoesNotFoldAsConst();
+    TestMalformedAggregateGlobalDoesNotStoreEmptyConstValue();
 
     return 0;
 }
