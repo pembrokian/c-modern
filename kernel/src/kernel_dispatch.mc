@@ -73,19 +73,34 @@ func kernel_dispatch_shell_control(state: *boot.KernelBootState, msg: service_ef
     if msg.payload[3] != serial_protocol.CMD_BANG {
         return shell_service.invalid_effect(shell_service.SHELL_INVALID_SHAPE)
     }
-    endpoint: u32 = shell_service.lifecycle_target_endpoint(msg.payload[2])
-    if endpoint == 0 {
-        return shell_service.invalid_effect(shell_service.SHELL_INVALID_COMMAND)
-    }
     if msg.payload[1] == serial_protocol.CMD_I {
-        mark: service_identity.ServiceMark = boot.bootmark_for_endpoint(*state, endpoint)
+        if msg.payload[2] == serial_protocol.TARGET_WORKSET {
+            return shell_service.lifecycle_identity_effect(syscall.SyscallStatus.Ok, boot.boot_workset_generation_payload(*state))
+        }
+        identity_endpoint: u32 = shell_service.lifecycle_target_endpoint(msg.payload[2])
+        if identity_endpoint == 0 {
+            return shell_service.invalid_effect(shell_service.SHELL_INVALID_COMMAND)
+        }
+        mark: service_identity.ServiceMark = boot.bootmark_for_endpoint(*state, identity_endpoint)
         return shell_service.lifecycle_identity_effect(syscall.SyscallStatus.Ok, service_identity.mark_generation_payload(mark))
     }
-    if !service_topology.service_can_restart(endpoint) {
-        return shell_service.lifecycle_effect(syscall.SyscallStatus.InvalidArgument, msg.payload[2], endpoint)
+    if msg.payload[2] == serial_protocol.TARGET_AUDIT {
+        *state = init.restart_retained_audit_lane(*state)
+        return shell_service.lifecycle_effect(syscall.SyscallStatus.Ok, msg.payload[2], serial_protocol.LIFECYCLE_RELOAD)
     }
-    *state = init.restart(*state, endpoint)
-    return shell_service.lifecycle_effect(syscall.SyscallStatus.Ok, msg.payload[2], endpoint)
+    if msg.payload[2] == serial_protocol.TARGET_WORKSET {
+        *state = init.restart_retained_workset(*state)
+        return shell_service.lifecycle_effect(syscall.SyscallStatus.Ok, msg.payload[2], serial_protocol.LIFECYCLE_RELOAD)
+    }
+    restart_endpoint: u32 = shell_service.lifecycle_target_endpoint(msg.payload[2])
+    if restart_endpoint == 0 {
+        return shell_service.invalid_effect(shell_service.SHELL_INVALID_COMMAND)
+    }
+    if !service_topology.service_can_restart(restart_endpoint) {
+        return shell_service.lifecycle_effect(syscall.SyscallStatus.InvalidArgument, msg.payload[2], shell_service.lifecycle_mode(restart_endpoint))
+    }
+    *state = init.restart(*state, restart_endpoint)
+    return shell_service.lifecycle_effect(syscall.SyscallStatus.Ok, msg.payload[2], shell_service.lifecycle_mode(restart_endpoint))
 }
 
 func kernel_dispatch_leaf(state: *boot.KernelBootState, msg: service_effect.Message) service_effect.Effect {

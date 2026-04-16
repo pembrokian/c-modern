@@ -60,3 +60,27 @@ func expect_identity(effect: service_effect.Effect, status: syscall.SyscallStatu
     }
     return true
 }
+
+func expect_generation_payload(effect: service_effect.Effect, status: syscall.SyscallStatus, generation: u32) bool {
+    if service_effect.effect_reply_status(effect) != status {
+        return false
+    }
+    if service_effect.effect_reply_payload_len(effect) != 4 {
+        return false
+    }
+    payload: [4]u8 = service_effect.effect_reply_payload(effect)
+    expected: [4]u8 = service_identity.generation_payload(generation)
+    if payload[0] != expected[0] {
+        return false
+    }
+    if payload[1] != expected[1] {
+        return false
+    }
+    if payload[2] != expected[2] {
+        return false
+    }
+    if payload[3] != expected[3] {
+        return false
+    }
+    return true
+}

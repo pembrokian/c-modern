@@ -50,6 +50,14 @@ func boot_queue_mark(s: KernelBootState) service_identity.ServiceMark {
     return service_identity.service_mark(service_topology.QUEUE_ENDPOINT_ID, s.queue.state.pid, s.queue.generation)
 }
 
+func boot_workset_generation(s: KernelBootState) u32 {
+    return s.workset_generation
+}
+
+func boot_workset_generation_payload(s: KernelBootState) [4]u8 {
+    return service_identity.generation_payload(s.workset_generation)
+}
+
 func boot_echo_mark(s: KernelBootState) service_identity.ServiceMark {
     return service_identity.service_mark(service_topology.ECHO_ENDPOINT_ID, s.echo.state.pid, s.echo.generation)
 }

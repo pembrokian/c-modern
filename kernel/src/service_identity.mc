@@ -65,13 +65,17 @@ func mark_generation(mark: ServiceMark) u32 {
     return mark.generation
 }
 
-func mark_generation_payload(mark: ServiceMark) [4]u8 {
+func generation_payload(generation: u32) [4]u8 {
     payload: [4]u8
-    payload[0] = u8(mark.generation >> 24)
-    payload[1] = u8(mark.generation >> 16)
-    payload[2] = u8(mark.generation >> 8)
-    payload[3] = u8(mark.generation)
+    payload[0] = u8(generation >> 24)
+    payload[1] = u8(generation >> 16)
+    payload[2] = u8(generation >> 8)
+    payload[3] = u8(generation)
     return payload
+}
+
+func mark_generation_payload(mark: ServiceMark) [4]u8 {
+    return generation_payload(mark.generation)
 }
 
 func refs_equal(a: ServiceRef, b: ServiceRef) bool {

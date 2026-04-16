@@ -68,10 +68,10 @@ func lifecycle_mode(endpoint: u32) u8 {
     return serial_protocol.LIFECYCLE_NONE
 }
 
-func lifecycle_effect(status: syscall.SyscallStatus, target: u8, endpoint: u32) service_effect.Effect {
+func lifecycle_effect(status: syscall.SyscallStatus, target: u8, mode: u8) service_effect.Effect {
     payload: [4]u8 = primitives.zero_payload()
     payload[0] = target
-    payload[1] = lifecycle_mode(endpoint)
+    payload[1] = mode
     return service_effect.effect_reply(status, 2, payload)
 }
 
@@ -146,17 +146,33 @@ func handle(s: ShellServiceState, m: service_effect.Message) service_effect.Effe
         if m.payload[3] != serial_protocol.CMD_BANG {
             return invalid_effect(SHELL_INVALID_SHAPE)
         }
-        endpoint: u32 = lifecycle_target_endpoint(m.payload[2])
-        if endpoint == 0 {
-            return invalid_effect(SHELL_INVALID_COMMAND)
-        }
         if m.payload[1] == serial_protocol.CMD_Q {
-            return lifecycle_effect(syscall.SyscallStatus.Ok, m.payload[2], endpoint)
+            if m.payload[2] == serial_protocol.TARGET_WORKSET || m.payload[2] == serial_protocol.TARGET_AUDIT {
+                return lifecycle_effect(syscall.SyscallStatus.Ok, m.payload[2], serial_protocol.LIFECYCLE_RELOAD)
+            }
+            query_endpoint: u32 = lifecycle_target_endpoint(m.payload[2])
+            if query_endpoint == 0 {
+                return invalid_effect(SHELL_INVALID_COMMAND)
+            }
+            return lifecycle_effect(syscall.SyscallStatus.Ok, m.payload[2], lifecycle_mode(query_endpoint))
         }
         if m.payload[1] == serial_protocol.CMD_I {
+            if m.payload[2] != serial_protocol.TARGET_WORKSET {
+                identity_endpoint: u32 = lifecycle_target_endpoint(m.payload[2])
+                if identity_endpoint == 0 {
+                    return invalid_effect(SHELL_INVALID_COMMAND)
+                }
+            }
             return lifecycle_identity_request(s, m)
         }
         if m.payload[1] == serial_protocol.CMD_R {
+            if m.payload[2] == serial_protocol.TARGET_WORKSET || m.payload[2] == serial_protocol.TARGET_AUDIT {
+                return lifecycle_restart_request(s, m)
+            }
+            restart_endpoint: u32 = lifecycle_target_endpoint(m.payload[2])
+            if restart_endpoint == 0 {
+                return invalid_effect(SHELL_INVALID_COMMAND)
+            }
             return lifecycle_restart_request(s, m)
         }
         return invalid_effect(SHELL_INVALID_COMMAND)

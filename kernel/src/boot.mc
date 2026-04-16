@@ -29,6 +29,7 @@ struct KernelBootState {
     log: ServiceCell<log_service.LogServiceState>
     kv: ServiceCell<kv_service.KvServiceState>
     queue: ServiceCell<queue_service.QueueServiceState>
+    workset_generation: u32
     echo: ServiceCell<echo_service.EchoServiceState>
     transfer: ServiceCell<transfer_service.TransferServiceState>
     ticket: ServiceCell<ticket_service.TicketServiceState>
@@ -53,7 +54,7 @@ func kernel_init() KernelBootState {
     transfer_cell: ServiceCell<transfer_service.TransferServiceState> = ServiceCell<transfer_service.TransferServiceState>{ state: transfer_service.transfer_init(transfer_slot.pid, 1), generation: 1 }
     ticket_cell: ServiceCell<ticket_service.TicketServiceState> = ServiceCell<ticket_service.TicketServiceState>{ state: ticket_service.ticket_init(ticket_slot.pid, 1, 1), generation: 1 }
 
-    return KernelBootState{ path_state: path_state, log: log_cell, kv: kv_cell, queue: queue_cell, echo: echo_cell, transfer: transfer_cell, ticket: ticket_cell, grants: transfer_grant.grant_init() }
+    return KernelBootState{ path_state: path_state, log: log_cell, kv: kv_cell, queue: queue_cell, workset_generation: 1, echo: echo_cell, transfer: transfer_cell, ticket: ticket_cell, grants: transfer_grant.grant_init() }
 }
 
 func debug_boot_routed(effect: service_effect.Effect) u32 {

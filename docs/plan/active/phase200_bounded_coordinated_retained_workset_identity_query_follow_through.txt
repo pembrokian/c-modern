@@ -1,0 +1,55 @@
+Phase 200 -- Bounded Coordinated Retained Workset Identity Query Follow-Through
+===============================================================================
+
+Status
+------
+COMPLETED
+
+Purpose
+-------
+Spend the bounded coordinated retained restart from Phase 197 on one compact
+caller-visible identity query so clients can observe the coordinated workset
+instance directly without widening into bundle frameworks, richer discovery,
+or a persistence subsystem.
+
+This phase should add one bounded identity query over the existing shell
+control path.
+The query should expose the current coordinated retained workset generation
+for the `kv_service` plus `queue_service` pair while preserving the existing
+Phase 197 rule: the workset itself is explicit and init-owned rather than a
+generic snapshot bundle.
+
+Implementation result
+---------------------
+- `kernel/src/boot.mc` now carries one explicit `workset_generation` counter.
+- `kernel/src/init.mc` bumps that counter only when
+  `restart_retained_workset(...)` performs the coordinated `kv_service` plus
+  `queue_service` reload.
+- `kernel/src/service_identity.mc` now exposes one generic
+  `generation_payload(...)` helper so both service-local and coordinated
+  identity queries share the same compact byte encoding.
+- `kernel/src/kernel_dispatch.mc` now answers `XIW!` with the current
+  coordinated workset generation payload.
+- `kernel/src/scenario_workset_identity.mc` proves that `XIW!` changes after
+  `XRW!` but remains stable across an individual `XRK!` restart.
+- `tests/system/kernel_reset_lane_phase200_workset_identity/` adds the
+  focused reset-lane fixture for the bounded coordinated identity contract.
+- No compiler, sema, MIR, backend, ABI, target, runtime, or `hal` expansion
+  was admitted in this phase.
+
+Chosen slice for this phase
+---------------------------
+1. one shell-visible coordinated identity query, `XIW!`
+2. one boot-owned workset generation counter
+3. one proof that `XRW!` advances workset identity
+4. one proof that individual retained-owner restarts do not advance workset
+   identity
+5. no richer bundle registry or synthetic discovery surface
+
+What this phase should prove
+----------------------------
+- that the Phase 197 coordinated retained workset can remain explicit while
+  still having one caller-visible identity marker
+- that coordinated retained identity is distinct from per-service identity
+- that the shell lifecycle and identity control family can grow one more
+  bounded follow-through without becoming a framework

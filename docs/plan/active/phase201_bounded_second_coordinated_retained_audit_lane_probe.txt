@@ -1,0 +1,71 @@
+Phase 201 -- Bounded Second Coordinated Retained Audit Lane Probe
+=================================================================
+
+Status
+------
+COMPLETED
+
+Purpose
+-------
+Push the retained-state model one step past Phase 197 and Phase 200 by adding
+one second explicit coordinated retained restart target over an already-real
+cross-owner relationship: key-value writes and their retained audit evidence
+in `log_service`.
+
+This phase should not add a bundle registry, dynamic dependency policy,
+persistence subsystem, or framework-owned retained graph.
+It should answer one narrower question: can the current explicit init-owned
+restart model still stay honest when a second caller-visible retained bundle
+exists, or has the repository finally reached the point where flat explicit
+coordination is no longer the truthful boundary?
+
+Repository status note
+----------------------
+- The repository already had explicit retained reload for `log_service`,
+  `kv_service`, and `queue_service`.
+- Phase 197 had already admitted one explicit coordinated retained target,
+  `XRW!`, for the `kv_service` plus `queue_service` workset.
+- Phase 200 had already admitted one caller-visible identity query for that
+  coordinated workset through `XIW!`.
+- The kernel already contained a real cross-owner audit relationship:
+  `kernel_dispatch_kv(...)` appends one advisory log marker on key-value
+  writes when the retained log still has capacity.
+
+Implemented outcome
+-------------------
+- `kernel/src/serial_protocol.mc` now admits one additional lifecycle target,
+  `TARGET_AUDIT` (`A`).
+- `kernel/src/shell_service.mc` now classifies `XQA!` and `XRA!` as one
+  explicit reload-style coordinated retained contract on the existing shell
+  lifecycle family.
+- `kernel/src/init.mc` now owns `restart_retained_audit_lane(...)`, which
+  snapshots `kv_service` and `log_service` and reloads both explicitly with
+  no registry, framework, or dynamic dependency graph.
+- `kernel/src/kernel_dispatch.mc` now enacts `XRA!` by calling the explicit
+  init-owned coordinated restart helper.
+- `kernel/src/scenario_audit_coordination.mc` proves the bounded contract on a
+  fresh boot state so the repo project keeps deterministic coverage without
+  depending on prior shared scenario history.
+- `tests/system/kernel_reset_lane_phase201_retained_audit_coordination/` adds
+  the focused reset-lane fixture that proves retained key-value truth and the
+  retained audit log bytes both survive the coordinated restart.
+- No compiler, sema, MIR, backend, ABI, target, runtime, or `hal` expansion
+  was admitted in this phase.
+
+Chosen slice for this phase
+---------------------------
+1. one second explicit coordinated retained target, `A`
+2. one init-owned restart helper for the `kv_service` plus `log_service` pair
+3. one shell-visible query and restart contract, `XQA!` and `XRA!`
+4. one fresh-state live probe plus one focused reset-lane fixture
+5. no bundle registry, no synthetic discovery, and no generic retained
+   coordination framework
+
+What this phase should prove
+----------------------------
+- that the explicit retained-state model can survive a second bounded
+  coordinated bundle without immediately becoming framework-shaped
+- that the existing kv-write audit evidence is a real enough cross-owner
+  relationship to justify one additive lifecycle target
+- that `init.mc` can remain the honest owner of coordinated retained restart
+  even after the repository admits more than one coordinated retained pair

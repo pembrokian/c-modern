@@ -41,9 +41,11 @@ const CMD_BANG: u8 = 33  // '!' — end-of-argument sentinel
 
 const TARGET_SERIAL: u8 = 83    // 'S'
 const TARGET_SHELL: u8 = 72     // 'H'
+const TARGET_AUDIT: u8 = 65     // 'A'
 const TARGET_LOG: u8 = 76       // 'L'
 const TARGET_KV: u8 = 75        // 'K'
 const TARGET_QUEUE: u8 = 81     // 'Q'
+const TARGET_WORKSET: u8 = 87   // 'W'
 const TARGET_ECHO: u8 = 69      // 'E'
 const TARGET_TRANSFER: u8 = 80  // 'P'
 const TARGET_TICKET: u8 = 84    // 'T'

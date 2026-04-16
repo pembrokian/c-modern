@@ -65,6 +65,27 @@ func restart_queue(state: boot.KernelBootState) boot.KernelBootState {
     return boot.bootrestart_queue(state, queue_service.queue_reload(queue_slot.pid, 1, snap))
 }
 
+func restart_retained_workset(state: boot.KernelBootState) boot.KernelBootState {
+    kv_slot: service_topology.ServiceSlot = service_topology.KV_SLOT
+    queue_slot: service_topology.ServiceSlot = service_topology.QUEUE_SLOT
+    kv_snap: kv_service.KvSnapshot = kv_service.kv_snapshot(state.kv.state)
+    queue_snap: queue_service.QueueSnapshot = queue_service.queue_snapshot(state.queue.state)
+
+    next: boot.KernelBootState = boot.bootrestart_kv(state, kv_service.kv_reload(kv_slot.pid, 1, kv_snap))
+    next = boot.bootrestart_queue(next, queue_service.queue_reload(queue_slot.pid, 1, queue_snap))
+    return boot.bootrestart_workset_generation(next)
+}
+
+func restart_retained_audit_lane(state: boot.KernelBootState) boot.KernelBootState {
+    kv_slot: service_topology.ServiceSlot = service_topology.KV_SLOT
+    log_slot: service_topology.ServiceSlot = service_topology.LOG_SLOT
+    kv_snap: kv_service.KvSnapshot = kv_service.kv_snapshot(state.kv.state)
+    log_snap: log_service.LogSnapshot = log_service.log_snapshot(state.log.state)
+
+    next: boot.KernelBootState = boot.bootrestart_kv(state, kv_service.kv_reload(kv_slot.pid, 1, kv_snap))
+    return boot.bootrestart_log(next, log_service.log_reload(log_slot.pid, 1, log_snap))
+}
+
 func restart_echo(state: boot.KernelBootState) boot.KernelBootState {
     echo_slot: service_topology.ServiceSlot = service_topology.ECHO_SLOT
     return boot.bootrestart_echo(state, echo_service.echo_init(echo_slot.pid, 1))

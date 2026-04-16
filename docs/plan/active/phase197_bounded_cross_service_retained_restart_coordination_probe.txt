@@ -3,7 +3,7 @@ Phase 197 -- Bounded Cross-Service Retained Restart Coordination Probe
 
 Status
 ------
-PLANNED
+COMPLETED
 
 Purpose
 -------
@@ -37,11 +37,28 @@ Repository status note
   `log_service`, `kv_service`, and `queue_service`.
 - Each retained owner currently snapshots and reloads its own state in
   isolation through an init-owned explicit restart path.
-- The current system has no generic snapshot bundle, no cross-service
-  persistence coordinator, and no durability claim.
+- The current system still has no generic snapshot bundle, no persistence
+  coordinator, and no durability claim.
 - Restart-visible identity is already explicit through stable routing plus
   generation change, but retained-state continuity is still proved only
   owner-by-owner.
+
+Implemented outcome
+-------------------
+- The kernel now admits one bounded coordinated retained-reload target on the
+  existing shell lifecycle path: `XRW!` restarts the retained workset made of
+  `kv_service` and `queue_service`, and `XQW!` reports that target as a reload
+  contract.
+- `kernel/src/init.mc` remains the owner of restart enactment.  The new
+  `restart_retained_workset(...)` helper snapshots `kv_service` and
+  `queue_service` first, then reloads both owners explicitly without adding a
+  registry, bundle format, or framework.
+- The caller-visible contract is one bounded work queue interpretation:
+  queue bytes remain meaningful after coordinated restart because the retained
+  key-value owner that gives those bytes meaning is reloaded in the same step.
+- The repository-owned kernel scenario and reset-lane fixture now prove the
+  same queued keys still resolve through retained kv values before and after
+  the coordinated restart.
 
 Problem being solved
 --------------------

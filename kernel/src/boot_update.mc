@@ -24,6 +24,10 @@ func bootwith_queue(s: KernelBootState, queue: queue_service.QueueServiceState) 
     return s with { queue: { state: queue, generation: s.queue.generation } }
 }
 
+func bootwith_workset_generation(s: KernelBootState, generation: u32) KernelBootState {
+    return s with { workset_generation: generation }
+}
+
 func bootwith_echo(s: KernelBootState, echo: echo_service.EchoServiceState) KernelBootState {
     return s with { echo: { state: echo, generation: s.echo.generation } }
 }
@@ -50,6 +54,10 @@ func bootrestart_kv(s: KernelBootState, kv: kv_service.KvServiceState) KernelBoo
 
 func bootrestart_queue(s: KernelBootState, queue: queue_service.QueueServiceState) KernelBootState {
     return s with { queue: { state: queue, generation: s.queue.generation + 1 } }
+}
+
+func bootrestart_workset_generation(s: KernelBootState) KernelBootState {
+    return s with { workset_generation: s.workset_generation + 1 }
 }
 
 func bootrestart_echo(s: KernelBootState, echo: echo_service.EchoServiceState) KernelBootState {

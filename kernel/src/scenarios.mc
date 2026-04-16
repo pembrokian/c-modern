@@ -1,10 +1,13 @@
 // Scenario orchestration entry point.
 
 import boot
+import scenario_audit_coordination
+import scenario_coordination
 import scenario_lifecycle
 import scenario_queue
 import scenario_restart
 import scenario_steps
+import scenario_workset_identity
 
 func run(state: *boot.KernelBootState) i32 {
     result: i32 = scenario_steps.run_main(state)
@@ -19,5 +22,18 @@ func run(state: *boot.KernelBootState) i32 {
     if result != 0 {
         return result
     }
-    return scenario_queue.run_queue_observability_probe(state)
+    result = scenario_queue.run_queue_observability_probe(state)
+    if result != 0 {
+        return result
+    }
+    audit_state: boot.KernelBootState = boot.kernel_init()
+    result = scenario_audit_coordination.run_retained_audit_coordination_probe(&audit_state)
+    if result != 0 {
+        return result
+    }
+    result = scenario_coordination.run_retained_coordination_probe(state)
+    if result != 0 {
+        return result
+    }
+    return scenario_workset_identity.run_workset_identity_probe(state)
 }
