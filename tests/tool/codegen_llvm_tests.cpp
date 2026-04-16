@@ -306,6 +306,133 @@ void TestBuildObjectFileRejectsUnsupportedExecutableInstructionBeforeIrEmission(
            "unsupported executable MIR should not write an LLVM IR artifact");
 }
 
+void TestBuildObjectFileRejectsReturnWithoutDeclaredValue() {
+    auto module = MakeMinimalSupportedModule();
+    module.functions[0].blocks[0].terminator.values.clear();
+
+    const std::filesystem::path artifact_dir =
+        std::filesystem::temp_directory_path() / "mc_codegen_llvm_return_signature_mismatch";
+    std::error_code remove_error;
+    std::filesystem::remove_all(artifact_dir, remove_error);
+
+    mc::support::DiagnosticSink diagnostics;
+    const auto object_result = mc::codegen_llvm::BuildObjectFile(
+        module,
+        "tests/cases/hello.mc",
+        {
+            .target = mc::codegen_llvm::BootstrapTargetConfig(),
+            .artifacts = {
+                .llvm_ir_path = artifact_dir / "return_signature_mismatch.ll",
+                .object_path = artifact_dir / "return_signature_mismatch.o",
+            },
+        },
+        diagnostics);
+
+    Expect(!object_result.ok, "non-void return terminators without values should fail executable emission");
+    Expect(diagnostics.HasErrors(), "non-void return terminators without values should emit backend diagnostics");
+    Expect(diagnostics.Render().find("return value count does not match function signature") != std::string::npos,
+           "non-void return terminators without values should fail before emitting ret void");
+    Expect(!std::filesystem::exists(artifact_dir / "return_signature_mismatch.ll"),
+           "return signature mismatches should not write an LLVM IR artifact");
+}
+
+void TestBuildObjectFileRejectsMalformedIndirectCallSignatureMetadata() {
+    mc::mir::Instruction callee_value {
+        .kind = mc::mir::Instruction::Kind::kConst,
+        .result = "%fn",
+        .type = mc::sema::Type {
+            .kind = mc::sema::Type::Kind::kProcedure,
+            .name = "proc(i32) -> i32",
+            .metadata = "2",
+            .subtypes = {mc::sema::NamedType("i32")},
+        },
+        .op = "0",
+    };
+
+    mc::mir::Instruction arg {
+        .kind = mc::mir::Instruction::Kind::kConst,
+        .result = "%arg0",
+        .type = mc::sema::NamedType("i32"),
+        .op = "1",
+    };
+
+    mc::mir::Instruction call {
+        .kind = mc::mir::Instruction::Kind::kCall,
+        .result = "%v1",
+        .type = mc::sema::NamedType("i32"),
+        .operands = {"%fn", "%arg0"},
+    };
+
+    mc::mir::BasicBlock entry {
+        .label = "entry0",
+        .instructions = {callee_value, arg, call},
+        .terminator = {
+            .kind = mc::mir::Terminator::Kind::kReturn,
+            .values = {"%v1"},
+        },
+    };
+
+    mc::mir::Function main_function {
+        .name = "main",
+        .return_types = {mc::sema::NamedType("i32")},
+        .blocks = {entry},
+    };
+
+    const std::filesystem::path artifact_dir =
+        std::filesystem::temp_directory_path() / "mc_codegen_llvm_malformed_indirect_call_signature";
+    std::error_code remove_error;
+    std::filesystem::remove_all(artifact_dir, remove_error);
+
+    mc::support::DiagnosticSink diagnostics;
+    const auto object_result = mc::codegen_llvm::BuildObjectFile(
+        mc::mir::Module {.functions = {main_function}},
+        "tests/cases/hello.mc",
+        {
+            .target = mc::codegen_llvm::BootstrapTargetConfig(),
+            .artifacts = {
+                .llvm_ir_path = artifact_dir / "malformed_indirect_call_signature.ll",
+                .object_path = artifact_dir / "malformed_indirect_call_signature.o",
+            },
+        },
+        diagnostics);
+
+    Expect(!object_result.ok, "malformed indirect call signature metadata should fail executable emission");
+    Expect(diagnostics.HasErrors(), "malformed indirect call signature metadata should emit backend diagnostics");
+    Expect(diagnostics.Render().find("malformed procedure signature metadata") != std::string::npos,
+           "indirect call lowering should reject malformed procedure metadata before indexing subtypes");
+    Expect(!std::filesystem::exists(artifact_dir / "malformed_indirect_call_signature.ll"),
+           "malformed indirect call signature metadata should not write an LLVM IR artifact");
+}
+
+void TestBuildObjectFileEscapesSourceFilenameInModuleHeader() {
+    const std::filesystem::path artifact_dir =
+        std::filesystem::temp_directory_path() / "mc_codegen_llvm_source_filename_escape";
+    std::error_code remove_error;
+    std::filesystem::remove_all(artifact_dir, remove_error);
+
+    mc::support::DiagnosticSink diagnostics;
+    const auto object_result = mc::codegen_llvm::BuildObjectFile(
+        MakeMinimalSupportedModule(),
+        std::filesystem::path("tests/cases/quote\"slash\\name.mc"),
+        {
+            .target = mc::codegen_llvm::BootstrapTargetConfig(),
+            .artifacts = {
+                .llvm_ir_path = artifact_dir / "escaped_source_filename.ll",
+                .object_path = artifact_dir / "escaped_source_filename.o",
+            },
+        },
+        diagnostics);
+
+    Expect(object_result.ok, "quoted source filenames should still emit LLVM IR successfully");
+    Expect(!diagnostics.HasErrors(), "quoted source filenames should not emit backend diagnostics");
+
+    std::ifstream ir_stream(artifact_dir / "escaped_source_filename.ll");
+    Expect(ir_stream.good(), "quoted source filenames should write LLVM IR output");
+    const std::string ir((std::istreambuf_iterator<char>(ir_stream)), std::istreambuf_iterator<char>());
+    Expect(ir.find("source_filename = \"quote\\22slash\\5Cname.mc\"") != std::string::npos,
+           "module header should escape quotes and backslashes in source_filename");
+}
+
     void TestBuildObjectFileFreestandingOmitsHostedRuntimePrologue() {
         auto target = mc::codegen_llvm::BootstrapTargetConfig();
         target.hosted = false;
@@ -1126,6 +1253,9 @@ int main() {
     TestLowerModuleAcceptsFreestandingBootstrapTarget();
     TestLowerModuleRejectsUnsupportedInstruction();
     TestBuildObjectFileRejectsUnsupportedExecutableInstructionBeforeIrEmission();
+    TestBuildObjectFileRejectsReturnWithoutDeclaredValue();
+    TestBuildObjectFileRejectsMalformedIndirectCallSignatureMetadata();
+    TestBuildObjectFileEscapesSourceFilenameInModuleHeader();
     TestBuildObjectFileFreestandingOmitsHostedRuntimePrologue();
     TestBuildObjectFileLowersPanicTerminator();
     TestLowerModuleLowersCheckedIntegerSemantics();

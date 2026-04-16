@@ -48,6 +48,8 @@ constexpr std::string_view kInspectSurface = "backend_ir_text";
 bool AtomicOrderAllowedForInstruction(mir::Instruction::Kind kind,
                                       std::string_view order_name);
 
+std::optional<std::string_view> UnsupportedExecutableInstructionName(mir::Instruction::Kind kind);
+
 bool IsBootstrapTarget(const TargetConfig& target) {
     return target.triple == kBootstrapTriple && target.target_family == kBootstrapTargetFamily &&
            target.object_format == kBootstrapObjectFormat;
@@ -95,12 +97,14 @@ bool ValidateExecutableBackendCapabilitiesImpl(const mir::Module& module,
 
         for (const auto& block : function.blocks) {
             for (const auto& instruction : block.instructions) {
-                if (instruction.kind != mir::Instruction::Kind::kAtomicCompareExchange) {
+                const auto unsupported = UnsupportedExecutableInstructionName(instruction.kind);
+                if (!unsupported.has_value()) {
                     continue;
                 }
 
                 ReportBackendError(source_path,
-                                   "LLVM bootstrap executable emission does not yet support MIR instruction 'atomic_compare_exchange' before LLVM IR emission in function '" +
+                                   "LLVM bootstrap executable emission does not yet support MIR instruction '" + std::string(*unsupported) +
+                                       "' before LLVM IR emission in function '" +
                                        function.name + "' block '" + block.label + "'",
                                    diagnostics);
                 return false;
@@ -644,6 +648,15 @@ bool IsProcedureSourceType(std::string_view source_name) {
     return source_name.rfind("proc(", 0) == 0;
 }
 
+std::optional<std::string_view> UnsupportedExecutableInstructionName(mir::Instruction::Kind kind) {
+    switch (kind) {
+        case mir::Instruction::Kind::kAtomicCompareExchange:
+            return "atomic_compare_exchange";
+        default:
+            return std::nullopt;
+    }
+}
+
 std::string DecodeStringLiteral(std::string_view literal) {
     if (literal.size() >= 2 && literal.front() == '"' && literal.back() == '"') {
         literal.remove_prefix(1);
@@ -700,6 +713,21 @@ std::string EncodeLLVMStringBytes(std::string_view decoded) {
         encoded << kHex[(ch >> 4) & 0xF] << kHex[ch & 0xF];
     }
     encoded << "\\00";
+    return encoded.str();
+}
+
+std::string EscapeLLVMQuotedString(std::string_view text) {
+    std::ostringstream encoded;
+    for (const unsigned char ch : text) {
+        if (ch >= 32 && ch <= 126 && ch != '\\' && ch != '"') {
+            encoded << static_cast<char>(ch);
+            continue;
+        }
+
+        encoded << '\\';
+        constexpr char kHex[] = "0123456789ABCDEF";
+        encoded << kHex[(ch >> 4) & 0xF] << kHex[ch & 0xF];
+    }
     return encoded.str();
 }
 
@@ -2797,15 +2825,43 @@ bool EmitCallInstruction(const mir::Instruction& instruction,
     }
 
     const sema::Type callee_type = callee_value.source_type.has_value() ? *callee_value.source_type : sema::UnknownType();
-    const auto parsed_param_count = callee_type.kind == sema::Type::Kind::kProcedure
-                                        ? mc::support::ParseArrayLength(callee_type.metadata)
-                                        : std::optional<std::size_t> {};
-    const std::size_t param_count = parsed_param_count.value_or(0);
+    std::vector<sema::Type> param_types;
+    std::vector<sema::Type> return_types;
+    if (indirect_call) {
+        if (callee_type.kind != sema::Type::Kind::kProcedure) {
+            ReportBackendError(source_path,
+                               "LLVM bootstrap executable emission requires checked procedure signature metadata for indirect call in function '" +
+                                   state.function->name + "' block '" + block.label + "'",
+                               diagnostics);
+            return false;
+        }
+
+        const auto parsed_param_count = mc::support::ParseArrayLength(callee_type.metadata);
+        if (!parsed_param_count.has_value() || *parsed_param_count > callee_type.subtypes.size()) {
+            ReportBackendError(source_path,
+                               "LLVM bootstrap executable emission encountered malformed procedure signature metadata for indirect call in function '" +
+                                   state.function->name + "' block '" + block.label + "'",
+                               diagnostics);
+            return false;
+        }
+
+        param_types.assign(callee_type.subtypes.begin(), callee_type.subtypes.begin() + static_cast<std::ptrdiff_t>(*parsed_param_count));
+        return_types.assign(callee_type.subtypes.begin() + static_cast<std::ptrdiff_t>(*parsed_param_count),
+                            callee_type.subtypes.end());
+    } else {
+        const auto params = ParameterLocals(*callee);
+        param_types.reserve(params.size());
+        for (const mir::Local* param : params) {
+            param_types.push_back(param->type);
+        }
+        return_types = callee->return_types;
+    }
+
     const std::size_t argument_count = instruction.operands.size() - argument_start;
-    if (callee_type.kind == sema::Type::Kind::kProcedure && argument_count != param_count) {
+    if (argument_count != param_types.size()) {
         const std::string call_label = indirect_call ? "indirect call" : "call to '" + instruction.target_name + "'";
         ReportBackendError(source_path,
-                           "LLVM bootstrap executable emission expected " + std::to_string(param_count) +
+                           "LLVM bootstrap executable emission expected " + std::to_string(param_types.size()) +
                                " call arguments for " + call_label + " but saw " + std::to_string(argument_count) +
                                " in function '" + state.function->name + "' block '" + block.label + "'",
                            diagnostics);
@@ -2826,7 +2882,7 @@ bool EmitCallInstruction(const mir::Instruction& instruction,
 
         BackendTypeInfo param_type;
         if (!LowerInstructionType(*state.module,
-                      callee_type.subtypes[index],
+                                  param_types[index],
                                   source_path,
                                   diagnostics,
                                   FunctionBlockContext("call argument", state.function->name, block),
@@ -2841,19 +2897,12 @@ bool EmitCallInstruction(const mir::Instruction& instruction,
     }
 
     sema::Type result_source_type = instruction.type;
-    if (callee_type.kind == sema::Type::Kind::kProcedure) {
-        if (param_count >= callee_type.subtypes.size()) {
-            result_source_type = sema::VoidType();
-        } else if (param_count + 1 == callee_type.subtypes.size()) {
-            result_source_type = callee_type.subtypes[param_count];
-        } else {
-            std::vector<sema::Type> return_types;
-            return_types.reserve(callee_type.subtypes.size() - param_count);
-            for (std::size_t index = param_count; index < callee_type.subtypes.size(); ++index) {
-                return_types.push_back(callee_type.subtypes[index]);
-            }
-            result_source_type = sema::TupleType(std::move(return_types));
-        }
+    if (return_types.empty()) {
+        result_source_type = sema::VoidType();
+    } else if (return_types.size() == 1) {
+        result_source_type = return_types.front();
+    } else {
+        result_source_type = sema::TupleType(return_types);
     }
 
     if (instruction.result.empty()) {
@@ -3067,6 +3116,14 @@ bool RenderExecutableInstruction(const mir::Instruction& instruction,
                                  ExecutableFunctionState& state,
                                  std::vector<std::string>& output_lines) {
     const mir::BasicBlock& block = state.function->blocks[block_index];
+
+    if (const auto unsupported = UnsupportedExecutableInstructionName(instruction.kind); unsupported.has_value()) {
+        ReportBackendError(source_path,
+                           "LLVM bootstrap executable emission does not yet support MIR instruction '" + std::string(*unsupported) +
+                               "' in function '" + state.function->name + "' block '" + block.label + "'",
+                           diagnostics);
+        return false;
+    }
 
     switch (instruction.kind) {
         case mir::Instruction::Kind::kConst: {
@@ -4250,11 +4307,7 @@ bool RenderExecutableInstruction(const mir::Instruction& instruction,
         }
 
         case mir::Instruction::Kind::kAtomicCompareExchange:
-            ReportBackendError(source_path,
-                               "LLVM bootstrap executable emission does not yet support MIR instruction 'atomic_compare_exchange' in function '" +
-                                   state.function->name + "' block '" + block.label + "'",
-                               diagnostics);
-            return false;
+            MC_UNREACHABLE("unsupported executable instruction should be rejected before lowering");
 
         case mir::Instruction::Kind::kArrayToSlice: {
             if (!RequireInstructionResult(instruction, block, source_path, diagnostics)) {
@@ -4695,16 +4748,17 @@ bool RenderExecutableTerminator(const mir::BasicBlock& block,
                                 std::vector<std::string>& output_lines) {
     switch (block.terminator.kind) {
         case mir::Terminator::Kind::kReturn: {
-            if (block.terminator.values.empty()) {
-                output_lines.push_back("ret void");
-                return true;
-            }
             if (block.terminator.values.size() != state.function->return_types.size()) {
                 ReportBackendError(source_path,
                                    "LLVM bootstrap executable emission return value count does not match function signature in function '" +
                                        state.function->name + "' block '" + block.label + "'",
                                    diagnostics);
                 return false;
+            }
+
+            if (block.terminator.values.empty()) {
+                output_lines.push_back("ret void");
+                return true;
             }
 
             const auto return_type = LowerFunctionReturnType(*state.module, state.function->return_types);
@@ -5201,7 +5255,7 @@ bool RenderLlvmModuleImpl(const mir::Module& module,
     const ExecutableRuntimeRequirements runtime_requirements = CollectExecutableRuntimeRequirements(module);
 
     std::ostringstream stream;
-    stream << "source_filename = \"" << source_path.filename().generic_string() << "\"\n";
+    stream << "source_filename = \"" << EscapeLLVMQuotedString(source_path.filename().generic_string()) << "\"\n";
     stream << "target triple = \"" << target.triple << "\"\n\n";
     if (target.hosted) {
         stream << "declare void @exit(i32)\n";
