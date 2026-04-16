@@ -147,10 +147,13 @@ class Parser {
       std::unique_ptr<TypeExpr> type_ann;
       std::vector<std::unique_ptr<Expr>> initializers;
       bool has_initializer = false;
+      bool uses_inferred_initializer_syntax = false;
       mc::support::SourcePosition end {};
     };
 
-    ParsedBindingTail ParseBindingTail(bool allow_storage_without_initializer, const char* missing_initializer_message);
+    ParsedBindingTail ParseBindingTail(bool allow_storage_without_initializer,
+                                       bool allow_inferred_initializer_syntax,
+                                       const char* missing_initializer_message);
 
     bool LooksLikeBindingStmt() const;
     void SkipStatementSeparator();
@@ -160,7 +163,6 @@ class Parser {
     bool IsLiteral(TokenKind kind) const;
     bool IsAggregateInitBase(const Expr& expr) const;
     bool IsBareNameExpr(const Expr& expr) const;
-    bool LooksLikeBareNameListAssignment() const;
     bool IsAssignmentTarget(const Expr& expr) const;
     bool IsCaseBoundary() const;
     bool IsPrefixUnaryOperator(TokenKind kind) const;

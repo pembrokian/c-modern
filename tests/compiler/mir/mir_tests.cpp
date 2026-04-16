@@ -714,33 +714,6 @@ void TestAddressOfFieldLowersForDirectAggregateBase() {
     }
 }
 
-void TestMixedBindingOrAssignmentUsesSemanticClassification() {
-    mc::support::DiagnosticSink diagnostics;
-    const auto lowered = Lower(
-        "func demo() i32 {\n"
-        "    left: i32 = 1\n"
-        "    left, right = 2, left\n"
-        "    return right\n"
-        "}\n",
-        diagnostics);
-
-    if (!lowered.ok) {
-        Fail("mixed binding-or-assignment lowering should succeed:\n" + diagnostics.Render());
-    }
-
-    const auto dump = mc::mir::DumpModule(*lowered.module);
-    if (dump.find("Local name=right type=i32") == std::string::npos) {
-        Fail("mixed binding-or-assignment lowering should create new locals for sema-classified bindings");
-    }
-    const auto load_pos = dump.find("load_local ");
-    const auto left_store_pos = dump.find("store_local target=left", load_pos == std::string::npos ? 0 : load_pos);
-    const auto right_store_pos = dump.find("store_local target=right", left_store_pos == std::string::npos ? 0 : left_store_pos);
-    if (load_pos == std::string::npos || left_store_pos == std::string::npos || right_store_pos == std::string::npos ||
-        !(load_pos < left_store_pos && left_store_pos < right_store_pos)) {
-        Fail("mixed binding-or-assignment lowering should evaluate right-hand sides before mutating targets");
-    }
-}
-
 void TestExplicitConversionLowersToConvert() {
     mc::support::DiagnosticSink diagnostics;
     const auto lowered = Lower(
@@ -3234,7 +3207,6 @@ int main() {
     TestDeferredImportedTypedThreadSpawnLowersDirectly();
     TestGlobalAddressLoweringUsesExplicitLocalAddr();
     TestAddressOfFieldLowersForDirectAggregateBase();
-    TestMixedBindingOrAssignmentUsesSemanticClassification();
     TestExplicitConversionLowersToConvert();
     TestNumericConversionLowersToConvertNumeric();
     TestArrayToSliceConversionLowersExplicitly();

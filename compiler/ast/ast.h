@@ -175,12 +175,6 @@ struct Stmt : Node {
     enum class Kind {
         kBlock,
         kBinding,
-        // kBindingOrAssign: parser-deferred disambiguation.
-        // At parse time, "name = expr" is ambiguous between a new binding
-        // and an assignment to an existing variable.  The parser emits this
-        // synthetic kind and sema resolves it to kBinding or kAssign once
-        // the symbol table is populated.
-        kBindingOrAssign,
         kVar,
         kConst,
         kAssign,

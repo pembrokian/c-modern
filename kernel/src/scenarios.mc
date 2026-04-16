@@ -13,7 +13,7 @@ import scenario_transfer
 import scenario_workset_identity
 
 func run(state: *boot.KernelBootState) i32 {
-    result: i32 = scenario_steps.run_main(state)
+    result := scenario_steps.run_main(state)
     if result != 0 {
         return result
     }
@@ -21,7 +21,7 @@ func run(state: *boot.KernelBootState) i32 {
     if result != 0 {
         return result
     }
-    transfer_state: boot.KernelBootState = boot.kernel_init()
+    transfer_state := boot.kernel_init()
     result = scenario_transfer.run_transfer_probe(&transfer_state)
     if result != 0 {
         return result
@@ -34,7 +34,7 @@ func run(state: *boot.KernelBootState) i32 {
     if result != 0 {
         return result
     }
-    audit_state: boot.KernelBootState = boot.kernel_init()
+    audit_state := boot.kernel_init()
     result = scenario_audit_coordination.run_retained_audit_coordination_probe(&audit_state)
     if result != 0 {
         return result

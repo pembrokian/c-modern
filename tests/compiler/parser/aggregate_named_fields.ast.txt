@@ -4,9 +4,10 @@ SourceFile
     body:
       BlockStmt
         statements:
-          BindingOrAssignStmt hasInitializer=true
-            NamePattern names=[cfg]
-            exprs:
+          AssignStmt
+            targets:
+              NameExpr text=cfg
+            values:
               AggregateInitExpr
                 typeTarget:
                   NamedType name=Config

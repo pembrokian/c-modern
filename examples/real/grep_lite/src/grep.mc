@@ -11,13 +11,13 @@ func contains(text: str, needle: str) bool {
         return false
     }
 
-    text_bytes: Slice<u8> = strings.bytes(text)
-    needle_bytes: Slice<u8> = strings.bytes(needle)
-    start: usize = 0
-    limit: usize = text.len - needle.len
+    text_bytes := strings.bytes(text)
+    needle_bytes := strings.bytes(needle)
+    start := 0
+    limit := text.len - needle.len
     while start <= limit {
-        matched: bool = true
-        index: usize = 0
+        matched := true
+        index := 0
         while index < needle.len {
             if text_bytes[start + index] != needle_bytes[index] {
                 matched = false
@@ -38,11 +38,11 @@ func count_matches(text: str, needle: str) usize {
         return 0
     }
 
-    bytes: Slice<u8> = strings.bytes(text)
-    count: usize = 0
-    start: usize = 0
+    bytes := strings.bytes(text)
+    count := 0
+    start := 0
     while start < text.len {
-        newline: usize = start
+        newline := start
         while newline < text.len {
             if bytes[newline] == 10 {
                 break
@@ -50,7 +50,7 @@ func count_matches(text: str, needle: str) usize {
             newline = newline + 1
         }
 
-        line: str = text[start:newline]
+        line := text[start:newline]
         if contains(line, needle) {
             count = count + 1
         }
@@ -68,11 +68,11 @@ func print_matches(text: str, needle: str) usize {
         return 0
     }
 
-    bytes: Slice<u8> = strings.bytes(text)
-    printed: usize = 0
-    start: usize = 0
+    bytes := strings.bytes(text)
+    printed := 0
+    start := 0
     while start < text.len {
-        newline: usize = start
+        newline := start
         while newline < text.len {
             if bytes[newline] == 10 {
                 break
@@ -80,7 +80,7 @@ func print_matches(text: str, needle: str) usize {
             newline = newline + 1
         }
 
-        line: str = text[start:newline]
+        line := text[start:newline]
         if contains(line, needle) {
             if io.write_line(line) != 0 {
                 return printed
@@ -97,16 +97,16 @@ func print_matches(text: str, needle: str) usize {
 }
 
 func run(needle: str, path: str) i32 {
-    alloc: *mem.Allocator = mem.default_allocator()
-    buf: *Buffer<u8> = fs.read_all(path, alloc)
+    alloc := mem.default_allocator()
+    buf := fs.read_all(path, alloc)
     if buf == nil {
         return 92
     }
     defer mem.buffer_free<u8>(buf)
 
-    bytes: Slice<u8> = mem.slice_from_buffer<u8>(buf)
-    text: str = str{ ptr: bytes.ptr, len: bytes.len }
-    matches: usize = print_matches(text, needle)
+    bytes := mem.slice_from_buffer<u8>(buf)
+    text := str{ ptr: bytes.ptr, len: bytes.len }
+    matches := print_matches(text, needle)
     if matches == 0 {
         return 1
     }

@@ -7,14 +7,14 @@ func main(args: Slice<cstr>) i32 {
         return 64
     }
 
-    alloc: *mem.Allocator = mem.default_allocator()
-    buf: *Buffer<u8> = fs.read_all(args[1], alloc)
+    alloc := mem.default_allocator()
+    buf := fs.read_all(args[1], alloc)
     if buf == nil {
         return 92
     }
     defer mem.buffer_free<u8>(buf)
 
-    bytes: Slice<u8> = mem.slice_from_buffer<u8>(buf)
-    text: str = str{ ptr: bytes.ptr, len: bytes.len }
+    bytes := mem.slice_from_buffer<u8>(buf)
+    text := str{ ptr: bytes.ptr, len: bytes.len }
     return expr.normalize_text(text)
 }

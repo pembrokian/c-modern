@@ -1,0 +1,116 @@
+Phase 210 -- Narrow Local Initializer Type Inference
+====================================================
+
+Status
+------
+COMPLETED
+
+Purpose
+-------
+Admit one narrow, explicit type-inference surface for local mutable bindings
+without reopening broader implicit typing pressure.
+
+This phase is real compiler implementation work.
+It is not a proof-only or documentation-only exercise.
+It should improve ordinary local code shape while preserving Modern C's
+explicit API, declaration, and control-flow boundaries.
+
+Repository status note
+----------------------
+- The compiler already supported local typed bindings and bootstrap
+  binding-or-assignment disambiguation.
+- Kernel-facing docs already used `:=` as the intended local inferred-binding
+  spelling, but the lexer and parser did not yet admit that token.
+- Existing sema and MIR already carried one-line initializer typing for local
+  bindings with no declared type, so the missing work was to make that surface
+  explicit, local-only, and strict.
+
+Implemented outcome
+-------------------
+- The lexer now recognizes `:=` as a distinct token.
+- The parser now admits `name := expr` and `a, b := x, y` as local binding
+  statements only.
+- Top-level declarations and `var` or `const` statements do not admit `:=`.
+- Sema now rejects inferred local bindings when the initializer does not
+  resolve to one concrete type, including:
+  - `ptr := nil`
+  - generic function references such as `f := identity`
+- MIR lowering and fixture coverage now accept and preserve the admitted local
+  `:=` shape end-to-end.
+- Language docs and planning surfaces now record the admitted narrow contract.
+
+Problem being solved
+--------------------
+- Ordinary local code wanted one short binding form for the common case where
+  the initializer already makes the type obvious.
+- The repository did not need broader type inference across statements,
+  branches, or public APIs.
+- Without an explicit local-only spelling, the current implementation relied on
+  either typed `var` declarations or the older bootstrap binding-or-assignment
+  path, both of which were noisier or less explicit than the intended language
+  direction.
+
+Core rule
+---------
+- Infer only from the right-hand side of one local binding statement.
+- Keep top-level declarations, function signatures, struct fields, and other
+  public or cross-owner surfaces explicit.
+- Reject inference when the result is not immediately concrete.
+- Do not widen into cross-statement, cross-branch, overload-driven, or
+  data-flow inference.
+
+Chosen slice for this phase
+---------------------------
+1. admit `:=` only for ordinary local binding statements
+2. require an initializer on every `:=` binding
+3. infer only from the right-hand-side expression list on that same line
+4. reject inferred bindings whose type is `nil` or otherwise unresolved
+5. make no top-level declaration inference, function-signature inference,
+   struct-field inference, global inference, or control-flow inference
+
+Implemented shape
+-----------------
+- Syntax: `binding_lhs := expr_list`
+- Admitted scope: local ordinary binding statements inside blocks
+- Semantic meaning: mutable local binding with the initializer's concrete type
+- Rejected forms:
+  - `var name := expr`
+  - `const name := expr`
+  - top-level `name := expr`
+  - `name := nil`
+  - generic-function references without explicit instantiation or call context
+- Compatibility note: the older bootstrap binding-or-assignment path remains
+  implemented, but this phase does not widen or bless it as the primary
+  inferred-binding syntax.
+
+Validation
+----------
+- `Build debug`
+- `mc_parser_fixture_unit`
+- `mc_sema_fixture_unit`
+
+Deliverables
+------------
+- one local-only inferred-binding syntax, `:=`
+- one strict sema rule for concrete right-hand-side-only inference
+- parser, sema, and MIR regression coverage for the admitted slice
+- aligned language-spec and planning-surface updates
+
+Non-goals
+---------
+- top-level inferred declarations
+- inferred function parameter or return types
+- inferred struct-field or enum-payload types
+- cross-statement or control-flow type inference
+- overload resolution or generic inference for binding declarations
+- empty collection literal inference
+
+Why this is the narrowest honest landing
+---------------------------------------
+- The repository wanted a clearer local binding spell, not a second type
+  system.
+- The existing sema and MIR machinery already supported initializer-local
+  typing, so `:=` could land as a precise surface change instead of a broad
+  compiler rewrite.
+- Rejecting `nil` and unresolved generic references preserves readability and
+  keeps the public language surface explicit.

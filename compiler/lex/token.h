@@ -51,6 +51,7 @@ enum class TokenKind {
     kRBracket,
     kComma,
     kColon,
+    kColonAssign,
     kDot,
     kAt,
     kDotDeref,

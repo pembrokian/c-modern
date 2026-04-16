@@ -309,6 +309,7 @@ std::unique_ptr<Stmt> Parser::ParseBindingStmt(Stmt::Kind kind,
     stmt->kind = kind;
     stmt->span.begin = start;
     auto binding = ParseBindingTail(allow_storage_without_initializer,
+                                    kind == Stmt::Kind::kBinding,
                                     kind == Stmt::Kind::kConst ? "const statement requires initializer"
                                                                : "binding requires either a type or initializer");
     stmt->pattern = std::move(binding.pattern);
@@ -323,46 +324,11 @@ std::unique_ptr<Stmt> Parser::ParseAssignOrExprStmt() {
     const auto start = Current().span.begin;
     auto first = ParseExpr();
     if (Match(TokenKind::kAssign)) {
-        if (IsBareNameExpr(*first)) {
-            auto stmt = std::make_unique<Stmt>();
-            stmt->kind = Stmt::Kind::kBindingOrAssign;
-            stmt->span.begin = start;
-            stmt->has_initializer = true;
-            stmt->pattern.names.push_back(first->text);
-            stmt->pattern.span = first->span;
-            stmt->exprs = ParseExprList();
-            stmt->span.end = Previous().span.end;
-            return stmt;
-        }
-
         auto stmt = std::make_unique<Stmt>();
         stmt->kind = Stmt::Kind::kAssign;
         stmt->span.begin = start;
         stmt->assign_targets.push_back(std::move(first));
         stmt->assign_values = ParseExprList();
-        stmt->span.end = Previous().span.end;
-        return stmt;
-    }
-
-    if (IsBareNameExpr(*first) && LooksLikeBareNameListAssignment()) {
-        auto stmt = std::make_unique<Stmt>();
-        stmt->kind = Stmt::Kind::kBindingOrAssign;
-        stmt->span.begin = start;
-        stmt->has_initializer = true;
-        stmt->pattern.names.push_back(first->text);
-        stmt->pattern.span.begin = first->span.begin;
-        stmt->pattern.span.end = first->span.end;
-
-        while (Match(TokenKind::kComma)) {
-            const auto name = ParseIdentifier("expected identifier after ',' in binding-or-assignment");
-            if (name.has_value()) {
-                stmt->pattern.names.push_back(*name);
-                stmt->pattern.span.end = Previous().span.end;
-            }
-        }
-
-        Consume(TokenKind::kAssign, "expected '=' after identifier list");
-        stmt->exprs = ParseExprList();
         stmt->span.end = Previous().span.end;
         return stmt;
     }

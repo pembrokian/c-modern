@@ -54,38 +54,6 @@
             case Stmt::Kind::kConst:
                 LowerBindingLike(stmt, false);
                 return;
-            case Stmt::Kind::kBindingOrAssign: {
-                const auto* fact = sema::FindBindingOrAssignFact(sema_module_, stmt);
-                if (fact == nullptr) {
-                    Report(stmt.span, "MIR lowering requires semantic classification for binding-or-assignment statement");
-                    return;
-                }
-                if (fact->resolutions.size() != stmt.pattern.names.size()) {
-                    Report(stmt.span, "MIR lowering requires one semantic resolution and one initializer per binding-or-assignment name");
-                    return;
-                }
-
-                const auto values = LowerExprValuesForArity(stmt.exprs,
-                                                            stmt.pattern.names.size(),
-                                                            stmt.span,
-                                                            "MIR lowering requires one semantic resolution and one initializer per binding-or-assignment name");
-                if (!values.has_value()) {
-                    return;
-                }
-
-                for (std::size_t index = 0; index < stmt.pattern.names.size(); ++index) {
-                    if (fact->resolutions[index] == sema::BindingOrAssignResolution::kAssign) {
-                        AssignNamedTarget(stmt.pattern.names[index], (*values)[index].value, stmt.span);
-                        continue;
-                    }
-                    BindLocal(stmt.pattern.names[index],
-                              (*values)[index].value.value,
-                              (*values)[index].value.type,
-                              true,
-                              stmt.span);
-                }
-                return;
-            }
             case Stmt::Kind::kAssign:
                 LowerAssign(stmt);
                 return;

@@ -467,9 +467,13 @@ Rules:
 - Tagged-union case destructuring uses the switch syntax `case VariantName(bound, values):`.
 
 Binding rules:
-- local initialized bindings may use inferred type or explicit type annotation
+- local initialized bindings may use `:=` for right-hand-side-only inferred
+    mutable locals or `: T =` for explicit type annotation
 - local storage declarations without an initializer require an explicit type annotation
 - `const` requires an initializer
+- inferred local bindings must resolve to one concrete compile-time type; if
+    the initializer is `nil`, generic-only, or otherwise unresolved, the binding
+    must use an explicit type annotation
 
 12. Tagged Unions
 

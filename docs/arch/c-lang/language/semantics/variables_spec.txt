@@ -16,10 +16,13 @@ Authority and scope:
 The admitted binding kinds are:
 - var for mutable bindings
 - const for immutable bindings
+- local inferred binding statements written as `name := expr`
 
 Rules:
 - var creates mutable storage or a mutable binding to storage according to the declared type
 - const creates an immutable binding
+- `:=` creates a mutable local binding with a type inferred from the
+	initializer expression on that same statement
 - const does not imply hidden allocation, deep ownership transfer, or a second lifetime system
 
 2. Scope Rules
@@ -40,6 +43,7 @@ Top-level rules:
 Local rules:
 - local const declarations require an initializer
 - local var declarations may omit an initializer
+- local `:=` bindings require an initializer and cannot appear at top level
 - reading local storage before it has been initialized is invalid behavior
 
 4. Type Rules
@@ -47,6 +51,10 @@ Local rules:
 Rules:
 - a binding may carry an explicit type annotation
 - when an initializer is present, the initializer must be semantically compatible with the declared or inferred type under the ordinary explicit-conversion rules
+- `:=` inference is statement-local only; it does not look across later
+	assignments, branch merges, or control-flow joins
+- `:=` requires the initializer to resolve to one concrete type; unresolved or
+	`nil`-only bindings must use an explicit type annotation
 - multi-result bindings preserve source order exactly
 
 5. Discard
@@ -59,5 +67,5 @@ Consequences:
 - explicit discard keeps intent visible in ordinary code and test code
 
 Bottom line:
-- var and const are the only binding categories in v0.2
+- var, const, and local `:=` inferred bindings are the admitted binding forms in v0.2
 - scopes are lexical, initialization matters, and unused results must be discarded explicitly

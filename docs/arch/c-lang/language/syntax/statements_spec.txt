@@ -39,11 +39,17 @@ Statement-separation rules:
 Admitted binding forms:
 - var declarations
 - const declarations
-- ordinary binding statements using the same explicit initialization rules as declarations
+- ordinary inferred local binding statements written as `name := expr`
+- ordinary local binding statements with an explicit type annotation
 
 Rules:
 - var introduces mutable storage
 - const introduces an immutable binding
+- `:=` introduces a mutable local binding and always requires an initializer
+- `:=` infers type only from the right-hand-side expression on that same
+	statement
+- `:=` is local-only; top-level and explicit `var` / `const` surfaces stay
+	explicit
 - multi-result bindings preserve result order exactly
 - ignoring a produced value requires explicit discard with _
 

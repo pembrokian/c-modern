@@ -5,6 +5,6 @@ struct PackedPair {
 }
 
 func main() i32 {
-    pair = PackedPair{ small: 1, large: 9 }
+    pair := PackedPair{ small: 1, large: 9 }
     return pair.large
 }

@@ -167,34 +167,62 @@ void TestImportedModuleSurfaceQualifiesNamedTypes() {
     }
 }
 
-void TestDuplicateBindingOrAssignDoesNotRecordInvalidFact() {
+void TestColonAssignBindingParsesAsBinding() {
     mc::support::DiagnosticSink diagnostics;
     const auto parsed = ParseText(
         "func demo() i32 {\n"
-        "    value, value = 1, 2\n"
-        "    return 0\n"
+        "    value := 1\n"
+        "    return value\n"
         "}\n",
-        "<duplicate-binding-or-assign>",
+        "<colon-assign-binding>",
         diagnostics);
     if (!parsed.ok) {
-        mc::test_support::Fail("duplicate binding-or-assignment fixture should parse successfully:\n" + diagnostics.Render());
+        mc::test_support::Fail("colon-assign binding fixture should parse successfully:\n" + diagnostics.Render());
     }
 
-    const auto checked = mc::sema::CheckProgram(*parsed.source_file, "<duplicate-binding-or-assign>", diagnostics);
-    if (checked.ok) {
-        mc::test_support::Fail("duplicate binding-or-assignment should fail semantic checking");
-    }
-    if (diagnostics.Render().find("duplicate local binding: value") == std::string::npos) {
-        mc::test_support::Fail("duplicate binding-or-assignment should report the duplicate local binding");
+    const auto checked = mc::sema::CheckProgram(*parsed.source_file, "<colon-assign-binding>", diagnostics);
+    if (!checked.ok) {
+        mc::test_support::Fail("colon-assign binding should pass semantic checking:\n" + diagnostics.Render());
     }
 
     const auto& function = parsed.source_file->decls.front();
     if (function.body == nullptr || function.body->statements.empty() || function.body->statements.front() == nullptr) {
-        mc::test_support::Fail("duplicate binding-or-assignment fixture should produce a function body statement");
+        mc::test_support::Fail("colon-assign binding fixture should produce a function body statement");
     }
 
-    if (mc::sema::FindBindingOrAssignFact(*checked.module, *function.body->statements.front()) != nullptr) {
-        mc::test_support::Fail("duplicate binding-or-assignment should not record an invalid semantic fact");
+    if (function.body->statements.front()->kind != mc::ast::Stmt::Kind::kBinding) {
+        mc::test_support::Fail("colon-assign binding should parse as an unambiguous binding statement");
+    }
+}
+
+void TestBareNameAssignRequiresDeclaration() {
+    mc::support::DiagnosticSink diagnostics;
+    const auto parsed = ParseText(
+        "func demo() i32 {\n"
+        "    value = 1\n"
+        "    return 0\n"
+        "}\n",
+        "<bare-name-assign-requires-declaration>",
+        diagnostics);
+    if (!parsed.ok) {
+        mc::test_support::Fail("bare-name assignment fixture should parse successfully:\n" + diagnostics.Render());
+    }
+
+    const auto checked = mc::sema::CheckProgram(*parsed.source_file, "<bare-name-assign-requires-declaration>", diagnostics);
+    if (checked.ok) {
+        mc::test_support::Fail("bare-name assignment without declaration should fail semantic checking");
+    }
+    if (diagnostics.Render().find("assignment target is not declared: value") == std::string::npos) {
+        mc::test_support::Fail("bare-name assignment should report an undeclared assignment target");
+    }
+
+    const auto& function = parsed.source_file->decls.front();
+    if (function.body == nullptr || function.body->statements.empty() || function.body->statements.front() == nullptr) {
+        mc::test_support::Fail("bare-name assignment fixture should produce a function body statement");
+    }
+
+    if (function.body->statements.front()->kind != mc::ast::Stmt::Kind::kAssign) {
+        mc::test_support::Fail("bare-name assignment should parse as an assignment statement");
     }
 }
 
@@ -342,7 +370,8 @@ int main(int argc, char** argv) {
     }
 
     TestImportedModuleSurfaceQualifiesNamedTypes();
-    TestDuplicateBindingOrAssignDoesNotRecordInvalidFact();
+    TestColonAssignBindingParsesAsBinding();
+    TestBareNameAssignRequiresDeclaration();
     TestFloatToIntConstConversionHonorsInt64Bounds();
     TestImportedMutableGlobalDoesNotFoldAsConst();
     TestMalformedAggregateGlobalDoesNotStoreEmptyConstValue();

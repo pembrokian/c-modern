@@ -5,6 +5,6 @@ struct Header {
 }
 
 func main() i32 {
-    header = Header{ tag: 1, value: 9 }
+    header := Header{ tag: 1, value: 9 }
     return header.value
 }

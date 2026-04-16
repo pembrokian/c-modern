@@ -359,6 +359,7 @@ std::optional<Decl> Parser::ParseBindingDecl(std::vector<Attribute> attributes,
     decl.attributes = std::move(attributes);
     decl.span.begin = start;
     auto binding = ParseBindingTail(allow_storage_without_initializer,
+                                    false,
                                     kind == Decl::Kind::kConst ? "const declaration requires initializer"
                                                                : "var declaration requires either a type or initializer");
     decl.pattern = std::move(binding.pattern);

@@ -22,15 +22,15 @@ func build_reply_observation(shell_state: shell_service.ShellServiceState, shell
 }
 
 func serial_shell_step(serial: *serial_service.SerialServiceState, shell: *shell_service.ShellServiceState, shell_endpoint_id: u32, obs: syscall.ReceiveObservation) service_effect.Effect {
-    current_serial: serial_service.SerialServiceState = *serial
-    current_shell: shell_service.ShellServiceState = *shell
+    current_serial := *serial
+    current_shell := *shell
 
     *serial = serial_service.serial_on_receive(current_serial, obs)
     if serial_service.serial_forward_request_len(*serial) == 0 {
         return service_effect.effect_none()
     }
 
-    shell_effect: service_effect.Effect = shell_service.handle(current_shell, service_effect.message(current_shell.pid, shell_endpoint_id, serial_service.serial_forward_request_len(*serial), serial_service.serial_forward_request_payload(*serial)))
+    shell_effect := shell_service.handle(current_shell, service_effect.message(current_shell.pid, shell_endpoint_id, serial_service.serial_forward_request_len(*serial), serial_service.serial_forward_request_payload(*serial)))
     if service_effect.effect_has_reply(shell_effect) != 0 {
         *serial = serial_service.serial_on_reply(*serial, build_reply_observation(current_shell, shell_endpoint_id, shell_effect))
     }
@@ -39,10 +39,10 @@ func serial_shell_step(serial: *serial_service.SerialServiceState, shell: *shell
 }
 
 func path_step(path: *SerialShellPathState, obs: syscall.ReceiveObservation) service_effect.Effect {
-    current: SerialShellPathState = *path
-    serial_state: serial_service.SerialServiceState = current.serial_state
-    shell_state: shell_service.ShellServiceState = current.shell_state
-    effect: service_effect.Effect = serial_shell_step(&serial_state, &shell_state, current.shell_endpoint_id, obs)
+    current := *path
+    serial_state := current.serial_state
+    shell_state := current.shell_state
+    effect := serial_shell_step(&serial_state, &shell_state, current.shell_endpoint_id, obs)
     *path = pathwith(current, serial_state, shell_state)
     return effect
 }
@@ -64,8 +64,8 @@ func path_serial_buffer_len(path: SerialShellPathState) usize {
 }
 
 func path_receive_reply(path: SerialShellPathState, effect: service_effect.Effect) SerialShellPathState {
-    obs: syscall.ReceiveObservation = syscall.ReceiveObservation{ status: service_effect.effect_reply_status(effect), block_reason: syscall.BlockReason.None, endpoint_id: path.shell_endpoint_id, source_pid: path.shell_state.pid, payload_len: service_effect.effect_reply_payload_len(effect), received_handle_slot: 0, received_handle_count: 0, payload: service_effect.effect_reply_payload(effect) }
-    new_serial: serial_service.SerialServiceState = serial_service.serial_on_reply(path.serial_state, obs)
+    obs := syscall.ReceiveObservation{ status: service_effect.effect_reply_status(effect), block_reason: syscall.BlockReason.None, endpoint_id: path.shell_endpoint_id, source_pid: path.shell_state.pid, payload_len: service_effect.effect_reply_payload_len(effect), received_handle_slot: 0, received_handle_count: 0, payload: service_effect.effect_reply_payload(effect) }
+    new_serial := serial_service.serial_on_reply(path.serial_state, obs)
     return pathwith(path, new_serial, path.shell_state)
 }
 

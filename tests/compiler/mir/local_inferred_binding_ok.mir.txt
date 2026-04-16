@@ -1,0 +1,8 @@
+Module
+  Function name=main returns=[i32]
+    Local name=count type=int_literal
+    Block label=entry0
+      const %v0:int_literal op=0
+      store_local target=count operands=[%v0]
+      load_local %v1:int_literal target=count
+      terminator return values=[%v1]

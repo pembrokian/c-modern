@@ -8,8 +8,8 @@ func main() i32 {
     }
 
     alloc: *mem.Allocator = mem.default_allocator()
-    bad = mem.buffer_new<u8>(alloc, 2)
-    view = mem.slice_from_buffer<u8>(bad)
+    bad := mem.buffer_new<u8>(alloc, 2)
+    view := mem.slice_from_buffer<u8>(bad)
     view[0] = 192
     view[1] = 175
     if utf8.valid_bytes(view) {

@@ -156,7 +156,7 @@ bool Parser::LooksLikeBindingStmt() const {
         offset += 2;
     }
 
-    return Peek(offset).kind == TokenKind::kColon;
+    return Peek(offset).kind == TokenKind::kColon || Peek(offset).kind == TokenKind::kColonAssign;
 }
 
 void Parser::SkipStatementSeparator() {
@@ -219,31 +219,27 @@ bool Parser::IsBareNameExpr(const Expr& expr) const {
     return expr.kind == Expr::Kind::kName;
 }
 
-bool Parser::LooksLikeBareNameListAssignment() const {
-    if (!Check(TokenKind::kComma)) {
-        return false;
-    }
-
-    std::size_t offset = 0;
-    while (Peek(offset).kind == TokenKind::kComma && Peek(offset + 1).kind == TokenKind::kIdentifier) {
-        offset += 2;
-    }
-
-    return Peek(offset).kind == TokenKind::kAssign;
-}
-
 Parser::ParsedBindingTail Parser::ParseBindingTail(bool allow_storage_without_initializer,
+                                                   bool allow_inferred_initializer_syntax,
                                                    const char* missing_initializer_message) {
     ParsedBindingTail binding;
     binding.pattern = ParseBindingPattern();
 
-    if (Match(TokenKind::kColon)) {
-        binding.type_ann = ParseTypeExpr();
-    }
-
-    if (Match(TokenKind::kAssign)) {
+    if (Match(TokenKind::kColonAssign)) {
+        if (!allow_inferred_initializer_syntax) {
+            ReportError(Previous(), "':=' is only allowed for local binding statements");
+        }
         binding.has_initializer = true;
+        binding.uses_inferred_initializer_syntax = true;
         binding.initializers = ParseExprList();
+    } else if (Match(TokenKind::kColon)) {
+        binding.type_ann = ParseTypeExpr();
+        if (Match(TokenKind::kAssign)) {
+            binding.has_initializer = true;
+            binding.initializers = ParseExprList();
+        } else if (!allow_storage_without_initializer || binding.type_ann == nullptr) {
+            ReportError(Current(), missing_initializer_message);
+        }
     } else if (!allow_storage_without_initializer || binding.type_ann == nullptr) {
         ReportError(Current(), missing_initializer_message);
     }

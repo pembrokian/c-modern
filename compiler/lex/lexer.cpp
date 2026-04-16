@@ -452,6 +452,9 @@ class Lexer {
             case ',':
                 return emit(TokenKind::kComma, 1);
             case ':':
+                if (PeekNext() == '=') {
+                    return emit(TokenKind::kColonAssign, 2);
+                }
                 return emit(TokenKind::kColon, 1);
             case '@':
                 return emit(TokenKind::kAt, 1);
@@ -613,6 +616,8 @@ std::string_view ToString(TokenKind kind) {
             return ",";
         case TokenKind::kColon:
             return ":";
+        case TokenKind::kColonAssign:
+            return ":=";
         case TokenKind::kDot:
             return ".";
         case TokenKind::kAt:

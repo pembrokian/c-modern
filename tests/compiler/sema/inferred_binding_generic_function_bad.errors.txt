@@ -1,0 +1,2 @@
+generic function identity requires explicit type arguments
+cannot infer type for local binding f; add an explicit type annotation

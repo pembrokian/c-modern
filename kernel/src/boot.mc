@@ -59,22 +59,22 @@ struct KernelBootState {
 }
 
 func kernel_init() KernelBootState {
-    serial_slot: service_topology.ServiceSlot = service_topology.SERIAL_SLOT
-    shell_slot: service_topology.ServiceSlot = service_topology.SHELL_SLOT
-    log_slot: service_topology.ServiceSlot = service_topology.LOG_SLOT
-    kv_slot: service_topology.ServiceSlot = service_topology.KV_SLOT
-    queue_slot: service_topology.ServiceSlot = service_topology.QUEUE_SLOT
-    echo_slot: service_topology.ServiceSlot = service_topology.ECHO_SLOT
-    transfer_slot: service_topology.ServiceSlot = service_topology.TRANSFER_SLOT
-    ticket_slot: service_topology.ServiceSlot = service_topology.TICKET_SLOT
+    serial_slot := service_topology.SERIAL_SLOT
+    shell_slot := service_topology.SHELL_SLOT
+    log_slot := service_topology.LOG_SLOT
+    kv_slot := service_topology.KV_SLOT
+    queue_slot := service_topology.QUEUE_SLOT
+    echo_slot := service_topology.ECHO_SLOT
+    transfer_slot := service_topology.TRANSFER_SLOT
+    ticket_slot := service_topology.TICKET_SLOT
 
-    path_state: serial_shell_path.SerialShellPathState = serial_shell_path.path_init(serial_service.serial_init(serial_slot.pid, 1), shell_service.shell_init(shell_slot.pid, 1), shell_slot.endpoint)
-    log_cell: ServiceCell<log_service.LogServiceState> = ServiceCell<log_service.LogServiceState>{ state: log_service.log_init(log_slot.pid, 1), generation: 1 }
-    kv_cell: ServiceCell<kv_service.KvServiceState> = ServiceCell<kv_service.KvServiceState>{ state: kv_service.kv_init(kv_slot.pid, 1), generation: 1 }
-    queue_cell: ServiceCell<queue_service.QueueServiceState> = ServiceCell<queue_service.QueueServiceState>{ state: queue_service.queue_init(queue_slot.pid, 1), generation: 1 }
-    echo_cell: ServiceCell<echo_service.EchoServiceState> = ServiceCell<echo_service.EchoServiceState>{ state: echo_service.echo_init(echo_slot.pid, 1), generation: 1 }
-    transfer_cell: ServiceCell<transfer_service.TransferServiceState> = ServiceCell<transfer_service.TransferServiceState>{ state: transfer_service.transfer_init(transfer_slot.pid, 1), generation: 1 }
-    ticket_cell: ServiceCell<ticket_service.TicketServiceState> = ServiceCell<ticket_service.TicketServiceState>{ state: ticket_service.ticket_init(ticket_slot.pid, 1, 1), generation: 1 }
+    path_state := serial_shell_path.path_init(serial_service.serial_init(serial_slot.pid, 1), shell_service.shell_init(shell_slot.pid, 1), shell_slot.endpoint)
+    log_cell := ServiceCell<log_service.LogServiceState>{ state: log_service.log_init(log_slot.pid, 1), generation: 1 }
+    kv_cell := ServiceCell<kv_service.KvServiceState>{ state: kv_service.kv_init(kv_slot.pid, 1), generation: 1 }
+    queue_cell := ServiceCell<queue_service.QueueServiceState>{ state: queue_service.queue_init(queue_slot.pid, 1), generation: 1 }
+    echo_cell := ServiceCell<echo_service.EchoServiceState>{ state: echo_service.echo_init(echo_slot.pid, 1), generation: 1 }
+    transfer_cell := ServiceCell<transfer_service.TransferServiceState>{ state: transfer_service.transfer_init(transfer_slot.pid, 1), generation: 1 }
+    ticket_cell := ServiceCell<ticket_service.TicketServiceState>{ state: ticket_service.ticket_init(ticket_slot.pid, 1, 1), generation: 1 }
 
     return KernelBootState{
         path_state: path_state,

@@ -88,8 +88,6 @@ std::string_view ToString(Stmt::Kind kind) {
             return "BlockStmt";
         case Stmt::Kind::kBinding:
             return "BindingStmt";
-        case Stmt::Kind::kBindingOrAssign:
-            return "BindingOrAssignStmt";
         case Stmt::Kind::kVar:
             return "VarStmt";
         case Stmt::Kind::kConst:

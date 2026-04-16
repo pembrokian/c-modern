@@ -104,6 +104,16 @@ Register By Concern
   end state: explicit conversions always use (<type-expr>)(value); bare Foo(x)
   remains function-call syntax only.
 
+- Slice: narrow local initializer inference
+  design: settled
+  plan phase: 3 boundary follow-through
+  repo status: landed
+  repo wave: Phase 210 narrow local initializer type inference
+  docs: docs/plan/active/phase210_narrow_local_initializer_type_inference.txt, docs/arch/c-lang/language/syntax/grammar_spec.txt, docs/arch/c-lang/language/semantics/variables_spec.txt
+  end state: local mutable bindings may use `:=` with one-line right-hand-side
+  inference only, while top-level declarations and public signatures remain
+  explicit.
+
 - Slice: AST inventory and deterministic parser dumps
   design: settled
   plan phase: 2

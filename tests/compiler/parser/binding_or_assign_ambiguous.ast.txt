@@ -4,12 +4,15 @@ SourceFile
     body:
       BlockStmt
         statements:
-          BindingOrAssignStmt hasInitializer=true
-            NamePattern names=[left]
-            exprs:
+          AssignStmt
+            targets:
+              NameExpr text=left
+            values:
               NameExpr text=right
-          BindingOrAssignStmt hasInitializer=true
-            NamePattern names=[first, second]
-            exprs:
+          AssignStmt
+            targets:
+              NameExpr text=first
+              NameExpr text=second
+            values:
               NameExpr text=second
               NameExpr text=first

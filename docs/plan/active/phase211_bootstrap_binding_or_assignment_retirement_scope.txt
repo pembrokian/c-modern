@@ -1,0 +1,156 @@
+Phase 211 -- Bootstrap Binding-Or-Assignment Retirement Scope
+=============================================================
+
+Status
+------
+COMPLETED
+
+Implemented outcome
+-------------------
+- Bare local `name = expr` and `a, b = x, y` now parse as assignment only.
+- The parser no longer produces `Stmt::Kind::kBindingOrAssign`.
+- Sema no longer records binding-or-assignment resolution facts.
+- MIR no longer carries mixed bind-versus-assign lowering for that retired
+  compatibility form.
+- Repository-owned implicit bare `=` local bindings that remained in stdlib
+  tests were migrated to `:=`.
+- Focused regression coverage now checks the intended post-Phase-211 rule:
+  undeclared bare-name `=` is an assignment error, while `:=` remains the
+  inferred local binding spelling.
+
+Purpose
+-------
+Scope a separate cleanup phase that reduces the older bootstrap
+`name = expr` / `a, b = x, y` binding-or-assignment compatibility surface now
+that Phase 210 landed explicit local `:=` bindings.
+
+This phase plan is about retiring an older compatibility path deliberately.
+It is not a request for broader type inference, assignment redesign, or a new
+implicit-typing system.
+
+Problem being solved
+--------------------
+- The parser still admits bare local `name = expr` forms as
+  `Stmt::Kind::kBindingOrAssign` when the left side is a bare name or list of
+  bare names.
+- Sema still resolves each name position dynamically as either a new local
+  bind or an assignment to an existing local.
+- MIR still carries compatibility behavior and tests for mixed bind/assign
+  classification.
+- Phase 210 made `:=` the intended local inferred-binding spelling, but left
+  the bootstrap compatibility path in place on purpose to keep that phase
+  narrow.
+- As long as the compatibility path remains, the language still exposes two
+  local binding stories:
+  1. the explicit preferred path: `name := expr`
+  2. the older bootstrap compatibility path: `name = expr`
+
+Why this needs a separate phase
+-------------------------------
+- Phase 210's real pressure was admitting one honest local binding form, not
+  deleting every older bootstrap surface in the same change.
+- Retiring `kBindingOrAssign` touches parser classification, semantic facts,
+  MIR assumptions, regression fixtures, and user-facing source migration.
+- Bundling that retirement into Phase 210 would have mixed one additive syntax
+  landing with one subtractive compatibility cleanup and made validation less
+  local.
+
+Current owner path
+------------------
+- Parser owner: `compiler/parse/parser_statements.cpp`
+  - `ParseAssignOrExprStmt()` creates `Stmt::Kind::kBindingOrAssign` for bare
+    `name = expr` and `a, b = x, y` forms.
+- Sema owner: `compiler/sema/check.cpp`
+  - `CheckBindingOrAssign(...)` resolves each name position as either bind or
+    assign and records binding-or-assignment facts.
+- MIR dependency: `tests/compiler/mir/mir_tests.cpp`
+  - current lowering coverage still asserts mixed bind/assign behavior.
+- Sema dependency: `tests/compiler/sema/sema_fixture_tests.cpp`
+  - current coverage still asserts duplicate-name behavior and fact recording
+    for the compatibility surface.
+
+Planned end state
+-----------------
+- Ordinary local binding creation uses explicit surfaces only:
+  - `var name: T = expr`
+  - `const name: T = expr`
+  - `name := expr`
+- Bare `name = expr` in statement position is assignment only.
+- Bare `a, b = x, y` in statement position is assignment only.
+- A bare-name assignment target that has not already been declared becomes a
+  clear semantic error rather than silently creating a new local.
+- The parser no longer produces `Stmt::Kind::kBindingOrAssign` for ordinary
+  source code.
+- Sema no longer records binding-or-assignment resolution facts for ordinary
+  local code.
+- MIR no longer needs mixed bind/assign compatibility behavior for this source
+  surface.
+
+Chosen slice for this phase
+---------------------------
+1. treat bare-name `=` statements as assignments, not implicit bindings
+2. require local binding creation to use `var`, `const`, or `:=`
+3. remove ordinary parser production of `Stmt::Kind::kBindingOrAssign`
+4. remove sema fact recording and mixed-resolution behavior that only exists
+   for that compatibility form
+5. migrate repository-owned source that still depends on implicit local bind
+   through bare `=`
+6. update tests and docs so `:=` is the only inferred local binding spelling
+
+Non-goals
+---------
+- no widening of `:=` inference
+- no top-level inference
+- no redesign of ordinary assignment semantics
+- no new destructuring or pattern-binding feature beyond the currently
+  admitted local binding forms
+- no broader parser cleanup unrelated to this compatibility path
+
+Key design constraints
+----------------------
+- Keep assignment semantics explicit: `=` remains assignment, not a second
+  binding form.
+- Keep the cleanup local to statement parsing, sema binding ownership, MIR
+  compatibility assumptions, and repository-owned source migration.
+- Prefer crisp diagnostics over heuristic fallback when a user writes
+  `name = expr` without first declaring `name`.
+- Preserve deterministic dumps and narrow regression coverage.
+
+Validation
+----------
+- `Build debug`
+- `mc_parser_fixture_unit`
+- `mc_sema_fixture_unit`
+- `mc_mir_fixture_unit`
+
+Notes from implementation
+-------------------------
+- The active kernel and shipped examples were already largely on explicit
+  declarations or `:=`; the remaining implicit bare `=` bind creation was
+  concentrated in stdlib tests.
+- Existing assignment checking already had the right narrow diagnostic,
+  `assignment target is not declared: <name>`, so Phase 211 reused that path
+  instead of inventing a second sema rule.
+- Tuple reassignment after explicit declaration such as
+  `left, right = pair()` remains admitted as ordinary assignment.
+
+Exit criteria
+-------------
+- no repository-owned language docs describe bare local `name = expr` as a
+  binding form
+- no ordinary parser path still emits `Stmt::Kind::kBindingOrAssign` for bare
+  local statement syntax
+- no admitted repository-owned source still relies on implicit local binding
+  through bare `=`
+- sema and MIR regression coverage reflect `:=` as the inferred local binding
+  surface and `=` as assignment only
+
+Risks to watch
+--------------
+- fixture churn may be larger than the parser change if older tests encode the
+  bootstrap compatibility surface broadly
+- direct removal of `kBindingOrAssign` may expose parser or MIR assumptions in
+  unexpected narrow tests, so migration and parser tightening should happen in
+  small validated steps
+- some old examples may currently rely on the compatibility surface without it
+  being obvious from syntax alone

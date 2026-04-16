@@ -16,10 +16,10 @@ func main() i32 {
     }
 
     alloc: *mem.Allocator = mem.default_allocator()
-    bad = mem.buffer_new<u8>(alloc, 1)
-    bytes = mem.slice_from_buffer<u8>(bad)
+    bad := mem.buffer_new<u8>(alloc, 1)
+    bytes := mem.slice_from_buffer<u8>(bad)
     bytes[0] = 128
-    text = str{ ptr: bytes.ptr, len: bytes.len }
+    text := str{ ptr: bytes.ptr, len: bytes.len }
     if utf8.leading_codepoint_width(text) != 0 {
         mem.buffer_free<u8>(bad)
         return 5

@@ -273,11 +273,13 @@ statement       = block
                 | continue_stmt
                 | defer_stmt
 
-binding_stmt    = initialized_binding_decl
+binding_stmt    = inferred_binding_decl
+                | initialized_binding_decl
                 | storage_binding_decl
                 | var_stmt
                 | const_stmt
 
+inferred_binding_decl = binding_lhs ":=" expr_list
 initialized_binding_decl = binding_lhs [ ":" type_expr ] "=" expr_list
 storage_binding_decl = binding_lhs ":" type_expr
 binding_lhs     = <identifier> { "," <identifier> }
@@ -317,8 +319,11 @@ statement_sep   = <newline>
 ```
 
 Rules:
-- local initialized bindings may be typed or inferred
+- local initialized bindings may be written as `name := expr` for inferred
+    mutable locals or `name: T = expr` for explicit local type
 - local storage declarations without an initializer require an explicit type
+- `:=` is local-only and is not admitted for top-level declarations or `var` /
+    `const` statements
 - `const` bindings are allowed at top level and inside blocks
 - multi-result binding and assignment are both part of the core v0.2 syntax
 - `for value in slice` and `for index, value in slice` are the standardized iterator forms

@@ -89,16 +89,6 @@ struct ExprTypeFact {
     Type type;
 };
 
-enum class BindingOrAssignResolution {
-    kBind,
-    kAssign,
-};
-
-struct BindingOrAssignFact {
-    support::SourceSpan span {};
-    std::vector<BindingOrAssignResolution> resolutions;
-};
-
 enum class ForInResolution {
     kForEach,
     kForRange,
@@ -132,8 +122,8 @@ struct SourceSpanEqual {
 
 // Module is the checked semantic product that downstream stages consume.
 // A full module produced by CheckProgram / CheckSourceFile contains the entire
-// top-level summary plus implementation-only facts such as expr_types,
-// binding_or_assign_facts, and for_in_facts that MIR lowering relies on.
+// top-level summary plus implementation-only facts such as expr_types and
+// for_in_facts that MIR lowering relies on.
 // Import-visible surfaces intentionally reuse this struct during bootstrap, but
 // BuildImportVisibleModuleSurface strips those local-only facts and keeps only
 // declarations and hidden-name sets that imported semantic checking needs.
@@ -147,7 +137,6 @@ struct Module {
     std::unordered_set<std::string> hidden_value_names;
     std::unordered_set<std::string> hidden_type_names;
     std::unordered_map<support::SourceSpan, Type, SourceSpanHash, SourceSpanEqual> expr_types;
-    std::unordered_map<support::SourceSpan, BindingOrAssignFact, SourceSpanHash, SourceSpanEqual> binding_or_assign_facts;
     std::unordered_map<support::SourceSpan, ForInFact, SourceSpanHash, SourceSpanEqual> for_in_facts;
     // Optional name -> index caches for functions and type declarations.
     // BuildModuleLookupMaps() refreshes them after bulk population, but
@@ -203,7 +192,6 @@ const FunctionSignature* FindFunctionSignature(const Module& module, std::string
 const TypeDeclSummary* FindTypeDecl(const Module& module, std::string_view name);
 const GlobalSummary* FindGlobalSummary(const Module& module, std::string_view name);
 const Type* FindExprType(const Module& module, const ast::Expr& expr);
-const BindingOrAssignFact* FindBindingOrAssignFact(const Module& module, const ast::Stmt& stmt);
 const ForInFact* FindForInFact(const Module& module, const ast::Stmt& stmt);
 std::string DumpModule(const Module& module);
 // Rebuild the auxiliary name -> index lookup caches (function_lookup,

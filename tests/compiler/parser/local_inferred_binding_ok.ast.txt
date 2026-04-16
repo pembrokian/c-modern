@@ -1,0 +1,15 @@
+SourceFile
+  ModuleKind=ordinary
+  FuncDecl name=main
+    returns:
+      NamedType name=i32
+    body:
+      BlockStmt
+        statements:
+          BindingStmt hasInitializer=true
+            NamePattern names=[count]
+            exprs:
+              LiteralExpr text=0 kind=int_lit
+          ReturnStmt
+            exprs:
+              NameExpr text=count

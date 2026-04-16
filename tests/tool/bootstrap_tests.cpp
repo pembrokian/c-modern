@@ -433,10 +433,10 @@ void TestParserPreservesBindingAssignmentAmbiguity() {
 
     Expect(parsed.ok, "parser should accept bare identifier-list equals forms");
     const auto dump = mc::ast::DumpSourceFile(*parsed.source_file);
-    Expect(dump.find("BindingOrAssignStmt") != std::string::npos,
-           "dump should preserve binding-versus-assignment ambiguity explicitly");
-    Expect(dump.find("NamePattern names=[first, second]") != std::string::npos,
-           "ambiguous node should preserve the identifier list");
+        Expect(dump.find("AssignStmt") != std::string::npos,
+            "dump should render bare identifier-list equals forms as assignments");
+        Expect(dump.find("targets:") != std::string::npos,
+            "assignment node should preserve targets explicitly");
 }
 
     void TestAstDumpDepthLimitAppliesThroughHelperBoundaries() {
