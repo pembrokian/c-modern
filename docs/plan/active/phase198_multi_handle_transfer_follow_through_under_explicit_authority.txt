@@ -3,7 +3,67 @@ Phase 198 -- Multi-Handle Transfer Follow-Through Under Explicit Authority
 
 Status
 ------
-PLANNED
+COMPLETE
+
+Outcome
+-------
+Phase 198 found that the current explicit transfer-only authority model can
+carry one bounded multi-handle step without widening into a capability
+framework, ordinary handle-bearing traffic, or compiler work.
+
+The landed implementation keeps the narrow authority boundary explicit:
+
+- the existing one-handle transfer path from Phase 185 still works unchanged
+- one additive two-handle bind shape now exists on the same
+  `TRANSFER_ENDPOINT_ID` path: the observation carries two contiguous
+  monotonic grant ids, dispatch resolves them locally, and `transfer_service`
+  retains exactly one explicit `(log, kv)` endpoint pair
+- the transfer owner exposes one tiny follow-through command family only for
+  that retained pair: bind (`B`), log append (`L`), and kv set (`K`)
+- grant truth remains monotonic and destructive on success for both handles;
+  stale ids remain invalid even after new grants are issued later
+- ordinary named traffic still rejects handle metadata at the gateway; the
+  two-handle shape remains transfer-only and local to the transfer owner
+- restart remains explicit and init-owned; restarting `transfer_service`
+  preserves stable routing but clears the retained pair so transferred
+  authority does not revive ambiently after service restart
+- the runtime carry surface widened only where the live slice needed it:
+  `service_effect.Message` now carries a second resolved transferred endpoint
+  id for the two-handle path; `Effect` still does not widen
+
+Implemented outcome
+-------------------
+- `kernel/src/transfer_grant.mc` now consumes either one grant or exactly two
+  contiguous monotonic grants and returns the resolved endpoint pair for the
+  two-handle path.
+- `kernel/src/transfer_service.mc` remains the sole authority consumer.  It
+  still supports the original one-handle follow-through send and now also owns
+  one retained `(log, kv)` pair plus one bounded command family using that
+  pair.
+- `kernel/src/kernel_dispatch.mc` keeps handle-bearing traffic separate from
+  ordinary named traffic and threads the second resolved endpoint only through
+  the explicit transfer path.
+- `kernel/src/scenario_transfer.mc` and `kernel/src/scenarios.mc` add one live
+  kernel probe proving bind, log follow-through, kv follow-through, stale-id
+  rejection, table-reuse non-revival, restart-visible instance replacement,
+  and post-restart pair loss.
+- `tests/system/kernel_reset_lane_phase198_multi_handle_transfer/` and the
+  reset-lane workflow table now prove the contract through the repository-owned
+  hosted kernel path.
+
+Phase result
+------------
+The repository now has an explicit answer to the next authority-pressure
+question after Phase 185:
+
+  the current transfer-only authority model still holds one bounded step
+  further, but only because the new two-handle shape stays local to the same
+  explicit transfer owner instead of widening into general capability routing.
+
+Validation
+----------
+- `Build debug`
+- `mc_tool_workflow_unit`
 
 Purpose
 -------
@@ -36,8 +96,9 @@ Repository status note
   follow-through send.
 - Ordinary named traffic still rejects received-handle metadata at the
   dispatch gateway.
-- The current model has no receiver-visible rights algebra, no ordinary
-  multi-handle message family, and no general capability subsystem.
+- The current model still has no receiver-visible rights algebra, no ordinary
+  multi-handle message family outside the transfer endpoint, and no general
+  capability subsystem.
 
 Problem being solved
 --------------------

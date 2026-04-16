@@ -147,7 +147,7 @@ func kernel_dispatch_transfer_receive(state: *boot.KernelBootState, observation:
     }
     current = boot.bootwith_grants(current, grant.table)
     *state = current
-    transfer_effect: service_effect.Effect = kernel_dispatch_leaf(state, service_effect.message_with_handle(observation.source_pid, observation.endpoint_id, observation.payload_len, observation.payload, observation.received_handle_slot, observation.received_handle_count, grant.endpoint))
+    transfer_effect: service_effect.Effect = kernel_dispatch_leaf(state, service_effect.message_with_handle(observation.source_pid, observation.endpoint_id, observation.payload_len, observation.payload, observation.received_handle_slot, observation.received_handle_count, grant.endpoint0, grant.endpoint1))
     return execute_effect(state, transfer_effect, 0)
 }
 
@@ -229,6 +229,9 @@ func kernel_dispatch_step(state: *boot.KernelBootState, observation: syscall.Rec
     }
     if observation.endpoint_id == service_topology.SERIAL_ENDPOINT_ID {
         return kernel_dispatch_serial(state, observation)
+    }
+    if observation.endpoint_id == service_topology.TRANSFER_ENDPOINT_ID {
+        return execute_effect(state, kernel_dispatch_leaf(state, service_effect.message(observation.source_pid, observation.endpoint_id, observation.payload_len, observation.payload)), 0)
     }
     return kernel_dispatch_leaf(state, service_effect.message(observation.source_pid, observation.endpoint_id, observation.payload_len, observation.payload))
 }

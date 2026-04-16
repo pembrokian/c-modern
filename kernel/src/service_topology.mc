@@ -22,8 +22,8 @@
 //     authority tokens in the capability sense.
 //   - Authority surface: handle transfer lives in
 //     syscall.ReceiveObservation.received_handle_slot and
-//     received_handle_count.  That is the intended future authority gate,
-//     separate from routing by name.
+//     received_handle_count.  That is the current explicit transfer-only
+//     authority gate, separate from routing by name.
 //   - Conclusion: endpoint ids are stable public names that double as
 //     routing keys.  They are NOT elevated authority-bearing values.
 //     A caller that knows a valid public name may address the service.

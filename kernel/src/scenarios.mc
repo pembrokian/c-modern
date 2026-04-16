@@ -7,6 +7,7 @@ import scenario_lifecycle
 import scenario_queue
 import scenario_restart
 import scenario_steps
+import scenario_transfer
 import scenario_workset_identity
 
 func run(state: *boot.KernelBootState) i32 {
@@ -15,6 +16,11 @@ func run(state: *boot.KernelBootState) i32 {
         return result
     }
     result = scenario_restart.run_restart_probe(state)
+    if result != 0 {
+        return result
+    }
+    transfer_state: boot.KernelBootState = boot.kernel_init()
+    result = scenario_transfer.run_transfer_probe(&transfer_state)
     if result != 0 {
         return result
     }

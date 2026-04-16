@@ -26,10 +26,10 @@ struct ReceiveObservation {
     endpoint_id: u32
     source_pid: u32
     payload_len: usize
-    // received_handle_slot and received_handle_count are reserved for future
-    // capability-passing. Current direct dispatch rejects any non-zero value
-    // at the gateway so services never treat handle-bearing traffic as plain
-    // named messaging.
+    // received_handle_slot and received_handle_count carry the explicit
+    // transfer-only authority path. Current dispatch still rejects any
+    // non-zero value on ordinary named traffic; the only admitted exception
+    // is the transfer endpoint.
     received_handle_slot: u32
     received_handle_count: usize
     payload: [4]u8

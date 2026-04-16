@@ -17,7 +17,8 @@ struct GrantIssue {
 
 struct GrantConsume {
     table: GrantTable
-    endpoint: u32
+    endpoint0: u32
+    endpoint1: u32
     status: syscall.SyscallStatus
 }
 
@@ -60,23 +61,50 @@ func grant_issue(t: GrantTable, pid: u32, endpoint: u32) GrantIssue {
 }
 
 func grant_consume(t: GrantTable, pid: u32, slot: u32, count: usize) GrantConsume {
-    if count != 1 {
-        return GrantConsume{ table: t, endpoint: 0, status: syscall.SyscallStatus.InvalidCapability }
+    if count == 1 {
+        return grant_consume_one(t, pid, slot)
     }
+    if count == 2 {
+        return grant_consume_two(t, pid, slot)
+    }
+    return GrantConsume{ table: t, endpoint0: 0, endpoint1: 0, status: syscall.SyscallStatus.InvalidCapability }
+}
+
+func grant_consume_one(t: GrantTable, pid: u32, slot: u32) GrantConsume {
     for i in 0..GRANT_CAPACITY {
         if t.ids[i] == slot {
             return grant_consume_index(t, pid, i)
         }
     }
-    return GrantConsume{ table: t, endpoint: 0, status: syscall.SyscallStatus.InvalidCapability }
+    return GrantConsume{ table: t, endpoint0: 0, endpoint1: 0, status: syscall.SyscallStatus.InvalidCapability }
+}
+
+func grant_consume_two(t: GrantTable, pid: u32, slot: u32) GrantConsume {
+    first: usize = GRANT_CAPACITY
+    second: usize = GRANT_CAPACITY
+    for i in 0..GRANT_CAPACITY {
+        if t.ids[i] == slot {
+            first = i
+        }
+        if t.ids[i] == slot + 1 {
+            second = i
+        }
+    }
+    if first >= GRANT_CAPACITY {
+        return GrantConsume{ table: t, endpoint0: 0, endpoint1: 0, status: syscall.SyscallStatus.InvalidCapability }
+    }
+    if second >= GRANT_CAPACITY {
+        return GrantConsume{ table: t, endpoint0: 0, endpoint1: 0, status: syscall.SyscallStatus.InvalidCapability }
+    }
+    return grant_consume_pair_index(t, pid, first, second)
 }
 
 func grant_consume_index(t: GrantTable, pid: u32, index: usize) GrantConsume {
     if t.endpoints[index] == 0 {
-        return GrantConsume{ table: t, endpoint: 0, status: syscall.SyscallStatus.InvalidCapability }
+        return GrantConsume{ table: t, endpoint0: 0, endpoint1: 0, status: syscall.SyscallStatus.InvalidCapability }
     }
     if t.owners[index] != pid {
-        return GrantConsume{ table: t, endpoint: 0, status: syscall.SyscallStatus.InvalidCapability }
+        return GrantConsume{ table: t, endpoint0: 0, endpoint1: 0, status: syscall.SyscallStatus.InvalidCapability }
     }
     next_owners: [GRANT_CAPACITY]u32 = t.owners
     next_endpoints: [GRANT_CAPACITY]u32 = t.endpoints
@@ -85,5 +113,35 @@ func grant_consume_index(t: GrantTable, pid: u32, index: usize) GrantConsume {
     next_owners[index] = 0
     next_endpoints[index] = 0
     next_ids[index] = 0
-    return GrantConsume{ table: grantwith(t, next_owners, next_endpoints, next_ids, t.next), endpoint: endpoint, status: syscall.SyscallStatus.Ok }
+    return GrantConsume{ table: grantwith(t, next_owners, next_endpoints, next_ids, t.next), endpoint0: endpoint, endpoint1: 0, status: syscall.SyscallStatus.Ok }
+}
+
+func grant_consume_pair_index(t: GrantTable, pid: u32, first: usize, second: usize) GrantConsume {
+    if first == second {
+        return GrantConsume{ table: t, endpoint0: 0, endpoint1: 0, status: syscall.SyscallStatus.InvalidCapability }
+    }
+    if t.endpoints[first] == 0 {
+        return GrantConsume{ table: t, endpoint0: 0, endpoint1: 0, status: syscall.SyscallStatus.InvalidCapability }
+    }
+    if t.endpoints[second] == 0 {
+        return GrantConsume{ table: t, endpoint0: 0, endpoint1: 0, status: syscall.SyscallStatus.InvalidCapability }
+    }
+    if t.owners[first] != pid {
+        return GrantConsume{ table: t, endpoint0: 0, endpoint1: 0, status: syscall.SyscallStatus.InvalidCapability }
+    }
+    if t.owners[second] != pid {
+        return GrantConsume{ table: t, endpoint0: 0, endpoint1: 0, status: syscall.SyscallStatus.InvalidCapability }
+    }
+    next_owners: [GRANT_CAPACITY]u32 = t.owners
+    next_endpoints: [GRANT_CAPACITY]u32 = t.endpoints
+    next_ids: [GRANT_CAPACITY]u32 = t.ids
+    endpoint0: u32 = next_endpoints[first]
+    endpoint1: u32 = next_endpoints[second]
+    next_owners[first] = 0
+    next_endpoints[first] = 0
+    next_ids[first] = 0
+    next_owners[second] = 0
+    next_endpoints[second] = 0
+    next_ids[second] = 0
+    return GrantConsume{ table: grantwith(t, next_owners, next_endpoints, next_ids, t.next), endpoint0: endpoint0, endpoint1: endpoint1, status: syscall.SyscallStatus.Ok }
 }
