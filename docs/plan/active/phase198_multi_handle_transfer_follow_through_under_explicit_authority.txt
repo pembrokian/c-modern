@@ -1,0 +1,145 @@
+Phase 198 -- Multi-Handle Transfer Follow-Through Under Explicit Authority
+=========================================================================
+
+Status
+------
+PLANNED
+
+Purpose
+-------
+Extend the current transferred-handle runtime path by exactly one bounded
+step so the repository can test whether the present one-handle transfer model
+is still the honest authority boundary.
+
+This phase should not turn the repository into a capability framework.
+It should answer a narrower question: can one compact explicit transfer path
+carry more than one handle in a single interaction while preserving the
+current grant-table and transfer-only ownership model?
+
+Relationship to companion notes
+-------------------------------
+This phase plan should stay aligned with:
+
+- `docs/plan/active/phase183_endpoint_ownership_and_authority_audit.txt`
+- `docs/plan/active/phase184_capability_propagation_and_leakage_probe.txt`
+- `docs/plan/active/phase185_ipc_shape_reaudit_under_restart_and_retained_state.txt`
+- `docs/plan/active/phase188_restart_visible_ticket_service_follow_through.txt`
+- `docs/plan/active/phase193_bounded_shell_service_identity_query_follow_through.txt`
+- `docs/plan/backlog.txt`
+- `docs/plan/decision_log.txt`
+
+Repository status note
+----------------------
+- The repository already has one explicit transferred-handle path.
+- That path is intentionally narrow: one monotonic one-shot grant id, one
+  attached handle per message, one transfer-only consumer, and one bounded
+  follow-through send.
+- Ordinary named traffic still rejects received-handle metadata at the
+  dispatch gateway.
+- The current model has no receiver-visible rights algebra, no ordinary
+  multi-handle message family, and no general capability subsystem.
+
+Problem being solved
+--------------------
+- The current authority model proves one transferred-handle interaction, but
+  it has not yet answered whether a bounded real consumer can carry more than
+  one authority token without forcing a broader redesign.
+- Without one explicit multi-handle pressure step, the repository still does
+  not know whether the present grant-table and transfer-only service shape is
+  a stable authority boundary or merely the smallest special case.
+- The next honest question is therefore not "capabilities in general" but
+  whether one explicit transfer path can stay honest with two attached
+  handles.
+
+Core rule
+---------
+- Keep handle-bearing authority explicit and local to the transfer path.
+- Keep ordinary named traffic closed to received-handle metadata.
+- Preserve destructive-on-success send behavior and monotonic stale-grant
+  rejection.
+- Add exactly one multi-handle transfer shape and stop there.
+- Do not widen into receiver-visible rights algebra, ambient authority, or a
+  general capability framework.
+
+Chosen interaction shape
+------------------------
+Chosen shape for this phase:
+
+1. admit exactly one transfer message that carries two attached handles
+2. keep both handles routed only through the existing transfer-only service
+   family
+3. make success consume the sender's granted authority for both handles
+4. keep stale or reused grant ids explicitly invalid
+5. add one restart proof showing that neither transferred authority token
+   revives ambiently after service restart or table reuse
+
+Why this is the right next step
+-------------------------------
+- It spends the current explicit authority model one step further without
+  reopening ordinary dispatch rules.
+- It keeps the pressure on the existing transfer owner rather than treating a
+  single special case as proof of a general subsystem.
+- It gives a clear discriminator: either two-handle transfer stays local to
+  the current model, or the next boundary blur becomes visible enough to name.
+
+Required implementation surfaces
+--------------------------------
+The likely owning implementation surfaces for this phase are:
+
+1. `kernel/src/transfer_grant.mc`
+   - extend grant ownership only enough to represent two explicit attached
+     handle grants in one bounded transfer operation
+
+2. `kernel/src/transfer_service.mc`
+   - keep transfer semantics local to the transfer owner and consume both
+     handles through one explicit service-owned path
+
+3. `kernel/src/kernel_dispatch.mc`
+   - validate and route the new multi-handle transfer shape without widening
+     ordinary named traffic
+
+4. `kernel/src/service_effect.mc`
+   - touch only if the narrowest honest representation of the two-handle
+     transfer needs additive metadata at the existing effect boundary
+
+5. `kernel/src/scenarios.mc`
+   - add one live workflow showing explicit multi-handle transfer, correct
+     follow-through use, stale-grant rejection, and post-restart no ambient
+     revival
+
+6. `tests/system/` and `tests/tool/tool_kernel_reset_lane_suite.cpp`
+   - add one focused reset-lane fixture and workflow registration proving the
+     two-handle authority contract directly
+
+Chosen slice for this phase
+---------------------------
+1. one explicit two-handle transfer shape
+2. one bounded follow-through consumer path
+3. sender-side destructive-on-success behavior for both handles
+4. stale-grant rejection
+5. one restart-stability proof for the two transferred authorities
+
+What this phase should not do
+-----------------------------
+- no receiver-visible rights algebra
+- no ordinary handle-bearing traffic outside the transfer endpoint
+- no dynamic discovery or namespace growth
+- no capability borrowing framework or ambient authority model
+- no compiler, sema, MIR, backend, ABI, target, runtime, or `hal` expansion
+
+Planning rule for this phase
+----------------------------
+- Start from the existing transfer-only owner and keep the new pressure there.
+- Prefer additive explicit metadata over widening the general dispatch model.
+- If representing two attached handles exposes a real blur in the current
+  effect or grant model, name that blur precisely rather than widening into a
+  general capability redesign inside this phase.
+
+What this phase should prove
+----------------------------
+- whether the current explicit authority-transfer model still scales with one
+  more real payload shape
+- whether monotonic grant truth remains sufficient when a message carries more
+  than one authority token
+- whether the next authority pressure still belongs to the transfer owner or
+  whether a broader boundary has become unavoidable

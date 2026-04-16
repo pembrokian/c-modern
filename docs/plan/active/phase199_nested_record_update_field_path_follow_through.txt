@@ -1,0 +1,148 @@
+Phase 199 -- Nested Record-Update Field-Path Follow-Through
+===========================================================
+
+Status
+------
+PLANNED
+
+Purpose
+-------
+Admit one bounded nested field-path extension to the landed `base with {
+field: value }` record-update form so owner-local code can replace the
+remaining inner-record rebuilds that still obscure straightforward immutable
+state transitions.
+
+This phase should not reopen mutation semantics or general state frameworks.
+It should answer one narrower language question: can the existing explicit
+copy-with model carry one nested field-path update form while staying
+deterministic, typed, and obviously immutable?
+
+Relationship to companion notes
+-------------------------------
+This phase plan should stay aligned with:
+
+- `docs/plan/active/phase164_struct_embedding_pressure_audit_and_conditional_admission.txt`
+- `docs/plan/active/phase191_constant_aggregate_tables_for_flat_owner_data.txt`
+- `docs/plan/active/phase192_inferred_brace_aggregate_follow_through.txt`
+- `docs/plan/active/phase195_narrow_record_update_syntax_for_owner_local_state_mutation.txt`
+- `docs/plan/backlog.txt`
+- `docs/plan/decision_log.txt`
+
+Repository status note
+----------------------
+- The repository already has one explicit immutable record-update form:
+  `base with { field: value, ... }`.
+- That form closed the dominant whole-record reconstruction noise in active
+  kernel owners.
+- The remaining source-level friction appears at wrapper boundaries such as
+  `ServiceCell<T>`-style or similar nested records, where callers still have
+  to rebuild one explicit inner aggregate by hand.
+- The backlog now names nested record-update field paths as the clearest
+  remaining owner-local ergonomics limitation exposed by the landed syntax.
+
+Problem being solved
+--------------------
+- Current source still forces one manual inner aggregate rebuild when the real
+  intent is "preserve the outer record and replace one nested field".
+- That noise is smaller than the pre-Phase-195 whole-record rebuild problem,
+  but it remains the strongest visible limitation in the landed record-update
+  model.
+- Without one bounded nested-path follow-through, later owner-local cleanup
+  risks either tolerating avoidable boilerplate or reopening broader syntax
+  ideas that go beyond the repository's actual pressure.
+
+Core rule
+---------
+- Keep record update explicit and immutable.
+- Extend only the existing `with { ... }` form.
+- Allow only named field paths through record-typed segments.
+- Preserve the result type of the base expression.
+- Do not widen into hidden mutation, array or slice element updates,
+  collection transforms, object methods, or state frameworks.
+
+Chosen syntax and scope
+-----------------------
+Chosen shape for this phase:
+
+1. extend the landed record-update form to allow one dotted field path such as
+   `base with { outer.inner: value }`
+2. require every path segment to be a known record field on the previous
+   segment's type
+3. infer the result type directly from `base`
+4. rebuild only the explicit nested record chain needed to preserve
+   immutability
+5. reject unknown fields, invalid non-record path segments, duplicate update
+   paths, and type-mismatched replacements
+
+Why this is the right next step
+-------------------------------
+- It is the narrowest follow-through on the real source-level limitation left
+  after Phase 195.
+- It reuses the existing explicit copy-with model instead of inventing a new
+  abstraction.
+- It gives the repository one more ergonomics improvement without changing
+  the underlying data model or runtime semantics.
+
+Required implementation surfaces
+--------------------------------
+The likely owning implementation surfaces for this phase are:
+
+1. `compiler/ast/ast.h`
+   - extend the record-update representation only enough to carry nested field
+     paths deterministically
+
+2. `compiler/parse/parser_expr.cpp`
+   - parse dotted field paths inside the existing `with { ... }` form with the
+     smallest recovery impact
+
+3. `compiler/sema/check.cpp`
+   - validate base type, field-path ownership, duplicate-path rejection, and
+     replacement typing at the terminal field
+
+4. `compiler/mir/`
+   - lower the nested update through existing aggregate rebuild machinery
+     rather than admitting a new runtime instruction
+
+5. active kernel owner code
+   - spend the feature immediately at the smallest real nested update sites
+     still forced to rebuild inner records by hand
+
+6. `tests/compiler/sema/` and `tests/compiler/mir/`
+   - add focused positive and negative coverage for nested-path typing and
+     deterministic lowering
+
+Chosen slice for this phase
+---------------------------
+1. one dotted nested field-path extension inside the existing record-update
+   form
+2. record-only path traversal
+3. terminal replacement typing
+4. immediate spend in active owner-local kernel code
+5. no generalized update semantics beyond nested named fields
+
+What this phase should not do
+-----------------------------
+- no hidden mutation or in-place update
+- no array, slice, map, or buffer element updates
+- no arbitrary computed paths
+- no struct embedding, property promotion, or object methods
+- no broader compile-time execution, reflection, or pattern-matching work
+
+Planning rule for this phase
+----------------------------
+- Start from one concrete remaining nested rebuild site in active kernel code.
+- Lower through the same aggregate and field mechanisms already used by
+  Phase 195.
+- Preserve deterministic dumps and fixture output.
+- If the syntax immediately pressures array-element updates, collection
+  updates, or mutation semantics, stop and name those as separate follow-on
+  work rather than widening this phase.
+
+What this phase should prove
+----------------------------
+- that the repository can remove the clearest remaining owner-local
+  record-update boilerplate without changing its data model
+- that the landed copy-with model extends one honest step further while
+  remaining explicit and immutable
+- that active kernel code becomes clearer exactly where the current language
+  still forces manual inner aggregate reconstruction

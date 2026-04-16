@@ -1,0 +1,162 @@
+Phase 197 -- Bounded Cross-Service Retained Restart Coordination Probe
+=====================================================================
+
+Status
+------
+PLANNED
+
+Purpose
+-------
+Test whether the current explicit retained-state reload model stays honest
+when one bounded caller-visible workflow depends on restart preserving one
+relationship across two retained owners rather than only preserving each
+owner in isolation.
+
+This phase should not invent a persistence framework.
+It should answer one narrower question: can one two-owner retained contract
+remain explicit, init-owned, and reviewable under restart, or has the
+repository reached the point where isolated per-service snapshot and reload
+is no longer the honest boundary?
+
+Relationship to companion notes
+-------------------------------
+This phase plan should stay aligned with:
+
+- `docs/plan/active/phase179_bounded_retained_state_reload_probe.txt`
+- `docs/plan/active/phase181_key_value_retained_state_reload_follow_through.txt`
+- `docs/plan/active/phase182_restart_identity_continuity_probe.txt`
+- `docs/plan/active/phase186_boot_decomposition_and_lifecycle_audit.txt`
+- `docs/plan/active/phase187_retained_queue_service_follow_through.txt`
+- `docs/plan/active/phase196_queue_observability_and_peek_follow_through.txt`
+- `docs/plan/backlog.txt`
+- `docs/plan/decision_log.txt`
+
+Repository status note
+----------------------
+- The repository already has explicit retained-state reload for
+  `log_service`, `kv_service`, and `queue_service`.
+- Each retained owner currently snapshots and reloads its own state in
+  isolation through an init-owned explicit restart path.
+- The current system has no generic snapshot bundle, no cross-service
+  persistence coordinator, and no durability claim.
+- Restart-visible identity is already explicit through stable routing plus
+  generation change, but retained-state continuity is still proved only
+  owner-by-owner.
+
+Problem being solved
+--------------------
+- The current retained-state model proves that one owner can preserve its own
+  state across restart, but it has not yet proved that one user-visible
+  workflow can rely on a bounded retained relationship across two owners.
+- Without that pressure, the repository still does not know whether explicit
+  per-service snapshot and reload remains the right owner boundary once
+  restart-visible behavior spans more than one retained service.
+- The next honest retained-state question is therefore not "general
+  persistence" but whether one bounded two-owner contract can survive restart
+  without forcing a framework.
+
+Core rule
+---------
+- Keep restart explicit and init-owned.
+- Keep retained-state truth inside the service owners that already own the
+  relevant state.
+- Add exactly one two-owner retained contract and prove it under restart.
+- Do not widen into transactions, snapshot bundles, durability, or a
+  persistence subsystem.
+- If the chosen contract cannot be expressed honestly through explicit owner
+  snapshots and init-owned reload, name that as the result instead of hiding
+  it behind new infrastructure.
+
+Chosen interaction shape
+------------------------
+Chosen shape for this phase:
+
+1. choose exactly one caller-visible workflow that depends on retained truth
+   across two existing retained owners
+2. define one explicit restart contract for that workflow in terms of those
+   two owners' preserved state
+3. keep snapshot and reload service-local, but make init restart preserve the
+   bounded cross-owner relationship the workflow depends on
+4. add one restart proof showing that the contract is visible before and
+   after restart
+5. stop at one relationship and do not generalize to arbitrary retained-owner
+   coordination
+
+Candidate contract shape
+------------------------
+The preferred contract for this phase should come from existing user-visible
+owners rather than a new service.
+Examples of acceptable shape include:
+
+1. a key-value plus queue relationship where queued work remains meaningful
+   only if the retained key-value state that describes or validates it also
+   survives restart
+2. a key-value plus log relationship where retained user-visible state and
+   its retained observation contract must continue to agree after restart
+
+The exact pair should be whichever yields the clearest user-visible proof
+without reopening authority or protocol-width work.
+
+Why this is the right next step
+-------------------------------
+- It pressures the retained-state model exactly one step beyond owner-local
+  reload without leaping to a persistence framework.
+- It reuses already-admitted retained owners instead of adding a fourth
+  service prematurely.
+- It gives a high-signal answer about whether explicit per-service reload is
+  still the right boundary or merely the current local minimum.
+
+Required implementation surfaces
+--------------------------------
+The likely owning implementation surfaces for this phase are:
+
+1. `kernel/src/init.mc`
+   - keep restart ownership explicit and extend the restart path only enough
+     to preserve the chosen two-owner contract
+
+2. the two retained service owners involved in the chosen contract
+   - expose the narrowest snapshot or reload truth needed for the bounded
+     cross-owner relationship
+
+3. `kernel/src/scenarios.mc`
+   - add one live workflow that establishes the contract, performs explicit
+     restart, and proves the contract still holds afterward
+
+4. `tests/system/` and `tests/tool/tool_kernel_reset_lane_suite.cpp`
+   - add one focused reset-lane fixture and one workflow registration proving
+     the contract directly
+
+Chosen slice for this phase
+---------------------------
+1. one bounded retained contract across two existing retained owners
+2. one explicit restart path that preserves that contract
+3. one live proof before and after restart
+4. no new generic retained-state machinery
+
+What this phase should not do
+-----------------------------
+- no generic snapshot registry
+- no durability or filesystem-backed persistence
+- no transaction model or atomic multi-owner snapshot bundle
+- no supervisor or retry framework
+- no compiler, sema, MIR, backend, ABI, target, runtime, or `hal` expansion
+
+Planning rule for this phase
+----------------------------
+- Start from one concrete caller-visible retained workflow, not from an
+  abstract persistence design.
+- Keep owner-local snapshot logic where it already belongs.
+- Make init own the explicit coordination step only if a real relationship
+  must be preserved across two retained owners.
+- If the chosen workflow exposes a blur that the current model cannot carry
+  honestly, stop and name that blur precisely instead of widening into a
+  framework inside the same phase.
+
+What this phase should prove
+----------------------------
+- whether the current explicit retained-state model scales one step beyond
+  isolated owner-local reload
+- whether one bounded cross-owner retained contract can remain explicit and
+  reviewable
+- whether the next retained-state pressure still belongs to kernel owners
+  rather than to a framework layer
