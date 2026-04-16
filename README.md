@@ -51,8 +51,8 @@ This summary mirrors the current statement in `docs/plan/admin/veya_running_syst
 - admitted service-layer boundary: shared service_effect Message and Effect contract; log_service, kv_service, queue_service, ticket_service, shell_service with compact hostile-user invalid classification (`?C`, `?S`), serial_service, echo_service, and transfer_service
 - admitted topology boundary: service_topology.mc owns SERIAL, SHELL, LOG, KV, ECHO, TRANSFER, QUEUE, and TICKET endpoint constants plus flat lookup helpers and static restart classification; shell_service.mc is topology-neutral
 - admitted event codes boundary: event_codes.mc owns the six observable event code constants; serial_shell_event_log.mc is a ring-buffer sink
-- admitted orchestration boundary: scenarios.mc owns the scripted observation loop; main.mc is init plus one call; init.mc owns endpoint-driven restart while retained-state reload now covers log, kv, and queue explicitly and reset-style restart now covers ticket_service
-- admitted proof set: Phases 109–188 (see `docs/plan/admin/veya_running_system_support_statement.txt` for the full list)
+- admitted orchestration boundary: scenarios.mc owns the scripted observation loop; main.mc is init plus one call; init.mc owns endpoint-driven restart, explicit retained-state reload for log or kv or queue, explicit coordinated retained restart for the workset (`kv` plus `queue`) and audit lane (`kv` plus `log`), and the boot-owned workset generation advances visible through the shell identity path
+- admitted proof set: Phases 109–201 (see `docs/plan/admin/veya_running_system_support_statement.txt` for the full list)
 - unsupported today: dynamic discovery, dynamic loading, a service manager, broader init policy, freestanding `mc run` or `mc test`, broader target-family admission, multicore, general packaging, struct embedding, and const functions
 
 Supported freestanding v0.3 slice:

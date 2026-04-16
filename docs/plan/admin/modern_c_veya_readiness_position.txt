@@ -41,6 +41,13 @@ Record one maintained repository position after Phase 176 admitted a fifth boot-
 Record one maintained repository position after Phase 177 hardened the shell as a hostile-user boundary with compact invalid classification and no payload-width or compiler expansion.
 Record one maintained repository position after Phase 178 kept topology and restart flat with one bounded structural follow-through.
 Record one maintained repository position after Phase 179 admitted one explicit retained-state reload path without opening persistence or compiler surfaces.
+Record one maintained repository position after Phase 189 admitted compact shell-visible lifecycle query and restart control without opening supervisor, framework, or compiler surfaces.
+Record one maintained repository position after Phase 193 admitted bounded shell-visible restart identity queries without widening into discovery or compiler work.
+Record one maintained repository position after Phase 196 admitted bounded queue observability without widening into mailbox or iteration frameworks.
+Record one maintained repository position after Phase 197 admitted one explicit coordinated retained restart target without opening persistence or compiler surfaces.
+Record one maintained repository position after Phase 198 admitted one bounded two-handle transfer follow-through without opening ordinary handle-bearing traffic or compiler surfaces.
+Record one maintained repository position after Phase 200 admitted one bounded coordinated retained workset identity query without opening bundle frameworks or compiler surfaces.
+Record one maintained repository position after Phase 201 admitted one second explicit coordinated retained restart target without opening retained-bundle frameworks or compiler surfaces.
 Record one maintained repository position after Phase 182 made restart identity explicit as stable routing plus replaced instance generation under the same endpoint and pid.
 Record one maintained repository position after Phase 183 made endpoint ids explicit stable public names and routing keys rather than authority tokens.
 Record one maintained repository position after Phase 184 hardened the dispatch gateway so non-zero received-handle metadata is rejected as explicit authority-bearing traffic rather than being silently treated as ordinary named messaging.
@@ -208,6 +215,13 @@ Current repository truth
 - The landed Phase 185 IPC shape re-audit keeps that authority gate as the default ordinary-message rule but admits one explicit transferred-handle exception: one transfer-only endpoint, one boot-owned monotonic grant table, and one bounded transfer_service follow-through path. This still belongs to the same admitted running-system slice rather than to a broader capability framework, typed transport redesign, payload widening wave, or reopened compiler wave.
 - The landed Phase 186 boot decomposition and lifecycle audit keeps the current flat split but repairs one owner blur: static restart classification now lives in `service_topology.mc`, while explicit restart enactment stays in `init.mc`; this belongs to the same admitted running-system slice rather than to a supervisor, lifecycle subsystem, or reopened compiler wave.
 - The landed Phase 187 retained queue service follow-through adds one bounded FIFO owner with explicit full, empty, dequeue, snapshot, and reload truth under that same lifecycle split; this belongs to the same admitted running-system slice rather than to a mailbox subsystem, persistence framework, queue framework, or reopened compiler wave.
+- The landed Phase 189 bounded shell lifecycle control follow-through adds one compact shell-visible `XQ` or `XR` control family over fixed public targets while keeping static lifecycle classification in `service_topology.mc` and restart enactment explicit and init-owned; this belongs to the same admitted running-system slice rather than to a supervisor, shell framework, or reopened compiler wave.
+- The landed Phase 193 bounded shell service identity query follow-through adds one compact `XI<target>!` identity query over the same fixed target set, exposing restart-visible generation truth without widening into discovery, richer control bundles, or reopened compiler work.
+- The landed Phase 196 queue observability and peek follow-through adds one bounded non-mutating count path and one bounded non-mutating peek path owned by `queue_service`; this belongs to the same admitted running-system slice rather than to a mailbox subsystem, iteration framework, or reopened compiler wave.
+- The landed Phase 197 bounded cross-service retained restart coordination probe adds one explicit coordinated retained workset target for `kv_service` plus `queue_service` on the existing shell lifecycle path; this belongs to the same admitted running-system slice rather than to a persistence framework, snapshot registry, or reopened compiler wave.
+- The landed Phase 198 multi-handle transfer follow-through under explicit authority extends the explicit transfer-only path to exactly one two-handle `(log, kv)` pair while keeping ordinary handle-bearing traffic closed; this belongs to the same admitted running-system slice rather than to a broader capability framework, transport redesign, or reopened compiler wave.
+- The landed Phase 200 bounded coordinated retained workset identity query follow-through adds one boot-owned coordinated workset generation counter visible through `XIW!`; this belongs to the same admitted running-system slice rather than to a bundle registry, richer identity framework, or reopened compiler wave.
+- The landed Phase 201 bounded second coordinated retained audit-lane probe adds one second explicit coordinated retained restart target for the `kv_service` plus `log_service` audit lane while keeping coordination flat and init-owned; this belongs to the same admitted running-system slice rather than to a retained-bundle framework, dynamic dependency policy, or reopened compiler wave.
 - The repository therefore proves that the current language, sema, MIR,
   backend, runtime, and build path are sufficient for one honest small kernel
   and running-system slice rather than only for freestanding representation
@@ -236,16 +250,21 @@ It means:
   compact shell-owned hostile-user invalid classification, flat topology
   lookup plus static restart classification over the boot-wired slots,
   endpoint-driven explicit restart over the admitted restartable services,
-  and explicit retained-state reload for `log_service`, `kv_service`, and
-  `queue_service` are now real inside that slice
+  shell-visible lifecycle query or restart or identity control on fixed
+  public targets, explicit retained-state reload for `log_service`,
+  `kv_service`, and `queue_service`, one coordinated retained workset restart
+  plus workset identity query, one second coordinated retained audit-lane
+  restart, bounded queue peek or count observability, and one explicit
+  two-handle transfer follow-through are now real inside that slice
 - broader platform, packaging, target-family, loader, namespace, kill, and
   scheduler-completion claims remain out of scope
 
-Phase 96 through Phase 166 are now concrete as one first real kernel wave,
+Phase 96 through Phase 201 are now concrete as one first real kernel wave,
 one ownership and hardware-boundary clarification wave, one first bounded
 running-system and plateau freeze wave, one interactive serial-shell system
 wave, one kernel behavioral reset wave, a service execution contract wave,
-and a model-boundary identification and repair wave.
+one model-boundary identification and repair wave, and one bounded retained-
+coordination and shell-control follow-through wave.
 
 That is meaningful implementation progress, but it is still an early system
 plateau rather than architectural completion.
@@ -372,11 +391,13 @@ What still needs discipline as implementation grows:
 
 Next milestone themes and work areas
 ------------------------------------
-Phase 180 closes the first post-Phase-174 plateau decision explicitly:
-service-system growth remains the stronger next frontier, and bounded
-second-target portability work stays deferred.
+Phases 197, 200, and 201 show that coordinated retained-state pressure still
+fits the current flat shell-plus-init ownership model. The next frontier
+should remain inside bounded service-system growth until a real consumer
+forces either a third coordinated retained bundle, richer coordinated
+identity, or stronger portability pressure.
 
-Recommended work themes after Phase 180:
+Recommended work themes after Phase 201:
 
 - continue inside the service system: prefer the next phase to land on one
   bounded service-growth, service-identity, retained-state, or user-facing
@@ -384,6 +405,10 @@ Recommended work themes after Phase 180:
 - preserve flat explicit ownership: keep routing, restart, retained-state, and
   shell behavior inside named owners instead of widening into a framework,
   supervisor, persistence layer, or compiler-facing mechanism by default
+- keep coordinated retained state explicit: reopen bundle or registry work
+  only when a third coordinated retained bundle appears, when two explicit
+  helpers in `init.mc` become more distortive than honest, or when callers
+  need coordinated identity or discovery across more than one fixed target
 - keep the two-phase boundary method: when a new running-system distortion is
   discovered, name it first and repair it in the next phase rather than
   widening opportunistically

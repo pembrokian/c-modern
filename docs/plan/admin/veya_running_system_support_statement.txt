@@ -9,7 +9,7 @@ Purpose
 -------
 Record the current admitted Veya running-system slice separately from the
 broader position note so the repository can state exactly what the work
-through Phase 188 does and does not support.
+through Phase 201 does and does not support.
 
 This is the current refreshed running-system statement.  It supersedes the
 earlier Phase 120 through Phase 121 statement and reflects the post-Phase-188
@@ -109,12 +109,26 @@ Repository status note
 - Phase 188 adds one bounded reset-style `ticket_service` whose shell-visible
   issued tickets carry an epoch byte and become explicitly stale across
   restart while the public endpoint id remains stable.
+- Phase 189 adds compact shell-visible lifecycle query and restart control on
+  fixed public targets while keeping restart enactment explicit and init-owned.
+- Phase 193 adds bounded shell-visible restart identity queries on the same
+  fixed-target control path.
+- Phase 196 adds queue count and peek observability without widening into
+  mailbox or iteration frameworks.
+- Phase 197 adds one explicit coordinated retained restart target for the
+  `kv_service` plus `queue_service` workset.
+- Phase 198 adds one bounded two-handle transfer follow-through while keeping
+  handle-bearing traffic explicit and transfer-only.
+- Phase 200 adds one caller-visible coordinated workset identity query through
+  a boot-owned workset generation counter.
+- Phase 201 adds one second explicit coordinated retained restart target for
+  the `kv_service` plus `log_service` audit lane.
 
 Core rule
 ---------
 - Keep this running-system support statement separate from the broader
   position note.
-- State only the admitted Phase 109 through Phase 188 running-system slice,
+- State only the admitted Phase 109 through Phase 201 running-system slice,
   not a larger platform ambition.
 - Keep service policy init-owned and explicit.
 - Reopen broader running-system claims only when a later kernel proof lands
@@ -149,10 +163,12 @@ Frozen support matrix
   explicitly;
   shell_service as a stateless
   command-routing owner with compact hostile-user invalid classification
-  (`?C` unknown command, `?S` malformed admitted shape); serial_service as
-  serial ingress and reply staging owner; handle-bearing observations remain
-  outside ordinary named messaging and are rejected at the dispatch gateway
-  with `InvalidCapability` unless they target the explicit transfer endpoint
+  (`?C` unknown command, `?S` malformed admitted shape) plus bounded
+  lifecycle query, restart, and identity routing on fixed public targets;
+  serial_service as serial ingress and reply staging owner; handle-bearing
+  observations remain outside ordinary named messaging and are rejected at
+  the dispatch gateway with `InvalidCapability` unless they target the
+  explicit transfer endpoint
 - admitted topology boundary: service_topology.mc owns SERIAL_ENDPOINT_ID,
   SHELL_ENDPOINT_ID, LOG_ENDPOINT_ID, KV_ENDPOINT_ID, ECHO_ENDPOINT_ID,
   TRANSFER_ENDPOINT_ID, QUEUE_ENDPOINT_ID, and TICKET_ENDPOINT_ID as the
@@ -165,7 +181,11 @@ Frozen support matrix
   sink consuming those codes from real effects
 - admitted orchestration boundary: scenarios.mc owns one scripted observation
   loop; main.mc is init plus one call to scenarios.run(state); boot.mc owns
-  kernel_init and the dispatch loop with named arms
+  kernel_init and the dispatch loop with named arms; init.mc owns
+  endpoint-driven restart, explicit per-service retained reload for log or kv
+  or queue, explicit coordinated retained restart for the workset (`kv` plus
+  `queue`) and audit lane (`kv` plus `log`), and the boot-owned workset
+  generation advances visible through the shell identity path
 - admitted proof set: Phase 109 first-running-kernel slice, Phase 110
   ownership split, Phase 111 scheduler and lifecycle clarification, Phase
   112 syscall boundary, Phase 113 interrupt-entry and generic-dispatch, Phase
@@ -202,7 +222,14 @@ Frozen support matrix
   authority audit, Phase 184 capability propagation and leakage probe, Phase
   185 IPC shape re-audit under restart and retained state, Phase 186 boot
   decomposition and lifecycle audit, Phase 187 retained queue service
-  follow-through, and Phase 188 restart-visible ticket service follow-through
+  follow-through, Phase 188 restart-visible ticket service follow-through,
+  Phase 189 bounded shell lifecycle control follow-through, Phase 193 bounded
+  shell service identity query follow-through, Phase 196 queue observability
+  and peek follow-through, Phase 197 bounded cross-service retained restart
+  coordination probe, Phase 198 multi-handle transfer follow-through under
+  explicit authority, Phase 200 bounded coordinated retained workset identity
+  query follow-through, and Phase 201 bounded second coordinated retained
+  audit-lane probe
 - unsupported today: dynamic discovery, a general namespace model, dynamic
   loading, a service manager, broader init policy, public freestanding `mc
   run` or `mc test`, broader target-family admission, multicore claims,
