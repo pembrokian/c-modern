@@ -3,6 +3,7 @@
 
 #include <cstddef>
 #include <filesystem>
+#include <functional>
 #include <optional>
 #include <sstream>
 #include <string>
@@ -116,6 +117,199 @@ struct FunctionLoweringState {
     std::unordered_map<std::string, std::string> values;
     std::unordered_map<std::string, BackendTypeInfo> value_types;
 };
+
+struct ExecutableValue {
+    std::string text;
+    BackendTypeInfo type;
+    std::optional<std::string> storage_slot;
+    std::optional<sema::Type> source_type;
+};
+
+struct ExecutableStringConstant {
+    std::string global_name;
+    std::string array_type;
+    std::size_t length = 0;
+};
+
+struct ExecutableGlobalInfo {
+    std::string backend_name;
+    sema::Type type;
+    BackendTypeInfo lowered_type;
+    bool is_const = false;
+    bool is_extern = false;
+    std::vector<std::string> initializers;
+};
+
+using ExecutableGlobals = std::unordered_map<std::string, ExecutableGlobalInfo>;
+
+struct ExecutableSignature {
+    std::vector<sema::Type> param_types;
+    std::vector<sema::Type> return_types;
+};
+
+struct ExecutableFunctionSignature {
+    std::vector<const mir::Local*> params;
+    ExecutableSignature types;
+};
+
+struct ExecutableCallSignature {
+    std::string callee_text;
+    std::string call_label;
+    ExecutableSignature types;
+};
+
+struct ExecutableFunctionState {
+    const mir::Module* module = nullptr;
+    const mir::Function* function = nullptr;
+    ExecutableFunctionSignature signature;
+    std::unordered_map<std::string, std::string> block_labels;
+    std::unordered_map<std::string, std::string> local_slots;
+    const ExecutableGlobals* globals = nullptr;
+    std::unordered_map<std::string, ExecutableStringConstant> string_constants;
+    std::unordered_map<std::string, ExecutableValue> values;
+};
+
+bool ResolveExecutableValue(const ExecutableFunctionState& state,
+                            const std::string& value_name,
+                            const mir::BasicBlock& block,
+                            const std::filesystem::path& source_path,
+                            support::DiagnosticSink& diagnostics,
+                            ExecutableValue& value);
+
+bool ResolveExecutableOperands(const mir::Instruction& instruction,
+                               const mir::BasicBlock& block,
+                               const std::filesystem::path& source_path,
+                               support::DiagnosticSink& diagnostics,
+                               const ExecutableFunctionState& state,
+                               ExecutableValue& first);
+
+bool ResolveExecutableOperands(const mir::Instruction& instruction,
+                               const mir::BasicBlock& block,
+                               const std::filesystem::path& source_path,
+                               support::DiagnosticSink& diagnostics,
+                               const ExecutableFunctionState& state,
+                               ExecutableValue& first,
+                               ExecutableValue& second);
+
+bool ResolveExecutableOperands(const mir::Instruction& instruction,
+                               const mir::BasicBlock& block,
+                               const std::filesystem::path& source_path,
+                               support::DiagnosticSink& diagnostics,
+                               const ExecutableFunctionState& state,
+                               ExecutableValue& first,
+                               ExecutableValue& second,
+                               ExecutableValue& third);
+
+std::optional<sema::Type> ResolveExecutableFieldBaseType(const mir::Module& module,
+                                                         const sema::Type& metadata_base_type,
+                                                         const ExecutableValue& base_value);
+
+void RecordExecutableValue(ExecutableFunctionState& state,
+                           const std::string& result_name,
+                           const std::string& text,
+                           const BackendTypeInfo& type,
+                           std::optional<std::string> storage_slot = std::nullopt,
+                           std::optional<sema::Type> source_type = std::nullopt);
+
+bool EmitValueRepresentationCoercion(const ExecutableValue& value,
+                                     const BackendTypeInfo& target_type,
+                                     std::size_t function_index,
+                                     std::size_t block_index,
+                                     std::size_t instruction_index,
+                                     std::string_view suffix,
+                                     std::vector<std::string>& output_lines,
+                                     std::string& coerced);
+
+bool ExtendIntegerToI64(const ExecutableValue& value,
+                        std::size_t function_index,
+                        std::size_t block_index,
+                        std::size_t instruction_index,
+                        std::string_view suffix,
+                        std::vector<std::string>& output_lines,
+                        std::string& extended);
+
+bool EmitNumericConversion(const ExecutableValue& operand,
+                           const BackendTypeInfo& result_type,
+                           std::size_t function_index,
+                           std::size_t block_index,
+                           std::size_t instruction_index,
+                           std::vector<std::string>& output_lines,
+                           std::string& result_text);
+
+namespace executable_support {
+
+ExecutableFunctionSignature NormalizeFunctionSignature(const mir::Function& function);
+
+bool NormalizeProcedureTypeSignature(const sema::Type& procedure_type,
+                                     const std::filesystem::path& source_path,
+                                     support::DiagnosticSink& diagnostics,
+                                     std::string_view context,
+                                     ExecutableSignature& signature);
+
+sema::Type SignatureResultType(const ExecutableSignature& signature);
+
+bool LowerExecutableParamTypes(const mir::Module& module,
+                               const ExecutableSignature& signature,
+                               const std::filesystem::path& source_path,
+                               support::DiagnosticSink& diagnostics,
+                               const std::function<std::string(std::size_t)>& describe_param,
+                               std::vector<BackendTypeInfo>& param_types);
+
+bool LowerExecutableReturnType(const mir::Module& module,
+                               const ExecutableSignature& signature,
+                               const std::filesystem::path& source_path,
+                               support::DiagnosticSink& diagnostics,
+                               std::string_view context,
+                               std::optional<BackendTypeInfo>& return_type);
+
+void RenderExecutableParameterList(const ExecutableFunctionSignature& function_signature,
+                                   const std::vector<BackendTypeInfo>& param_types,
+                                   bool include_names,
+                                   std::ostringstream& stream);
+
+bool LowerExecutableLocalTypes(const mir::Module& module,
+                               const mir::Function& function,
+                               const std::filesystem::path& source_path,
+                               support::DiagnosticSink& diagnostics,
+                               std::vector<BackendTypeInfo>& local_types);
+
+void RenderExecutableEntryPrologue(const mir::Function& function,
+                                   const ExecutableFunctionSignature& function_signature,
+                                   const std::vector<BackendTypeInfo>& local_types,
+                                   const std::vector<BackendTypeInfo>& param_types,
+                                   std::ostringstream& stream);
+
+ExecutableFunctionState InitializeExecutableFunctionState(
+    const mir::Module& module,
+    const mir::Function& function,
+    const ExecutableFunctionSignature& function_signature,
+    std::size_t function_index,
+    const ExecutableGlobals& globals,
+    std::unordered_map<std::string, ExecutableStringConstant> string_constants);
+
+bool CollectExecutableStringConstants(const mir::Module& module,
+                                     const mir::Function& function,
+                                     std::size_t function_index,
+                                     const std::filesystem::path& source_path,
+                                     support::DiagnosticSink& diagnostics,
+                                     std::ostringstream& stream,
+                                     std::unordered_map<std::string, ExecutableStringConstant>& string_constants);
+
+}  // namespace executable_support
+
+namespace executable_atomic {
+
+bool RenderAtomicInstruction(const mir::Instruction& instruction,
+                             std::size_t function_index,
+                             std::size_t block_index,
+                             std::size_t instruction_index,
+                             const mir::BasicBlock& block,
+                             const std::filesystem::path& source_path,
+                             support::DiagnosticSink& diagnostics,
+                             ExecutableFunctionState& state,
+                             std::vector<std::string>& output_lines);
+
+}  // namespace executable_atomic
 
 inline std::string_view ToString(mir::Instruction::Kind kind) {
     switch (kind) {

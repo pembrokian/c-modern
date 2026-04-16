@@ -404,6 +404,109 @@ void TestBuildObjectFileRejectsMalformedIndirectCallSignatureMetadata() {
            "malformed indirect call signature metadata should not write an LLVM IR artifact");
 }
 
+void TestBuildObjectFileUsesDirectCalleeDeclarationForCallSignature() {
+    mc::mir::Instruction callee_symbol {
+        .kind = mc::mir::Instruction::Kind::kSymbolRef,
+        .result = "%fn",
+        .type = mc::sema::Type {
+            .kind = mc::sema::Type::Kind::kProcedure,
+            .name = "proc(i32) -> i32",
+            .metadata = "2",
+            .subtypes = {mc::sema::NamedType("i32")},
+        },
+        .target_kind = mc::mir::Instruction::TargetKind::kFunction,
+        .target_name = "add1",
+    };
+
+    mc::mir::Instruction arg {
+        .kind = mc::mir::Instruction::Kind::kConst,
+        .result = "%arg0",
+        .type = mc::sema::NamedType("i32"),
+        .op = "41",
+    };
+
+    mc::mir::Instruction call {
+        .kind = mc::mir::Instruction::Kind::kCall,
+        .result = "%v1",
+        .type = mc::sema::NamedType("i32"),
+        .target_kind = mc::mir::Instruction::TargetKind::kFunction,
+        .target_name = "add1",
+        .operands = {"%fn", "%arg0"},
+    };
+
+    mc::mir::BasicBlock main_entry {
+        .label = "entry0",
+        .instructions = {callee_symbol, arg, call},
+        .terminator = {
+            .kind = mc::mir::Terminator::Kind::kReturn,
+            .values = {"%v1"},
+        },
+    };
+
+    mc::mir::Instruction load_param {
+        .kind = mc::mir::Instruction::Kind::kLoadLocal,
+        .result = "%v0",
+        .type = mc::sema::NamedType("i32"),
+        .target = "x",
+    };
+
+    mc::mir::BasicBlock callee_entry {
+        .label = "entry0",
+        .instructions = {load_param},
+        .terminator = {
+            .kind = mc::mir::Terminator::Kind::kReturn,
+            .values = {"%v0"},
+        },
+    };
+
+    mc::mir::Function add1 {
+        .name = "add1",
+        .locals = {
+            mc::mir::Local {
+                .name = "x",
+                .type = mc::sema::NamedType("i32"),
+                .is_parameter = true,
+            },
+        },
+        .return_types = {mc::sema::NamedType("i32")},
+        .blocks = {callee_entry},
+    };
+
+    mc::mir::Function main_function {
+        .name = "main",
+        .return_types = {mc::sema::NamedType("i32")},
+        .blocks = {main_entry},
+    };
+
+    const std::filesystem::path artifact_dir =
+        std::filesystem::temp_directory_path() / "mc_codegen_llvm_direct_call_signature";
+    std::error_code remove_error;
+    std::filesystem::remove_all(artifact_dir, remove_error);
+
+    mc::support::DiagnosticSink diagnostics;
+    const auto object_result = mc::codegen_llvm::BuildObjectFile(
+        mc::mir::Module {.functions = {add1, main_function}},
+        "tests/cases/hello.mc",
+        {
+            .target = mc::codegen_llvm::BootstrapTargetConfig(),
+            .artifacts = {
+                .llvm_ir_path = artifact_dir / "direct_call_signature.ll",
+                .object_path = artifact_dir / "direct_call_signature.o",
+            },
+            .wrap_hosted_main = false,
+        },
+        diagnostics);
+
+    Expect(object_result.ok, "direct call lowering should derive its signature from the direct callee declaration");
+    Expect(!diagnostics.HasErrors(), "direct call lowering should ignore malformed operand metadata when the direct callee declaration is valid");
+
+    std::ifstream ir_stream(artifact_dir / "direct_call_signature.ll");
+    Expect(ir_stream.good(), "direct call signature lowering should write LLVM IR output");
+    const std::string ir((std::istreambuf_iterator<char>(ir_stream)), std::istreambuf_iterator<char>());
+    Expect(ir.find("call i32 @add1(i32 41)") != std::string::npos,
+           "direct call lowering should still emit the direct callee call using the declaration signature");
+}
+
 void TestBuildObjectFileEscapesSourceFilenameInModuleHeader() {
     const std::filesystem::path artifact_dir =
         std::filesystem::temp_directory_path() / "mc_codegen_llvm_source_filename_escape";
@@ -1255,6 +1358,7 @@ int main() {
     TestBuildObjectFileRejectsUnsupportedExecutableInstructionBeforeIrEmission();
     TestBuildObjectFileRejectsReturnWithoutDeclaredValue();
     TestBuildObjectFileRejectsMalformedIndirectCallSignatureMetadata();
+    TestBuildObjectFileUsesDirectCalleeDeclarationForCallSignature();
     TestBuildObjectFileEscapesSourceFilenameInModuleHeader();
     TestBuildObjectFileFreestandingOmitsHostedRuntimePrologue();
     TestBuildObjectFileLowersPanicTerminator();

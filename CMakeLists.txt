@@ -84,6 +84,9 @@ target_link_libraries(mc_mir PUBLIC mc_sema_bootstrap mc_frontend_stub mc_suppor
 
 add_library(mc_codegen_llvm STATIC
     compiler/codegen_llvm/backend_dump.cpp
+    compiler/codegen_llvm/backend_executable_atomic.cpp
+    compiler/codegen_llvm/backend_executable_support.cpp
+    compiler/codegen_llvm/backend_executable_value_support.cpp
     compiler/codegen_llvm/backend_host.cpp
     compiler/codegen_llvm/backend_inspect.cpp
     compiler/codegen_llvm/backend_names.cpp
