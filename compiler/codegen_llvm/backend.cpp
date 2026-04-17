@@ -798,12 +798,25 @@ bool RenderLLVMEnumConstValue(const mir::Module& module,
 bool RenderLLVMGlobalConstValue(const mir::Module& module,
                                 sema::Type type,
                                 const sema::ConstValue& value,
+                                bool wrap_hosted_main,
                                 const std::filesystem::path& source_path,
                                 support::DiagnosticSink& diagnostics,
                                 std::string& rendered) {
     type = sema::CanonicalizeBuiltinType(std::move(type));
     if (type.kind == sema::Type::Kind::kConst && !type.subtypes.empty()) {
-        return RenderLLVMGlobalConstValue(module, type.subtypes.front(), value, source_path, diagnostics, rendered);
+        return RenderLLVMGlobalConstValue(module, type.subtypes.front(), value, wrap_hosted_main, source_path, diagnostics, rendered);
+    }
+
+    if (value.kind == sema::ConstValue::Kind::kProcedure) {
+        const sema::Type canonical_type = StripMirAliasOrDistinct(module, std::move(type));
+        if (canonical_type.kind != sema::Type::Kind::kProcedure) {
+            ReportBackendError(source_path,
+                               "LLVM bootstrap backend requires procedure-typed global constant for named procedure reference",
+                               diagnostics);
+            return false;
+        }
+        rendered = LLVMFunctionSymbol(value.procedure_name, wrap_hosted_main);
+        return true;
     }
 
     const sema::Type canonical_type = StripMirAliasOrDistinct(module, std::move(type));
@@ -857,6 +870,7 @@ bool RenderLLVMGlobalConstValue(const mir::Module& module,
             if (!RenderLLVMGlobalConstValue(module,
                                             canonical_type.subtypes.front(),
                                             value.elements[index],
+                                            wrap_hosted_main,
                                             source_path,
                                             diagnostics,
                                             element_text)) {
@@ -912,7 +926,13 @@ bool RenderLLVMGlobalConstValue(const mir::Module& module,
         }
 
         std::string field_text;
-        if (!RenderLLVMGlobalConstValue(module, fields[index].second, value.elements[index], source_path, diagnostics, field_text)) {
+        if (!RenderLLVMGlobalConstValue(module,
+                                        fields[index].second,
+                                        value.elements[index],
+                                        wrap_hosted_main,
+                                        source_path,
+                                        diagnostics,
+                                        field_text)) {
             return false;
         }
 
@@ -4865,6 +4885,7 @@ bool RenderLlvmModuleImpl(const mir::Module& module,
                 if (!RenderLLVMGlobalConstValue(module,
                                                 global.type,
                                                 *global.constant_values[index],
+                                                wrap_hosted_main,
                                                 source_path,
                                                 diagnostics,
                                                 init_value)) {

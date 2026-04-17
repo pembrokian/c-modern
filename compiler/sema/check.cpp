@@ -3038,9 +3038,21 @@ std::optional<ConstValue> ConstExprEvaluator::EvaluateConstExpr(const Expr& expr
                                                                 std::unordered_set<std::string>& active_names) {
     switch (expr.kind) {
         case Expr::Kind::kName:
+            if (expr.type_args.empty()) {
+                if (const auto* function = FindFunctionSignature(context_.module, expr.text);
+                    function != nullptr && function->type_params.empty()) {
+                    return MakeProcedureConstValue(expr.text);
+                }
+            }
             return EvaluateTopLevelConst(expr.text, report_errors, active_names);
         case Expr::Kind::kQualifiedName:
             if (const Module* imported_module = context_.find_imported_module(expr.text); imported_module != nullptr) {
+                if (expr.type_args.empty()) {
+                    if (const auto* function = FindFunctionSignature(*imported_module, expr.secondary_text);
+                        function != nullptr && function->type_params.empty()) {
+                        return MakeProcedureConstValue(QualifyImportedName(expr.text, expr.secondary_text));
+                    }
+                }
                 if (const auto* global = FindGlobalSummary(*imported_module, expr.secondary_text);
                     global != nullptr && global->is_const) {
                     return ParseGlobalConstValue(*global, expr.secondary_text);

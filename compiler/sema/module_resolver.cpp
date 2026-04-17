@@ -72,6 +72,11 @@ ConstValue RewriteImportedConstValue(ConstValue value,
     if (value.kind == ConstValue::Kind::kEnum) {
         value.enum_type = RewriteImportedTypeNames(std::move(value.enum_type), module_name, local_type_names, type_params);
     }
+    if (value.kind == ConstValue::Kind::kProcedure &&
+        !value.procedure_name.empty() &&
+        value.procedure_name.find('.') == std::string::npos) {
+        value.procedure_name = QualifyImportedName(module_name, value.procedure_name);
+    }
     for (auto& element : value.elements) {
         element = RewriteImportedConstValue(std::move(element), module_name, local_type_names, type_params);
     }

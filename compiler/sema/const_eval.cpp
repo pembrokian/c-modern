@@ -170,6 +170,8 @@ bool ConstValuesEqual(const ConstValue& left, const ConstValue& right) {
             return left.text == right.text;
         case ConstValue::Kind::kNil:
             return true;
+        case ConstValue::Kind::kProcedure:
+            return left.procedure_name == right.procedure_name;
         case ConstValue::Kind::kEnum:
             if (left.enum_type != right.enum_type || left.variant_name != right.variant_name ||
                 left.variant_tag != right.variant_tag || left.field_names != right.field_names ||
@@ -262,6 +264,8 @@ std::string RenderConstValue(const ConstValue& value) {
             return value.text;
         case ConstValue::Kind::kNil:
             return "nil";
+        case ConstValue::Kind::kProcedure:
+            return value.procedure_name;
         case ConstValue::Kind::kEnum: {
             std::ostringstream stream;
             stream << FormatType(value.enum_type) << '.' << value.variant_name;
@@ -320,6 +324,14 @@ ConstValue MakeConstValue(double value) {
     ConstValue result;
     result.kind = ConstValue::Kind::kFloat;
     result.float_value = value;
+    result.text = RenderConstValue(result);
+    return result;
+}
+
+ConstValue MakeProcedureConstValue(std::string procedure_name) {
+    ConstValue result;
+    result.kind = ConstValue::Kind::kProcedure;
+    result.procedure_name = std::move(procedure_name);
     result.text = RenderConstValue(result);
     return result;
 }

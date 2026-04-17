@@ -143,6 +143,11 @@ std::string SerializeConstValue(const std::optional<sema::ConstValue>& value) {
             return "s:" + value->text;
         case sema::ConstValue::Kind::kNil:
             return "n:";
+        case sema::ConstValue::Kind::kProcedure: {
+            std::string encoded = "p:";
+            AppendLengthPrefixed(encoded, value->procedure_name);
+            return encoded;
+        }
         case sema::ConstValue::Kind::kEnum: {
             std::string encoded = "e:";
             AppendLengthPrefixed(encoded, sema::FormatType(value->enum_type));
@@ -327,6 +332,17 @@ std::optional<sema::ConstValue> ParseConstValue(std::string_view text) {
             value.kind = sema::ConstValue::Kind::kInteger;
             value.integer_value = *parsed;
             value.text = std::to_string(*parsed);
+            return value;
+        }
+        case 'p': {
+            std::string_view payload = text.substr(2);
+            const auto procedure_name = ConsumeLengthPrefixed(payload);
+            if (!procedure_name.has_value() || !payload.empty()) {
+                return std::nullopt;
+            }
+            value.kind = sema::ConstValue::Kind::kProcedure;
+            value.procedure_name = std::string(*procedure_name);
+            value.text = sema::RenderConstValue(value);
             return value;
         }
         case 'f': {

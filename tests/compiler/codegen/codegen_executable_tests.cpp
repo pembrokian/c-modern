@@ -522,6 +522,12 @@ void RunCodegenExecutableCoreSuite(const std::filesystem::path& source_root,
                     42,
                     {});
 
+    RunBuiltFixture(mc_path,
+                    source_root / "tests/compiler/codegen/procedure_dispatch_table.mc",
+                    work_root / "procedure_dispatch_table",
+                    45,
+                    {});
+
     const std::filesystem::path global_source = work_root / "global_counter.mc";
     WriteFile(global_source,
               "var counter: i32 = 7\n"

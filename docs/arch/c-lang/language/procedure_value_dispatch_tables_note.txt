@@ -1,57 +1,31 @@
-Modern C - Procedure-Value Dispatch Tables Note
-================================================
+Modern C - Procedure-Value Dispatch Tables
+==========================================
 
 Purpose
 -------
-Record one narrow open language question that has now appeared repeatedly in
-real code pressure: whether Modern C should explicitly admit and prove
-procedure-value dispatch tables as ordinary typed data.
+Record the admitted narrow callable-data surface for explicit procedure-value
+dispatch tables.
 
-This note is intentionally narrower than a general function-pointer feature
-proposal. The repository already admits procedure types and callable values.
-The remaining question is whether explicit typed tables of those values should
-be part of the maintained source contract and compiler proof surface.
+This note is intentionally narrower than a general function-pointer, closure,
+or callback-framework proposal. Modern C now admits explicit typed fixed arrays
+and structs containing exact-signature named procedures as ordinary typed data.
 
-Current repository status
--------------------------
-- The language already treats procedure types as first-class semantic types.
-- The call syntax already allows calling a callable value rather than only a
-  named function declaration.
-- The compiler already has direct evidence for procedure-typed locals, fields,
-  parameter passing, and indirect calls.
-- Real kernel and service code still trends toward explicit switches or flat
-  if-chains because the repository does not yet present an equally obvious,
-  explicitly maintained table-shaped pattern for dispatch.
-
-Problem being named
--------------------
-- The repeated pressure is not for closures, callbacks with hidden captures,
-  registries, or dynamic service routing.
-- The repeated pressure is for one simpler source-level pattern: an explicit
-  typed struct or fixed array whose elements are named procedures of one known
-  signature, so the table itself is just ordinary data.
-- Without that maintained pattern, code that would naturally centralize one
-  family of operation-to-handler mappings may instead stay in repeated switch
-  arms or one-off helper families, even when the real semantics are already
-  table-shaped.
-
-Proposed admitted surface
--------------------------
-If the language is widened here, keep the admission strictly narrow:
-
+Admitted surface
+----------------
 1. procedure values remain non-capturing callable values with exact signature
-   identity
-2. named procedures may appear anywhere an ordinary value of matching
-   procedure type is already legal
+  identity
+2. named non-generic procedures may appear as constant ingredients when the
+  destination type is an explicit matching procedure type
 3. explicit typed aggregate literals may contain procedure values when every
-   element or field matches the declared procedure type exactly
+  element or field matches the declared procedure type exactly
 4. top-level `const` values, local values, struct fields, and fixed-array
-   elements may use procedure values under the same explicit typing rules
-5. calling through a procedure value loaded from such a table uses the
-   ordinary call rules already admitted for callable values
+  elements may use procedure values under the same explicit typing rules
+5. imported constant aggregates containing procedure values remain valid across
+  module-surface export, import rewriting, and build-unit namespacing
+6. calling through a procedure value loaded from such a table uses the
+  ordinary call rules already admitted for callable values
 
-The key point is that the language feature should be: explicit typed data that
-happens to contain procedure values.
+The feature is: explicit typed data that happens to contain procedure values.
 
 Suggested spellings
 -------------------
@@ -88,8 +62,8 @@ handler: func(u8) u8 = OPS[index]
 return handler(value)
 ```
 
-Why this surface is attractive
-------------------------------
+Why this surface exists
+-----------------------
 - It reuses existing procedure-type and ordinary-call semantics instead of
   inventing a second callable model.
 - It matches the repository's preference for explicit typed data rather than
@@ -97,8 +71,8 @@ Why this surface is attractive
 - It gives user-space and library code a clean table-shaped pattern without
   forcing the kernel architecture to prefer tables over explicit owner-local
   routing.
-- It creates a narrow target for parser, sema, MIR, and codegen proof work if
-  any current pipeline stage still rejects the shape.
+- It stays inside one narrow parser/sema/constant-evaluation/import/codegen
+  slice rather than widening into a broader callable feature wave.
 
 Non-goals
 ---------
@@ -106,22 +80,11 @@ Non-goals
 - lambda syntax or anonymous procedure literals
 - callback registries, service discovery tables, or dynamic broker layers
 - implicit coercion between distinct procedure signatures
+- generic procedure instantiation as a constant ingredient
 - erased `void*`-style callback conventions
 - method promotion, object-model dispatch, or hidden vtable semantics
 - using language support for procedure tables as an argument to replace the
   kernel's explicit routing style wholesale
-
-Questions that remain open
---------------------------
-1. Should procedure references count as admitted constant ingredients for all
-   explicit aggregate-constant paths, or should some positions remain local- or
-   runtime-only until stronger pressure appears?
-2. Is fixed-array support enough for honest dispatch pressure, or do real
-   programs also need top-level struct constants that contain procedure values?
-3. Should the language say anything about equality or ordering on procedure
-   values now, or keep this work limited to storage, transport, and call?
-4. Does the repository want this admitted surface in v0.2, or should it stay a
-   documented deferral until a second real consumer appears outside the kernel?
 
 Design guardrail
 ----------------
@@ -130,14 +93,9 @@ decision, not as an architecture decision. The language may admit the shape
 while the kernel and reset-lane system still prefer flat owner-local routing,
 switches, and topology-owned explicit dispatch.
 
-Narrowest honest next move
---------------------------
-The next step should not be a broad callable-feature wave. It should be one
-bounded probe or closure pass that answers a smaller question:
-
-- Can explicit typed struct and fixed-array tables of named procedures survive
-  parse, sema, MIR, constant handling, and executable lowering honestly?
-
-If yes, standardize and prove that shape.
-If no, fix only the rejecting owner boundary rather than widening into
-closures, registries, or framework-style callback machinery.
+Current boundary
+----------------
+The admitted surface is intentionally limited to named procedures with exact
+signatures stored in explicit typed aggregates. It does not imply procedure
+equality, ordering, closures, erased callbacks, or a broader callback
+framework.

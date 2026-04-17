@@ -1,0 +1,11 @@
+SemanticModule
+  TypeDecl name=Routes kind=struct
+    Field name=first type=proc(u8)->u8
+    Field name=second type=proc(u8)->u8
+    Layout size=16 align=8 offsets=[0, 8]
+  Const names=[OPS] type=[2]proc(u8)->u8 values=[{inc, dec}]
+  Const names=[ROUTES] type=Routes values=[{first: inc, second: dec}]
+  Function name=inc params=[u8] returns=[u8]
+  Function name=dec params=[u8] returns=[u8]
+  Function name=apply_local params=[u8] returns=[u8]
+  Function name=main params=[] returns=[i32]

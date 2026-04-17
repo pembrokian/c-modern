@@ -17,6 +17,7 @@
 #include "compiler/codegen_llvm/backend.h"
 #include "compiler/lex/lexer.h"
 #include "compiler/mci/mci.h"
+#include "compiler/sema/const_eval.h"
 #include "compiler/support/assert.h"
 #include "compiler/support/dump_paths.h"
 #include "compiler/support/module_paths.h"
@@ -784,6 +785,24 @@ void RewriteImportedTypeDecl(mc::mir::TypeDecl& type_decl,
     }
 }
 
+mc::sema::ConstValue RewriteImportedConstValue(mc::sema::ConstValue value,
+                                               const std::unordered_map<std::string, std::string>& renamed_types,
+                                               const std::unordered_map<std::string, std::string>& renamed_functions) {
+    if (value.kind == mc::sema::ConstValue::Kind::kEnum) {
+        value.enum_type = RewriteImportedTypeNames(std::move(value.enum_type), renamed_types);
+    }
+    if (value.kind == mc::sema::ConstValue::Kind::kProcedure) {
+        if (const auto found = renamed_functions.find(value.procedure_name); found != renamed_functions.end()) {
+            value.procedure_name = found->second;
+        }
+    }
+    for (auto& element : value.elements) {
+        element = RewriteImportedConstValue(std::move(element), renamed_types, renamed_functions);
+    }
+    value.text = mc::sema::RenderConstValue(value);
+    return value;
+}
+
 void RewriteImportedSymbolReference(const std::unordered_map<std::string, std::string>& renamed_functions,
                                     const std::unordered_map<std::string, std::string>& renamed_globals,
                                     mc::mir::Instruction::TargetKind target_kind,
@@ -934,6 +953,12 @@ void NamespaceImportedBuildUnit(mc::mir::Module& module,
             const std::string qualified_name = QualifyImportedSymbol(module_name, name);
             renamed_globals.emplace(name, qualified_name);
             name = qualified_name;
+        }
+        for (auto& value : global.constant_values) {
+            if (!value.has_value()) {
+                continue;
+            }
+            value = RewriteImportedConstValue(std::move(*value), renamed_types, renamed_functions);
         }
     }
 

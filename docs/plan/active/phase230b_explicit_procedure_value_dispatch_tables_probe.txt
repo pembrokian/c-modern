@@ -3,13 +3,13 @@ Phase 230b -- Explicit Procedure-Value Dispatch Tables Probe
 
 Status
 ------
-PROPOSED
+LANDED
 
 Purpose
 -------
-Decide whether Modern C should explicitly admit typed procedure-value dispatch
-tables as ordinary data, and if the answer is yes, close only the narrow owner
-boundaries needed to make that shape compile honestly end to end.
+Admit one narrow callable-data surface: explicit typed procedure-value dispatch
+tables as ordinary data, and close only the owner boundaries needed to make
+that shape compile honestly end to end.
 
 This phase is intentionally smaller than a general callable-feature expansion.
 It is a data-shape and proof-surface probe, not a closure, callback-framework,
@@ -27,15 +27,20 @@ Repository status note
   clearly maintained, obviously supported pattern for explicit typed dispatch
   tables of named procedures.
 
-Problem being solved
---------------------
-- The repository already supports individual procedure values, but it does not
-  yet clearly state or prove whether fixed arrays and aggregate constants of
-  named procedures are admitted as ordinary typed data.
-- Without that clarity, authors either avoid the table-shaped source pattern or
-  have to discover support boundaries experimentally.
-- The missing work is not to add closures or registries; it is to decide and,
-  if needed, prove one explicit table-shaped callable pattern.
+Landed outcome
+--------------
+- explicit typed fixed arrays and structs containing exact-signature named
+  non-generic procedures are now admitted as ordinary typed data
+- top-level `const` aggregates, local explicit typed aggregates, indexed lookup,
+  field lookup, and ordinary indirect call all compile honestly through the
+  owned pipeline
+- imported constant aggregates containing procedure values survive module
+  surface export, import rewriting, and build-unit namespacing
+- the compiler change stayed narrow to sema constant evaluation, constant
+  serialization, imported-symbol rewriting, and executable global emission
+- the phase deliberately did not widen into closures, callback registries,
+  erased callbacks, procedure equality, ordering, or generic procedure
+  constants
 
 Core rule
 ---------
@@ -93,15 +98,15 @@ Kernel-boundary path
   service routing into tables
 - keep any kernel-facing demonstration small and optional
 
-Questions this phase must answer
---------------------------------
-1. Are named procedures already valid constant ingredients for explicit typed
-   aggregate constants in every path needed for table-shaped storage?
-2. If not, which boundary is actually rejecting the shape?
-3. Is fixed-array support alone enough, or do real consumers also need struct
-   constants of procedure values?
-4. Can the repository admit this feature without reopening equality,
-   ordering, ABI-erasure, or closure-capture questions?
+Implemented repair
+------------------
+1. sema constant evaluation now treats named non-generic procedures as valid
+  constant ingredients for explicit typed aggregates
+2. `.mci` artifacts now serialize and parse procedure-valued constants
+3. imported constant aggregates now rewrite procedure symbols through both the
+  sema import surface and build-unit namespacing path
+4. LLVM executable emission now renders procedure-valued global constants as
+  function-symbol pointer constants
 
 Validation expectations
 -----------------------
@@ -112,12 +117,20 @@ Validation expectations
   through that table
 - no regressions in existing callable-value or aggregate-literal tests
 
+Validation completed
+--------------------
+- `Build debug`
+- `mc_sema_fixture_unit`
+- `mc_codegen_executable_core_unit`
+- one direct imported-module build probe copying an imported procedure table
+  into a local `const` and calling through it
+
 Exit criteria
 -------------
 - the repository has a maintained answer on explicit typed procedure-value
   dispatch tables
-- if admitted, at least one real fixed-array or struct-shaped table compiles
-  honestly through the owned pipeline
+- at least one real fixed-array and one struct-shaped table compile honestly
+  through the owned pipeline
 - the admitted shape stays limited to named procedures, exact signatures, and
   explicit typed aggregates
 - no closure system, callback registry, or kernel routing framework is

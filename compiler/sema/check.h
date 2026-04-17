@@ -60,6 +60,7 @@ struct ConstValue {
         kFloat,
         kString,
         kNil,
+        kProcedure,
         kEnum,
         kAggregate,
     };
@@ -69,6 +70,7 @@ struct ConstValue {
     double float_value = 0.0;
     bool bool_value = false;
     std::string text;
+    std::string procedure_name;
     Type enum_type;
     std::string variant_name;
     std::int64_t variant_tag = 0;
