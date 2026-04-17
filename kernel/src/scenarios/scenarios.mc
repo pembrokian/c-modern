@@ -4,6 +4,8 @@ import boot
 import scenario_authority
 import scenario_audit_coordination
 import scenario_coordination
+import scenario_durability
+import scenario_journal_service
 import scenario_lifecycle
 import scenario_retained_policy
 import scenario_queue
@@ -64,6 +66,10 @@ func run(state: *boot.KernelBootState) i32 {
     if result != 0 {
         return result
     }
+    result = scenario_durability.run_retained_durable_boundary_probe()
+    if result != 0 {
+        return result
+    }
     result = scenario_retained_summary.run_retained_summary_probe()
     if result != 0 {
         return result
@@ -74,6 +80,10 @@ func run(state: *boot.KernelBootState) i32 {
         return result
     }
     result = scenario_timer_task_service.run_timer_task_probe()
+    if result != 0 {
+        return result
+    }
+    result = scenario_journal_service.run_journal_service_probe()
     if result != 0 {
         return result
     }

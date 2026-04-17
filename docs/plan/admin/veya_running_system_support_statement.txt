@@ -9,10 +9,10 @@ Purpose
 -------
 Record the current admitted Veya running-system slice separately from the
 broader position note so the repository can state exactly what the work
-through Phase 217 does and does not support.
+through Phase 230 does and does not support.
 
 This is the current refreshed running-system statement.  It supersedes the
-earlier Phase 120 through Phase 121 statement and reflects the post-Phase-217
+earlier Phase 120 through Phase 121 statement and reflects the post-Phase-230
 landing.
 
 This note is intentionally narrower than the current-position assessment.
@@ -147,12 +147,17 @@ Repository status note
 - Phase 217 adds one compact shell-visible retained-versus-durable boundary
   query over the same fixed targets, keeping retained state explicit while
   keeping durable persistence unadmitted and requirement-gated.
+- Phase 230 admits one bounded durable `journal_service` owner with fixed
+  append/replay/clear lanes, explicit boot/init durable reload, and one
+  compact owner-local durable artifact, making the retained-versus-durable
+  boundary executable without widening into a filesystem or storage
+  framework.
 
 Core rule
 ---------
 - Keep this running-system support statement separate from the broader
   position note.
-- State only the admitted Phase 109 through Phase 217 running-system slice,
+- State only the admitted Phase 109 through Phase 230 running-system slice,
   not a larger platform ambition.
 - Keep service policy init-owned and explicit.
 - Reopen broader running-system claims only when a later kernel proof lands
@@ -184,7 +189,9 @@ Frozen support matrix
   transferred-handle consumer that performs one follow-through send;
   ticket_service as one bounded reset-style owner that issues two-byte
   `[epoch, id]` tickets and rejects stale or already-consumed tickets
-  explicitly;
+  explicitly; journal_service as one bounded durable owner with fixed lanes,
+  compact append/replay/clear behavior, and explicit boot/init reload from a
+  host-backed durable artifact;
   shell_service as a stateless
   command-routing owner with compact hostile-user invalid classification
   (`?C` unknown command, `?S` malformed admitted shape) plus bounded
@@ -197,9 +204,9 @@ Frozen support matrix
   explicit transfer endpoint
 - admitted topology boundary: service_topology.mc owns SERIAL_ENDPOINT_ID,
   SHELL_ENDPOINT_ID, LOG_ENDPOINT_ID, KV_ENDPOINT_ID, ECHO_ENDPOINT_ID,
-  TRANSFER_ENDPOINT_ID, QUEUE_ENDPOINT_ID, and TICKET_ENDPOINT_ID as the
-  neutral topology module with no service imports; shell_service.mc is
-  topology-neutral;
+  TRANSFER_ENDPOINT_ID, QUEUE_ENDPOINT_ID, TICKET_ENDPOINT_ID, and
+  JOURNAL_ENDPOINT_ID as the neutral topology module with no service imports;
+  shell_service.mc is topology-neutral;
   service_topology also owns static restart classification; kernel_dispatch
   routes through named arms referencing service_topology
 - admitted event codes boundary: event_codes.mc owns EVENT_SERIAL_BUFFERED
@@ -209,10 +216,11 @@ Frozen support matrix
   loop; main.mc is init plus one call to scenarios.run(state); boot.mc owns
   kernel_init and the dispatch loop with named arms; init.mc owns
   endpoint-driven restart, explicit per-service retained reload for log or kv
-  or queue, explicit coordinated retained restart for the workset (`kv` plus
-  `queue`) and audit lane (`kv` plus `log`), and the boot-owned workset plus
-  audit generation markers and last-restart outcomes visible through the
-  shell identity and retained-summary path
+  or queue, explicit durable reload for journal, explicit coordinated
+  retained restart for the workset (`kv` plus `queue`) and audit lane (`kv`
+  plus `log`), and the boot-owned workset plus audit generation markers and
+  last-restart outcomes visible through the shell identity and retained-
+  summary path
 - admitted identity boundary: `service_identity.mc` owns stable public
   `ServiceRef` and per-service `ServiceMark`; `boot.mc` owns per-service and
   coordinated-lane generation truth plus continuity outcomes; `boot_identity.mc`
@@ -269,7 +277,8 @@ Frozen support matrix
   vocabulary and ownership-table audit, Phase 212 authority inspection
   follow-through, Phase 213 unified identity taxonomy for restartable
   services, Phase 214 system introspection surface for service state, and
-  Phase 217 retained-versus-durable state boundary
+  Phase 217 retained-versus-durable state boundary, and Phase 230 durable
+  journal service first pressure step
 - unsupported today: dynamic discovery, a general namespace model, dynamic
   loading, a service manager, broader init policy, public freestanding `mc
   run` or `mc test`, broader target-family admission, multicore claims,
@@ -338,15 +347,16 @@ Practical support statement
 ---------------------------
 The current repository can honestly claim one bounded running-system support
 statement over the repository-owned Veya kernel artifact: one interactive
-serial-shell system with log, kv, queue, echo, transfer, shell, and serial
-services; one named neutral service topology module; one named event codes
-module; per-send
+serial-shell system with log, kv, queue, echo, transfer, ticket, journal,
+shell, and serial services; one named neutral service topology module; one
+named event codes module; per-send
 delivery witness on the Effect type; named dispatch arms in the boot
 orchestrator; a scripted observation loop in scenarios.mc; a shell that
 classifies shell-owned hostile-user invalid commands as unknown command or
-malformed admitted shape; flat topology lookup helpers over the six boot
+malformed admitted shape; flat topology lookup helpers over the admitted boot-wired
 slots; an endpoint-driven init-owned restart entry for the admitted
-restartable services; and a thin main.mc that is init plus one call.
+restartable services; one explicit durable owner with replayable restart
+state; and a thin main.mc that is init plus one call.
 
 The repository also provides the complete Phase 109–121 mechanism boundary
 and the Phase 122–179 authority, service, orchestration, and model-repair

@@ -1,5 +1,6 @@
 import identity_taxonomy
 import file_service
+import journal_service
 import kv_service
 import log_service
 import queue_service
@@ -85,6 +86,8 @@ func bootstate_metadata_for_target(s: KernelBootState, target: u8) u8 {
         return u8(timer_service.timer_active_count(s.timer.state))
     case serial_protocol.TARGET_TASK:
         return u8(task_service.task_active_count(s.task.state))
+    case serial_protocol.TARGET_JOURNAL:
+        return u8(journal_service.journal_count(s.journal.state))
     default:
         return 0
     }
@@ -138,6 +141,8 @@ func summary_outcome_code(outcome: RestartOutcome) u8 {
         return 2
     case RestartOutcome.CoordinatedRetainedReloaded:
         return 3
+    case RestartOutcome.DurableReloaded:
+        return 4
     default:
         return 0
     }
@@ -172,6 +177,8 @@ func bootrestart_outcome_for_endpoint(s: KernelBootState, endpoint: u32) Restart
         return s.timer_restart_outcome
     case service_topology.TASK_ENDPOINT_ID:
         return s.task_restart_outcome
+    case service_topology.JOURNAL_ENDPOINT_ID:
+        return s.journal_restart_outcome
     default:
         return RestartOutcome.None
     }
@@ -179,7 +186,7 @@ func bootrestart_outcome_for_endpoint(s: KernelBootState, endpoint: u32) Restart
 
 func bootsummary_payload_for_endpoint(s: KernelBootState, endpoint: u32) [4]u8 {
     participation: RetainedSummaryParticipation = RetainedSummaryParticipation.None
-    if endpoint == service_topology.LOG_ENDPOINT_ID || endpoint == service_topology.KV_ENDPOINT_ID || endpoint == service_topology.QUEUE_ENDPOINT_ID || endpoint == service_topology.FILE_ENDPOINT_ID || endpoint == service_topology.TIMER_ENDPOINT_ID {
+    if endpoint == service_topology.LOG_ENDPOINT_ID || endpoint == service_topology.KV_ENDPOINT_ID || endpoint == service_topology.QUEUE_ENDPOINT_ID || endpoint == service_topology.FILE_ENDPOINT_ID || endpoint == service_topology.TIMER_ENDPOINT_ID || endpoint == service_topology.JOURNAL_ENDPOINT_ID {
         participation = RetainedSummaryParticipation.Service
     }
     mark: service_identity.ServiceMark = bootmark_for_endpoint(s, endpoint)
@@ -225,6 +232,10 @@ func boot_task_mark(s: KernelBootState) service_identity.ServiceMark {
     return service_identity.service_mark(service_topology.TASK_ENDPOINT_ID, s.task.state.pid, s.task.generation)
 }
 
+func boot_journal_mark(s: KernelBootState) service_identity.ServiceMark {
+    return service_identity.service_mark(service_topology.JOURNAL_ENDPOINT_ID, s.journal.state.pid, s.journal.generation)
+}
+
 func bootmark_for_endpoint(s: KernelBootState, endpoint: u32) service_identity.ServiceMark {
     switch endpoint {
     case service_topology.LOG_ENDPOINT_ID:
@@ -245,6 +256,8 @@ func bootmark_for_endpoint(s: KernelBootState, endpoint: u32) service_identity.S
         return boot_timer_mark(s)
     case service_topology.TASK_ENDPOINT_ID:
         return boot_task_mark(s)
+    case service_topology.JOURNAL_ENDPOINT_ID:
+        return boot_journal_mark(s)
     default:
         return service_identity.service_mark(endpoint, 0, 0)
     }

@@ -6,6 +6,7 @@
 
 import echo_service
 import file_service
+import journal_service
 import kv_service
 import log_service
 import queue_service
@@ -33,6 +34,7 @@ enum RestartOutcome {
     OrdinaryReplaced,
     RetainedReloaded,
     CoordinatedRetainedReloaded,
+    DurableReloaded,
 }
 
 struct ServiceCell<T> {
@@ -64,6 +66,8 @@ struct KernelBootState {
     timer_restart_outcome: RestartOutcome
     task: ServiceCell<task_service.TaskServiceState>
     task_restart_outcome: RestartOutcome
+    journal: ServiceCell<journal_service.JournalServiceState>
+    journal_restart_outcome: RestartOutcome
     grants: transfer_grant.GrantTable
 }
 
@@ -79,6 +83,7 @@ func kernel_init() KernelBootState {
     file_slot := service_topology.FILE_SLOT
     timer_slot := service_topology.TIMER_SLOT
     task_slot := service_topology.TASK_SLOT
+    journal_slot := service_topology.JOURNAL_SLOT
 
     path_state := serial_shell_path.path_init(serial_service.serial_init(serial_slot.pid, 1), shell_service.shell_init(shell_slot.pid, 1), shell_slot.endpoint)
     log_cell := ServiceCell<log_service.LogServiceState>{ state: log_service.log_init(log_slot.pid, 1), generation: 1 }
@@ -90,6 +95,7 @@ func kernel_init() KernelBootState {
     file_cell := ServiceCell<file_service.FileServiceState>{ state: file_service.file_init(file_slot.pid, 1), generation: 1 }
     timer_cell := ServiceCell<timer_service.TimerServiceState>{ state: timer_service.timer_init(timer_slot.pid, 1), generation: 1 }
     task_cell := ServiceCell<task_service.TaskServiceState>{ state: task_service.task_init(task_slot.pid, 1), generation: 1 }
+    journal_cell := ServiceCell<journal_service.JournalServiceState>{ state: journal_service.journal_load(journal_slot.pid, 1), generation: 1 }
 
     return KernelBootState{
         path_state: path_state,
@@ -115,6 +121,8 @@ func kernel_init() KernelBootState {
         timer_restart_outcome: RestartOutcome.None,
         task: task_cell,
         task_restart_outcome: RestartOutcome.None,
+        journal: journal_cell,
+        journal_restart_outcome: RestartOutcome.None,
         grants: transfer_grant.grant_init()
     }
 }

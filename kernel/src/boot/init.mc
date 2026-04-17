@@ -16,6 +16,7 @@
 import boot
 import echo_service
 import file_service
+import journal_service
 import kv_service
 import log_service
 import queue_service
@@ -65,6 +66,8 @@ func restart_policy_for_target(target: u8) RestartPolicyInfo {
         return restart_policy_single(target, serial_protocol.POLICY_KEEP)
     case serial_protocol.TARGET_TASK:
         return restart_policy_single(target, serial_protocol.POLICY_CLEAR)
+    case serial_protocol.TARGET_JOURNAL:
+        return restart_policy_single(target, serial_protocol.POLICY_KEEP)
     default:
         return RestartPolicyInfo{ target: 0, owner0: serial_protocol.PARTICIPANT_NONE, owner1: serial_protocol.PARTICIPANT_NONE, policy: serial_protocol.PARTICIPANT_NONE }
     }
@@ -103,6 +106,8 @@ func restart(state: boot.KernelBootState, endpoint: u32) boot.KernelBootState {
         return restart_timer(state)
     case service_topology.TASK_ENDPOINT_ID:
         return restart_task(state)
+    case service_topology.JOURNAL_ENDPOINT_ID:
+        return restart_journal(state)
     default:
         return state
     }
@@ -198,4 +203,10 @@ func restart_task(state: boot.KernelBootState) boot.KernelBootState {
     task_slot := service_topology.TASK_SLOT
     next := boot.bootrestart_task(state, task_service.task_init(task_slot.pid, 1))
     return boot.bootwith_task_restart_outcome(next, boot.RestartOutcome.OrdinaryReplaced)
+}
+
+func restart_journal(state: boot.KernelBootState) boot.KernelBootState {
+    journal_slot := service_topology.JOURNAL_SLOT
+    next := boot.bootrestart_journal(state, journal_service.journal_load(journal_slot.pid, 1))
+    return boot.bootwith_journal_restart_outcome(next, boot.RestartOutcome.DurableReloaded)
 }

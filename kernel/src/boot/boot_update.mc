@@ -1,5 +1,6 @@
 import echo_service
 import file_service
+import journal_service
 import kv_service
 import log_service
 import queue_service
@@ -149,4 +150,16 @@ func bootwith_task_restart_outcome(s: KernelBootState, outcome: RestartOutcome) 
 
 func bootrestart_task(s: KernelBootState, task: task_service.TaskServiceState) KernelBootState {
     return s with { task.state: task, task.generation: s.task.generation + 1 }
+}
+
+func bootwith_journal(s: KernelBootState, journal: journal_service.JournalServiceState) KernelBootState {
+    return s with { journal.state: journal }
+}
+
+func bootwith_journal_restart_outcome(s: KernelBootState, outcome: RestartOutcome) KernelBootState {
+    return s with { journal_restart_outcome: outcome }
+}
+
+func bootrestart_journal(s: KernelBootState, journal: journal_service.JournalServiceState) KernelBootState {
+    return s with { journal.state: journal, journal.generation: s.journal.generation + 1 }
 }

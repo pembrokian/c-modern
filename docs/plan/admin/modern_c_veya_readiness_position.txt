@@ -55,6 +55,7 @@ Record one maintained repository position after Phase 212 admitted one bounded a
 Record one maintained repository position after Phase 213 published one reusable restartable-service identity taxonomy without opening registries, durable naming, or compiler surfaces.
 Record one maintained repository position after Phase 214 admitted one compact service-state inspection surface without opening registries, dashboards, or compiler surfaces.
 Record one maintained repository position after Phase 217 admitted one compact retained-versus-durable boundary query without opening storage frameworks, persistence mechanisms, or compiler surfaces.
+Record one maintained repository position after Phase 230 admitted one bounded durable journal owner without opening a filesystem framework, persistence registry, or compiler wave.
 Record one maintained repository position after Phase 202 retired the deleted freestanding legacy archive, refreshed active workflow and support docs, and kept reset-lane coverage anchored to the scenario table without opening a new framework or compiler wave.
 Record one maintained repository position after Phase 182 made restart identity explicit as stable routing plus replaced instance generation under the same endpoint and pid.
 Record one maintained repository position after Phase 183 made endpoint ids explicit stable public names and routing keys rather than authority tokens.
@@ -237,6 +238,7 @@ Current repository truth
 - The landed Phase 213 unified identity taxonomy for restartable services turns the separate stable public name, per-service generation, coordinated lane generation, restart-outcome, and retained-summary identity truths into one reusable repository-owned taxonomy plus one runtime-owned target classifier; this belongs to the same admitted running-system slice rather than to registries, durable naming, or a reopened compiler wave.
 - The landed Phase 214 system introspection surface for service state adds one compact shell-visible `XC<target>!` query that composes lifecycle class, restart mode, retained participation, retained policy, a bounded generation marker, and already-admitted local count metadata without widening into discovery, dashboards, or reopened compiler work.
 - The landed Phase 217 retained-versus-durable state boundary adds one compact shell-visible `XD<target>!` query that projects retained-state class, durable-state non-admission, and explicit durable requirements without widening into storage frameworks, persistence mechanisms, or reopened compiler work.
+- The landed Phase 230 durable journal service first pressure step admits one bounded durable `journal_service` owner with fixed append/replay/clear lanes, explicit boot/init durable reload, and one owner-local durable artifact, making durable recovery executable without widening into a filesystem framework, storage registry, or reopened compiler work.
 - Phase 202 then removed the retired freestanding archive itself, refreshed active docs to the live grouped workflow owners, and added one workflow-suite guard so every checked-in reset-lane fixture with a `build.toml` stays represented in the scenario table; this maintenance step belongs to workflow and documentation honesty rather than to a new runtime or compiler surface.
 - The repository therefore proves that the current language, sema, MIR,
   backend, runtime, and build path are sufficient for one honest small kernel
@@ -275,8 +277,10 @@ It means:
   `kv_service`, and `queue_service`, one coordinated retained workset restart
   plus workset identity query, one second coordinated retained audit-lane
   restart, one compact retained summary path for retained participation,
-  generation marker, and last restart outcome, bounded queue peek or count observability, and one explicit
-  two-handle transfer follow-through are now real inside that slice
+  generation marker, and last restart outcome, one compact retained-versus-
+  durable boundary query, one durable journal owner with replayable restart
+  state, bounded queue peek or count observability, and one explicit two-
+  handle transfer follow-through are now real inside that slice
 - broader platform, packaging, target-family, loader, namespace, kill, and
   scheduler-completion claims remain out of scope
 

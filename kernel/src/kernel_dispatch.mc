@@ -9,6 +9,7 @@
 import boot
 import echo_service
 import file_service
+import journal_service
 import init
 import identity_taxonomy
 import event_codes
@@ -70,6 +71,8 @@ func authority_class_code(class: service_topology.ServiceAuthorityClass) u8 {
         return serial_protocol.AUTHORITY_TRANSFER
     case service_topology.ServiceAuthorityClass.RetainedOwner:
         return serial_protocol.AUTHORITY_RETAINED
+    case service_topology.ServiceAuthorityClass.DurableOwner:
+        return serial_protocol.AUTHORITY_DURABLE
     case service_topology.ServiceAuthorityClass.ShellControl:
         return serial_protocol.AUTHORITY_SHELL
     default:
@@ -121,6 +124,9 @@ func lifecycle_authority_reply(state: *boot.KernelBootState, target: u8) service
     scope: u8 = serial_protocol.AUTHORITY_SCOPE_NONE
     if class == service_topology.ServiceAuthorityClass.RetainedOwner {
         scope = serial_protocol.AUTHORITY_SCOPE_RETAINED
+    }
+    if class == service_topology.ServiceAuthorityClass.DurableOwner {
+        scope = serial_protocol.AUTHORITY_SCOPE_DURABLE
     }
 
     return shell_service.lifecycle_authority_effect(
@@ -285,6 +291,18 @@ func dispatch_task(state: *boot.KernelBootState, msg: service_effect.Message) se
     return task_result.effect
 }
 
+func dispatch_journal(state: *boot.KernelBootState, msg: service_effect.Message) service_effect.Effect {
+    current: boot.KernelBootState = *state
+    journal_result: journal_service.JournalResult = journal_service.handle(current.journal.state, msg)
+    if journal_service.journal_changed(current.journal.state, journal_result.state) {
+        if !journal_service.journal_persist(journal_result.state) {
+            return service_effect.effect_reply(syscall.SyscallStatus.Closed, 0, primitives.zero_payload())
+        }
+    }
+    *state = boot.bootwith_journal(current, journal_result.state)
+    return journal_result.effect
+}
+
 func lifecycle_invalid_reply(state: *boot.KernelBootState, target: u8) service_effect.Effect {
     return shell_service.invalid_effect(shell_service.SHELL_INVALID_COMMAND)
 }
@@ -338,6 +356,8 @@ func leaf_route(endpoint: u32) LeafRoute {
         return LeafRoute{ endpoint: endpoint, reply: dispatch_timer }
     case service_topology.TASK_ENDPOINT_ID:
         return LeafRoute{ endpoint: endpoint, reply: dispatch_task }
+    case service_topology.JOURNAL_ENDPOINT_ID:
+        return LeafRoute{ endpoint: endpoint, reply: dispatch_journal }
     default:
         return LeafRoute{ endpoint: endpoint, reply: dispatch_invalid_endpoint }
     }

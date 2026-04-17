@@ -11,6 +11,10 @@ extern(c) func __mc_fs_list_dir(path: str, alloc: *mem.Allocator) *Buffer<u8>
 @private
 extern(c) func __mc_fs_read_all_err(path: str, alloc: *mem.Allocator, err: *errors.Error) *Buffer<u8>
 extern(c) func __mc_fs_read_all(path: str, alloc: *mem.Allocator) *Buffer<u8>
+@private
+extern(c) func __mc_fs_write_all_err(path: str, bytes: Slice<u8>, err: *errors.Error) bool
+@private
+extern(c) func __mc_fs_read_exact_err(path: str, bytes: Slice<u8>, err: *errors.Error) bool
 
 func file_size(path: str) (isize, errors.Error) {
     err: errors.Error = errors.ok()
@@ -54,4 +58,30 @@ func read_all(path: str, alloc: *mem.Allocator) *Buffer<u8> {
         return nil
     }
     return buf
+}
+
+func write_all_err(path: str, bytes: Slice<u8>) errors.Error {
+    err: errors.Error = errors.ok()
+    ok: bool = __mc_fs_write_all_err(path, bytes, &err)
+    if !ok && errors.is_ok(err) {
+        return errors.fail_io(1)
+    }
+    return err
+}
+
+func write_all(path: str, bytes: Slice<u8>) bool {
+    return errors.is_ok(write_all_err(path, bytes))
+}
+
+func read_exact_err(path: str, bytes: Slice<u8>) errors.Error {
+    err: errors.Error = errors.ok()
+    ok: bool = __mc_fs_read_exact_err(path, bytes, &err)
+    if !ok && errors.is_ok(err) {
+        return errors.fail_io(1)
+    }
+    return err
+}
+
+func read_exact(path: str, bytes: Slice<u8>) bool {
+    return errors.is_ok(read_exact_err(path, bytes))
 }

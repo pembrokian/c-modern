@@ -164,10 +164,18 @@ std::string LoadKernelResetLaneFixtureFile(const std::filesystem::path& source_r
     }
 
     const std::string kernel_src = (source_root / "kernel" / "src").generic_string();
+    const std::string stdlib_src = (source_root / "stdlib").generic_string();
     size_t pos = 0;
     while ((pos = text.find(kKernelNewSourcePlaceholder, pos)) != std::string::npos) {
         text.replace(pos, kKernelNewSourcePlaceholder.size(), kernel_src);
         pos += kernel_src.size();
+    }
+    const std::string transport_entry = kernel_src + "/transport";
+    const std::string stdlib_entry = "\"" + stdlib_src + "\"";
+    const size_t transport_pos = text.find(transport_entry);
+    if (transport_pos != std::string::npos && text.find(stdlib_entry) == std::string::npos) {
+        const size_t insert_pos = transport_pos + transport_entry.size() + 1;
+        text.insert(insert_pos, ",\n\t\"" + stdlib_src + "\"");
     }
     return text;
 }
@@ -302,7 +310,7 @@ ResetLaneScenarioTiming RunKernelResetLaneScenario(const std::filesystem::path& 
     };
 }
 
-constexpr std::array<ResetLaneScenario, 46> kResetLaneScenarios = {{
+constexpr std::array<ResetLaneScenario, 47> kResetLaneScenarios = {{
     {"repo project", "", "", "kernel_reset_lane_repo_build", "kernel", "kernel_reset_lane_repo_build_output.txt", "kernel_reset_lane_repo_run_output.txt", "kernel reset lane repo project build", "kernel reset lane repo project run", true, 2000, 100},
     {"smoke", "tests/smoke/kernel_reset_lane_serial_round_trip", "kernel_reset_lane_smoke_project", "kernel_reset_lane_smoke_build", "app", "kernel_reset_lane_smoke_build_output.txt", "kernel_reset_lane_smoke_run_output.txt", "kernel reset lane smoke build", "kernel reset lane smoke run", true, 900, 100},
     {"retained state", "tests/system/kernel_reset_lane_retained_log", "kernel_reset_lane_retained_state_project", "kernel_reset_lane_retained_state_build", "app", "kernel_reset_lane_retained_state_build_output.txt", "kernel_reset_lane_retained_state_run_output.txt", "kernel reset lane retained-state build", "kernel reset lane retained-state run", true, 900, 100},
@@ -349,6 +357,7 @@ constexpr std::array<ResetLaneScenario, 46> kResetLaneScenarios = {{
     {"timer task service", "tests/system/kernel_reset_lane_phase220_timer_task_service", "kernel_reset_lane_phase220_timer_task_service_project", "kernel_reset_lane_phase220_timer_task_service_build", "app", "kernel_reset_lane_phase220_timer_task_service_build_output.txt", "kernel_reset_lane_phase220_timer_task_service_run_output.txt", "kernel reset lane phase 220 timer task service build", "kernel reset lane phase 220 timer task service run", true, 1000, 100},
     {"task completion", "tests/system/kernel_reset_lane_phase225_task_completion", "kernel_reset_lane_phase225_task_completion_project", "kernel_reset_lane_phase225_task_completion_build", "app", "kernel_reset_lane_phase225_task_completion_build_output.txt", "kernel_reset_lane_phase225_task_completion_run_output.txt", "kernel reset lane phase 225 task completion build", "kernel reset lane phase 225 task completion run", true, 1000, 100},
     {"file growth", "tests/system/kernel_reset_lane_phase226_file_growth", "kernel_reset_lane_phase226_file_growth_project", "kernel_reset_lane_phase226_file_growth_build", "app", "kernel_reset_lane_phase226_file_growth_build_output.txt", "kernel_reset_lane_phase226_file_growth_run_output.txt", "kernel reset lane phase 226 file growth build", "kernel reset lane phase 226 file growth run", true, 1000, 100},
+    {"durable journal", "tests/system/kernel_reset_lane_phase230_durable_journal", "kernel_reset_lane_phase230_durable_journal_project", "kernel_reset_lane_phase230_durable_journal_build", "app", "kernel_reset_lane_phase230_durable_journal_build_output.txt", "kernel_reset_lane_phase230_durable_journal_run_output.txt", "kernel reset lane phase 230 durable journal build", "kernel reset lane phase 230 durable journal run", true, 1000, 100},
 }};
 
 std::vector<const ResetLaneScenario*> SelectResetLaneScenarios(ResetLaneMode mode) {

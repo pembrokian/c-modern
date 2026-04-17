@@ -42,6 +42,36 @@ Open questions:
 Why this is still open:
 - The next possible follow-up is no longer whether the language needs any fatal primitive at all; it is whether real programs eventually need richer failure detail than kind or code alone, or a separate invariant helper beyond plain `if` plus `panic(code)`, without reintroducing hidden control flow.
 
+2. Procedure-Value Dispatch Tables
+
+The semantic decision is partly settled: procedure types and callable values
+already exist. The remaining question is whether Modern C should explicitly
+standardize table-shaped storage of named procedures as ordinary typed data.
+
+Current repository status:
+- procedure types already belong to the maintained semantic type surface
+- ordinary call syntax already accepts callable values
+- the compiler already proves basic procedure-value passing and indirect calls
+- repeated real-code pressure still reports that the language lacks an obvious
+	clean dispatch-table pattern for explicit typed handler maps
+
+Open questions:
+- Should explicit typed fixed arrays and structs containing named procedures be
+	part of the maintained source contract for v0.2?
+- If admitted, should the feature stay limited to exact-signature non-capturing
+	procedure values stored in explicit typed aggregates?
+- Can this remain a pure data-shape admission without reopening closures,
+	callback registries, or dynamic service routing?
+
+Why this is still open:
+- the repeated pressure is real, but the narrowest honest answer may be either
+	a small compiler proof wave for explicit typed procedure tables or an
+	explicit deferral; the repository should decide that question directly
+	instead of letting ad hoc switch-heavy code stand in for the design choice
+
+Reference:
+- docs/arch/c-lang/language/procedure_value_dispatch_tables_note.txt
+
 Non-open items
 
 The following are not current open questions for v0.2 unless real program pressure reopens them:

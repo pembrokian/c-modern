@@ -7,6 +7,7 @@ const STATE_CLASS_FIXED: u8 = 0
 const STATE_CLASS_ORDINARY: u8 = 1
 const STATE_CLASS_RETAINED: u8 = 2
 const STATE_CLASS_LANE: u8 = 3
+const STATE_CLASS_DURABLE: u8 = 4
 
 const STATE_MODE_NONE: u8 = 0
 const STATE_MODE_RESET: u8 = 1
@@ -44,6 +45,8 @@ func state_class(target: u8) u8 {
         return STATE_CLASS_RETAINED
     case serial_protocol.TARGET_TIMER:
         return STATE_CLASS_RETAINED
+    case serial_protocol.TARGET_JOURNAL:
+        return STATE_CLASS_DURABLE
     case serial_protocol.TARGET_TASK:
         return STATE_CLASS_ORDINARY
     case serial_protocol.TARGET_ECHO:
@@ -71,7 +74,8 @@ func state_participation(target: u8) u8 {
     if identity_taxonomy.identity_target_is_lane(target) {
         return STATE_PARTICIPATION_LANE
     }
-    if state_class(target) == STATE_CLASS_RETAINED {
+    class: u8 = state_class(target)
+    if class == STATE_CLASS_RETAINED || class == STATE_CLASS_DURABLE {
         return STATE_PARTICIPATION_SERVICE
     }
     return STATE_PARTICIPATION_NONE
@@ -93,6 +97,9 @@ func state_generation_marker(generation: u32) u8 {
 
 func state_durability(target: u8) u8 {
     class: u8 = state_class(target)
+    if class == STATE_CLASS_DURABLE {
+        return STATE_DURABILITY_DURABLE
+    }
     if class == STATE_CLASS_RETAINED || class == STATE_CLASS_LANE {
         return STATE_DURABILITY_RETAINED
     }
@@ -100,11 +107,11 @@ func state_durability(target: u8) u8 {
 }
 
 func state_durable_level(target: u8) u8 {
-    return STATE_DURABILITY_NONE
+    return state_durability(target)
 }
 
 func state_durable_requirements(target: u8) u8 {
-    if state_durability(target) == STATE_DURABILITY_RETAINED {
+    if state_durability(target) != STATE_DURABILITY_NONE {
         return STATE_DURABLE_REQ_PERSISTENCE + STATE_DURABLE_REQ_NAMING + STATE_DURABLE_REQ_RECOVERY
     }
     return STATE_DURABLE_REQ_NONE

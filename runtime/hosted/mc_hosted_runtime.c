@@ -1390,6 +1390,108 @@ struct mc_buffer_u8* __mc_fs_read_all_err(struct mc_string path,
     return out;
 }
 
+bool __mc_fs_write_all_err(struct mc_string path,
+                           struct mc_slice_u8 bytes,
+                           uintptr_t* out_err) {
+    mc_store_error(out_err, 0);
+    if (bytes.len < 0) {
+        mc_store_error(out_err, mc_error_make(MC_ERROR_KIND_IO, 1));
+        return false;
+    }
+
+    char* c_path = mc_copy_string_to_cstr(path);
+    if (c_path == NULL) {
+        mc_store_error(out_err, mc_error_make(MC_ERROR_KIND_MEM, 1));
+        return false;
+    }
+
+    errno = 0;
+    FILE* file = fopen(c_path, "wb");
+    free(c_path);
+    if (file == NULL) {
+        mc_store_error(out_err, mc_error_code_from_errno());
+        return false;
+    }
+
+    const size_t size = (size_t) bytes.len;
+    size_t total = 0;
+    while (total < size) {
+        errno = 0;
+        const size_t written = fwrite(bytes.ptr + total, 1, size - total, file);
+        if (written == 0) {
+            if (ferror(file) != 0) {
+                mc_store_error(out_err, mc_error_code_from_errno());
+            } else {
+                mc_store_error(out_err, mc_error_make(MC_ERROR_KIND_IO, 1));
+            }
+            fclose(file);
+            return false;
+        }
+        total += written;
+    }
+
+    errno = 0;
+    if (fflush(file) != 0) {
+        mc_store_error(out_err, mc_error_code_from_errno());
+        fclose(file);
+        return false;
+    }
+    errno = 0;
+    if (fclose(file) != 0) {
+        mc_store_error(out_err, mc_error_code_from_errno());
+        return false;
+    }
+    return true;
+}
+
+bool __mc_fs_read_exact_err(struct mc_string path,
+                            struct mc_slice_u8 bytes,
+                            uintptr_t* out_err) {
+    mc_store_error(out_err, 0);
+    if (bytes.len < 0) {
+        mc_store_error(out_err, mc_error_make(MC_ERROR_KIND_IO, 1));
+        return false;
+    }
+
+    char* c_path = mc_copy_string_to_cstr(path);
+    if (c_path == NULL) {
+        mc_store_error(out_err, mc_error_make(MC_ERROR_KIND_MEM, 1));
+        return false;
+    }
+
+    errno = 0;
+    FILE* file = fopen(c_path, "rb");
+    free(c_path);
+    if (file == NULL) {
+        mc_store_error(out_err, mc_error_code_from_errno());
+        return false;
+    }
+
+    const size_t target_size = (size_t) bytes.len;
+    errno = 0;
+    const size_t read_size = target_size == 0 ? 0 : fread(bytes.ptr, 1, target_size, file);
+    const int read_error = ferror(file);
+    const int extra = fgetc(file);
+    if (fclose(file) != 0 && *out_err == 0) {
+        mc_store_error(out_err, mc_error_code_from_errno());
+        return false;
+    }
+
+    if (read_size != target_size) {
+        if (read_error != 0) {
+            mc_store_error(out_err, mc_error_code_from_errno());
+        } else {
+            mc_store_error(out_err, mc_error_make(MC_ERROR_KIND_IO, 1));
+        }
+        return false;
+    }
+    if (extra != EOF) {
+        mc_store_error(out_err, mc_error_make(MC_ERROR_KIND_IO, 1));
+        return false;
+    }
+    return true;
+}
+
 int32_t __mc_net_tcp_listen(uint8_t a,
                             uint8_t b,
                             uint8_t c,

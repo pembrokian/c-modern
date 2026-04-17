@@ -1,0 +1,142 @@
+Phase 230b -- Explicit Procedure-Value Dispatch Tables Probe
+============================================================
+
+Status
+------
+PROPOSED
+
+Purpose
+-------
+Decide whether Modern C should explicitly admit typed procedure-value dispatch
+tables as ordinary data, and if the answer is yes, close only the narrow owner
+boundaries needed to make that shape compile honestly end to end.
+
+This phase is intentionally smaller than a general callable-feature expansion.
+It is a data-shape and proof-surface probe, not a closure, callback-framework,
+or dynamic-dispatch architecture phase.
+
+Repository status note
+----------------------
+- The language already has procedure types and callable values.
+- The compiler already proves parameter passing, struct-field procedure values,
+  and indirect calls in at least one narrow slice.
+- The kernel and reset-lane system still prefer flat if-chains and switches,
+  which is an architectural choice rather than proof that procedure-value
+  tables are unwanted at the language level.
+- Repeated real-code pressure now reports one narrower gap: there is no
+  clearly maintained, obviously supported pattern for explicit typed dispatch
+  tables of named procedures.
+
+Problem being solved
+--------------------
+- The repository already supports individual procedure values, but it does not
+  yet clearly state or prove whether fixed arrays and aggregate constants of
+  named procedures are admitted as ordinary typed data.
+- Without that clarity, authors either avoid the table-shaped source pattern or
+  have to discover support boundaries experimentally.
+- The missing work is not to add closures or registries; it is to decide and,
+  if needed, prove one explicit table-shaped callable pattern.
+
+Core rule
+---------
+- Keep the slice limited to explicit typed procedure-value tables.
+- Prefer exact-signature named procedures only.
+- Reuse existing ordinary call and aggregate-literal rules where possible.
+- Fix only the owner boundary that rejects the admitted shape.
+- Do not widen into closures, lambda syntax, callback registries, erased
+  callback conventions, or kernel dispatch architecture changes.
+
+Chosen slice for this phase
+---------------------------
+1. publish one maintained language note that states the narrow proposed surface
+   for explicit procedure-value dispatch tables
+2. determine whether the following shapes already work honestly end to end:
+   - top-level `const` fixed arrays of named procedures with one exact
+     signature
+   - top-level `const` structs containing named procedures
+   - local explicit typed aggregate literals containing named procedures
+   - indexed or field-based lookup followed by ordinary indirect call
+3. if any shape fails, repair only the rejecting owner boundary in parser,
+   sema, MIR, constant handling, or executable lowering
+4. add one compiler proof fixture and one executable or MIR proof using a real
+   explicit dispatch-table shape rather than a synthetic callable-only probe
+5. if the phase finds that the shape is still not justified, publish an
+   explicit deferral and keep the kernel routing style unchanged
+
+Planned outcome
+---------------
+- the repository will either admit explicit typed procedure-value dispatch
+  tables honestly or document a clear bounded deferral
+- authors will no longer need to infer the answer indirectly from scattered
+  indirect-call or struct-field tests
+- the language decision will stay narrow and will not be allowed to imply a
+  broader callback or framework direction
+
+Preferred implementation shape
+------------------------------
+Language-note path
+- keep the semantics explicit: procedure-value tables are typed data, not a
+  second dispatch system
+- place the maintained note under the c-lang language docs and route the open
+  question through `docs/arch/c-lang/open_decisions.txt`
+
+Compiler-proof path
+- prefer one fixed-array proof and one struct-shaped proof over a broad test
+  matrix
+- if a failure is found, fix the first rejecting owner instead of layering
+  temporary rewrites around it
+- keep signature matching exact; do not introduce coercion or erased callback
+  policy
+
+Kernel-boundary path
+- do not treat language admission as a mandate to rewrite shell, boot, or
+  service routing into tables
+- keep any kernel-facing demonstration small and optional
+
+Questions this phase must answer
+--------------------------------
+1. Are named procedures already valid constant ingredients for explicit typed
+   aggregate constants in every path needed for table-shaped storage?
+2. If not, which boundary is actually rejecting the shape?
+3. Is fixed-array support alone enough, or do real consumers also need struct
+   constants of procedure values?
+4. Can the repository admit this feature without reopening equality,
+   ordering, ABI-erasure, or closure-capture questions?
+
+Validation expectations
+-----------------------
+- `Build debug`
+- one focused sema or MIR fixture proving explicit typed procedure-value table
+  construction
+- one focused executable or codegen proof exercising lookup and indirect call
+  through that table
+- no regressions in existing callable-value or aggregate-literal tests
+
+Exit criteria
+-------------
+- the repository has a maintained answer on explicit typed procedure-value
+  dispatch tables
+- if admitted, at least one real fixed-array or struct-shaped table compiles
+  honestly through the owned pipeline
+- the admitted shape stays limited to named procedures, exact signatures, and
+  explicit typed aggregates
+- no closure system, callback registry, or kernel routing framework is
+  introduced
+
+Non-goals
+---------
+- closures or captured environments
+- anonymous function literals
+- general callback framework admission
+- dynamic service registries or table-driven kernel dispatch as policy
+- procedure equality or ordering unless a real admitted consumer forces it
+- erased `void*` callback conventions or ABI polymorphism
+
+Why this is the narrowest honest next move
+------------------------------------------
+- The repository already has enough callable support that the remaining
+  pressure is no longer "do procedure values exist" but "is one obvious table
+  shape officially supported?"
+- A narrow probe resolves that uncertainty directly.
+- It keeps the language question small while preserving the repository's
+  explicit, owner-local architectural style.

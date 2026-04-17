@@ -3,7 +3,7 @@ Phase 230 -- Durable Journal Service First Pressure Step
 
 Status
 ------
-PROPOSED
+IMPLEMENTED
 
 Purpose
 -------
@@ -134,6 +134,46 @@ Exit criteria
 - retained-versus-durable pressure becomes executable rather than purely
   classificatory
 - no filesystem, namespace, or storage framework is introduced
+
+Implemented shape
+-----------------
+1. added one durable `journal_service` owner under `kernel/src/services/`
+2. kept the contract bounded to two fixed journal lanes with compact append,
+   replay, and clear operations routed through the existing shell/dispatch path
+3. made durability explicit at boot and restart by loading journal state from
+   a host-backed durable artifact instead of retained boot state
+4. kept the artifact format fixed-size and owner-local so the pressure stayed
+   on durable replay and restart truth rather than on protocol-width or
+   filesystem-framework work
+5. added one scenario probe and one dedicated reset-lane fixture proving clear,
+   append, replay, restart, reload, and replay-again behavior
+
+Implementation notes
+--------------------
+- `journal_service` is the only new durable owner in this phase.
+- The shell surface stays compact: one additive journal command family routes
+  to one boot-wired journal endpoint.
+- The topology and service-state surfaces now distinguish the journal as a
+  durable owner instead of another retained or reset-only service.
+- Boot and init own the explicit reload path; the service owns serialization,
+  replay order, and durable artifact interpretation.
+- The implementation adds only the narrow hosted stdlib/runtime helpers needed
+  to overwrite and exactly reload the fixed-size durable artifact.
+
+Validation
+----------
+- `mc_tool_workflow_kernel_reset_lane_unit`
+- `mc_tool_workflow_kernel_reset_lane_full_unit`
+
+Decision notes
+--------------
+- The phase landed as a real kernel/stdlib/runtime implementation rather than
+  as a proof-only or docs-only pressure step.
+- No compiler, sema, MIR, or language widening was admitted.
+- One compiler/backend limitation surfaced during implementation: a top-level
+  `const str` durable-artifact path did not lower honestly on the executable
+  path, so the phase kept the path literal inline and records that limitation
+  as compiler follow-up rather than as a reason to widen this phase.
 
 Why this is the narrowest honest next move
 ------------------------------------------

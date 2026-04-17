@@ -48,6 +48,7 @@ const CMD_W: u8 = 87   // 'W' — stall-count query; also write sub-op within CM
 const CMD_F: u8 = 70   // 'F' — file command family
 const CMD_M: u8 = 77   // 'M' — timer command family
 const CMD_J: u8 = 74   // 'J' — task command family
+const CMD_Y: u8 = 89   // 'Y' — journal command family
 
 const TARGET_SERIAL: u8 = 83    // 'S'
 const TARGET_SHELL: u8 = 72     // 'H'
@@ -62,6 +63,7 @@ const TARGET_TICKET: u8 = 84    // 'T'
 const TARGET_FILE: u8 = 70      // 'F'
 const TARGET_TIMER: u8 = 77     // 'M'
 const TARGET_TASK: u8 = 74      // 'J'
+const TARGET_JOURNAL: u8 = 85   // 'U'
 
 const PARTICIPANT_NONE: u8 = 78  // 'N'
 const POLICY_CLEAR: u8 = 67      // 'C'
@@ -76,6 +78,7 @@ const AUTHORITY_TRANSFER: u8 = 84     // 'T'
 const AUTHORITY_RETAINED: u8 = 82     // 'R'
 const AUTHORITY_COORDINATED: u8 = 67  // 'C'
 const AUTHORITY_SHELL: u8 = 83        // 'S'
+const AUTHORITY_DURABLE: u8 = 68      // 'D'
 
 const AUTHORITY_TRANSFER_NO: u8 = 78   // 'N'
 const AUTHORITY_TRANSFER_YES: u8 = 84  // 'T'
@@ -83,6 +86,7 @@ const AUTHORITY_TRANSFER_YES: u8 = 84  // 'T'
 const AUTHORITY_SCOPE_NONE: u8 = 78         // 'N'
 const AUTHORITY_SCOPE_RETAINED: u8 = 82     // 'R'
 const AUTHORITY_SCOPE_COORDINATED: u8 = 67  // 'C'
+const AUTHORITY_SCOPE_DURABLE: u8 = 68      // 'D'
 
 func encode_echo(left: u8, right: u8) [4]u8 {
     return ipc.payload_byte(CMD_E, CMD_C, left, right)
@@ -222,4 +226,16 @@ func encode_task_complete(id: u8) [4]u8 {
 
 func encode_task_list(window: u8) [4]u8 {
     return ipc.payload_byte(CMD_J, CMD_L, window, CMD_BANG)
+}
+
+func encode_journal_append(name: u8, value: u8) [4]u8 {
+    return ipc.payload_byte(CMD_Y, CMD_A, name, value)
+}
+
+func encode_journal_replay(name: u8) [4]u8 {
+    return ipc.payload_byte(CMD_Y, CMD_R, name, CMD_BANG)
+}
+
+func encode_journal_clear(name: u8) [4]u8 {
+    return ipc.payload_byte(CMD_Y, CMD_C, name, CMD_BANG)
 }
