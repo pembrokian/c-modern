@@ -296,6 +296,14 @@ func encode_lease_consume(id: u8, workflow: u8) [4]u8 {
     return encode_two_args(CMD_Z, CMD_U, id, workflow)
 }
 
+func encode_lease_issue_object_update(name: u8, value: u8) [4]u8 {
+    return encode_two_args(CMD_Z, CMD_W, name, value)
+}
+
+func encode_lease_consume_object_update(id: u8) [4]u8 {
+    return encode_one_arg(CMD_Z, CMD_D, id)
+}
+
 func encode_completion_fetch() [4]u8 {
     return encode_no_args(CMD_V, CMD_F)
 }

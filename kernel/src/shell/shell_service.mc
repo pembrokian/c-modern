@@ -592,11 +592,19 @@ func lease_consume(s: ShellServiceState, m: service_effect.Message) service_effe
     return forward_payload(s, service_topology.LEASE_ENDPOINT_ID, 3, payload)
 }
 
+func lease_issue_object_update(s: ShellServiceState, m: service_effect.Message) service_effect.Effect {
+    return forward_three(s, service_topology.LEASE_ENDPOINT_ID, serial_protocol.CMD_W, m.payload[2], m.payload[3])
+}
+
+func lease_consume_object_update(s: ShellServiceState, m: service_effect.Message) service_effect.Effect {
+    return forward_two(s, service_topology.LEASE_ENDPOINT_ID, serial_protocol.CMD_D, m.payload[2])
+}
+
 const LEASE_ROUTES: [5]OpHandler = [5]OpHandler{
     OpHandler{ op: serial_protocol.CMD_I, check: bang3, run: lease_issue },
     OpHandler{ op: serial_protocol.CMD_U, check: anymsg, run: lease_consume },
-    UNUSED_ROUTE,
-    UNUSED_ROUTE,
+    OpHandler{ op: serial_protocol.CMD_W, check: anymsg, run: lease_issue_object_update },
+    OpHandler{ op: serial_protocol.CMD_D, check: bang3, run: lease_consume_object_update },
     UNUSED_ROUTE
 }
 

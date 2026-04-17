@@ -4,8 +4,17 @@ import syscall
 
 const LEASE_CAPACITY: usize = 4
 
+const LEASE_CMD_ISSUE_COMPLETION: u8 = 73       // 'I'
+const LEASE_CMD_CONSUME_COMPLETION: u8 = 85     // 'U'
+const LEASE_CMD_ISSUE_OBJECT_UPDATE: u8 = 87    // 'W'
+const LEASE_CMD_CONSUME_OBJECT_UPDATE: u8 = 68  // 'D'
+
+const LEASE_KIND_COMPLETION: u8 = 67     // 'C'
+const LEASE_KIND_OBJECT_UPDATE: u8 = 87  // 'W'
+
 const LEASE_OP_NONE: u8 = 0
-const LEASE_OP_TAKE: u8 = 1
+const LEASE_OP_TAKE_COMPLETION: u8 = 1
+const LEASE_OP_SCHEDULE_OBJECT_UPDATE: u8 = 2
 
 const LEASE_STALE: u8 = 83    // 'S'
 const LEASE_INVALID: u8 = 73  // 'I'
@@ -15,7 +24,9 @@ struct LeaseServiceState {
     slot: u32
     next: u8
     ids: [LEASE_CAPACITY]u8
-    workflows: [LEASE_CAPACITY]u8
+    kinds: [LEASE_CAPACITY]u8
+    firsts: [LEASE_CAPACITY]u8
+    seconds: [LEASE_CAPACITY]u8
     gens: [LEASE_CAPACITY]u8
     len: usize
 }
@@ -24,15 +35,16 @@ struct LeaseResult {
     state: LeaseServiceState
     effect: service_effect.Effect
     op: u8
-    workflow: u8
+    first: u8
+    second: u8
 }
 
 func lease_init(pid: u32, slot: u32) LeaseServiceState {
-    return LeaseServiceState{ pid: pid, slot: slot, next: 1, ids: primitives.zero_payload(), workflows: primitives.zero_payload(), gens: primitives.zero_payload(), len: 0 }
+    return LeaseServiceState{ pid: pid, slot: slot, next: 1, ids: primitives.zero_payload(), kinds: primitives.zero_payload(), firsts: primitives.zero_payload(), seconds: primitives.zero_payload(), gens: primitives.zero_payload(), len: 0 }
 }
 
-func leasewith(s: LeaseServiceState, next: u8, ids: [LEASE_CAPACITY]u8, workflows: [LEASE_CAPACITY]u8, gens: [LEASE_CAPACITY]u8, len: usize) LeaseServiceState {
-    return LeaseServiceState{ pid: s.pid, slot: s.slot, next: next, ids: ids, workflows: workflows, gens: gens, len: len }
+func leasewith(s: LeaseServiceState, next: u8, ids: [LEASE_CAPACITY]u8, kinds: [LEASE_CAPACITY]u8, firsts: [LEASE_CAPACITY]u8, seconds: [LEASE_CAPACITY]u8, gens: [LEASE_CAPACITY]u8, len: usize) LeaseServiceState {
+    return LeaseServiceState{ pid: s.pid, slot: s.slot, next: next, ids: ids, kinds: kinds, firsts: firsts, seconds: seconds, gens: gens, len: len }
 }
 
 func lease_reply(status: syscall.SyscallStatus, len: usize, payload: [4]u8) service_effect.Effect {
@@ -45,70 +57,127 @@ func lease_failure(code: u8) service_effect.Effect {
     return lease_reply(syscall.SyscallStatus.InvalidArgument, 1, payload)
 }
 
-func lease_issue(s: LeaseServiceState, workflow: u8, generation: u8) LeaseResult {
-    if workflow == 0 {
-        return LeaseResult{ state: s, effect: lease_failure(LEASE_INVALID), op: LEASE_OP_NONE, workflow: 0 }
+func lease_issue(s: LeaseServiceState, kind: u8, first: u8, second: u8, generation: u8) LeaseResult {
+    if first == 0 && kind == LEASE_KIND_COMPLETION {
+        return LeaseResult{ state: s, effect: lease_failure(LEASE_INVALID), op: LEASE_OP_NONE, first: 0, second: 0 }
     }
     if s.len >= LEASE_CAPACITY {
-        return LeaseResult{ state: s, effect: lease_reply(syscall.SyscallStatus.Exhausted, 0, primitives.zero_payload()), op: LEASE_OP_NONE, workflow: 0 }
+        return LeaseResult{ state: s, effect: lease_reply(syscall.SyscallStatus.Exhausted, 0, primitives.zero_payload()), op: LEASE_OP_NONE, first: 0, second: 0 }
     }
 
     ids := s.ids
-    workflows := s.workflows
+    kinds := s.kinds
+    firsts := s.firsts
+    seconds := s.seconds
     gens := s.gens
     ids[s.len] = s.next
-    workflows[s.len] = workflow
+    kinds[s.len] = kind
+    firsts[s.len] = first
+    seconds[s.len] = second
     gens[s.len] = generation
 
     payload: [4]u8 = primitives.zero_payload()
     payload[0] = s.next
-    payload[1] = workflow
-    return LeaseResult{ state: leasewith(s, s.next + 1, ids, workflows, gens, s.len + 1), effect: lease_reply(syscall.SyscallStatus.Ok, 2, payload), op: LEASE_OP_NONE, workflow: 0 }
+    payload[1] = first
+    return LeaseResult{ state: leasewith(s, s.next + 1, ids, kinds, firsts, seconds, gens, s.len + 1), effect: lease_reply(syscall.SyscallStatus.Ok, 2, payload), op: LEASE_OP_NONE, first: 0, second: 0 }
+}
+
+func lease_issue_completion(s: LeaseServiceState, workflow: u8, generation: u8) LeaseResult {
+    return lease_issue(s, LEASE_KIND_COMPLETION, workflow, 0, generation)
+}
+
+func lease_issue_object_update(s: LeaseServiceState, name: u8, value: u8, generation: u8) LeaseResult {
+    return lease_issue(s, LEASE_KIND_OBJECT_UPDATE, name, value, generation)
 }
 
 func lease_remove_at(s: LeaseServiceState, idx: usize) LeaseServiceState {
     ids: [LEASE_CAPACITY]u8 = primitives.zero_payload()
-    workflows: [LEASE_CAPACITY]u8 = primitives.zero_payload()
+    kinds: [LEASE_CAPACITY]u8 = primitives.zero_payload()
+    firsts: [LEASE_CAPACITY]u8 = primitives.zero_payload()
+    seconds: [LEASE_CAPACITY]u8 = primitives.zero_payload()
     gens: [LEASE_CAPACITY]u8 = primitives.zero_payload()
     for keep in 0..idx {
         ids[keep] = s.ids[keep]
-        workflows[keep] = s.workflows[keep]
+        kinds[keep] = s.kinds[keep]
+        firsts[keep] = s.firsts[keep]
+        seconds[keep] = s.seconds[keep]
         gens[keep] = s.gens[keep]
     }
     for keep in idx + 1..s.len {
         ids[keep - 1] = s.ids[keep]
-        workflows[keep - 1] = s.workflows[keep]
+        kinds[keep - 1] = s.kinds[keep]
+        firsts[keep - 1] = s.firsts[keep]
+        seconds[keep - 1] = s.seconds[keep]
         gens[keep - 1] = s.gens[keep]
     }
-    return leasewith(s, s.next, ids, workflows, gens, s.len - 1)
+    return leasewith(s, s.next, ids, kinds, firsts, seconds, gens, s.len - 1)
 }
 
-func lease_consume(s: LeaseServiceState, id: u8, workflow: u8, generation: u8) LeaseResult {
+func lease_consume_completion(s: LeaseServiceState, id: u8, workflow: u8, generation: u8) LeaseResult {
     for i in 0..s.len {
         if s.ids[i] != id {
             continue
         }
-        if s.workflows[i] != workflow {
-            return LeaseResult{ state: s, effect: lease_failure(LEASE_INVALID), op: LEASE_OP_NONE, workflow: 0 }
+        if s.kinds[i] != LEASE_KIND_COMPLETION || s.firsts[i] != workflow {
+            return LeaseResult{ state: s, effect: lease_failure(LEASE_INVALID), op: LEASE_OP_NONE, first: 0, second: 0 }
         }
 
         next := lease_remove_at(s, i)
         if s.gens[i] != generation {
-            return LeaseResult{ state: next, effect: lease_failure(LEASE_STALE), op: LEASE_OP_NONE, workflow: 0 }
+            return LeaseResult{ state: next, effect: lease_failure(LEASE_STALE), op: LEASE_OP_NONE, first: 0, second: 0 }
         }
-        return LeaseResult{ state: next, effect: lease_reply(syscall.SyscallStatus.Ok, 0, primitives.zero_payload()), op: LEASE_OP_TAKE, workflow: workflow }
+        return LeaseResult{ state: next, effect: lease_reply(syscall.SyscallStatus.Ok, 0, primitives.zero_payload()), op: LEASE_OP_TAKE_COMPLETION, first: workflow, second: 0 }
     }
-    return LeaseResult{ state: s, effect: lease_failure(LEASE_INVALID), op: LEASE_OP_NONE, workflow: 0 }
+    return LeaseResult{ state: s, effect: lease_failure(LEASE_INVALID), op: LEASE_OP_NONE, first: 0, second: 0 }
 }
 
-func handle(s: LeaseServiceState, m: service_effect.Message, generation: u8) LeaseResult {
-    if m.payload_len == 2 {
-        return lease_issue(s, m.payload[1], generation)
+func lease_consume_object_update(s: LeaseServiceState, id: u8, generation: u8) LeaseResult {
+    for i in 0..s.len {
+        if s.ids[i] != id {
+            continue
+        }
+        if s.kinds[i] != LEASE_KIND_OBJECT_UPDATE {
+            return LeaseResult{ state: s, effect: lease_failure(LEASE_INVALID), op: LEASE_OP_NONE, first: 0, second: 0 }
+        }
+
+        next := lease_remove_at(s, i)
+        if s.gens[i] != generation {
+            return LeaseResult{ state: next, effect: lease_failure(LEASE_STALE), op: LEASE_OP_NONE, first: 0, second: 0 }
+        }
+        return LeaseResult{ state: next, effect: lease_reply(syscall.SyscallStatus.Ok, 0, primitives.zero_payload()), op: LEASE_OP_SCHEDULE_OBJECT_UPDATE, first: s.firsts[i], second: s.seconds[i] }
     }
-    if m.payload_len == 3 {
-        return lease_consume(s, m.payload[1], m.payload[2], generation)
+    return LeaseResult{ state: s, effect: lease_failure(LEASE_INVALID), op: LEASE_OP_NONE, first: 0, second: 0 }
+}
+
+func handle(s: LeaseServiceState, m: service_effect.Message, completion_generation: u8, workset_generation: u8) LeaseResult {
+    if m.payload_len == 0 {
+        return LeaseResult{ state: s, effect: lease_failure(LEASE_INVALID), op: LEASE_OP_NONE, first: 0, second: 0 }
     }
-    return LeaseResult{ state: s, effect: lease_failure(LEASE_INVALID), op: LEASE_OP_NONE, workflow: 0 }
+
+    switch m.payload[0] {
+    case LEASE_CMD_ISSUE_COMPLETION:
+        if m.payload_len != 2 {
+            return LeaseResult{ state: s, effect: lease_failure(LEASE_INVALID), op: LEASE_OP_NONE, first: 0, second: 0 }
+        }
+        return lease_issue_completion(s, m.payload[1], completion_generation)
+    case LEASE_CMD_CONSUME_COMPLETION:
+        if m.payload_len != 3 {
+            return LeaseResult{ state: s, effect: lease_failure(LEASE_INVALID), op: LEASE_OP_NONE, first: 0, second: 0 }
+        }
+        return lease_consume_completion(s, m.payload[1], m.payload[2], completion_generation)
+    case LEASE_CMD_ISSUE_OBJECT_UPDATE:
+        if m.payload_len != 3 {
+            return LeaseResult{ state: s, effect: lease_failure(LEASE_INVALID), op: LEASE_OP_NONE, first: 0, second: 0 }
+        }
+        return lease_issue_object_update(s, m.payload[1], m.payload[2], workset_generation)
+    case LEASE_CMD_CONSUME_OBJECT_UPDATE:
+        if m.payload_len != 2 {
+            return LeaseResult{ state: s, effect: lease_failure(LEASE_INVALID), op: LEASE_OP_NONE, first: 0, second: 0 }
+        }
+        return lease_consume_object_update(s, m.payload[1], workset_generation)
+    default:
+        return LeaseResult{ state: s, effect: lease_failure(LEASE_INVALID), op: LEASE_OP_NONE, first: 0, second: 0 }
+    }
 }
 
 func lease_count(s: LeaseServiceState) usize {

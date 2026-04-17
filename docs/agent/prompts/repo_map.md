@@ -7,7 +7,7 @@ This file is a fast orientation map for agents working in this repository.
 - `CMakeLists.txt`: canonical build graph and CTest registration
 - `Makefile`: convenience wrapper around the CMake workflow
 - `README.md`: current repository summary and common commands
-- `kernel/`: repository-owned Veya kernel bring-up tree; currently at the Phase 235 restart-safe named object update workflow slice over the hosted reset-lane workflow surface
+- `kernel/`: repository-owned Veya kernel bring-up tree; currently at the Phase 236 delegated named object processing slice over the hosted reset-lane workflow surface
 - `docs/agent/prompts/plan_spec.txt`: normative spec for the required structure of new per-phase plan documents
 - `docs/plan/admin/canopus_repo_layout_and_test_policy.txt`: current repository policy for Veya source, build, and test placement
 - `docs/plan/plan.txt`: authoritative multi-phase implementation plan
@@ -44,9 +44,9 @@ This file is a fast orientation map for agents working in this repository.
   - `src/transfer_service.mc`: bounded transfer-service protocol state, copied emit payload, and transfer observation records
   - `src/timer_service.mc`: bounded timer-service state, id-scoped create/cancel/query/expired operations, and explicit active/expired/cancelled classification
   - `src/task_service.mc`: bounded task-service state, id-scoped submit/query/complete/cancel/list operations, and explicit active/done/failed/cancelled classification
-  - `src/workflow_service.mc`: bounded retained delayed-work owner tying timer expiry to task execution or one fixed-delay durable named-object update, journal-backed restart continuity, and completion-backed terminal outcomes
+  - `src/workflow_service.mc`: bounded retained delayed-work owner tying timer expiry to task execution or one fixed-delay durable named-object update, journal-backed restart continuity, completion-backed terminal outcomes, and delegated durable-update follow-through after lease consumption
   - `src/completion_mailbox_service.mc`: bounded retained completion owner for workflow terminal outcomes plus explicit fetch/ack/take behavior
-  - `src/lease_service.mc`: bounded retained temporary delegation owner for one completion-bound workflow lease path
+  - `src/lease_service.mc`: bounded retained temporary delegation owner for one completion-bound workflow lease path plus one delegated durable named-object update lease shape bound to existing restart-visible generation truth
   - `src/serial_service.mc`: bounded serial-service ingress state plus one service-owned copied receive-frame log, one fixed forwarded composition request observation, one aggregate-reply observation, and one service-local malformed-input classification path
   - `src/state.mc`: kernel descriptor, process-slot, task-slot, ready-queue, and boot-log records
   - `src/address_space.mc`: bounded address-space, mapping, user-entry-frame, and child-bootstrap construction records with translation-root ownership delegated to `mmu`

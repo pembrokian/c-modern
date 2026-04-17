@@ -203,6 +203,14 @@ func cmd_lease_consume(id: u8, workflow: u8) syscall.ReceiveObservation {
     return serial_obs(DEFAULT_SERIAL_ROUTE.endpoint, DEFAULT_SERIAL_ROUTE.pid, serial_protocol.encode_lease_consume(id, workflow))
 }
 
+func cmd_lease_issue_object_update(name: u8, value: u8) syscall.ReceiveObservation {
+    return serial_obs(DEFAULT_SERIAL_ROUTE.endpoint, DEFAULT_SERIAL_ROUTE.pid, serial_protocol.encode_lease_issue_object_update(name, value))
+}
+
+func cmd_lease_consume_object_update(id: u8) syscall.ReceiveObservation {
+    return serial_obs(DEFAULT_SERIAL_ROUTE.endpoint, DEFAULT_SERIAL_ROUTE.pid, serial_protocol.encode_lease_consume_object_update(id))
+}
+
 func cmd_completion_fetch() syscall.ReceiveObservation {
     return serial_obs(DEFAULT_SERIAL_ROUTE.endpoint, DEFAULT_SERIAL_ROUTE.pid, serial_protocol.encode_completion_fetch())
 }

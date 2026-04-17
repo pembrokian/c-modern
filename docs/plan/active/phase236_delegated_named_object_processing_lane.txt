@@ -3,7 +3,7 @@ Phase 236 -- Delegated Named Object Processing Lane
 
 Status
 ------
-PROPOSED
+IMPLEMENTED
 
 Purpose
 -------
@@ -19,7 +19,7 @@ local.
 Repository status note
 ----------------------
 - Phase 233 landed `lease_service` as a bounded temporary-authority owner.
-- Phase 235 is expected to let workflows apply durable named-object updates.
+- Phase 235 already lets workflows apply durable named-object updates.
 - The authority model has already been pressure-tested for completion retrieval
   but not yet for durable data mutation.
 - The repository still lacks one real delegated mutation workload.

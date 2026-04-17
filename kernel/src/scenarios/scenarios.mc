@@ -5,6 +5,7 @@ import scenario_authority
 import scenario_audit_coordination
 import scenario_completion_mailbox
 import scenario_coordination
+import scenario_delegated_object_processing
 import scenario_durability
 import scenario_journal_service
 import scenario_lease_service
@@ -109,6 +110,10 @@ func run(state: *boot.KernelBootState) i32 {
         return result
     }
     result = scenario_lease_service.run_lease_service_probe()
+    if result != 0 {
+        return result
+    }
+    result = scenario_delegated_object_processing.run_delegated_named_object_processing_probe()
     if result != 0 {
         return result
     }
