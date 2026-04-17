@@ -3,7 +3,38 @@ Phase 215 -- Queue Pressure And Backpressure First Probe
 
 Status
 ------
-PROPOSED
+COMPLETED
+
+Outcome
+-------
+Phase 215 completed the first explicit queue-pressure landing it was intended
+to deliver.
+
+The running system now carries one deterministic queue-full contract anchored
+to the admitted queue owner: enqueue rejects with `Exhausted` at capacity,
+queue state remains unchanged on rejection, and callers can observe that
+consequence directly on the existing queue command path.
+
+Implemented outcome
+-------------------
+- `kernel/src/scenario_queue.mc` now includes `run_queue_pressure_probe(...)`
+  which drives the queue to capacity, verifies explicit full-queue rejection,
+  and verifies unchanged head and count after rejection.
+- `kernel/src/scenarios.mc` now runs that queue-pressure probe as part of the
+  live scenario loop owner.
+- `tests/system/kernel_reset_lane_phase215_queue_pressure/` now provides one
+  focused reset-lane fixture proving full-queue behavior and caller-visible
+  rejection on the existing protocol.
+- `tests/tool/tool_kernel_reset_lane_suite.cpp` now includes the Phase 215
+  reset-lane fixture in the grouped workflow suite.
+- `docs/plan/decision_log.txt` and `docs/plan/backlog.txt` now record the
+  bounded reject policy and the deliberate non-expansion boundary.
+
+Validation
+----------
+- the CMake debug build succeeded after the landing
+- the focused Phase 215 reset-lane fixture passed
+- `mc_tool_workflow_kernel_reset_lane_unit` remained green
 
 Purpose
 -------

@@ -36,6 +36,21 @@ const FAIL_QUEUE_RESTART_DEQUEUE_VALUE: i32 = 143
 const FAIL_QUEUE_FINAL_COUNT_STATUS: i32 = 144
 const FAIL_QUEUE_FINAL_COUNT_LEN: i32 = 145
 const FAIL_QUEUE_FINAL_PEEK_STATUS: i32 = 146
+const FAIL_QUEUE_PRESSURE_FILL_0: i32 = 147
+const FAIL_QUEUE_PRESSURE_FILL_1: i32 = 148
+const FAIL_QUEUE_PRESSURE_FILL_2: i32 = 149
+const FAIL_QUEUE_PRESSURE_FILL_3: i32 = 150
+const FAIL_QUEUE_PRESSURE_OVERFLOW_STATUS: i32 = 151
+const FAIL_QUEUE_PRESSURE_COUNT_STATUS: i32 = 152
+const FAIL_QUEUE_PRESSURE_COUNT_LEN: i32 = 153
+const FAIL_QUEUE_PRESSURE_PEEK_STATUS: i32 = 154
+const FAIL_QUEUE_PRESSURE_PEEK_LEN: i32 = 155
+const FAIL_QUEUE_PRESSURE_PEEK_VALUE: i32 = 156
+const FAIL_QUEUE_PRESSURE_DEQUEUE_STATUS: i32 = 157
+const FAIL_QUEUE_PRESSURE_DEQUEUE_LEN: i32 = 158
+const FAIL_QUEUE_PRESSURE_DEQUEUE_VALUE: i32 = 159
+const FAIL_QUEUE_PRESSURE_POST_COUNT_STATUS: i32 = 160
+const FAIL_QUEUE_PRESSURE_POST_COUNT_LEN: i32 = 161
 
 func run_queue_observability_probe(state: *boot.KernelBootState) i32 {
     effect: service_effect.Effect = kernel_dispatch.kernel_dispatch_step(state, scenario_transport.cmd_queue_count())
@@ -150,6 +165,73 @@ func run_queue_observability_probe(state: *boot.KernelBootState) i32 {
     effect = kernel_dispatch.kernel_dispatch_step(state, scenario_transport.cmd_queue_peek())
     if service_effect.effect_reply_status(effect) != syscall.SyscallStatus.InvalidArgument {
         return FAIL_QUEUE_FINAL_PEEK_STATUS
+    }
+
+    return 0
+}
+
+func run_queue_pressure_probe(state: *boot.KernelBootState) i32 {
+    effect: service_effect.Effect = kernel_dispatch.kernel_dispatch_step(state, scenario_transport.cmd_queue_enqueue(21))
+    if service_effect.effect_reply_status(effect) != syscall.SyscallStatus.Ok {
+        return FAIL_QUEUE_PRESSURE_FILL_0
+    }
+
+    effect = kernel_dispatch.kernel_dispatch_step(state, scenario_transport.cmd_queue_enqueue(22))
+    if service_effect.effect_reply_status(effect) != syscall.SyscallStatus.Ok {
+        return FAIL_QUEUE_PRESSURE_FILL_1
+    }
+
+    effect = kernel_dispatch.kernel_dispatch_step(state, scenario_transport.cmd_queue_enqueue(23))
+    if service_effect.effect_reply_status(effect) != syscall.SyscallStatus.Ok {
+        return FAIL_QUEUE_PRESSURE_FILL_2
+    }
+
+    effect = kernel_dispatch.kernel_dispatch_step(state, scenario_transport.cmd_queue_enqueue(24))
+    if service_effect.effect_reply_status(effect) != syscall.SyscallStatus.Ok {
+        return FAIL_QUEUE_PRESSURE_FILL_3
+    }
+
+    effect = kernel_dispatch.kernel_dispatch_step(state, scenario_transport.cmd_queue_enqueue(99))
+    if service_effect.effect_reply_status(effect) != syscall.SyscallStatus.Exhausted {
+        return FAIL_QUEUE_PRESSURE_OVERFLOW_STATUS
+    }
+
+    effect = kernel_dispatch.kernel_dispatch_step(state, scenario_transport.cmd_queue_count())
+    if service_effect.effect_reply_status(effect) != syscall.SyscallStatus.Ok {
+        return FAIL_QUEUE_PRESSURE_COUNT_STATUS
+    }
+    if service_effect.effect_reply_payload_len(effect) != 4 {
+        return FAIL_QUEUE_PRESSURE_COUNT_LEN
+    }
+
+    effect = kernel_dispatch.kernel_dispatch_step(state, scenario_transport.cmd_queue_peek())
+    if service_effect.effect_reply_status(effect) != syscall.SyscallStatus.Ok {
+        return FAIL_QUEUE_PRESSURE_PEEK_STATUS
+    }
+    if service_effect.effect_reply_payload_len(effect) != 1 {
+        return FAIL_QUEUE_PRESSURE_PEEK_LEN
+    }
+    if service_effect.effect_reply_payload(effect)[0] != 21 {
+        return FAIL_QUEUE_PRESSURE_PEEK_VALUE
+    }
+
+    effect = kernel_dispatch.kernel_dispatch_step(state, scenario_transport.cmd_queue_dequeue())
+    if service_effect.effect_reply_status(effect) != syscall.SyscallStatus.Ok {
+        return FAIL_QUEUE_PRESSURE_DEQUEUE_STATUS
+    }
+    if service_effect.effect_reply_payload_len(effect) != 1 {
+        return FAIL_QUEUE_PRESSURE_DEQUEUE_LEN
+    }
+    if service_effect.effect_reply_payload(effect)[0] != 21 {
+        return FAIL_QUEUE_PRESSURE_DEQUEUE_VALUE
+    }
+
+    effect = kernel_dispatch.kernel_dispatch_step(state, scenario_transport.cmd_queue_count())
+    if service_effect.effect_reply_status(effect) != syscall.SyscallStatus.Ok {
+        return FAIL_QUEUE_PRESSURE_POST_COUNT_STATUS
+    }
+    if service_effect.effect_reply_payload_len(effect) != 3 {
+        return FAIL_QUEUE_PRESSURE_POST_COUNT_LEN
     }
 
     return 0

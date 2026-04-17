@@ -35,6 +35,11 @@ func run(state: *boot.KernelBootState) i32 {
     if result != 0 {
         return result
     }
+    pressure_state := boot.kernel_init()
+    result = scenario_queue.run_queue_pressure_probe(&pressure_state)
+    if result != 0 {
+        return result
+    }
     audit_state := boot.kernel_init()
     result = scenario_audit_coordination.run_retained_audit_coordination_probe(&audit_state)
     if result != 0 {
