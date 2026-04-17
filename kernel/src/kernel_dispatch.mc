@@ -19,7 +19,6 @@ import queue_service
 import serial_protocol
 import serial_shell_path
 import service_effect
-import service_identity
 import service_state
 import service_topology
 import shell_service
@@ -59,26 +58,6 @@ func lifecycle_is_lane_target(target: u8) bool {
     return identity_taxonomy.identity_target_is_lane(target)
 }
 
-func lifecycle_op_supported(op: u8) bool {
-    return op == serial_protocol.CMD_A || op == serial_protocol.CMD_C || op == serial_protocol.CMD_D || op == serial_protocol.CMD_I || op == serial_protocol.CMD_P || op == serial_protocol.CMD_S || op == serial_protocol.CMD_R
-}
-
-func lifecycle_validate(msg: service_effect.Message) u8 {
-    if msg.payload_len != 4 {
-        return shell_service.SHELL_INVALID_SHAPE
-    }
-    if msg.payload[0] != serial_protocol.CMD_X {
-        return shell_service.SHELL_INVALID_COMMAND
-    }
-    if !lifecycle_op_supported(msg.payload[1]) {
-        return shell_service.SHELL_INVALID_COMMAND
-    }
-    if msg.payload[3] != serial_protocol.CMD_BANG {
-        return shell_service.SHELL_INVALID_SHAPE
-    }
-    return 0
-}
-
 func lifecycle_target_endpoint(target: u8) u32 {
     return shell_service.lifecycle_target_endpoint(target)
 }
@@ -110,43 +89,6 @@ func authority_payload(target: u8, class: u8, transfer: u8, scope: u8) [4]u8 {
 func lifecycle_policy_code(target: u8) u8 {
     info: init.RestartPolicyInfo = init.restart_policy_for_target(target)
     return service_state.state_policy_code(info.policy)
-}
-
-func lifecycle_metadata(state: *boot.KernelBootState, target: u8) u8 {
-    current: boot.KernelBootState = *state
-    switch target {
-    case serial_protocol.TARGET_LOG:
-        return u8(log_service.log_len(current.log.state))
-    case serial_protocol.TARGET_KV:
-        return u8(kv_service.kv_count(current.kv.state))
-    case serial_protocol.TARGET_QUEUE:
-        return u8(queue_service.queue_len(current.queue.state))
-    case serial_protocol.TARGET_FILE:
-        return u8(file_service.file_count(current.file.state))
-    case serial_protocol.TARGET_TIMER:
-        return u8(timer_service.timer_active_count(current.timer.state))
-    case serial_protocol.TARGET_TASK:
-        return u8(task_service.task_active_count(current.task.state))
-    default:
-        return 0
-    }
-}
-
-func lifecycle_generation_marker(state: *boot.KernelBootState, target: u8) u8 {
-    if target == serial_protocol.TARGET_WORKSET {
-        return service_state.state_generation_marker(boot.boot_workset_generation(*state))
-    }
-    if target == serial_protocol.TARGET_AUDIT {
-        return service_state.state_generation_marker(boot.boot_audit_generation(*state))
-    }
-
-    endpoint: u32 = lifecycle_target_endpoint(target)
-    if endpoint == 0 || !service_topology.service_can_restart(endpoint) {
-        return 0
-    }
-
-    mark: service_identity.ServiceMark = boot.bootmark_for_endpoint(*state, endpoint)
-    return service_state.state_generation_marker(service_identity.mark_generation(mark))
 }
 
 func lifecycle_authority_reply(state: *boot.KernelBootState, target: u8) service_effect.Effect {
@@ -207,8 +149,8 @@ func lifecycle_state_reply(state: *boot.KernelBootState, target: u8) service_eff
         service_state.state_mode_code(mode),
         service_state.state_participation(target),
         lifecycle_policy_code(target),
-        lifecycle_metadata(state, target),
-        lifecycle_generation_marker(state, target))
+        boot.bootstate_metadata_for_target(*state, target),
+        boot.bootstate_generation_marker_for_target(*state, target))
     return shell_service.lifecycle_state_effect(syscall.SyscallStatus.Ok, payload)
 }
 
@@ -226,15 +168,14 @@ func lifecycle_identity_reply(state: *boot.KernelBootState, target: u8) service_
     if !identity_taxonomy.identity_target_has_generation_query(target) {
         return shell_service.invalid_effect(shell_service.SHELL_INVALID_COMMAND)
     }
-    if target == serial_protocol.TARGET_WORKSET {
-        return shell_service.lifecycle_identity_effect(syscall.SyscallStatus.Ok, boot.boot_workset_generation_payload(*state))
+    if target != serial_protocol.TARGET_WORKSET {
+        identity_endpoint: u32 = lifecycle_target_endpoint(target)
+        if identity_endpoint == 0 {
+            return shell_service.invalid_effect(shell_service.SHELL_INVALID_COMMAND)
+        }
     }
-    identity_endpoint: u32 = lifecycle_target_endpoint(target)
-    if identity_endpoint == 0 {
-        return shell_service.invalid_effect(shell_service.SHELL_INVALID_COMMAND)
-    }
-    mark: service_identity.ServiceMark = boot.bootmark_for_endpoint(*state, identity_endpoint)
-    return shell_service.lifecycle_identity_effect(syscall.SyscallStatus.Ok, service_identity.mark_generation_payload(mark))
+    payload: [4]u8 = boot.bootgeneration_payload_for_target(*state, target)
+    return shell_service.lifecycle_identity_effect(syscall.SyscallStatus.Ok, payload)
 }
 
 func lifecycle_policy_reply(state: *boot.KernelBootState, target: u8) service_effect.Effect {
@@ -419,13 +360,14 @@ func kernel_dispatch_kv(state: *boot.KernelBootState, msg: service_effect.Messag
 // lifecycle control step on the shell endpoint; no leaf service produces a
 // further Send that needs chasing through a non-leaf path.
 func kernel_dispatch_shell_control(state: *boot.KernelBootState, msg: service_effect.Message) service_effect.Effect {
-    invalid_kind: u8 = lifecycle_validate(msg)
+    invalid_kind: u8 = shell_service.lifecycle_invalid_kind(msg)
     if invalid_kind != 0 {
         return shell_service.invalid_effect(invalid_kind)
     }
 
-    route: LifecycleRoute = lifecycle_route(msg.payload[1])
-    return route.reply(state, msg.payload[2])
+    control: shell_service.LifecycleControl = shell_service.lifecycle_control(msg)
+    route: LifecycleRoute = lifecycle_route(control.op)
+    return route.reply(state, control.target)
 }
 
 func kernel_dispatch_leaf(state: *boot.KernelBootState, msg: service_effect.Message) service_effect.Effect {

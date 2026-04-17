@@ -10,6 +10,11 @@ const SHELL_INVALID_REPLY: u8 = 63  // '?'
 const SHELL_INVALID_COMMAND: u8 = 67  // 'C'
 const SHELL_INVALID_SHAPE: u8 = 83  // 'S'
 
+struct LifecycleControl {
+    op: u8
+    target: u8
+}
+
 struct ShellServiceState {
     pid: u32
     slot: u32
@@ -36,6 +41,30 @@ func bang3(m: service_effect.Message) bool {
 
 func bang23(m: service_effect.Message) bool {
     return m.payload[2] == serial_protocol.CMD_BANG && m.payload[3] == serial_protocol.CMD_BANG
+}
+
+func lifecycle_op_supported(op: u8) bool {
+    return op == serial_protocol.CMD_A || op == serial_protocol.CMD_C || op == serial_protocol.CMD_D || op == serial_protocol.CMD_I || op == serial_protocol.CMD_P || op == serial_protocol.CMD_S || op == serial_protocol.CMD_R
+}
+
+func lifecycle_control(m: service_effect.Message) LifecycleControl {
+    return LifecycleControl{ op: m.payload[1], target: m.payload[2] }
+}
+
+func lifecycle_invalid_kind(m: service_effect.Message) u8 {
+    if m.payload_len != 4 {
+        return SHELL_INVALID_SHAPE
+    }
+    if m.payload[0] != serial_protocol.CMD_X {
+        return SHELL_INVALID_COMMAND
+    }
+    if !lifecycle_op_supported(m.payload[1]) {
+        return SHELL_INVALID_COMMAND
+    }
+    if m.payload[3] != serial_protocol.CMD_BANG {
+        return SHELL_INVALID_SHAPE
+    }
+    return 0
 }
 
 // lifecycle_target_endpoint maps a shell protocol target byte to the

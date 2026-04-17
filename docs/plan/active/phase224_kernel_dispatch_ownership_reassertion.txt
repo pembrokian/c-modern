@@ -3,7 +3,7 @@ Phase 224 -- Kernel Dispatch Ownership Reassertion
 
 Status
 ------
-ACTIVE
+COMPLETE
 
 Purpose
 -------
@@ -150,3 +150,33 @@ Why this is the narrowest honest next move
 - The backlog explicitly names dispatch drift as an active maintenance risk.
 - Doing the ownership reassertion before the next service wave is cheaper and
   more honest than waiting until dispatch already carries service-local policy.
+
+Implementation closeout
+-----------------------
+- `kernel_dispatch.mc` was re-audited top to bottom against the four-owner
+  model.
+- Shell-owned lifecycle control decode moved out of dispatch:
+  - lifecycle command-shape validation now lives in
+    `kernel/src/shell/shell_service.mc`
+  - dispatch now consumes a shell-owned `LifecycleControl` decode instead of
+    inspecting raw `X<op><target>!` bytes directly
+- Boot-owned lifecycle state projection moved out of dispatch:
+  - lifecycle metadata and generation-marker projection now live in
+    `kernel/src/boot/boot_identity.mc`
+  - dispatch now asks boot for target-owned generation and metadata payload
+    ingredients instead of reading service state directly for those queries
+- No new framework, registry, supervisor, shell redesign, compiler expansion,
+  or transport widening was admitted.
+
+What remains intentionally dispatch-owned
+-----------------------------------------
+- endpoint lookup and invalid-endpoint rejection
+- transfer-endpoint special-case gating for explicit handle-bearing traffic
+- leaf-service routing and bounded effect chasing
+- serial-path effect wiring and reply commit
+- one bounded lifecycle control execution step after shell decode
+
+Validation run
+--------------
+- `Build debug`
+- `mc_tool_workflow_kernel_reset_lane_unit`

@@ -1,7 +1,14 @@
 import identity_taxonomy
+import file_service
+import kv_service
+import log_service
+import queue_service
 import service_identity
+import service_state
 import serial_protocol
 import service_topology
+import task_service
+import timer_service
 
 // Named ServiceRef accessors for the four boot-wired services.
 // These refs are stable across restart -- the endpoint_id never changes after
@@ -62,6 +69,54 @@ func boot_audit_generation(s: KernelBootState) u32 {
 
 func boot_workset_generation_payload(s: KernelBootState) [4]u8 {
     return service_identity.generation_payload(s.workset_generation)
+}
+
+func bootstate_metadata_for_target(s: KernelBootState, target: u8) u8 {
+    switch target {
+    case serial_protocol.TARGET_LOG:
+        return u8(log_service.log_len(s.log.state))
+    case serial_protocol.TARGET_KV:
+        return u8(kv_service.kv_count(s.kv.state))
+    case serial_protocol.TARGET_QUEUE:
+        return u8(queue_service.queue_len(s.queue.state))
+    case serial_protocol.TARGET_FILE:
+        return u8(file_service.file_count(s.file.state))
+    case serial_protocol.TARGET_TIMER:
+        return u8(timer_service.timer_active_count(s.timer.state))
+    case serial_protocol.TARGET_TASK:
+        return u8(task_service.task_active_count(s.task.state))
+    default:
+        return 0
+    }
+}
+
+func bootstate_generation_marker_for_target(s: KernelBootState, target: u8) u8 {
+    if target == serial_protocol.TARGET_WORKSET {
+        return service_state.state_generation_marker(s.workset_generation)
+    }
+    if target == serial_protocol.TARGET_AUDIT {
+        return service_state.state_generation_marker(s.audit_generation)
+    }
+
+    endpoint: u32 = shell_service.lifecycle_target_endpoint(target)
+    if endpoint == 0 || !service_topology.service_can_restart(endpoint) {
+        return 0
+    }
+
+    mark: service_identity.ServiceMark = bootmark_for_endpoint(s, endpoint)
+    return service_state.state_generation_marker(service_identity.mark_generation(mark))
+}
+
+func bootgeneration_payload_for_target(s: KernelBootState, target: u8) [4]u8 {
+    if target == serial_protocol.TARGET_WORKSET {
+        return boot_workset_generation_payload(s)
+    }
+    endpoint: u32 = shell_service.lifecycle_target_endpoint(target)
+    if endpoint == 0 {
+        return service_identity.generation_payload(0)
+    }
+    mark: service_identity.ServiceMark = bootmark_for_endpoint(s, endpoint)
+    return service_identity.mark_generation_payload(mark)
 }
 
 func summary_participation_code(participation: RetainedSummaryParticipation) u8 {
