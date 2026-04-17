@@ -1,0 +1,152 @@
+Phase 242 -- Update Manifest And Staged Artifact Store First Slice
+==================================================================
+
+Status
+------
+PROPOSED
+
+Purpose
+-------
+Admit one bounded update-manifest and staged-artifact owner so the repository
+can move from generic durable named objects to a product-shaped remote update
+surface with explicit manifest truth, staged payload storage, and restart-
+visible reload.
+
+This phase exists now because Phases 234 through 241 would have already
+established durable named state, restart-safe workflows, external ingress, and
+delegated external handling. The next honest move is to give that machinery a
+single product-shaped consumer rather than widening internal infrastructure for
+its own sake.
+
+Repository status note
+----------------------
+- Phase 234 admits `object_store_service` as a bounded durable named-object
+  owner with create, read, and replace semantics.
+- Phase 237 closes the durable named-object milestone by stressing durable
+  updates, delivery, and restart pressure on one composed lane.
+- Phase 238 through Phase 241 admit bounded external ingress, connection-backed
+  workflow execution, external completion pressure, and delegated external
+  request handling.
+- The repository still lacks one product-shaped durable owner whose contract is
+  explicitly about update manifests and staged artifacts rather than generic
+  objects or external requests.
+
+Problem being solved
+--------------------
+- The current system can persist named state and process external work, but it
+  still cannot represent one staged update artifact plus the manifest truth
+  that says what that artifact means.
+- Without a manifest and staged-artifact owner, the next milestone would either
+  overload `object_store_service` with packaging semantics or hide manifest
+  truth inside workflow logic.
+- That would make update workflows under-specified and would weaken the clean
+  ownership boundaries established by the earlier phases.
+
+Non-goals
+---------
+- no general package manager
+- no dependency solver
+- no version-range language
+- no filesystem or directory framework
+- no installer policy engine
+- no compiler-manifest or project-manifest redesign beyond one narrow update-
+  specific contract if the phase proves it necessary
+
+Invariants
+----------
+- `object_store_service` remains a generic durable named-object owner and does
+  not become the owner of update-manifest semantics.
+- `connection_service` remains the owner of ingress lifetime truth.
+- The four-byte shell frame stays fixed.
+- Durable reload remains explicit through owner-local state plus boot or init
+  reload, not through a generic persistence registry.
+- Compiler and driver diagnostics remain owner-local and additive if update
+  manifest truth requires a tool-side failure surface.
+
+Required surface changes
+------------------------
+1. Add one bounded `update_store_service` owner under `kernel/src/services/`.
+2. Admit one compact manifest and staged-artifact contract only:
+   - stage one bounded artifact payload under a fixed update slot
+   - record one bounded manifest for that staged artifact
+   - query staged update state and manifest classification
+3. Add explicit durable reload for staged artifact and manifest truth.
+4. Add one deterministic scenario proving stage, query, restart reload, and
+   manifest-truth preservation.
+5. Add one focused reset-lane fixture for the staged update-store owner.
+
+Forbidden changes
+-----------------
+- do not widen `object_store_service` into a package or update owner
+- do not add a general schema framework or manifest registry
+- do not widen shell transport width to carry richer staged payloads
+- do not move manifest-truth interpretation into boot, dispatch, or workflow
+  merely to simplify the service owner
+- do not admit package dependency, rollback, or installation policy in this
+  phase
+
+Phase role in the larger sequence
+---------------------------------
+- This phase starts the bounded remote update workflow milestone.
+- It consumes the durable named-state and external ingress capabilities from
+  Phases 234 through 241.
+- It prepares the next three phases by giving workflow, delegation, and
+  completion pressure one concrete product-shaped object: a staged update with
+  explicit manifest truth.
+
+Relevant backlog items this phase intentionally brings under pressure
+--------------------------------------------------------------------
+- durable named-state and replay bounded to `journal_service` and
+  `object_store_service`
+- connection-style ingress bounded to the connection owner's fixed-capacity
+  slots and owner-local idle-budget timeout
+- error-surface follow-through owner-local and additive on compiler-visible
+  manifest truth gaps
+- shared libraries, install policy, and broader cross-target coordination stay
+  explicit and deferred until a real admitted project needs more
+
+Questions this phase must answer
+--------------------------------
+1. What is the narrowest update-manifest truth the repository can admit without
+   turning this into a package manager?
+2. Can one staged-artifact owner stay honest without filesystem-scale naming or
+   installation semantics?
+3. Which update facts belong in the new owner versus in workflow logic,
+   `object_store_service`, or tool-side manifest parsing?
+4. Does one bounded staged artifact plus manifest create enough pressure for
+   the later apply, delegation, and recovery phases?
+
+Preferred implementation shape
+------------------------------
+- Keep update-manifest and staged-artifact truth in
+  `kernel/src/services/update_store_service.mc`.
+- Reuse existing durable reload patterns from `journal_service` and
+  `object_store_service` rather than introducing a new persistence layer.
+- Reuse external ingress only as the way staged data arrives; do not make
+  `connection_service` the owner of staged update state.
+- If a tool-side manifest check becomes necessary, keep it local to the owning
+  parser or driver path with additive notes rather than a schema framework.
+
+Test obligations
+----------------
+- `Build debug`
+- one focused scenario proving staged artifact storage, manifest query, and
+  restart reload
+- one focused reset-lane fixture for the new update-store owner
+- `mc_tool_workflow_kernel_reset_lane_unit`
+
+Acceptance criteria
+-------------------
+- one bounded owner can durably stage an update artifact and its manifest truth
+- manifest and staged-artifact state survive restart and remain queryable
+- no package-manager, dependency, or filesystem framework is introduced
+- the milestone now has one concrete product-shaped durable input surface
+
+Future follow-up
+----------------
+- The likely immediate next pressure is a restart-safe workflow that validates
+  and applies one staged update.
+- Delegated installer authority and recovery reporting should build on this
+  owner rather than reopening generic object-store semantics.
+- Reopen richer manifest semantics only if one real admitted update workflow
+  cannot stay honest inside the bounded manifest contract landed here.

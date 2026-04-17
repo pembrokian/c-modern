@@ -1,11 +1,13 @@
 import journal_service
 import completion_mailbox_service
 import connection_service
+import lease_service
 import object_store_service
 import primitives
 import service_effect
 import syscall
 import task_service
+import ticket_service
 import timer_service
 
 const WORKFLOW_OP_SCHEDULE: u8 = 83  // 'S'
@@ -40,6 +42,10 @@ const WORKFLOW_CONNECTION_SLOT_MARKER: u8 = 128
 const WORKFLOW_STATE_CONNECTION_EXECUTED: u8 = 69          // 'E'
 const WORKFLOW_STATE_CONNECTION_CANCELLED: u8 = 89         // 'Y'
 const WORKFLOW_STATE_CONNECTION_RESTART_CANCELLED: u8 = 90 // 'Z'
+const WORKFLOW_STATE_CONNECTION_TICKET_USED: u8 = 86       // 'V'
+const WORKFLOW_STATE_CONNECTION_TICKET_INVALID: u8 = 73    // 'I'
+const WORKFLOW_STATE_CONNECTION_TICKET_STALE: u8 = 83      // 'S'
+const WORKFLOW_STATE_CONNECTION_TICKET_CONSUMED: u8 = 80   // 'P'
 
 struct WorkflowServiceState {
     pid: u32
@@ -74,6 +80,8 @@ struct WorkflowAdvanceResult {
     timer: timer_service.TimerServiceState
     task: task_service.TaskServiceState
     object_store: object_store_service.ObjectStoreServiceState
+    lease: lease_service.LeaseServiceState
+    ticket: ticket_service.TicketServiceState
     completion: completion_mailbox_service.CompletionMailboxServiceState
 }
 
@@ -83,6 +91,8 @@ struct WorkflowStepResult {
     task: task_service.TaskServiceState
     object_store: object_store_service.ObjectStoreServiceState
     journal: journal_service.JournalServiceState
+    lease: lease_service.LeaseServiceState
+    ticket: ticket_service.TicketServiceState
     completion: completion_mailbox_service.CompletionMailboxServiceState
     effect: service_effect.Effect
 }
@@ -122,12 +132,23 @@ struct WorkflowCancelExecution {
     effect: service_effect.Effect
 }
 
-func workflow_advance_result(workflow: WorkflowServiceState, timer: timer_service.TimerServiceState, task: task_service.TaskServiceState, object_store: object_store_service.ObjectStoreServiceState, completion: completion_mailbox_service.CompletionMailboxServiceState) WorkflowAdvanceResult {
-    return WorkflowAdvanceResult{ workflow: workflow, timer: timer, task: task, object_store: object_store, completion: completion }
+struct WorkflowDelegatedConnectionResult {
+    workflow: WorkflowServiceState
+    lease: lease_service.LeaseServiceState
+    ticket: ticket_service.TicketServiceState
+    completion: completion_mailbox_service.CompletionMailboxServiceState
 }
 
-func workflow_step_result(workflow: WorkflowServiceState, timer: timer_service.TimerServiceState, task: task_service.TaskServiceState, object_store: object_store_service.ObjectStoreServiceState, journal: journal_service.JournalServiceState, completion: completion_mailbox_service.CompletionMailboxServiceState, effect: service_effect.Effect) WorkflowStepResult {
-    return WorkflowStepResult{ workflow: workflow, timer: timer, task: task, object_store: object_store, journal: journal, completion: completion, effect: effect }
+func workflow_advance_result(workflow: WorkflowServiceState, timer: timer_service.TimerServiceState, task: task_service.TaskServiceState, object_store: object_store_service.ObjectStoreServiceState, lease: lease_service.LeaseServiceState, ticket: ticket_service.TicketServiceState, completion: completion_mailbox_service.CompletionMailboxServiceState) WorkflowAdvanceResult {
+    return WorkflowAdvanceResult{ workflow: workflow, timer: timer, task: task, object_store: object_store, lease: lease, ticket: ticket, completion: completion }
+}
+
+func workflow_step_result(workflow: WorkflowServiceState, timer: timer_service.TimerServiceState, task: task_service.TaskServiceState, object_store: object_store_service.ObjectStoreServiceState, journal: journal_service.JournalServiceState, lease: lease_service.LeaseServiceState, ticket: ticket_service.TicketServiceState, completion: completion_mailbox_service.CompletionMailboxServiceState, effect: service_effect.Effect) WorkflowStepResult {
+    return WorkflowStepResult{ workflow: workflow, timer: timer, task: task, object_store: object_store, journal: journal, lease: lease, ticket: ticket, completion: completion, effect: effect }
+}
+
+func workflow_delegated_connection_result(workflow: WorkflowServiceState, lease: lease_service.LeaseServiceState, ticket: ticket_service.TicketServiceState, completion: completion_mailbox_service.CompletionMailboxServiceState) WorkflowDelegatedConnectionResult {
+    return WorkflowDelegatedConnectionResult{ workflow: workflow, lease: lease, ticket: ticket, completion: completion }
 }
 
 func workflow_state_init(pid: u32) WorkflowServiceState {
@@ -308,6 +329,17 @@ func workflow_connection_slot(s: WorkflowServiceState) u8 {
         return s.opcode
     }
     return s.due - WORKFLOW_CONNECTION_SLOT_MARKER
+}
+
+func workflow_connection_uses_ticket_lease(s: WorkflowServiceState) bool {
+    return s.opcode >= connection_service.CONNECTION_EXTERNAL_TICKET_BASE
+}
+
+func workflow_connection_ticket_lease_id(s: WorkflowServiceState) u8 {
+    if !workflow_connection_uses_ticket_lease(s) {
+        return 0
+    }
+    return s.opcode - connection_service.CONNECTION_EXTERNAL_TICKET_BASE
 }
 
 func workflow_object_name(s: WorkflowServiceState) u8 {
@@ -561,88 +593,131 @@ func workflow_deliver_completion(s: WorkflowServiceState, completion: completion
     return WorkflowDeliveryResult{ workflow: workflow_pending_delivery(s, outcome, status), completion: queued.state }
 }
 
-func workflow_advance_waiting(s: WorkflowServiceState, timer: timer_service.TimerServiceState, task: task_service.TaskServiceState, object_store: object_store_service.ObjectStoreServiceState, completion: completion_mailbox_service.CompletionMailboxServiceState, connection: connection_service.ConnectionServiceState) WorkflowAdvanceResult {
+func workflow_connection_ticket_outcome(effect: service_effect.Effect) u8 {
+    if service_effect.effect_reply_status(effect) == syscall.SyscallStatus.Ok {
+        return WORKFLOW_STATE_CONNECTION_TICKET_USED
+    }
+    if service_effect.effect_reply_payload_len(effect) == 0 {
+        return WORKFLOW_STATE_CONNECTION_TICKET_INVALID
+    }
+
+    code := service_effect.effect_reply_payload(effect)[0]
+    if code == lease_service.LEASE_STALE || code == ticket_service.TICKET_STALE {
+        return WORKFLOW_STATE_CONNECTION_TICKET_STALE
+    }
+    if code == ticket_service.TICKET_CONSUMED {
+        return WORKFLOW_STATE_CONNECTION_TICKET_CONSUMED
+    }
+    return WORKFLOW_STATE_CONNECTION_TICKET_INVALID
+}
+
+func workflow_execute_connection_ticket(s: WorkflowServiceState, lease: lease_service.LeaseServiceState, ticket: ticket_service.TicketServiceState, completion: completion_mailbox_service.CompletionMailboxServiceState, ticket_generation: u8) WorkflowDelegatedConnectionResult {
+    consume := lease_service.lease_consume_external_ticket(lease, workflow_connection_ticket_lease_id(s), ticket_generation)
+    next_lease := consume.state
+    next_ticket := ticket
+    outcome := workflow_connection_ticket_outcome(consume.effect)
+
+    if consume.op == lease_service.LEASE_OP_USE_EXTERNAL_TICKET {
+        used := ticket_service.ticket_use(ticket, consume.first, consume.second)
+        next_ticket = used.state
+        outcome = workflow_connection_ticket_outcome(used.effect)
+    }
+
+    delivered := workflow_deliver_completion(s, completion, outcome)
+    return workflow_delegated_connection_result(delivered.workflow, next_lease, next_ticket, delivered.completion)
+}
+
+func workflow_advance_waiting(s: WorkflowServiceState, timer: timer_service.TimerServiceState, task: task_service.TaskServiceState, object_store: object_store_service.ObjectStoreServiceState, lease: lease_service.LeaseServiceState, ticket: ticket_service.TicketServiceState, completion: completion_mailbox_service.CompletionMailboxServiceState, connection: connection_service.ConnectionServiceState, ticket_generation: u8) WorkflowAdvanceResult {
     next_task: task_service.TaskServiceState = task
     next_object_store: object_store_service.ObjectStoreServiceState = object_store
+    next_lease: lease_service.LeaseServiceState = lease
+    next_ticket: ticket_service.TicketServiceState = ticket
     next_completion: completion_mailbox_service.CompletionMailboxServiceState = completion
 
     if workflow_is_connection(s) && !workflow_connection_active(s, connection) {
         connection_cancelled_delivery := workflow_deliver_completion(s with { restart: WORKFLOW_RESTART_NONE }, next_completion, WORKFLOW_STATE_CONNECTION_CANCELLED)
-        return workflow_advance_result(connection_cancelled_delivery.workflow, timer, next_task, next_object_store, connection_cancelled_delivery.completion)
+        return workflow_advance_result(connection_cancelled_delivery.workflow, timer, next_task, next_object_store, next_lease, next_ticket, connection_cancelled_delivery.completion)
     }
 
     idx := timer_service.timer_find(timer, WORKFLOW_TIMER_ID)
     if idx >= timer_service.TIMER_CAPACITY {
         missing_delivery := workflow_deliver_completion(s, next_completion, workflow_cancelled_outcome(s))
-        return workflow_advance_result(missing_delivery.workflow, timer, next_task, next_object_store, missing_delivery.completion)
+        return workflow_advance_result(missing_delivery.workflow, timer, next_task, next_object_store, next_lease, next_ticket, missing_delivery.completion)
     }
 
     due := timer.due[idx]
     if timer.state[idx] == timer_service.TIMER_STATE_ACTIVE {
         if workflow_is_connection(s) {
-            return workflow_advance_result(workflow_waiting_connection(s, workflow_connection_slot(s), s.restart, s.generation), timer, next_task, next_object_store, next_completion)
+            return workflow_advance_result(workflow_waiting_connection(s, workflow_connection_slot(s), s.restart, s.generation), timer, next_task, next_object_store, next_lease, next_ticket, next_completion)
         }
         if workflow_is_object_update(s) {
-            return workflow_advance_result(workflow_waiting_object_update(s, s.restart, s.generation), timer, next_task, next_object_store, next_completion)
+            return workflow_advance_result(workflow_waiting_object_update(s, s.restart, s.generation), timer, next_task, next_object_store, next_lease, next_ticket, next_completion)
         }
-        return workflow_advance_result(workflow_waiting_task(s, due, s.restart, s.generation), timer, next_task, next_object_store, next_completion)
+        return workflow_advance_result(workflow_waiting_task(s, due, s.restart, s.generation), timer, next_task, next_object_store, next_lease, next_ticket, next_completion)
     }
     if timer.state[idx] == timer_service.TIMER_STATE_CANCELLED {
         timer_cancelled_delivery := workflow_deliver_completion(s, next_completion, workflow_cancelled_outcome(s))
-        return workflow_advance_result(timer_cancelled_delivery.workflow, timer, next_task, next_object_store, timer_cancelled_delivery.completion)
+        return workflow_advance_result(timer_cancelled_delivery.workflow, timer, next_task, next_object_store, next_lease, next_ticket, timer_cancelled_delivery.completion)
     }
     if timer.state[idx] != timer_service.TIMER_STATE_EXPIRED {
         if workflow_is_object_update(s) {
             invalid_object := workflow_deliver_completion(s, next_completion, WORKFLOW_STATE_OBJECT_CANCELLED)
-            return workflow_advance_result(invalid_object.workflow, timer, next_task, next_object_store, invalid_object.completion)
+            return workflow_advance_result(invalid_object.workflow, timer, next_task, next_object_store, next_lease, next_ticket, invalid_object.completion)
         }
         invalid_timer := workflow_deliver_completion(s, next_completion, WORKFLOW_STATE_FAILED)
-        return workflow_advance_result(invalid_timer.workflow, timer, next_task, next_object_store, invalid_timer.completion)
+        return workflow_advance_result(invalid_timer.workflow, timer, next_task, next_object_store, next_lease, next_ticket, invalid_timer.completion)
     }
 
     if workflow_is_object_update(s) {
         update := object_store_service.object_update(next_object_store, workflow_object_name(s), workflow_object_value(s))
         next_object_store = update.state
         update_delivery := workflow_deliver_completion(s, next_completion, workflow_object_update_outcome(update.effect))
-        return workflow_advance_result(update_delivery.workflow, timer, next_task, next_object_store, update_delivery.completion)
+        return workflow_advance_result(update_delivery.workflow, timer, next_task, next_object_store, next_lease, next_ticket, update_delivery.completion)
     }
 
     if workflow_is_connection(s) {
+        if workflow_connection_uses_ticket_lease(s) {
+            delegated := workflow_execute_connection_ticket(s, next_lease, next_ticket, next_completion, ticket_generation)
+            return workflow_advance_result(delegated.workflow, timer, next_task, next_object_store, delegated.lease, delegated.ticket, delegated.completion)
+        }
+
         connection_submit := task_service.task_submit(task, s.opcode)
         next_task = connection_submit.state
         if service_effect.effect_reply_status(connection_submit.effect) != syscall.SyscallStatus.Ok {
             connection_submit_failed := workflow_deliver_completion(s, next_completion, WORKFLOW_STATE_CONNECTION_CANCELLED)
-            return workflow_advance_result(connection_submit_failed.workflow, timer, next_task, next_object_store, connection_submit_failed.completion)
+            return workflow_advance_result(connection_submit_failed.workflow, timer, next_task, next_object_store, next_lease, next_ticket, connection_submit_failed.completion)
         }
 
         connection_payload := service_effect.effect_reply_payload(connection_submit.effect)
         if connection_payload[1] == task_service.TASK_STATE_FAILED {
             immediate_cancel := workflow_deliver_completion(s, next_completion, WORKFLOW_STATE_CONNECTION_CANCELLED)
-            return workflow_advance_result(immediate_cancel.workflow, timer, next_task, next_object_store, immediate_cancel.completion)
+            return workflow_advance_result(immediate_cancel.workflow, timer, next_task, next_object_store, next_lease, next_ticket, immediate_cancel.completion)
         }
 
-        return workflow_advance_result(workflow_running_connection(s, workflow_connection_slot(s), connection_payload[0]), timer, next_task, next_object_store, next_completion)
+        return workflow_advance_result(workflow_running_connection(s, workflow_connection_slot(s), connection_payload[0]), timer, next_task, next_object_store, next_lease, next_ticket, next_completion)
     }
 
     submit := task_service.task_submit(task, s.opcode)
     next_task = submit.state
     if service_effect.effect_reply_status(submit.effect) != syscall.SyscallStatus.Ok {
         submit_failed := workflow_deliver_completion(s, next_completion, WORKFLOW_STATE_FAILED)
-        return workflow_advance_result(submit_failed.workflow, timer, next_task, next_object_store, submit_failed.completion)
+        return workflow_advance_result(submit_failed.workflow, timer, next_task, next_object_store, next_lease, next_ticket, submit_failed.completion)
     }
 
     payload := service_effect.effect_reply_payload(submit.effect)
     if payload[1] == task_service.TASK_STATE_FAILED {
         immediate_failed := workflow_deliver_completion(s, next_completion, WORKFLOW_STATE_FAILED)
-        return workflow_advance_result(immediate_failed.workflow, timer, next_task, next_object_store, immediate_failed.completion)
+        return workflow_advance_result(immediate_failed.workflow, timer, next_task, next_object_store, next_lease, next_ticket, immediate_failed.completion)
     }
 
-    return workflow_advance_result(workflow_running_task(s, payload[0]), timer, next_task, next_object_store, next_completion)
+    return workflow_advance_result(workflow_running_task(s, payload[0]), timer, next_task, next_object_store, next_lease, next_ticket, next_completion)
 }
 
-func workflow_advance_running(s: WorkflowServiceState, timer: timer_service.TimerServiceState, task: task_service.TaskServiceState, object_store: object_store_service.ObjectStoreServiceState, completion: completion_mailbox_service.CompletionMailboxServiceState, connection: connection_service.ConnectionServiceState) WorkflowAdvanceResult {
+func workflow_advance_running(s: WorkflowServiceState, timer: timer_service.TimerServiceState, task: task_service.TaskServiceState, object_store: object_store_service.ObjectStoreServiceState, lease: lease_service.LeaseServiceState, ticket: ticket_service.TicketServiceState, completion: completion_mailbox_service.CompletionMailboxServiceState, connection: connection_service.ConnectionServiceState) WorkflowAdvanceResult {
     next_task: task_service.TaskServiceState = task
     next_object_store: object_store_service.ObjectStoreServiceState = object_store
+    next_lease: lease_service.LeaseServiceState = lease
+    next_ticket: ticket_service.TicketServiceState = ticket
     next_completion: completion_mailbox_service.CompletionMailboxServiceState = completion
     running := workflow_running_state(workflow_running_task_id(s))
 
@@ -650,7 +725,7 @@ func workflow_advance_running(s: WorkflowServiceState, timer: timer_service.Time
         cancelled_execution := workflow_connection_cancel_result(s, timer, task)
         next_task = cancelled_execution.task
         connection_cancelled_delivery := workflow_deliver_completion(s with { restart: WORKFLOW_RESTART_NONE }, next_completion, WORKFLOW_STATE_CONNECTION_CANCELLED)
-        return workflow_advance_result(connection_cancelled_delivery.workflow, cancelled_execution.timer, next_task, next_object_store, connection_cancelled_delivery.completion)
+        return workflow_advance_result(connection_cancelled_delivery.workflow, cancelled_execution.timer, next_task, next_object_store, next_lease, next_ticket, connection_cancelled_delivery.completion)
     }
 
     complete := task_service.task_complete(task, running.task)
@@ -658,68 +733,68 @@ func workflow_advance_running(s: WorkflowServiceState, timer: timer_service.Time
     if service_effect.effect_reply_status(complete.effect) == syscall.SyscallStatus.Ok {
         if workflow_is_connection(s) {
             connection_done_delivery := workflow_deliver_completion(s, next_completion, WORKFLOW_STATE_CONNECTION_EXECUTED)
-            return workflow_advance_result(connection_done_delivery.workflow, timer, next_task, next_object_store, connection_done_delivery.completion)
+            return workflow_advance_result(connection_done_delivery.workflow, timer, next_task, next_object_store, next_lease, next_ticket, connection_done_delivery.completion)
         }
         task_done_delivery := workflow_deliver_completion(s, next_completion, WORKFLOW_STATE_DONE)
-        return workflow_advance_result(task_done_delivery.workflow, timer, next_task, next_object_store, task_done_delivery.completion)
+        return workflow_advance_result(task_done_delivery.workflow, timer, next_task, next_object_store, next_lease, next_ticket, task_done_delivery.completion)
     }
 
     query := task_service.task_query(next_task, running.task)
     next_task = query.state
     if service_effect.effect_reply_status(query.effect) != syscall.SyscallStatus.Ok {
         query_failed := workflow_deliver_completion(s, next_completion, WORKFLOW_STATE_FAILED)
-        return workflow_advance_result(query_failed.workflow, timer, next_task, next_object_store, query_failed.completion)
+        return workflow_advance_result(query_failed.workflow, timer, next_task, next_object_store, next_lease, next_ticket, query_failed.completion)
     }
 
     query_payload := service_effect.effect_reply_payload(query.effect)
     if query_payload[0] == task_service.TASK_STATE_CANCELLED {
         if workflow_is_connection(s) {
             connection_task_cancelled := workflow_deliver_completion(s, next_completion, WORKFLOW_STATE_CONNECTION_CANCELLED)
-            return workflow_advance_result(connection_task_cancelled.workflow, timer, next_task, next_object_store, connection_task_cancelled.completion)
+            return workflow_advance_result(connection_task_cancelled.workflow, timer, next_task, next_object_store, next_lease, next_ticket, connection_task_cancelled.completion)
         }
         task_cancelled_delivery := workflow_deliver_completion(s, next_completion, WORKFLOW_STATE_CANCELLED)
-        return workflow_advance_result(task_cancelled_delivery.workflow, timer, next_task, next_object_store, task_cancelled_delivery.completion)
+        return workflow_advance_result(task_cancelled_delivery.workflow, timer, next_task, next_object_store, next_lease, next_ticket, task_cancelled_delivery.completion)
     }
     if query_payload[0] == task_service.TASK_STATE_DONE {
         if workflow_is_connection(s) {
             connection_query_done := workflow_deliver_completion(s, next_completion, WORKFLOW_STATE_CONNECTION_EXECUTED)
-            return workflow_advance_result(connection_query_done.workflow, timer, next_task, next_object_store, connection_query_done.completion)
+            return workflow_advance_result(connection_query_done.workflow, timer, next_task, next_object_store, next_lease, next_ticket, connection_query_done.completion)
         }
         task_query_done := workflow_deliver_completion(s, next_completion, WORKFLOW_STATE_DONE)
-        return workflow_advance_result(task_query_done.workflow, timer, next_task, next_object_store, task_query_done.completion)
+        return workflow_advance_result(task_query_done.workflow, timer, next_task, next_object_store, next_lease, next_ticket, task_query_done.completion)
     }
     if query_payload[0] == task_service.TASK_STATE_FAILED {
         if workflow_is_connection(s) {
             connection_task_failed := workflow_deliver_completion(s, next_completion, WORKFLOW_STATE_CONNECTION_CANCELLED)
-            return workflow_advance_result(connection_task_failed.workflow, timer, next_task, next_object_store, connection_task_failed.completion)
+            return workflow_advance_result(connection_task_failed.workflow, timer, next_task, next_object_store, next_lease, next_ticket, connection_task_failed.completion)
         }
         task_failed_delivery := workflow_deliver_completion(s, next_completion, WORKFLOW_STATE_FAILED)
-        return workflow_advance_result(task_failed_delivery.workflow, timer, next_task, next_object_store, task_failed_delivery.completion)
+        return workflow_advance_result(task_failed_delivery.workflow, timer, next_task, next_object_store, next_lease, next_ticket, task_failed_delivery.completion)
     }
 
-    return workflow_advance_result(s, timer, next_task, next_object_store, next_completion)
+    return workflow_advance_result(s, timer, next_task, next_object_store, next_lease, next_ticket, next_completion)
 }
 
-func workflow_advance_delivering(s: WorkflowServiceState, timer: timer_service.TimerServiceState, task: task_service.TaskServiceState, object_store: object_store_service.ObjectStoreServiceState, completion: completion_mailbox_service.CompletionMailboxServiceState) WorkflowAdvanceResult {
+func workflow_advance_delivering(s: WorkflowServiceState, timer: timer_service.TimerServiceState, task: task_service.TaskServiceState, object_store: object_store_service.ObjectStoreServiceState, lease: lease_service.LeaseServiceState, ticket: ticket_service.TicketServiceState, completion: completion_mailbox_service.CompletionMailboxServiceState) WorkflowAdvanceResult {
     delivery := workflow_delivery_state(workflow_delivery_outcome(s), workflow_delivery_status(s))
     retry_delivery := workflow_deliver_completion(s, completion, delivery.outcome)
-    return workflow_advance_result(retry_delivery.workflow, timer, task, object_store, retry_delivery.completion)
+    return workflow_advance_result(retry_delivery.workflow, timer, task, object_store, lease, ticket, retry_delivery.completion)
 }
 
-func workflow_advance(s: WorkflowServiceState, timer: timer_service.TimerServiceState, task: task_service.TaskServiceState, object_store: object_store_service.ObjectStoreServiceState, completion: completion_mailbox_service.CompletionMailboxServiceState, connection: connection_service.ConnectionServiceState) WorkflowAdvanceResult {
+func workflow_advance(s: WorkflowServiceState, timer: timer_service.TimerServiceState, task: task_service.TaskServiceState, object_store: object_store_service.ObjectStoreServiceState, lease: lease_service.LeaseServiceState, ticket: ticket_service.TicketServiceState, completion: completion_mailbox_service.CompletionMailboxServiceState, connection: connection_service.ConnectionServiceState, ticket_generation: u8) WorkflowAdvanceResult {
     if workflow_is_waiting(s) {
-        return workflow_advance_waiting(s, timer, task, object_store, completion, connection)
+        return workflow_advance_waiting(s, timer, task, object_store, lease, ticket, completion, connection, ticket_generation)
     }
 
     if workflow_is_running(s) {
-        return workflow_advance_running(s, timer, task, object_store, completion, connection)
+        return workflow_advance_running(s, timer, task, object_store, lease, ticket, completion, connection)
     }
 
     if workflow_is_delivering(s) {
-        return workflow_advance_delivering(s, timer, task, object_store, completion)
+        return workflow_advance_delivering(s, timer, task, object_store, lease, ticket, completion)
     }
 
-    return workflow_advance_result(s, timer, task, object_store, completion)
+    return workflow_advance_result(s, timer, task, object_store, lease, ticket, completion)
 }
 
 func workflow_sync_journal(journal: journal_service.JournalServiceState, s: WorkflowServiceState) journal_service.JournalServiceState {
@@ -730,40 +805,40 @@ func workflow_sync_journal(journal: journal_service.JournalServiceState, s: Work
     return journal_service.journalwith(journal, journal.lane0, lane)
 }
 
-func workflow_step_with_synced_journal(workflow: WorkflowServiceState, timer: timer_service.TimerServiceState, task: task_service.TaskServiceState, object_store: object_store_service.ObjectStoreServiceState, journal: journal_service.JournalServiceState, completion: completion_mailbox_service.CompletionMailboxServiceState, effect: service_effect.Effect) WorkflowStepResult {
-    return workflow_step_result(workflow, timer, task, object_store, workflow_sync_journal(journal, workflow), completion, effect)
+func workflow_step_with_synced_journal(workflow: WorkflowServiceState, timer: timer_service.TimerServiceState, task: task_service.TaskServiceState, object_store: object_store_service.ObjectStoreServiceState, journal: journal_service.JournalServiceState, lease: lease_service.LeaseServiceState, ticket: ticket_service.TicketServiceState, completion: completion_mailbox_service.CompletionMailboxServiceState, effect: service_effect.Effect) WorkflowStepResult {
+    return workflow_step_result(workflow, timer, task, object_store, workflow_sync_journal(journal, workflow), lease, ticket, completion, effect)
 }
 
-func workflow_step_schedule(workflow: WorkflowServiceState, timer: timer_service.TimerServiceState, task: task_service.TaskServiceState, object_store: object_store_service.ObjectStoreServiceState, journal: journal_service.JournalServiceState, completion: completion_mailbox_service.CompletionMailboxServiceState, msg: service_effect.Message, generation: u8) WorkflowStepResult {
+func workflow_step_schedule(workflow: WorkflowServiceState, timer: timer_service.TimerServiceState, task: task_service.TaskServiceState, object_store: object_store_service.ObjectStoreServiceState, journal: journal_service.JournalServiceState, lease: lease_service.LeaseServiceState, ticket: ticket_service.TicketServiceState, completion: completion_mailbox_service.CompletionMailboxServiceState, msg: service_effect.Message, generation: u8) WorkflowStepResult {
     prepared := workflow_prepare_schedule(workflow, generation)
     scheduled := handle(prepared, msg)
     if service_effect.effect_reply_status(scheduled.effect) != syscall.SyscallStatus.Ok {
-        return workflow_step_with_synced_journal(workflow, timer, task, object_store, journal, completion, scheduled.effect)
+        return workflow_step_with_synced_journal(workflow, timer, task, object_store, journal, lease, ticket, completion, scheduled.effect)
     }
 
     create := timer_service.timer_create(timer, WORKFLOW_TIMER_ID, workflow_schedule_due_for_message(msg))
     next_timer := create.state
     if service_effect.effect_reply_status(create.effect) != syscall.SyscallStatus.Ok {
-        return workflow_step_with_synced_journal(workflow, next_timer, task, object_store, journal, completion, create.effect)
+        return workflow_step_with_synced_journal(workflow, next_timer, task, object_store, journal, lease, ticket, completion, create.effect)
     }
 
-    return workflow_step_with_synced_journal(scheduled.state, next_timer, task, object_store, journal, completion, scheduled.effect)
+    return workflow_step_with_synced_journal(scheduled.state, next_timer, task, object_store, journal, lease, ticket, completion, scheduled.effect)
 }
 
-func workflow_step_schedule_connection(workflow: WorkflowServiceState, timer: timer_service.TimerServiceState, task: task_service.TaskServiceState, object_store: object_store_service.ObjectStoreServiceState, journal: journal_service.JournalServiceState, completion: completion_mailbox_service.CompletionMailboxServiceState, id: u8, slot: u8, opcode: u8, generation: u8) WorkflowStepResult {
+func workflow_step_schedule_connection(workflow: WorkflowServiceState, timer: timer_service.TimerServiceState, task: task_service.TaskServiceState, object_store: object_store_service.ObjectStoreServiceState, journal: journal_service.JournalServiceState, lease: lease_service.LeaseServiceState, ticket: ticket_service.TicketServiceState, completion: completion_mailbox_service.CompletionMailboxServiceState, id: u8, slot: u8, opcode: u8, generation: u8) WorkflowStepResult {
     prepared := workflow_prepare_schedule(workflow, generation)
     scheduled := workflow_schedule_connection(prepared, id, slot, opcode)
     if service_effect.effect_reply_status(scheduled.effect) != syscall.SyscallStatus.Ok {
-        return workflow_step_with_synced_journal(workflow, timer, task, object_store, journal, completion, scheduled.effect)
+        return workflow_step_with_synced_journal(workflow, timer, task, object_store, journal, lease, ticket, completion, scheduled.effect)
     }
 
     create := timer_service.timer_create(timer, WORKFLOW_TIMER_ID, 2)
     next_timer := create.state
     if service_effect.effect_reply_status(create.effect) != syscall.SyscallStatus.Ok {
-        return workflow_step_with_synced_journal(workflow, next_timer, task, object_store, journal, completion, create.effect)
+        return workflow_step_with_synced_journal(workflow, next_timer, task, object_store, journal, lease, ticket, completion, create.effect)
     }
 
-    return workflow_step_with_synced_journal(scheduled.state, next_timer, task, object_store, journal, completion, scheduled.effect)
+    return workflow_step_with_synced_journal(scheduled.state, next_timer, task, object_store, journal, lease, ticket, completion, scheduled.effect)
 }
 
 func workflow_execute_cancel(workflow: WorkflowServiceState, timer: timer_service.TimerServiceState, task: task_service.TaskServiceState) WorkflowCancelExecution {
@@ -776,18 +851,18 @@ func workflow_execute_cancel(workflow: WorkflowServiceState, timer: timer_servic
     return WorkflowCancelExecution{ timer: timer, task: cancel_task.state, effect: cancel_task.effect }
 }
 
-func workflow_step_cancel(workflow: WorkflowServiceState, timer: timer_service.TimerServiceState, task: task_service.TaskServiceState, object_store: object_store_service.ObjectStoreServiceState, journal: journal_service.JournalServiceState, completion: completion_mailbox_service.CompletionMailboxServiceState, msg: service_effect.Message) WorkflowStepResult {
+func workflow_step_cancel(workflow: WorkflowServiceState, timer: timer_service.TimerServiceState, task: task_service.TaskServiceState, object_store: object_store_service.ObjectStoreServiceState, journal: journal_service.JournalServiceState, lease: lease_service.LeaseServiceState, ticket: ticket_service.TicketServiceState, completion: completion_mailbox_service.CompletionMailboxServiceState, msg: service_effect.Message) WorkflowStepResult {
     if msg.payload_len != 2 || !workflow_can_cancel(workflow, msg.payload[1]) {
-        return workflow_step_with_synced_journal(workflow, timer, task, object_store, journal, completion, workflow_reply_invalid())
+        return workflow_step_with_synced_journal(workflow, timer, task, object_store, journal, lease, ticket, completion, workflow_reply_invalid())
     }
 
     cancelled_execution := workflow_execute_cancel(workflow, timer, task)
     if service_effect.effect_reply_status(cancelled_execution.effect) != syscall.SyscallStatus.Ok {
-        return workflow_step_with_synced_journal(workflow, cancelled_execution.timer, cancelled_execution.task, object_store, journal, completion, cancelled_execution.effect)
+        return workflow_step_with_synced_journal(workflow, cancelled_execution.timer, cancelled_execution.task, object_store, journal, lease, ticket, completion, cancelled_execution.effect)
     }
 
     cancelled := handle(workflow, msg)
-    return workflow_step_with_synced_journal(cancelled.state, cancelled_execution.timer, cancelled_execution.task, object_store, journal, completion, cancelled.effect)
+    return workflow_step_with_synced_journal(cancelled.state, cancelled_execution.timer, cancelled_execution.task, object_store, journal, lease, ticket, completion, cancelled.effect)
 }
 
 func workflow_lane_matches(s: WorkflowServiceState, lane: journal_service.JournalLane) bool {
@@ -845,29 +920,31 @@ func workflow_restart_reload(pid: u32, snap: WorkflowSnapshotRecord, lane: journ
     return workflow_waiting_task(current, workflow_wait_due(current), WORKFLOW_RESTART_RESUMED, generation)
 }
 
-func step(s: WorkflowServiceState, timer: timer_service.TimerServiceState, task: task_service.TaskServiceState, object_store: object_store_service.ObjectStoreServiceState, journal: journal_service.JournalServiceState, completion: completion_mailbox_service.CompletionMailboxServiceState, connection: connection_service.ConnectionServiceState, msg: service_effect.Message, generation: u8) WorkflowStepResult {
+func step(s: WorkflowServiceState, timer: timer_service.TimerServiceState, task: task_service.TaskServiceState, object_store: object_store_service.ObjectStoreServiceState, journal: journal_service.JournalServiceState, lease: lease_service.LeaseServiceState, ticket: ticket_service.TicketServiceState, completion: completion_mailbox_service.CompletionMailboxServiceState, connection: connection_service.ConnectionServiceState, msg: service_effect.Message, generation: u8, ticket_generation: u8) WorkflowStepResult {
     ticked_timer := timer_service.timer_tick(timer)
-    advanced := workflow_advance(s, ticked_timer, task, object_store, completion, connection)
+    advanced := workflow_advance(s, ticked_timer, task, object_store, lease, ticket, completion, connection, ticket_generation)
     next_workflow := advanced.workflow
     next_timer := advanced.timer
     next_task := advanced.task
     next_object_store := advanced.object_store
+    next_lease := advanced.lease
+    next_ticket := advanced.ticket
     next_completion := advanced.completion
 
     if msg.payload_len == 0 {
-        return workflow_step_with_synced_journal(next_workflow, next_timer, next_task, next_object_store, journal, next_completion, workflow_reply_invalid())
+        return workflow_step_with_synced_journal(next_workflow, next_timer, next_task, next_object_store, journal, next_lease, next_ticket, next_completion, workflow_reply_invalid())
     }
 
     if msg.payload[0] == WORKFLOW_OP_SCHEDULE || msg.payload[0] == WORKFLOW_OP_UPDATE {
-        return workflow_step_schedule(next_workflow, next_timer, next_task, next_object_store, journal, next_completion, msg, generation)
+        return workflow_step_schedule(next_workflow, next_timer, next_task, next_object_store, journal, next_lease, next_ticket, next_completion, msg, generation)
     }
 
     if msg.payload[0] == WORKFLOW_OP_CANCEL {
-        return workflow_step_cancel(next_workflow, next_timer, next_task, next_object_store, journal, next_completion, msg)
+        return workflow_step_cancel(next_workflow, next_timer, next_task, next_object_store, journal, next_lease, next_ticket, next_completion, msg)
     }
 
     handled := handle(next_workflow, msg)
-    return workflow_step_with_synced_journal(handled.state, next_timer, next_task, next_object_store, journal, next_completion, handled.effect)
+    return workflow_step_with_synced_journal(handled.state, next_timer, next_task, next_object_store, journal, next_lease, next_ticket, next_completion, handled.effect)
 }
 
 func workflow_active_count(s: WorkflowServiceState) usize {

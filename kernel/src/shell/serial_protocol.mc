@@ -302,6 +302,10 @@ func encode_lease_issue_object_update(name: u8, value: u8) [4]u8 {
     return encode_two_args(CMD_Z, CMD_W, name, value)
 }
 
+func encode_lease_issue_external_ticket(epoch: u8, id: u8) [4]u8 {
+    return encode_two_args(CMD_Z, CMD_T, epoch, id)
+}
+
 func encode_lease_consume_object_update(id: u8) [4]u8 {
     return encode_one_arg(CMD_Z, CMD_D, id)
 }

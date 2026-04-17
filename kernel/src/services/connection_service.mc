@@ -9,6 +9,7 @@ const CONNECTION_OP_RECEIVE: u8 = 82  // 'R'
 const CONNECTION_OP_SEND: u8 = 83   // 'S'
 const CONNECTION_OP_CLOSE: u8 = 67  // 'C'
 const CONNECTION_OP_EXECUTE: u8 = 88  // 'X'
+const CONNECTION_EXTERNAL_TICKET_BASE: u8 = 128
 
 const CONNECTION_STATE_INVALID: u8 = 73       // 'I'
 const CONNECTION_STATE_OPEN: u8 = 79          // 'O'

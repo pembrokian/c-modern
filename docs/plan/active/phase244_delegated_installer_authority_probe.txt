@@ -1,0 +1,139 @@
+Phase 244 -- Delegated Installer Authority Probe
+================================================
+
+Status
+------
+PROPOSED
+
+Purpose
+-------
+Admit one bounded delegated authority path for update apply or activation so
+the repository can pressure temporary authority, staged update truth, and
+restart-safe execution on one real installer-shaped step.
+
+This phase exists now because Phase 243 would make restart-safe update apply
+real. The next honest move is to require explicit authority for one sensitive
+update step rather than allowing all apply or activation work to remain owner-
+local.
+
+Repository status note
+----------------------
+- Phase 233 admits `lease_service` as the bounded temporary-authority owner.
+- Phase 236 extends delegation to one durable named-object processing lane.
+- Phase 241 extends delegation to one external request path.
+- Phase 243 is expected to admit one restart-safe update-apply workflow.
+- The repository still lacks one delegated authority path whose consequence is
+  an applied or activated update.
+
+Problem being solved
+--------------------
+- The current authority model has not yet been forced through one installer-
+  shaped operation where temporary authority governs an apply or activation
+  step with real durable consequences.
+- Without this phase, the update milestone would risk declaring install-like
+  work complete while leaving the most sensitive step owner-local and
+  under-stressed.
+- That would weaken the claim that the bounded authority model is sufficient
+  for product-shaped workflows.
+
+Non-goals
+---------
+- no authentication system
+- no session or login model
+- no ACL or capability algebra
+- no multi-hop delegation chain
+- no generic installer policy engine
+- no dynamic endpoint assignment
+
+Invariants
+----------
+- Temporary authority remains bounded and owner-local to `lease_service`.
+- `workflow_service` remains the owner of queued execution and restart
+  continuity.
+- `update_store_service` remains the owner of staged update and applied-target
+  truth.
+- The four-byte shell frame stays fixed.
+- Restart-visible stale rejection remains explicit and deterministic.
+
+Required surface changes
+------------------------
+1. Extend `lease_service` with one admitted lease or delegation shape for one
+   update apply or activation step.
+2. Add one explicit handoff path where a non-owner service performs one bounded
+   installer-shaped action through delegated authority.
+3. Add explicit stale, invalid, and already-consumed failures on the delegated
+   installer path.
+4. Add one deterministic scenario proving valid delegated apply or activation
+   plus stale-after-restart rejection.
+5. Add one focused reset-lane fixture for delegated installer authority.
+
+Forbidden changes
+-----------------
+- do not widen `lease_service` into sessions, ACLs, or a general capability
+  framework
+- do not move authority truth into dispatch, shell, or `update_store_service`
+  merely to simplify routing
+- do not introduce ordinary handle-bearing traffic outside the current narrow
+  transfer and lease boundaries
+- do not add a generic installer privilege or policy subsystem
+
+Phase role in the larger sequence
+---------------------------------
+- This phase consumes the update-apply workflow from Phase 243.
+- It prepares the final phase by making recovery and completion reporting
+  meaningful on a delegated installer path.
+- If it lands honestly, the repository will have a much stronger claim that
+  bounded authority can govern one real product-shaped update operation.
+
+Relevant backlog items this phase intentionally brings under pressure
+--------------------------------------------------------------------
+- restart identity as a split contract rather than a framework
+- future authority changes framed through the Phase 209 ownership vocabulary
+- restart-visible user-issued state local to bounded authority owners
+- completion delivery bounded to one retained completion mailbox owner plus
+  workflow-local retry state
+
+Questions this phase must answer
+--------------------------------
+1. Is one delegated apply or activation step enough to validate the current
+   authority model for installer-shaped work?
+2. Does generation-based stale rejection remain sufficient once authority gates
+   an applied update consequence?
+3. Which authority facts belong in `lease_service` versus `workflow_service`
+   and `update_store_service`?
+4. Does this phase expose a real need for broader installer policy, or can
+   that remain honestly deferred?
+
+Preferred implementation shape
+------------------------------
+- Keep temporary authority in `lease_service`.
+- Keep staged update and applied-target truth in `update_store_service`.
+- Keep restart-safe execution in `workflow_service` when the delegated step is
+  queued or delayed.
+- Reuse completion-mailbox outcomes for the delegated installer path rather
+  than inventing a second reporting surface.
+
+Test obligations
+----------------
+- `Build debug`
+- one focused scenario proving delegated installer action, one stale-after-
+  restart rejection, and one already-consumed rejection
+- one focused reset-lane fixture for delegated installer authority
+- `mc_tool_workflow_kernel_reset_lane_unit`
+- `mc_tool_workflow_kernel_reset_lane_full_unit`
+
+Acceptance criteria
+-------------------
+- one bounded delegated authority path can govern one update apply or
+  activation step
+- stale or restarted authority is rejected deterministically and visibly
+- update, workflow, completion, and authority truths remain in their bounded
+  owners
+- no session, authentication, or installer-policy framework is introduced
+
+Future follow-up
+----------------
+- The likely immediate next pressure is recovery and completion reporting when
+  delegated installer work is interrupted by restart or backlog.
+- Reopen broader installer privilege policy only if one real admitted update
+  consumer cannot stay honest inside the bounded lease model.

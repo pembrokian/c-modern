@@ -80,14 +80,14 @@ func smoke_ticket_restart_is_visible() bool {
         return false
     }
 
-    invalid: service_effect.Effect = use(&state, fresh_ticket[0], fresh_ticket[1])
-    if service_effect.effect_reply_status(invalid) != syscall.SyscallStatus.InvalidArgument {
+    consumed_again: service_effect.Effect = use(&state, fresh_ticket[0], fresh_ticket[1])
+    if service_effect.effect_reply_status(consumed_again) != syscall.SyscallStatus.InvalidArgument {
         return false
     }
-    if service_effect.effect_reply_payload_len(invalid) != 1 {
+    if service_effect.effect_reply_payload_len(consumed_again) != 1 {
         return false
     }
-    if service_effect.effect_reply_payload(invalid)[0] != ticket_service.TICKET_INVALID {
+    if service_effect.effect_reply_payload(consumed_again)[0] != ticket_service.TICKET_CONSUMED {
         return false
     }
 

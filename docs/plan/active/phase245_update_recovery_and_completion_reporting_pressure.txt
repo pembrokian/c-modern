@@ -1,0 +1,143 @@
+Phase 245 -- Update Recovery And Completion Reporting Pressure
+==============================================================
+
+Status
+------
+PROPOSED
+
+Purpose
+-------
+Admit one bounded pressure phase that forces staged update apply, delegated
+installer authority, completion delivery, and restart recovery to interact
+under interruption and backlog rather than as mostly independent success paths.
+
+This phase exists now because Phases 242 through 244 would create the first
+real bounded remote update workflow. The next honest move is to stress that
+workflow under recovery and reporting pressure before widening into rollback,
+distribution, or package-manager claims.
+
+Repository status note
+----------------------
+- Phase 243 is expected to produce restart-safe update-apply outcomes.
+- Phase 244 is expected to produce delegated installer authority outcomes.
+- Phase 232 and Phase 240 already establish the current completion-mailbox plus
+  workflow-local retry split under internal and external pressure.
+- The repository still lacks one phase whose primary purpose is to make a
+  product-shaped update workflow contend with backlog and restart timing.
+
+Problem being solved
+--------------------
+- The current system can stage and apply work, but it has not yet proven that a
+  bounded remote update can replay, fail, resume, or defer completion honestly
+  when restart and backlog interfere with delivery.
+- Without this phase, the update milestone would end with coherent happy-path
+  pieces and no strong evidence that the product-shaped workflow composes
+  honestly under stress.
+- That would make the milestone feel more like infrastructure assembly than a
+  true forcing function.
+
+Non-goals
+---------
+- no rollback framework
+- no package manager or dependency solver
+- no fairness framework
+- no generic broker or queue system
+- no supervisor or retry-policy framework
+- no install-policy engine beyond the bounded update contract already admitted
+
+Invariants
+----------
+- Completion delivery remains bounded through `completion_mailbox_service`.
+- Queue pressure truth remains explicit and owner-local.
+- `workflow_service` remains the owner of queued execution and retry-visible
+  continuation state.
+- `update_store_service` remains the owner of staged and applied update truth.
+- The four-byte shell frame stays fixed.
+
+Required surface changes
+------------------------
+1. Add one explicit update terminal path that can remain pending in delivery
+   under mailbox-full pressure.
+2. Add one bounded scenario where delegated installer work collides with
+   restart timing or backlog pressure.
+3. Add one caller-visible outcome for deferred, retried, failed, or resumed
+   update reporting if the current mailbox semantics require it.
+4. Add one deterministic scenario covering update success, backlog pressure,
+   and restart-interrupted or restart-resumed reporting.
+5. Add one focused reset-lane fixture for the composed remote update lane.
+
+Forbidden changes
+-----------------
+- do not widen completion delivery into a broker, fairness, or supervisor
+  framework
+- do not move backlog truth out of `completion_mailbox_service`
+- do not solve pressure by silently dropping update outcomes
+- do not add rollback or dependency management as a side effect of recovery
+  pressure
+
+Phase role in the larger sequence
+---------------------------------
+- This phase closes the bounded remote update workflow milestone.
+- It consumes the staged update, apply, delegation, and completion surfaces
+  from Phases 242 through 244.
+- It should leave the repository with one genuinely stressed product-shaped
+  update lane before any broader package or distribution milestone is proposed.
+
+Relevant backlog items this phase intentionally brings under pressure
+--------------------------------------------------------------------
+- completion delivery bounded to one retained completion mailbox owner plus
+  workflow-local retry state
+- durable named-state and replay bounded to explicit durable owners
+- restart identity as a split contract rather than a framework
+- shared libraries, install policy, and broader cross-target coordination stay
+  explicit and deferred until a real admitted project needs more
+
+Questions this phase must answer
+--------------------------------
+1. Is the current completion-mailbox plus workflow-local retry split still
+   honest when the outcome is a staged remote update rather than a generic work
+   item?
+2. What is the narrowest caller-visible truth when an update apply succeeds but
+   reporting cannot be delivered immediately?
+3. Does restart during deferred reporting require one new bounded update
+   outcome class, or can the current model stay honest as-is?
+4. Has the update milestone created real product-shaped pressure without
+   forcing rollback, fairness, or supervisor frameworks?
+
+Preferred implementation shape
+------------------------------
+- Reuse the existing completion-mailbox owner and its queue-style consequence
+  language.
+- Keep any new deferred-reporting or retry-visible state local to
+  `workflow_service` or the completion owner.
+- Keep staged and applied update truth in `update_store_service`.
+- Keep delegated authority truth in `lease_service`.
+
+Test obligations
+----------------
+- `Build debug`
+- one focused scenario proving update success, mailbox-full reporting pressure,
+  and restart-interrupted or restart-resumed reporting
+- one focused reset-lane fixture for the composed remote update lane
+- `mc_tool_workflow_kernel_reset_lane_unit`
+- `mc_tool_workflow_kernel_reset_lane_full_unit`
+
+Acceptance criteria
+-------------------
+- the repository has one composed remote update lane that remains honest under
+  backlog and restart timing
+- caller-visible update reporting outcomes remain explicit and deterministic
+- no rollback, fairness, broker, or supervisor framework is introduced
+- the milestone ends with real product-shaped composition pressure rather than
+  only successful nominal behavior
+
+Future follow-up
+----------------
+- The likely next milestone after this is a broader package or distribution
+  surface only if one real admitted consumer needs more than a bounded remote
+  update lane.
+- If this phase exposes deeper install policy or compiler-manifest pressure,
+  record it in `docs/plan/backlog.txt` rather than widening this milestone
+  after the fact.
+- Reopen rollback or dependency-management work only when a real admitted
+  update consumer proves the bounded remote update lane insufficient.

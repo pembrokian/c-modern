@@ -1,0 +1,137 @@
+Phase 243 -- Restart-Safe Update Apply Workflow
+===============================================
+
+Status
+------
+PROPOSED
+
+Purpose
+-------
+Admit one bounded update-apply workflow that validates, applies, and records
+one staged update through the existing workflow and journal substrate, so the
+repository proves one restart-safe product-shaped mutation path rather than
+another generic work lane.
+
+This phase exists now because Phase 242 would make a staged update artifact and
+manifest real. The next honest move is to apply that staged update through the
+already-admitted recoverable workflow path instead of handling update state
+purely synchronously inside the staging owner.
+
+Repository status note
+----------------------
+- Phase 231 admits `workflow_service` as the bounded restart-safe work owner.
+- Phase 235 extends that workflow surface to durable named-object updates.
+- Phase 242 is expected to admit one staged update manifest and artifact owner.
+- The repository still lacks one workflow whose terminal outcome means an
+  applied update rather than a generic durable-object mutation or external
+  request completion.
+
+Problem being solved
+--------------------
+- The system can stage update data, but it still cannot prove one restart-safe
+  apply path that consumes that staged state and produces an installation-like
+  effect.
+- Without this phase, the update milestone would stop at durable storage and
+  would fail to test whether the current workflow substrate can carry a
+  product-shaped apply operation honestly.
+- That would leave the update milestone too static and under-pressure.
+
+Non-goals
+---------
+- no general installer framework
+- no multi-package apply queue
+- no rollback engine in this phase
+- no dependency resolution
+- no service supervisor or scheduler framework
+- no broad compiler or manifest-system redesign
+
+Invariants
+----------
+- `workflow_service` remains a bounded owner-local workflow system.
+- `update_store_service` remains the owner of staged artifact and manifest
+  truth.
+- Completion delivery remains bounded through `completion_mailbox_service`.
+- The four-byte shell frame stays fixed.
+- Restart continuity remains explicit through the current journal-backed
+  workflow substrate and owner-local durable reload.
+
+Required surface changes
+------------------------
+1. Add one admitted update-apply workflow kind in `workflow_service`.
+2. Add one explicit apply step in `update_store_service` that transitions one
+   staged update into one applied target state.
+3. Add explicit terminal outcomes for applied, rejected, and restart-cancelled
+   update workflows.
+4. Add one deterministic scenario proving staged update apply plus restart
+   recovery.
+5. Add one focused reset-lane fixture for the update-apply workflow.
+
+Forbidden changes
+-----------------
+- do not turn `workflow_service` into a general installer orchestrator
+- do not move staged update truth into workflow code
+- do not widen transport width to carry richer update payloads or manifests
+- do not add rollback, dependency, or multi-target apply policy here
+- do not bypass the existing completion-mailbox owner for update terminal
+  outcomes
+
+Phase role in the larger sequence
+---------------------------------
+- This phase consumes the staged update owner admitted in Phase 242.
+- It prepares the next two phases by making delegated authority and recovery
+  reporting matter on one real update-apply path.
+- It is the first phase in this milestone that should make staged update data
+  produce an install-like durable consequence.
+
+Relevant backlog items this phase intentionally brings under pressure
+--------------------------------------------------------------------
+- durable named-state and replay bounded to explicit durable owners
+- completion delivery bounded to one retained completion mailbox owner plus
+  workflow-local retry state
+- restart identity as a split contract rather than a framework
+- shared libraries, install policy, and broader cross-target coordination stay
+  explicit and deferred until a real admitted project needs more
+
+Questions this phase must answer
+--------------------------------
+1. Can one staged update apply workflow stay honest without turning into an
+   installer framework?
+2. Which update-apply states must survive restart, and which must cancel
+   explicitly?
+3. Is one applied target enough to expose the real workflow pressure for
+   product-shaped updates?
+4. Does completion delivery remain sufficient once the outcome is an applied
+   update rather than a generic object mutation?
+
+Preferred implementation shape
+------------------------------
+- Keep staged-update truth in `update_store_service`.
+- Keep queued restart-safe execution in `workflow_service`.
+- Reuse the current journal-backed workflow restart substrate.
+- Keep any target-state mutation owner-local to the update-store or one nearby
+  owner rather than spreading install truth across boot or dispatch.
+
+Test obligations
+----------------
+- `Build debug`
+- one focused scenario proving stage, apply, restart during wait or apply, and
+  explicit terminal outcome delivery
+- one focused reset-lane fixture for the update-apply workflow
+- `mc_tool_workflow_kernel_reset_lane_unit`
+
+Acceptance criteria
+-------------------
+- one bounded workflow can apply one staged update and survive restart honestly
+- terminal outcomes are delivered through the existing completion mailbox
+- no installer, rollback, or dependency framework is introduced
+- the update milestone now has one real restart-safe apply path
+
+Future follow-up
+----------------
+- The likely immediate next pressure is delegated authority for one apply or
+  activation step.
+- Broader installer policy and rollback should remain deferred until this
+  bounded apply path proves them necessary.
+- If implementation exposes a manifest-truth gap on the tool side, record it
+  as an owner-local compiler or driver follow-up rather than widening this
+  phase.

@@ -8,13 +8,16 @@ const LEASE_CMD_ISSUE_COMPLETION: u8 = 73       // 'I'
 const LEASE_CMD_CONSUME_COMPLETION: u8 = 85     // 'U'
 const LEASE_CMD_ISSUE_OBJECT_UPDATE: u8 = 87    // 'W'
 const LEASE_CMD_CONSUME_OBJECT_UPDATE: u8 = 68  // 'D'
+const LEASE_CMD_ISSUE_EXTERNAL_TICKET: u8 = 84  // 'T'
 
 const LEASE_KIND_COMPLETION: u8 = 67     // 'C'
 const LEASE_KIND_OBJECT_UPDATE: u8 = 87  // 'W'
+const LEASE_KIND_EXTERNAL_TICKET: u8 = 84  // 'T'
 
 const LEASE_OP_NONE: u8 = 0
 const LEASE_OP_TAKE_COMPLETION: u8 = 1
 const LEASE_OP_SCHEDULE_OBJECT_UPDATE: u8 = 2
+const LEASE_OP_USE_EXTERNAL_TICKET: u8 = 3
 
 const LEASE_STALE: u8 = 83    // 'S'
 const LEASE_INVALID: u8 = 73  // 'I'
@@ -90,6 +93,13 @@ func lease_issue_object_update(s: LeaseServiceState, name: u8, value: u8, genera
     return lease_issue(s, LEASE_KIND_OBJECT_UPDATE, name, value, generation)
 }
 
+func lease_issue_external_ticket(s: LeaseServiceState, epoch: u8, id: u8, generation: u8) LeaseResult {
+    if epoch == 0 || id == 0 {
+        return LeaseResult{ state: s, effect: lease_failure(LEASE_INVALID), op: LEASE_OP_NONE, first: 0, second: 0 }
+    }
+    return lease_issue(s, LEASE_KIND_EXTERNAL_TICKET, epoch, id, generation)
+}
+
 func lease_remove_at(s: LeaseServiceState, idx: usize) LeaseServiceState {
     ids: [LEASE_CAPACITY]u8 = primitives.zero_payload()
     kinds: [LEASE_CAPACITY]u8 = primitives.zero_payload()
@@ -149,7 +159,25 @@ func lease_consume_object_update(s: LeaseServiceState, id: u8, generation: u8) L
     return LeaseResult{ state: s, effect: lease_failure(LEASE_INVALID), op: LEASE_OP_NONE, first: 0, second: 0 }
 }
 
-func handle(s: LeaseServiceState, m: service_effect.Message, completion_generation: u8, workset_generation: u8) LeaseResult {
+func lease_consume_external_ticket(s: LeaseServiceState, id: u8, generation: u8) LeaseResult {
+    for i in 0..s.len {
+        if s.ids[i] != id {
+            continue
+        }
+        if s.kinds[i] != LEASE_KIND_EXTERNAL_TICKET {
+            return LeaseResult{ state: s, effect: lease_failure(LEASE_INVALID), op: LEASE_OP_NONE, first: 0, second: 0 }
+        }
+
+        next := lease_remove_at(s, i)
+        if s.gens[i] != generation {
+            return LeaseResult{ state: next, effect: lease_failure(LEASE_STALE), op: LEASE_OP_NONE, first: 0, second: 0 }
+        }
+        return LeaseResult{ state: next, effect: lease_reply(syscall.SyscallStatus.Ok, 0, primitives.zero_payload()), op: LEASE_OP_USE_EXTERNAL_TICKET, first: s.firsts[i], second: s.seconds[i] }
+    }
+    return LeaseResult{ state: s, effect: lease_failure(LEASE_INVALID), op: LEASE_OP_NONE, first: 0, second: 0 }
+}
+
+func handle(s: LeaseServiceState, m: service_effect.Message, completion_generation: u8, workset_generation: u8, ticket_generation: u8) LeaseResult {
     if m.payload_len == 0 {
         return LeaseResult{ state: s, effect: lease_failure(LEASE_INVALID), op: LEASE_OP_NONE, first: 0, second: 0 }
     }
@@ -170,6 +198,11 @@ func handle(s: LeaseServiceState, m: service_effect.Message, completion_generati
             return LeaseResult{ state: s, effect: lease_failure(LEASE_INVALID), op: LEASE_OP_NONE, first: 0, second: 0 }
         }
         return lease_issue_object_update(s, m.payload[1], m.payload[2], workset_generation)
+    case LEASE_CMD_ISSUE_EXTERNAL_TICKET:
+        if m.payload_len != 3 {
+            return LeaseResult{ state: s, effect: lease_failure(LEASE_INVALID), op: LEASE_OP_NONE, first: 0, second: 0 }
+        }
+        return lease_issue_external_ticket(s, m.payload[1], m.payload[2], ticket_generation)
     case LEASE_CMD_CONSUME_OBJECT_UPDATE:
         if m.payload_len != 2 {
             return LeaseResult{ state: s, effect: lease_failure(LEASE_INVALID), op: LEASE_OP_NONE, first: 0, second: 0 }

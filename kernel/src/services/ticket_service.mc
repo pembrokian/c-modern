@@ -4,6 +4,7 @@ import syscall
 
 const TICKET_CAPACITY: usize = 4
 const TICKET_STALE: u8 = 83  // 'S'
+const TICKET_CONSUMED: u8 = 67  // 'C'
 const TICKET_INVALID: u8 = 73  // 'I'
 
 struct TicketServiceState {
@@ -63,6 +64,10 @@ func ticket_use(s: TicketServiceState, epoch: u8, id: u8) TicketResult {
             payload[0] = id
             return TicketResult{ state: ticketwith(s, s.next, ids, s.len - 1), effect: service_effect.effect_reply(syscall.SyscallStatus.Ok, 1, payload) }
         }
+    }
+
+    if id != 0 && id < s.next {
+        return TicketResult{ state: s, effect: ticket_failure(syscall.SyscallStatus.InvalidArgument, TICKET_CONSUMED) }
     }
     return TicketResult{ state: s, effect: ticket_failure(syscall.SyscallStatus.InvalidArgument, TICKET_INVALID) }
 }

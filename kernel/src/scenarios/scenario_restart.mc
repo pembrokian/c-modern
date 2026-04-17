@@ -60,9 +60,9 @@ const FAIL_RESTART_TICKET_EPOCH_REUSED: i32 = 72
 const FAIL_RESTART_TICKET_USE_STATUS: i32 = 73
 const FAIL_RESTART_TICKET_USE_LEN: i32 = 74
 const FAIL_RESTART_TICKET_USE_VALUE: i32 = 75
-const FAIL_RESTART_TICKET_INVALID_STATUS: i32 = 76
-const FAIL_RESTART_TICKET_INVALID_LEN: i32 = 77
-const FAIL_RESTART_TICKET_INVALID_KIND: i32 = 78
+const FAIL_RESTART_TICKET_CONSUMED_STATUS: i32 = 76
+const FAIL_RESTART_TICKET_CONSUMED_LEN: i32 = 77
+const FAIL_RESTART_TICKET_CONSUMED_KIND: i32 = 78
 
 func run_restart_probe(state: *boot.KernelBootState) i32 {
     log_before: service_identity.ServiceMark = boot.boot_log_mark(*state)
@@ -316,13 +316,13 @@ func run_restart_probe(state: *boot.KernelBootState) i32 {
 
     ticket_use_effect = kernel_dispatch.kernel_dispatch_step(state, scenario_transport.cmd_ticket_use(fresh_ticket[0], fresh_ticket[1]))
     if service_effect.effect_reply_status(ticket_use_effect) != syscall.SyscallStatus.InvalidArgument {
-        return FAIL_RESTART_TICKET_INVALID_STATUS
+        return FAIL_RESTART_TICKET_CONSUMED_STATUS
     }
     if service_effect.effect_reply_payload_len(ticket_use_effect) != 1 {
-        return FAIL_RESTART_TICKET_INVALID_LEN
+        return FAIL_RESTART_TICKET_CONSUMED_LEN
     }
-    if service_effect.effect_reply_payload(ticket_use_effect)[0] != ticket_service.TICKET_INVALID {
-        return FAIL_RESTART_TICKET_INVALID_KIND
+    if service_effect.effect_reply_payload(ticket_use_effect)[0] != ticket_service.TICKET_CONSUMED {
+        return FAIL_RESTART_TICKET_CONSUMED_KIND
     }
 
     return 0

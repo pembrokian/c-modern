@@ -207,6 +207,10 @@ func cmd_lease_issue_object_update(name: u8, value: u8) syscall.ReceiveObservati
     return serial_obs(DEFAULT_SERIAL_ROUTE.endpoint, DEFAULT_SERIAL_ROUTE.pid, serial_protocol.encode_lease_issue_object_update(name, value))
 }
 
+func cmd_lease_issue_external_ticket(epoch: u8, id: u8) syscall.ReceiveObservation {
+    return serial_obs(DEFAULT_SERIAL_ROUTE.endpoint, DEFAULT_SERIAL_ROUTE.pid, serial_protocol.encode_lease_issue_external_ticket(epoch, id))
+}
+
 func cmd_lease_consume_object_update(id: u8) syscall.ReceiveObservation {
     return serial_obs(DEFAULT_SERIAL_ROUTE.endpoint, DEFAULT_SERIAL_ROUTE.pid, serial_protocol.encode_lease_consume_object_update(id))
 }
