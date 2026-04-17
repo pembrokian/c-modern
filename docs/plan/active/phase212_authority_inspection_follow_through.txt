@@ -3,7 +3,7 @@ Phase 212 -- Authority Inspection Follow-Through
 
 Status
 ------
-PROPOSED
+COMPLETE
 
 Purpose
 -------
@@ -40,6 +40,41 @@ Problem being solved
   without a visible runtime counterpart.
 - The missing truth is narrow: report current authority class and bounded
   ownership exposure for one fixed target at a time.
+
+Landed implementation
+---------------------
+- `kernel/src/serial_protocol.mc` now admits one compact shell-visible
+  authority query, `XA<target>!`, on the existing `X` control family.
+- `kernel/src/shell_service.mc` keeps command parsing and reply shaping on the
+  existing shell-visible control hop.
+- `kernel/src/service_topology.mc` now owns static per-endpoint authority
+  classification for boot-wired service targets.
+- `kernel/src/kernel_dispatch.mc` now projects one fixed-width authority reply
+  from the existing owner-local truths: topology-owned public or transfer or
+  retained or shell control classes, plus coordinated retained control for the
+  workset and audit-lane targets.
+- `kernel/src/scenario_authority.mc` and
+  `tests/system/kernel_reset_lane_phase212_authority_inspection/` prove the
+  landed query on representative public-endpoint, retained-owner,
+  transfer-only, shell-control, and coordinated-control targets.
+
+Authority inspection contract
+-----------------------------
+Request
+- `XA<target>!`
+
+Reply
+- fixed four-byte payload: `<target, class, transfer, scope>`
+- `class` is one of:
+  - `P` public endpoint authority
+  - `T` transfer-only authority
+  - `R` retained-owner authority
+  - `C` coordinated-retained control authority
+  - `S` shell-visible control authority
+- `transfer` is `T` when the target exposes transfer-bearing authority and `N`
+  otherwise
+- `scope` is `R` for retained-owner scope, `C` for coordinated retained
+  control scope, and `N` otherwise
 
 Core rule
 ---------

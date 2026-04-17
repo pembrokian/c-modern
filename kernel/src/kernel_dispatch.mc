@@ -55,7 +55,7 @@ func lifecycle_is_lane_target(target: u8) bool {
 }
 
 func lifecycle_op_supported(op: u8) bool {
-    return op == serial_protocol.CMD_I || op == serial_protocol.CMD_P || op == serial_protocol.CMD_S || op == serial_protocol.CMD_R
+    return op == serial_protocol.CMD_A || op == serial_protocol.CMD_I || op == serial_protocol.CMD_P || op == serial_protocol.CMD_S || op == serial_protocol.CMD_R
 }
 
 func lifecycle_validate(msg: service_effect.Message) u8 {
@@ -76,6 +76,67 @@ func lifecycle_validate(msg: service_effect.Message) u8 {
 
 func lifecycle_target_endpoint(target: u8) u32 {
     return shell_service.lifecycle_target_endpoint(target)
+}
+
+func authority_class_code(class: service_topology.ServiceAuthorityClass) u8 {
+    switch class {
+    case service_topology.ServiceAuthorityClass.PublicEndpoint:
+        return serial_protocol.AUTHORITY_PUBLIC
+    case service_topology.ServiceAuthorityClass.TransferOnly:
+        return serial_protocol.AUTHORITY_TRANSFER
+    case service_topology.ServiceAuthorityClass.RetainedOwner:
+        return serial_protocol.AUTHORITY_RETAINED
+    case service_topology.ServiceAuthorityClass.ShellControl:
+        return serial_protocol.AUTHORITY_SHELL
+    default:
+        return 0
+    }
+}
+
+func authority_payload(target: u8, class: u8, transfer: u8, scope: u8) [4]u8 {
+    payload: [4]u8 = primitives.zero_payload()
+    payload[0] = target
+    payload[1] = class
+    payload[2] = transfer
+    payload[3] = scope
+    return payload
+}
+
+func lifecycle_authority_reply(state: *boot.KernelBootState, target: u8) service_effect.Effect {
+    if lifecycle_is_lane_target(target) {
+        return shell_service.lifecycle_authority_effect(
+            syscall.SyscallStatus.Ok,
+            authority_payload(
+                target,
+                serial_protocol.AUTHORITY_COORDINATED,
+                serial_protocol.AUTHORITY_TRANSFER_NO,
+                serial_protocol.AUTHORITY_SCOPE_COORDINATED))
+    }
+
+    authority_endpoint: u32 = lifecycle_target_endpoint(target)
+    if authority_endpoint == 0 {
+        return shell_service.invalid_effect(shell_service.SHELL_INVALID_COMMAND)
+    }
+
+    class: service_topology.ServiceAuthorityClass = service_topology.service_authority_class(authority_endpoint)
+    class_code: u8 = authority_class_code(class)
+    if class_code == 0 {
+        return shell_service.invalid_effect(shell_service.SHELL_INVALID_COMMAND)
+    }
+
+    transfer: u8 = serial_protocol.AUTHORITY_TRANSFER_NO
+    if class == service_topology.ServiceAuthorityClass.TransferOnly {
+        transfer = serial_protocol.AUTHORITY_TRANSFER_YES
+    }
+
+    scope: u8 = serial_protocol.AUTHORITY_SCOPE_NONE
+    if class == service_topology.ServiceAuthorityClass.RetainedOwner {
+        scope = serial_protocol.AUTHORITY_SCOPE_RETAINED
+    }
+
+    return shell_service.lifecycle_authority_effect(
+        syscall.SyscallStatus.Ok,
+        authority_payload(target, class_code, transfer, scope))
 }
 
 func lifecycle_identity_reply(state: *boot.KernelBootState, target: u8) service_effect.Effect {
@@ -171,6 +232,8 @@ func lifecycle_invalid_reply(state: *boot.KernelBootState, target: u8) service_e
 
 func lifecycle_route(op: u8) LifecycleRoute {
     switch op {
+    case serial_protocol.CMD_A:
+        return LifecycleRoute{ op: op, reply: lifecycle_authority_reply }
     case serial_protocol.CMD_I:
         return LifecycleRoute{ op: op, reply: lifecycle_identity_reply }
     case serial_protocol.CMD_P:

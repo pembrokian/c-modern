@@ -1336,13 +1336,6 @@ class Checker {
         module_->expr_types[expr.span] = type;
     }
 
-    void RecordBindingOrAssignFact(const Stmt& stmt, std::vector<BindingOrAssignResolution> resolutions) {
-        module_->binding_or_assign_facts[stmt.span] = {
-            .span = stmt.span,
-            .resolutions = std::move(resolutions),
-        };
-    }
-
     void RecordForInFact(const Stmt& stmt, ForInResolution resolution) {
         module_->for_in_facts[stmt.span] = {
             .span = stmt.span,
@@ -1387,22 +1380,6 @@ class Checker {
         }
 
         return VoidType();
-    }
-
-    bool HasDuplicateBindingOrAssignBindNames(const Stmt& stmt,
-                                              const std::vector<BindingOrAssignResolution>& resolutions) {
-        std::unordered_set<std::string> seen_bind_names;
-        bool has_duplicates = false;
-        for (std::size_t index = 0; index < stmt.pattern.names.size() && index < resolutions.size(); ++index) {
-            if (resolutions[index] != BindingOrAssignResolution::kBind) {
-                continue;
-            }
-            if (!seen_bind_names.insert(stmt.pattern.names[index]).second) {
-                Report(stmt.span, "duplicate local binding: " + stmt.pattern.names[index]);
-                has_duplicates = true;
-            }
-        }
-        return has_duplicates;
     }
 
     bool IsConcreteInferredBindingType(const Type& type) const {
@@ -2382,9 +2359,6 @@ class Checker {
             case Stmt::Kind::kConst:
                 CheckBindingLike(stmt, stmt.kind != Stmt::Kind::kConst);
                 return;
-            case Stmt::Kind::kBindingOrAssign:
-                CheckBindingOrAssign(stmt);
-                return;
             case Stmt::Kind::kAssign:
                 CheckAssign(stmt);
                 return;
@@ -2536,48 +2510,6 @@ class Checker {
 
         for (std::size_t index = 0; index < stmt.pattern.names.size(); ++index) {
             BindValue(stmt.pattern.names[index], IsUnknown(declared_type) ? value_types[index] : declared_type, is_mutable, stmt.span);
-        }
-    }
-
-    void CheckBindingOrAssign(const Stmt& stmt) {
-        std::vector<BindingOrAssignResolution> resolutions;
-        resolutions.reserve(stmt.pattern.names.size());
-        for (const auto& name : stmt.pattern.names) {
-            resolutions.push_back(LookupValue(name).has_value() ? BindingOrAssignResolution::kAssign : BindingOrAssignResolution::kBind);
-        }
-
-        if (stmt.exprs.size() == stmt.pattern.names.size()) {
-            for (std::size_t index = 0; index < stmt.pattern.names.size(); ++index) {
-                if (resolutions[index] != BindingOrAssignResolution::kAssign) {
-                    continue;
-                }
-                const auto binding = LookupValue(stmt.pattern.names[index]);
-                if (binding.has_value()) {
-                    ApplyExpectedAggregateType(*stmt.exprs[index], binding->type);
-                }
-            }
-        }
-
-        const auto values = AnalyzeExprValuesForArity(stmt.exprs,
-                                                      stmt.pattern.names.size(),
-                                                      stmt.span,
-                                                      "binding-or-assignment requires one value per name");
-        if (!values.has_value()) {
-            return;
-        }
-
-        if (HasDuplicateBindingOrAssignBindNames(stmt, resolutions)) {
-            return;
-        }
-
-        RecordBindingOrAssignFact(stmt, resolutions);
-
-        for (std::size_t index = 0; index < stmt.pattern.names.size(); ++index) {
-            if (resolutions[index] == BindingOrAssignResolution::kAssign) {
-                CheckAssignableNameTarget(stmt.pattern.names[index], stmt.span, (*values)[index].type);
-                continue;
-            }
-            BindValue(stmt.pattern.names[index], (*values)[index].type, true, stmt.span);
         }
     }
 
@@ -3512,14 +3444,6 @@ const GlobalSummary* FindGlobalSummary(const Module& module, std::string_view na
 const Type* FindExprType(const Module& module, const ast::Expr& expr) {
     const auto found = module.expr_types.find(expr.span);
     if (found != module.expr_types.end()) {
-        return &found->second;
-    }
-    return nullptr;
-}
-
-const BindingOrAssignFact* FindBindingOrAssignFact(const Module& module, const ast::Stmt& stmt) {
-    const auto found = module.binding_or_assign_facts.find(stmt.span);
-    if (found != module.binding_or_assign_facts.end()) {
         return &found->second;
     }
     return nullptr;

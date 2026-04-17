@@ -85,6 +85,29 @@ func expect_policy(effect: service_effect.Effect, status: syscall.SyscallStatus,
     return true
 }
 
+func expect_authority(effect: service_effect.Effect, status: syscall.SyscallStatus, target: u8, class: u8, transfer: u8, scope: u8) bool {
+    if service_effect.effect_reply_status(effect) != status {
+        return false
+    }
+    if service_effect.effect_reply_payload_len(effect) != 4 {
+        return false
+    }
+    payload: [4]u8 = service_effect.effect_reply_payload(effect)
+    if payload[0] != target {
+        return false
+    }
+    if payload[1] != class {
+        return false
+    }
+    if payload[2] != transfer {
+        return false
+    }
+    if payload[3] != scope {
+        return false
+    }
+    return true
+}
+
 func expect_generation_payload(effect: service_effect.Effect, status: syscall.SyscallStatus, generation: u32) bool {
     if service_effect.effect_reply_status(effect) != status {
         return false

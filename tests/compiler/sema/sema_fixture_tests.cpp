@@ -167,38 +167,29 @@ void TestImportedModuleSurfaceQualifiesNamedTypes() {
     }
 }
 
-void TestDuplicateBindingOrAssignDoesNotRecordInvalidFact() {
+void TestBareAssignmentDoesNotCreateLocalBindings() {
     mc::support::DiagnosticSink diagnostics;
     const auto parsed = ParseText(
         "func demo() i32 {\n"
-        "    value, value = 1, 2\n"
+        "    value = 1\n"
         "    return 0\n"
         "}\n",
-        "<duplicate-binding-or-assign>",
+        "<assignment-only-bare-equals>",
         diagnostics);
     if (!parsed.ok) {
-        mc::test_support::Fail("duplicate binding-or-assignment fixture should parse successfully:\n" + diagnostics.Render());
+        mc::test_support::Fail("assignment-only fixture should parse successfully:\n" + diagnostics.Render());
     }
 
-    const auto checked = mc::sema::CheckProgram(*parsed.source_file, "<duplicate-binding-or-assign>", diagnostics);
+    const auto checked = mc::sema::CheckProgram(*parsed.source_file, "<assignment-only-bare-equals>", diagnostics);
     if (checked.ok) {
-        mc::test_support::Fail("duplicate binding-or-assignment should fail semantic checking");
+        mc::test_support::Fail("bare assignment should fail semantic checking when the target is undeclared");
     }
-    if (diagnostics.Render().find("duplicate local binding: value") == std::string::npos) {
-        mc::test_support::Fail("duplicate binding-or-assignment should report the duplicate local binding");
-    }
-
-    const auto& function = parsed.source_file->decls.front();
-    if (function.body == nullptr || function.body->statements.empty() || function.body->statements.front() == nullptr) {
-        mc::test_support::Fail("duplicate binding-or-assignment fixture should produce a function body statement");
-    }
-
-    if (mc::sema::FindBindingOrAssignFact(*checked.module, *function.body->statements.front()) != nullptr) {
-        mc::test_support::Fail("duplicate binding-or-assignment should not record an invalid semantic fact");
+    if (diagnostics.Render().find("assignment target is not declared: value") == std::string::npos) {
+        mc::test_support::Fail("bare assignment should report the undeclared assignment target");
     }
 }
 
-void TestColonAssignBindingDoesNotRecordBindingOrAssignFact() {
+void TestColonAssignBindingParsesAsBinding() {
     mc::support::DiagnosticSink diagnostics;
     const auto parsed = ParseText(
         "func demo() i32 {\n"
@@ -223,10 +214,6 @@ void TestColonAssignBindingDoesNotRecordBindingOrAssignFact() {
 
     if (function.body->statements.front()->kind != mc::ast::Stmt::Kind::kBinding) {
         mc::test_support::Fail("colon-assign binding should parse as an unambiguous binding statement");
-    }
-
-    if (mc::sema::FindBindingOrAssignFact(*checked.module, *function.body->statements.front()) != nullptr) {
-        mc::test_support::Fail("colon-assign binding should not record a binding-or-assignment fact");
     }
 }
 
@@ -374,8 +361,8 @@ int main(int argc, char** argv) {
     }
 
     TestImportedModuleSurfaceQualifiesNamedTypes();
-    TestDuplicateBindingOrAssignDoesNotRecordInvalidFact();
-    TestColonAssignBindingDoesNotRecordBindingOrAssignFact();
+    TestBareAssignmentDoesNotCreateLocalBindings();
+    TestColonAssignBindingParsesAsBinding();
     TestFloatToIntConstConversionHonorsInt64Bounds();
     TestImportedMutableGlobalDoesNotFoldAsConst();
     TestMalformedAggregateGlobalDoesNotStoreEmptyConstValue();

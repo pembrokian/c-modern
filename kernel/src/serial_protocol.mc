@@ -13,6 +13,7 @@
 //   Q D ! !         — queue dequeue
 //   Q C ! !         — queue count (returns count as reply_payload_len)
 //   Q P ! !         — queue peek
+//   X A <target> !  — authority inspection query
 //   X Q <target> !  — lifecycle query
 //   X P <target> !  — lifecycle policy query
 //   X S <target> !  — retained summary query
@@ -60,6 +61,19 @@ const LIFECYCLE_NONE: u8 = 78    // 'N'
 const LIFECYCLE_RESET: u8 = 82   // 'R'
 const LIFECYCLE_RELOAD: u8 = 76  // 'L'
 
+const AUTHORITY_PUBLIC: u8 = 80       // 'P'
+const AUTHORITY_TRANSFER: u8 = 84     // 'T'
+const AUTHORITY_RETAINED: u8 = 82     // 'R'
+const AUTHORITY_COORDINATED: u8 = 67  // 'C'
+const AUTHORITY_SHELL: u8 = 83        // 'S'
+
+const AUTHORITY_TRANSFER_NO: u8 = 78   // 'N'
+const AUTHORITY_TRANSFER_YES: u8 = 84  // 'T'
+
+const AUTHORITY_SCOPE_NONE: u8 = 78         // 'N'
+const AUTHORITY_SCOPE_RETAINED: u8 = 82     // 'R'
+const AUTHORITY_SCOPE_COORDINATED: u8 = 67  // 'C'
+
 func encode_echo(left: u8, right: u8) [4]u8 {
     return ipc.payload_byte(CMD_E, CMD_C, left, right)
 }
@@ -86,6 +100,10 @@ func encode_kv_count() [4]u8 {
 
 func encode_lifecycle_query(target: u8) [4]u8 {
     return ipc.payload_byte(CMD_X, CMD_Q, target, CMD_BANG)
+}
+
+func encode_lifecycle_authority(target: u8) [4]u8 {
+    return ipc.payload_byte(CMD_X, CMD_A, target, CMD_BANG)
 }
 
 func encode_lifecycle_identity(target: u8) [4]u8 {

@@ -1,6 +1,7 @@
 // Scenario orchestration entry point.
 
 import boot
+import scenario_authority
 import scenario_audit_coordination
 import scenario_coordination
 import scenario_lifecycle
@@ -48,6 +49,10 @@ func run(state: *boot.KernelBootState) i32 {
         return result
     }
     result = scenario_retained_policy.run_retained_policy_probe()
+    if result != 0 {
+        return result
+    }
+    result = scenario_authority.run_authority_probe()
     if result != 0 {
         return result
     }

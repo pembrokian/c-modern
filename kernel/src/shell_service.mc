@@ -94,6 +94,14 @@ func lifecycle_policy_request(s: ShellServiceState, m: service_effect.Message) s
     return service_effect.effect_send(s.pid, service_topology.SHELL_ENDPOINT_ID, m.payload_len, m.payload)
 }
 
+func lifecycle_authority_request(s: ShellServiceState, m: service_effect.Message) service_effect.Effect {
+    return service_effect.effect_send(s.pid, service_topology.SHELL_ENDPOINT_ID, m.payload_len, m.payload)
+}
+
+func lifecycle_authority_effect(status: syscall.SyscallStatus, payload: [4]u8) service_effect.Effect {
+    return service_effect.effect_reply(status, 4, payload)
+}
+
 func lifecycle_policy_effect(status: syscall.SyscallStatus, payload: [4]u8) service_effect.Effect {
     return service_effect.effect_reply(status, 4, payload)
 }
@@ -171,6 +179,14 @@ func handle(s: ShellServiceState, m: service_effect.Message) service_effect.Effe
             return invalid_effect(SHELL_INVALID_SHAPE)
         }
         switch op {
+        case serial_protocol.CMD_A:
+            if m.payload[2] != serial_protocol.TARGET_WORKSET && m.payload[2] != serial_protocol.TARGET_AUDIT {
+                authority_endpoint: u32 = lifecycle_target_endpoint(m.payload[2])
+                if authority_endpoint == 0 {
+                    return invalid_effect(SHELL_INVALID_COMMAND)
+                }
+            }
+            return lifecycle_authority_request(s, m)
         case serial_protocol.CMD_Q:
             if m.payload[2] == serial_protocol.TARGET_WORKSET || m.payload[2] == serial_protocol.TARGET_AUDIT {
                 return lifecycle_effect(syscall.SyscallStatus.Ok, m.payload[2], serial_protocol.LIFECYCLE_RELOAD)

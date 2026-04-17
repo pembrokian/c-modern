@@ -163,7 +163,7 @@ Mutation: only the explicit init-owned coordinated restart helpers mutate the
 lane as a lane; participating service owners still own their own retained data.
 Transfer: none.
 Observation: shell-visible identity, summary, and policy queries (`XIW!`,
-`XS<target>!`, `XP<target>!`) expose the lane's current truth.
+`XS<target>!`, `XP<target>!`, `XA<target>!`) expose the lane's current truth.
 Destruction: explicit restart may reload or clear current participating state
 according to the fixed target policy.
 Notes: these lanes are explicit named coordination targets, not inferred bundles
@@ -178,7 +178,7 @@ public targets.
 Mutation: lifecycle restart requests mutate state only through the explicit
 init-owned restart path. Pure inspection queries do not mutate authority state.
 Transfer: none.
-Observation: `XQ`, `XI`, `XS`, `XP`, and `XIW` are observation surfaces over
+Observation: `XQ`, `XA`, `XI`, `XS`, `XP`, and `XIW` are observation surfaces over
 already-admitted truth.
 Destruction: `XR` may replace or reload the targeted owner or lane, but only
 through the current fixed target model.

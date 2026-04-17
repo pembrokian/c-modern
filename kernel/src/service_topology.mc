@@ -51,6 +51,14 @@ enum ServiceRestartMode {
     Reload,
 }
 
+enum ServiceAuthorityClass {
+    None,
+    PublicEndpoint,
+    TransferOnly,
+    RetainedOwner,
+    ShellControl,
+}
+
 const SERIAL_SLOT: ServiceSlot = { endpoint: SERIAL_ENDPOINT_ID, pid: 1 }
 const SHELL_SLOT: ServiceSlot = { endpoint: SHELL_ENDPOINT_ID, pid: 2 }
 const LOG_SLOT: ServiceSlot = { endpoint: LOG_ENDPOINT_ID, pid: 3 }
@@ -139,6 +147,26 @@ func service_restart_reloads_state(endpoint: u32) bool {
         return true
     }
     return false
+}
+
+func service_authority_class(endpoint: u32) ServiceAuthorityClass {
+    switch endpoint {
+    case SHELL_ENDPOINT_ID:
+        return ServiceAuthorityClass.ShellControl
+    case TRANSFER_ENDPOINT_ID:
+        return ServiceAuthorityClass.TransferOnly
+    case LOG_ENDPOINT_ID:
+        return ServiceAuthorityClass.RetainedOwner
+    case KV_ENDPOINT_ID:
+        return ServiceAuthorityClass.RetainedOwner
+    case QUEUE_ENDPOINT_ID:
+        return ServiceAuthorityClass.RetainedOwner
+    default:
+        if endpoint_is_boot_wired(endpoint) {
+            return ServiceAuthorityClass.PublicEndpoint
+        }
+        return ServiceAuthorityClass.None
+    }
 }
 
 // endpoint_is_boot_wired returns true when the endpoint id names one of the
