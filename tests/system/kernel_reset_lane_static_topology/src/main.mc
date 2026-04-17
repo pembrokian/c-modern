@@ -33,6 +33,7 @@ func smoke_slot_endpoints_match_constants() bool {
     file_slot: service_topology.ServiceSlot = service_topology.FILE_SLOT
     timer_slot: service_topology.ServiceSlot = service_topology.TIMER_SLOT
     task_slot: service_topology.ServiceSlot = service_topology.TASK_SLOT
+    connection_slot: service_topology.ServiceSlot = service_topology.CONNECTION_SLOT
     journal_slot: service_topology.ServiceSlot = service_topology.JOURNAL_SLOT
     workflow_slot: service_topology.ServiceSlot = service_topology.WORKFLOW_SLOT
     lease_slot: service_topology.ServiceSlot = service_topology.LEASE_SLOT
@@ -72,6 +73,9 @@ func smoke_slot_endpoints_match_constants() bool {
     if task_slot.endpoint != service_topology.TASK_ENDPOINT_ID {
         return false
     }
+    if connection_slot.endpoint != service_topology.CONNECTION_ENDPOINT_ID {
+        return false
+    }
     if journal_slot.endpoint != service_topology.JOURNAL_ENDPOINT_ID {
         return false
     }
@@ -90,9 +94,9 @@ func smoke_slot_endpoints_match_constants() bool {
     return true
 }
 
-// B: SERVICE_COUNT must equal 16 — the number of boot-wired slots.
-func smoke_service_count_is_sixteen() bool {
-    if service_topology.SERVICE_COUNT != 16 {
+// B: SERVICE_COUNT must equal 17 — the number of boot-wired slots.
+func smoke_service_count_is_seventeen() bool {
+    if service_topology.SERVICE_COUNT != 17 {
         return false
     }
     return true
@@ -114,7 +118,7 @@ func main() i32 {
     if smoke_slot_endpoints_match_constants() == false {
         return 1
     }
-    if smoke_service_count_is_sixteen() == false {
+    if smoke_service_count_is_seventeen() == false {
         return 2
     }
     if smoke_init_and_round_trip() == false {

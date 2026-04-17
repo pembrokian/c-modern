@@ -4,6 +4,7 @@ import boot
 import scenario_authority
 import scenario_audit_coordination
 import scenario_completion_mailbox
+import scenario_connection_service
 import scenario_coordination
 import scenario_delegated_object_processing
 import scenario_durability
@@ -87,6 +88,10 @@ func run(state: *boot.KernelBootState) i32 {
         return result
     }
     result = scenario_timer_task_service.run_timer_task_probe()
+    if result != 0 {
+        return result
+    }
+    result = scenario_connection_service.run_connection_service_probe()
     if result != 0 {
         return result
     }

@@ -3,7 +3,7 @@ Phase 238 -- Connection Service Narrow Ingress Admission
 
 Status
 ------
-PROPOSED
+LANDED 2026-04-17
 
 Purpose
 -------
@@ -131,3 +131,33 @@ Future follow-up
   workflows rather than handling it only owner-locally.
 - Reopen broader network abstractions only if one real admitted consumer cannot
   stay honest with fixed-capacity connection slots and bounded ingress units.
+
+Implementation summary
+----------------------
+- Added `kernel/src/services/connection_service.mc` as the owner-local contract
+  for bounded connection open, receive, send, close, disconnect, and timeout
+  truth.
+- Wired the service through the existing boot-wired owners only: topology,
+  fixed-width shell protocol, shell forwarding, boot state, boot identity,
+  explicit init-owned restart, kernel dispatch routing, and deterministic
+  scenarios.
+- Added one repo-project scenario and one reset-lane fixture proving the
+  bounded slice without introducing a timer framework, queue framework,
+  network stack, or second orchestration layer.
+
+Validation
+----------
+- `Build debug`
+- `mc_tool_workflow_kernel_reset_lane_full_unit`
+
+Review against the phase spec
+-----------------------------
+- Required surface changes landed: one bounded connection owner, one compact
+  shell command family, explicit state and failure outcomes, one deterministic
+  scenario, and one focused reset-lane fixture.
+- Ownership boundaries stayed narrow: dispatch remains routing-only, shell owns
+  decode and forwarding, init owns restart enactment, and connection lifetime
+  truth stays owner-local to `connection_service`.
+- Forbidden changes were preserved: transport width stayed fixed at four bytes,
+  no generic broker or mailbox layer was introduced, and no connection state
+  truth moved into shell, boot, or dispatch.

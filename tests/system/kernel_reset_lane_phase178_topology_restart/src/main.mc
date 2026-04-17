@@ -11,7 +11,7 @@ func cmd(payload: [4]u8) syscall.ReceiveObservation {
 }
 
 func smoke_topology_is_enumerable() bool {
-    expected: [16]u32
+    expected: [17]u32
     expected[0] = service_topology.SERIAL_ENDPOINT_ID
     expected[1] = service_topology.SHELL_ENDPOINT_ID
     expected[2] = service_topology.LOG_ENDPOINT_ID
@@ -28,8 +28,9 @@ func smoke_topology_is_enumerable() bool {
     expected[13] = service_topology.LEASE_ENDPOINT_ID
     expected[14] = service_topology.COMPLETION_MAILBOX_ENDPOINT_ID
     expected[15] = service_topology.OBJECT_STORE_ENDPOINT_ID
+    expected[16] = service_topology.CONNECTION_ENDPOINT_ID
 
-    if service_topology.service_count() != 16 {
+    if service_topology.service_count() != 17 {
         return false
     }
     for i in 0..service_topology.service_count() {
@@ -42,7 +43,7 @@ func smoke_topology_is_enumerable() bool {
         }
     }
 
-    invalid: service_topology.ServiceSlot = service_topology.service_slot_at(16)
+    invalid: service_topology.ServiceSlot = service_topology.service_slot_at(17)
     if service_topology.service_slot_is_valid(invalid) {
         return false
     }
@@ -116,6 +117,12 @@ func smoke_lifecycle_classification_stays_flat() bool {
         return false
     }
     if service_topology.service_restart_reloads_state(service_topology.TASK_ENDPOINT_ID) {
+        return false
+    }
+    if !service_topology.service_can_restart(service_topology.CONNECTION_ENDPOINT_ID) {
+        return false
+    }
+    if service_topology.service_restart_reloads_state(service_topology.CONNECTION_ENDPOINT_ID) {
         return false
     }
     if !service_topology.service_can_restart(service_topology.JOURNAL_ENDPOINT_ID) {

@@ -1,4 +1,5 @@
 import completion_mailbox_service
+import connection_service
 import echo_service
 import file_service
 import journal_service
@@ -150,6 +151,18 @@ func bootwith_task(s: KernelBootState, task: task_service.TaskServiceState) Kern
 
 func bootwith_task_restart_outcome(s: KernelBootState, outcome: RestartOutcome) KernelBootState {
     return s with { task_restart_outcome: outcome }
+}
+
+func bootwith_connection(s: KernelBootState, connection: connection_service.ConnectionServiceState) KernelBootState {
+    return s with { connection.state: connection }
+}
+
+func bootwith_connection_restart_outcome(s: KernelBootState, outcome: RestartOutcome) KernelBootState {
+    return s with { connection_restart_outcome: outcome }
+}
+
+func bootrestart_connection(s: KernelBootState, connection: connection_service.ConnectionServiceState) KernelBootState {
+    return s with { connection.state: connection, connection.generation: s.connection.generation + 1 }
 }
 
 func bootrestart_task(s: KernelBootState, task: task_service.TaskServiceState) KernelBootState {

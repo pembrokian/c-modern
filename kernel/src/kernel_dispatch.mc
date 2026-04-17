@@ -8,6 +8,7 @@
 
 import boot
 import completion_mailbox_service
+import connection_service
 import echo_service
 import file_service
 import journal_service
@@ -295,6 +296,13 @@ func dispatch_task(state: *boot.KernelBootState, msg: service_effect.Message) se
     return task_result.effect
 }
 
+func dispatch_connection(state: *boot.KernelBootState, msg: service_effect.Message) service_effect.Effect {
+    current: boot.KernelBootState = *state
+    connection_result: connection_service.ConnectionResult = connection_service.handle(current.connection.state, msg)
+    *state = boot.bootwith_connection(current, connection_result.state)
+    return connection_result.effect
+}
+
 func dispatch_journal(state: *boot.KernelBootState, msg: service_effect.Message) service_effect.Effect {
     current: boot.KernelBootState = *state
     journal_result: journal_service.JournalResult = journal_service.handle(current.journal.state, msg)
@@ -427,6 +435,8 @@ func leaf_route(endpoint: u32) LeafRoute {
         return LeafRoute{ endpoint: endpoint, reply: dispatch_timer }
     case service_topology.TASK_ENDPOINT_ID:
         return LeafRoute{ endpoint: endpoint, reply: dispatch_task }
+    case service_topology.CONNECTION_ENDPOINT_ID:
+        return LeafRoute{ endpoint: endpoint, reply: dispatch_connection }
     case service_topology.JOURNAL_ENDPOINT_ID:
         return LeafRoute{ endpoint: endpoint, reply: dispatch_journal }
     case service_topology.WORKFLOW_ENDPOINT_ID:

@@ -15,6 +15,7 @@
 
 import boot
 import completion_mailbox_service
+import connection_service
 import echo_service
 import file_service
 import journal_service
@@ -70,6 +71,8 @@ func restart_policy_for_target(target: u8) RestartPolicyInfo {
         return restart_policy_single(target, serial_protocol.POLICY_KEEP)
     case serial_protocol.TARGET_TASK:
         return restart_policy_single(target, serial_protocol.POLICY_CLEAR)
+    case serial_protocol.TARGET_CONNECTION:
+        return restart_policy_single(target, serial_protocol.POLICY_CLEAR)
     case serial_protocol.TARGET_JOURNAL:
         return restart_policy_single(target, serial_protocol.POLICY_KEEP)
     case serial_protocol.TARGET_WORKFLOW:
@@ -118,6 +121,8 @@ func restart(state: boot.KernelBootState, endpoint: u32) boot.KernelBootState {
         return restart_timer(state)
     case service_topology.TASK_ENDPOINT_ID:
         return restart_task(state)
+    case service_topology.CONNECTION_ENDPOINT_ID:
+        return restart_connection(state)
     case service_topology.JOURNAL_ENDPOINT_ID:
         return restart_journal(state)
     case service_topology.WORKFLOW_ENDPOINT_ID:
@@ -223,6 +228,12 @@ func restart_task(state: boot.KernelBootState) boot.KernelBootState {
     task_slot := service_topology.TASK_SLOT
     next := boot.bootrestart_task(state, task_service.task_init(task_slot.pid, 1))
     return boot.bootwith_task_restart_outcome(next, boot.RestartOutcome.OrdinaryReplaced)
+}
+
+func restart_connection(state: boot.KernelBootState) boot.KernelBootState {
+    slot := service_topology.CONNECTION_SLOT
+    next := boot.bootrestart_connection(state, connection_service.connection_init(slot.pid, 1))
+    return boot.bootwith_connection_restart_outcome(next, boot.RestartOutcome.OrdinaryReplaced)
 }
 
 func restart_journal(state: boot.KernelBootState) boot.KernelBootState {

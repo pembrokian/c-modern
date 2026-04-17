@@ -223,6 +223,22 @@ func cmd_completion_count() syscall.ReceiveObservation {
     return serial_obs(DEFAULT_SERIAL_ROUTE.endpoint, DEFAULT_SERIAL_ROUTE.pid, serial_protocol.encode_completion_count())
 }
 
+func cmd_connection_open(slot: u8, budget: u8) syscall.ReceiveObservation {
+    return serial_obs(DEFAULT_SERIAL_ROUTE.endpoint, DEFAULT_SERIAL_ROUTE.pid, serial_protocol.encode_connection_open(slot, budget))
+}
+
+func cmd_connection_receive(slot: u8, value: u8) syscall.ReceiveObservation {
+    return serial_obs(DEFAULT_SERIAL_ROUTE.endpoint, DEFAULT_SERIAL_ROUTE.pid, serial_protocol.encode_connection_receive(slot, value))
+}
+
+func cmd_connection_send(slot: u8, value: u8) syscall.ReceiveObservation {
+    return serial_obs(DEFAULT_SERIAL_ROUTE.endpoint, DEFAULT_SERIAL_ROUTE.pid, serial_protocol.encode_connection_send(slot, value))
+}
+
+func cmd_connection_close(slot: u8, reason: u8) syscall.ReceiveObservation {
+    return serial_obs(DEFAULT_SERIAL_ROUTE.endpoint, DEFAULT_SERIAL_ROUTE.pid, serial_protocol.encode_connection_close(slot, reason))
+}
+
 func kv_count_obs(pid: u32) syscall.ReceiveObservation {
     return serial_obs(service_topology.SERIAL_ENDPOINT_ID, pid, serial_protocol.encode_kv_count())
 }

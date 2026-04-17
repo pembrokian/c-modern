@@ -53,6 +53,7 @@ const CMD_Y: u8 = 89   // 'Y' — journal command family
 const CMD_O: u8 = 79   // 'O' — workflow command family
 const CMD_V: u8 = 86   // 'V' — completion mailbox command family
 const CMD_Z: u8 = 90   // 'Z' — lease command family
+const CMD_H: u8 = 72   // 'H' — connection command family
 
 const TARGET_SERIAL: u8 = 83    // 'S'
 const TARGET_SHELL: u8 = 72     // 'H'
@@ -72,6 +73,7 @@ const TARGET_WORKFLOW: u8 = 79  // 'O'
 const TARGET_OBJECT_STORE: u8 = 78  // 'N'
 const TARGET_LEASE: u8 = 90     // 'Z'
 const TARGET_COMPLETION: u8 = 66  // 'B'
+const TARGET_CONNECTION: u8 = 72  // 'H'
 
 const PARTICIPANT_NONE: u8 = 78  // 'N'
 const POLICY_CLEAR: u8 = 67      // 'C'
@@ -314,4 +316,20 @@ func encode_completion_ack() [4]u8 {
 
 func encode_completion_count() [4]u8 {
     return encode_no_args(CMD_V, CMD_C)
+}
+
+func encode_connection_open(slot: u8, budget: u8) [4]u8 {
+    return encode_two_args(CMD_H, CMD_O, slot, budget)
+}
+
+func encode_connection_receive(slot: u8, value: u8) [4]u8 {
+    return encode_two_args(CMD_H, CMD_R, slot, value)
+}
+
+func encode_connection_send(slot: u8, value: u8) [4]u8 {
+    return encode_two_args(CMD_H, CMD_S, slot, value)
+}
+
+func encode_connection_close(slot: u8, reason: u8) [4]u8 {
+    return encode_two_args(CMD_H, CMD_C, slot, reason)
 }

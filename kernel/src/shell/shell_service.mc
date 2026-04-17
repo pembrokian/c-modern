@@ -156,6 +156,8 @@ func lifecycle_target_endpoint(target: u8) u32 {
         return service_topology.COMPLETION_MAILBOX_ENDPOINT_ID
     case serial_protocol.TARGET_OBJECT_STORE:
         return service_topology.OBJECT_STORE_ENDPOINT_ID
+    case serial_protocol.TARGET_CONNECTION:
+        return service_topology.CONNECTION_ENDPOINT_ID
     default:
         return 0
     }
@@ -580,6 +582,34 @@ func route_completion(s: ShellServiceState, m: service_effect.Message, op: u8) s
     return dispatch(COMPLETION_ROUTES, s, m, op)
 }
 
+func connection_open(s: ShellServiceState, m: service_effect.Message) service_effect.Effect {
+    return forward_three(s, service_topology.CONNECTION_ENDPOINT_ID, serial_protocol.CMD_O, m.payload[2], m.payload[3])
+}
+
+func connection_receive(s: ShellServiceState, m: service_effect.Message) service_effect.Effect {
+    return forward_three(s, service_topology.CONNECTION_ENDPOINT_ID, serial_protocol.CMD_R, m.payload[2], m.payload[3])
+}
+
+func connection_send(s: ShellServiceState, m: service_effect.Message) service_effect.Effect {
+    return forward_three(s, service_topology.CONNECTION_ENDPOINT_ID, serial_protocol.CMD_S, m.payload[2], m.payload[3])
+}
+
+func connection_close(s: ShellServiceState, m: service_effect.Message) service_effect.Effect {
+    return forward_three(s, service_topology.CONNECTION_ENDPOINT_ID, serial_protocol.CMD_C, m.payload[2], m.payload[3])
+}
+
+const CONNECTION_ROUTES: [5]OpHandler = [5]OpHandler{
+    OpHandler{ op: serial_protocol.CMD_O, check: anymsg, run: connection_open },
+    OpHandler{ op: serial_protocol.CMD_R, check: anymsg, run: connection_receive },
+    OpHandler{ op: serial_protocol.CMD_S, check: anymsg, run: connection_send },
+    OpHandler{ op: serial_protocol.CMD_C, check: anymsg, run: connection_close },
+    UNUSED_ROUTE
+}
+
+func route_connection(s: ShellServiceState, m: service_effect.Message, op: u8) service_effect.Effect {
+    return dispatch(CONNECTION_ROUTES, s, m, op)
+}
+
 func lease_issue(s: ShellServiceState, m: service_effect.Message) service_effect.Effect {
     return forward_two(s, service_topology.LEASE_ENDPOINT_ID, serial_protocol.CMD_I, m.payload[2])
 }
@@ -682,6 +712,9 @@ func handle(s: ShellServiceState, m: service_effect.Message) service_effect.Effe
 
     case serial_protocol.CMD_T:
         return route_ticket(s, m, op)
+
+    case serial_protocol.CMD_H:
+        return route_connection(s, m, op)
     default:
         return invalid_effect(SHELL_INVALID_COMMAND)
     }
