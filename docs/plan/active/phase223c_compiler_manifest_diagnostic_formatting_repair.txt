@@ -3,7 +3,7 @@ Phase 223C -- Compiler Manifest Diagnostic Formatting Repair
 
 Status
 ------
-ACTIVE
+COMPLETE
 
 Purpose
 -------
@@ -92,6 +92,18 @@ Suggested execution order
 3. Emit the improved diagnostic for that family only.
 4. Add one focused regression covering the chosen manifest failure.
 5. Validate with the narrowest build plus focused driver or workflow test.
+
+Phase 223C outcome
+------------------
+- Chosen family: `unknown compiler regression kind: ...`
+- Landing shape: keep the existing error line and add one note listing the accepted manifest kinds: `check-pass, check-fail, run-output, mir`
+- Owner boundary kept: `compiler/driver/driver.cpp` only for implementation
+- Focused regression: `tests/tool/tool_test_command_suite.cpp` exercises `mc test` with an unknown manifest kind and asserts the additive note
+
+Closeout note
+-------------
+- Maintained non-goals: no manifest redesign, no generalized schema layer, no diagnostic-engine widening, no fix-its, no localization, and no IDE protocol integration
+- No new language limitation was encountered while landing this phase, so no new `Potential language features` backlog entry was needed
 
 Deliverables
 ------------

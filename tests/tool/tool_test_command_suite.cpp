@@ -180,6 +180,42 @@ void TestProjectTestCommandFailsOnOrdinaryFailure(const std::filesystem::path& b
                          "mc test should print the overall target failure verdict");
 }
 
+void TestCompilerManifestUnknownKindListsAcceptedKinds(const std::filesystem::path& binary_root,
+                                                       const std::filesystem::path& mc_path) {
+    const std::filesystem::path project_root = binary_root / "test_unknown_compiler_manifest_kind_project";
+    const std::filesystem::path tests_root = project_root / "tests";
+    const std::filesystem::path regressions_root = tests_root / "regressions";
+    const std::filesystem::path project_path = WriteTestProject(
+        project_root,
+        "func main() i32 {\n"
+        "    return 0\n"
+        "}\n");
+    WriteFile(tests_root / "compiler_manifest.txt",
+              "bogus regressions/check_ok.mc\n");
+    WriteFile(regressions_root / "check_ok.mc",
+              "func helper(value: i32) i32 {\n"
+              "    return value\n"
+              "}\n");
+
+    const std::filesystem::path build_dir = binary_root / "test_unknown_compiler_manifest_kind_build";
+    std::filesystem::remove_all(build_dir);
+    const auto [outcome, output] = RunProjectTestCommand(mc_path,
+                                                         project_path,
+                                                         build_dir,
+                                                         build_dir / "test_unknown_compiler_manifest_kind_output.txt",
+                                                         "unknown compiler manifest kind");
+    if (!outcome.exited || outcome.exit_code == 0) {
+        Fail("mc test should fail when compiler_manifest.txt uses an unknown regression kind:\n" + output);
+    }
+
+    ExpectOutputContains(output,
+                         "unknown compiler regression kind: bogus",
+                         "unknown compiler regression kind should name the invalid manifest token");
+    ExpectOutputContains(output,
+                         "note: accepted kinds: check-pass, check-fail, run-output, mir",
+                         "unknown compiler regression kind should list the accepted manifest kinds");
+}
+
 void TestDisabledTestTargetListsEnabledTargets(const std::filesystem::path& binary_root,
                                                const std::filesystem::path& mc_path) {
     const std::filesystem::path project_root = binary_root / "disabled_test_target_project";
@@ -377,6 +413,7 @@ void RunWorkflowTestCommandSuite(const std::filesystem::path& binary_root,
                                  const std::filesystem::path& mc_path) {
     TestProjectTestCommandSucceeds(binary_root, mc_path);
     TestProjectTestCommandFailsOnOrdinaryFailure(binary_root, mc_path);
+    TestCompilerManifestUnknownKindListsAcceptedKinds(binary_root, mc_path);
     TestDisabledTestTargetListsEnabledTargets(binary_root, mc_path);
     TestProjectTestTimeoutFailsDeterministically(binary_root, mc_path);
     TestDuplicateOrdinaryTestModuleNamesExplainBootstrapRule(binary_root, mc_path);

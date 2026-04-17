@@ -614,6 +614,10 @@ std::optional<CompilerRegressionKind> ParseRegressionKind(std::string_view token
     return std::nullopt;
 }
 
+std::string AcceptedCompilerRegressionKinds() {
+    return "check-pass, check-fail, run-output, mir";
+}
+
 bool ParseCompilerManifest(const std::filesystem::path& manifest_path,
                           support::DiagnosticSink& diagnostics,
                           std::vector<CompilerRegressionCase>& regression_cases) {
@@ -657,6 +661,12 @@ bool ParseCompilerManifest(const std::filesystem::path& manifest_path,
                 .span = {{line_number, 1}, {line_number, 1}},
                 .severity = support::DiagnosticSeverity::kError,
                 .message = "unknown compiler regression kind: " + kind_text,
+            });
+            diagnostics.Report({
+                .file_path = manifest_path,
+                .span = {{line_number, 1}, {line_number, 1}},
+                .severity = support::DiagnosticSeverity::kNote,
+                .message = "accepted kinds: " + AcceptedCompilerRegressionKinds(),
             });
             return false;
         }
