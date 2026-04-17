@@ -50,6 +50,17 @@ The following modules are deferred until the named phase boundary forces them:
 
 Recent service targets
 
+- Phase 240 (landed): external ingress completion pressure. External
+  connection-backed workflow results now keep request occupancy truth in
+  `connection_service` until completion delivery actually succeeds, so
+  mailbox-full retry does not falsely free the ingress slot early.
+  `workflow_service.mc` still owns bounded retry and terminal-outcome truth,
+  `completion_mailbox_service.mc` still owns queue-full `Exhausted` then
+  `WouldBlock`, and the phase proves one external backlog-plus-stall lane
+  through `scenario_connection_completion_pressure.mc`. The focused reset-lane
+  fixture is
+  `tests/system/kernel_reset_lane_phase240_external_ingress_completion_pressure`.
+
 - Phase 239 (landed): connection-backed workflow execution. `connection_service.mc`,
   `workflow_service.mc`, and `kernel_dispatch.mc` now admit one explicit
   `connection execute` handoff that keeps connection lifetime truth owner-local

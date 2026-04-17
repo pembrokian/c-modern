@@ -304,6 +304,9 @@ func workflow_object_workflow_id(name: u8) u8 {
 }
 
 func workflow_connection_slot(s: WorkflowServiceState) u8 {
+    if s.due < WORKFLOW_CONNECTION_SLOT_MARKER {
+        return s.opcode
+    }
     return s.due - WORKFLOW_CONNECTION_SLOT_MARKER
 }
 
@@ -462,6 +465,9 @@ func workflow_running_connection(s: WorkflowServiceState, slot: u8, task: u8) Wo
 }
 
 func workflow_pending_delivery(s: WorkflowServiceState, outcome: u8, status: u8) WorkflowServiceState {
+    if workflow_is_connection(s) {
+        return workflow_state_raw(s, s.kind, s.id, status, workflow_connection_slot(s), outcome, WORKFLOW_STATE_DELIVERING, s.restart, s.generation)
+    }
     return workflow_restate(s, workflow_payload_delivery(outcome, status), WORKFLOW_STATE_DELIVERING, s.restart, s.generation)
 }
 

@@ -408,7 +408,7 @@ func dispatch_workflow(state: *boot.KernelBootState, msg: service_effect.Message
     next = boot.bootwith_object_store(next, step.object_store)
     next = boot.bootwith_journal(next, step.journal)
     next = boot.bootwith_completion(next, step.completion)
-    if workflow_service.workflow_is_connection(previous_workflow) && !workflow_service.workflow_is_active(step.workflow) && previous_workflow.id != 0 {
+    if workflow_service.workflow_is_connection(previous_workflow) && !workflow_service.workflow_is_active(step.workflow) && !workflow_service.workflow_is_delivering(step.workflow) && previous_workflow.id != 0 {
         next = boot.bootwith_connection(next, connection_service.connection_request_finish(next.connection.state, workflow_service.workflow_connection_slot(previous_workflow), previous_workflow.id))
     }
     *state = next

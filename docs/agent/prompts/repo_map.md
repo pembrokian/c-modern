@@ -45,7 +45,7 @@ This file is a fast orientation map for agents working in this repository.
   - `src/timer_service.mc`: bounded timer-service state, id-scoped create/cancel/query/expired operations, and explicit active/expired/cancelled classification
   - `src/task_service.mc`: bounded task-service state, id-scoped submit/query/complete/cancel/list operations, and explicit active/done/failed/cancelled classification
   - `src/services/connection_service.mc`: bounded connection-ingress owner with fixed-capacity open/receive/send/close semantics, explicit disconnected/timed-out outcomes, owner-local idle-budget timeout truth, and reset-on-restart behavior
-  - `src/workflow_service.mc`: bounded retained delayed-work owner tying timer expiry to task execution or one fixed-delay durable named-object update, journal-backed restart continuity, completion-backed terminal outcomes, and delegated durable-update follow-through after lease consumption
+  - `src/workflow_service.mc`: bounded retained delayed-work owner tying timer expiry to task execution or one fixed-delay durable named-object update, journal-backed restart continuity, completion-backed terminal outcomes, delegated durable-update follow-through after lease consumption, and external-ingress delivery retry while mailbox pressure keeps the request live in `connection_service`
   - `src/completion_mailbox_service.mc`: bounded retained completion owner for workflow terminal outcomes plus explicit fetch/ack/take behavior
   - `src/lease_service.mc`: bounded retained temporary delegation owner for one completion-bound workflow lease path plus one delegated durable named-object update lease shape bound to existing restart-visible generation truth
   - `src/serial_service.mc`: bounded serial-service ingress state plus one service-owned copied receive-frame log, one fixed forwarded composition request observation, one aggregate-reply observation, and one service-local malformed-input classification path
@@ -175,6 +175,7 @@ This file is a fast orientation map for agents working in this repository.
 - Repository-owned smoke and regression outputs should prefer semantic build-tree roots such as `build/debug/audit/...`, `build/debug/probes/...`, `build/debug/tmp/...`, `build/debug/tool/...`, and `build/debug/codegen/executable/...`.
 - Veya-specific disposable outputs should stay under those same roots, usually beneath `build/debug/tool/workflow/...` for repo-owned regressions or `build/debug/probes/veya/...` for manual experiments.
 - Remaining top-level `build/debug/phase*` paths are preserved manual or probe areas rather than active regression output policy.
+- Phase 240 extends the Phase 239 connection-backed workflow lane by requiring external request occupancy to remain live until completion delivery succeeds under mailbox pressure.
 
 ## Where To Change Things
 
