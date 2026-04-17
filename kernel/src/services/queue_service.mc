@@ -82,16 +82,16 @@ func handle(s: QueueServiceState, m: service_effect.Message) QueueResult {
         if m.payload[1] != serial_protocol.CMD_BANG {
             return QueueResult{ state: s, effect: service_effect.effect_reply(syscall.SyscallStatus.InvalidArgument, 0, primitives.zero_payload()) }
         }
-        if m.payload[0] == serial_protocol.CMD_C {
+        switch m.payload[0] {
+        case serial_protocol.CMD_C:
             return queue_count(s)
-        }
-        if m.payload[0] == serial_protocol.CMD_P {
+        case serial_protocol.CMD_P:
             return queue_peek(s)
-        }
-        if m.payload[0] == serial_protocol.CMD_W {
+        case serial_protocol.CMD_W:
             return QueueResult{ state: s, effect: service_effect.effect_reply(syscall.SyscallStatus.Ok, s.stall_count, primitives.zero_payload()) }
+        default:
+            return QueueResult{ state: s, effect: service_effect.effect_reply(syscall.SyscallStatus.InvalidArgument, 0, primitives.zero_payload()) }
         }
-        return QueueResult{ state: s, effect: service_effect.effect_reply(syscall.SyscallStatus.InvalidArgument, 0, primitives.zero_payload()) }
     }
     if m.payload_len != 1 {
         return QueueResult{ state: s, effect: service_effect.effect_reply(syscall.SyscallStatus.InvalidArgument, 0, primitives.zero_payload()) }

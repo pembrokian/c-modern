@@ -76,20 +76,20 @@ func run_retained_coordination_probe(state: *boot.KernelBootState) i32 {
         return FAIL_COORDINATION_KV_GET_BEFORE_VALUE
     }
 
-    kv_before: service_identity.ServiceMark = boot.boot_kv_mark(*state)
-    queue_before: service_identity.ServiceMark = boot.boot_queue_mark(*state)
+    kv_before := boot.boot_kv_mark(*state)
+    queue_before := boot.boot_queue_mark(*state)
     effect = kernel_dispatch.kernel_dispatch_step(state, scenario_transport.cmd_lifecycle_restart(serial_protocol.TARGET_WORKSET))
     if !scenario_assert.expect_lifecycle(effect, syscall.SyscallStatus.Ok, serial_protocol.TARGET_WORKSET, serial_protocol.LIFECYCLE_RELOAD) {
         return FAIL_COORDINATION_RESTART_STATUS
     }
 
-    kv_after: service_identity.ServiceMark = boot.boot_kv_mark(*state)
-    queue_after: service_identity.ServiceMark = boot.boot_queue_mark(*state)
-    kv_id: i32 = scenario_assert.expect_restart_identity(kv_before, kv_after, FAIL_COORDINATION_KV_IDENTITY_BASE)
+    kv_after := boot.boot_kv_mark(*state)
+    queue_after := boot.boot_queue_mark(*state)
+    kv_id := scenario_assert.expect_restart_identity(kv_before, kv_after, FAIL_COORDINATION_KV_IDENTITY_BASE)
     if kv_id != 0 {
         return kv_id
     }
-    queue_id: i32 = scenario_assert.expect_restart_identity(queue_before, queue_after, FAIL_COORDINATION_QUEUE_IDENTITY_BASE)
+    queue_id := scenario_assert.expect_restart_identity(queue_before, queue_after, FAIL_COORDINATION_QUEUE_IDENTITY_BASE)
     if queue_id != 0 {
         return queue_id
     }

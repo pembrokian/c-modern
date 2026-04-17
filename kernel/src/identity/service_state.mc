@@ -42,6 +42,10 @@ func state_class(target: u8) u8 {
         return STATE_CLASS_RETAINED
     case serial_protocol.TARGET_FILE:
         return STATE_CLASS_RETAINED
+    case serial_protocol.TARGET_TIMER:
+        return STATE_CLASS_RETAINED
+    case serial_protocol.TARGET_TASK:
+        return STATE_CLASS_ORDINARY
     case serial_protocol.TARGET_ECHO:
         return STATE_CLASS_ORDINARY
     case serial_protocol.TARGET_TRANSFER:

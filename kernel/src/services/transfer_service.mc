@@ -117,11 +117,12 @@ func handle(s: TransferServiceState, m: service_effect.Message) TransferResult {
         }
         return transfer_bind(s, m)
     }
-    if cmd == TRANSFER_CMD_LOG {
+    switch cmd {
+    case TRANSFER_CMD_LOG:
         return transfer_log(s, m)
-    }
-    if cmd == TRANSFER_CMD_KV {
+    case TRANSFER_CMD_KV:
         return transfer_kv(s, m)
+    default:
+        return transfer_badarg(s)
     }
-    return transfer_badarg(s)
 }

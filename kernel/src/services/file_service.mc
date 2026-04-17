@@ -92,19 +92,19 @@ func handle(s: FileServiceState, m: service_effect.Message) FileResult {
     }
     op: u8 = m.payload[0]
     name: u8 = m.payload[1]
-    if op == FILE_OP_CREATE {
+    switch op {
+    case FILE_OP_CREATE:
         return file_create(s, name)
-    }
-    if op == FILE_OP_READ {
+    case FILE_OP_READ:
         return file_read(s, name)
-    }
-    if op == FILE_OP_WRITE {
+    case FILE_OP_WRITE:
         if m.payload_len < 3 {
             return FileResult{ state: s, effect: service_effect.effect_reply(syscall.SyscallStatus.InvalidArgument, 0, primitives.zero_payload()) }
         }
         return file_write(s, name, m.payload[2])
+    default:
+        return FileResult{ state: s, effect: service_effect.effect_reply(syscall.SyscallStatus.InvalidArgument, 0, primitives.zero_payload()) }
     }
-    return FileResult{ state: s, effect: service_effect.effect_reply(syscall.SyscallStatus.InvalidArgument, 0, primitives.zero_payload()) }
 }
 
 func filerecv(s: FileServiceState, obs: syscall.ReceiveObservation) FileResult {

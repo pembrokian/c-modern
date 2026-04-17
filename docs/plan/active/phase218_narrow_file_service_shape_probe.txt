@@ -35,10 +35,10 @@ Implementation notes
 - service_state.mc: TARGET_FILE → STATE_CLASS_RETAINED
 - service_topology.mc: FILE_ENDPOINT_ID in service_authority_class →
   RetainedOwner
-- scenario_218.mc: run_file_service_probe() — 13 steps, fail codes 2180–2190
+- scenario_file_service.mc: run_file_service_probe() — 13 steps, fail codes 2180–2190
 - scenario_transport.mc: cmd_file_create, cmd_file_write, cmd_file_read,
   cmd_file_count helpers
-- scenarios.mc: import scenario_218, call run_file_service_probe()
+- scenarios.mc: import scenario_file_service, call run_file_service_probe()
 - Design choice: 1 byte per file slot (lens[i]=0 or 1, data[i] is the byte) —
   chosen because the language has no 2D fixed array syntax, and 1-byte capacity
   is sufficient for a shape probe; see decision_log.txt and backlog.txt

@@ -45,6 +45,8 @@ const CMD_X: u8 = 88   // 'X' — lifecycle control family
 const CMD_BANG: u8 = 33  // '!' — end-of-argument sentinel
 const CMD_W: u8 = 87   // 'W' — stall-count query; also write sub-op within CMD_F
 const CMD_F: u8 = 70   // 'F' — file command family
+const CMD_M: u8 = 77   // 'M' — timer command family
+const CMD_J: u8 = 74   // 'J' — task command family
 
 const TARGET_SERIAL: u8 = 83    // 'S'
 const TARGET_SHELL: u8 = 72     // 'H'
@@ -57,6 +59,8 @@ const TARGET_ECHO: u8 = 69      // 'E'
 const TARGET_TRANSFER: u8 = 80  // 'P'
 const TARGET_TICKET: u8 = 84    // 'T'
 const TARGET_FILE: u8 = 70      // 'F'
+const TARGET_TIMER: u8 = 77     // 'M'
+const TARGET_TASK: u8 = 74      // 'J'
 
 const PARTICIPANT_NONE: u8 = 78  // 'N'
 const POLICY_CLEAR: u8 = 67      // 'C'
@@ -177,4 +181,36 @@ func encode_file_read(name: u8) [4]u8 {
 
 func encode_file_count() [4]u8 {
     return ipc.payload_byte(CMD_F, CMD_L, CMD_BANG, CMD_BANG)
+}
+
+func encode_timer_create(id: u8, due: u8) [4]u8 {
+    return ipc.payload_byte(CMD_M, CMD_C, id, due)
+}
+
+func encode_timer_cancel(id: u8) [4]u8 {
+    return ipc.payload_byte(CMD_M, CMD_X, id, CMD_BANG)
+}
+
+func encode_timer_query(id: u8) [4]u8 {
+    return ipc.payload_byte(CMD_M, CMD_Q, id, CMD_BANG)
+}
+
+func encode_timer_expired(window: u8) [4]u8 {
+    return ipc.payload_byte(CMD_M, CMD_E, window, CMD_BANG)
+}
+
+func encode_task_submit(opcode: u8) [4]u8 {
+    return ipc.payload_byte(CMD_J, CMD_S, opcode, CMD_BANG)
+}
+
+func encode_task_query(id: u8) [4]u8 {
+    return ipc.payload_byte(CMD_J, CMD_Q, id, CMD_BANG)
+}
+
+func encode_task_cancel(id: u8) [4]u8 {
+    return ipc.payload_byte(CMD_J, CMD_C, id, CMD_BANG)
+}
+
+func encode_task_list(window: u8) [4]u8 {
+    return ipc.payload_byte(CMD_J, CMD_L, window, CMD_BANG)
 }

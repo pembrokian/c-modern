@@ -31,7 +31,7 @@ Source tree layout (Phase 219)
 - `src/` root: `main.mc` (entry), `kernel_dispatch.mc` (routing), `event_codes.mc` (shared shell-event constants)
 - `src/boot/`: `boot.mc`, `boot_identity.mc`, `boot_update.mc`, `init.mc`
 - `src/identity/`: `service_identity.mc`, `service_state.mc`, `service_topology.mc`, `identity_taxonomy.mc`
-- `src/services/`: `echo_service.mc`, `file_service.mc`, `kv_service.mc`, `log_service.mc`, `queue_service.mc`, `ticket_service.mc`, `transfer_grant.mc`, `transfer_service.mc`
+- `src/services/`: `echo_service.mc`, `file_service.mc`, `kv_service.mc`, `log_service.mc`, `queue_service.mc`, `task_service.mc`, `ticket_service.mc`, `timer_service.mc`, `transfer_grant.mc`, `transfer_service.mc`
 - `src/shell/`: `serial_protocol.mc`, `serial_service.mc`, `serial_shell_event_log.mc`, `serial_shell_path.mc`, `shell_service.mc`
 - `src/scenarios/`: `scenarios.mc` and all `scenario_*.mc` files
 - `src/transport/`: `primitives.mc`, `syscall.mc`, `ipc.mc`, `service_effect.mc`
@@ -55,9 +55,22 @@ Next target
   CMD_F protocol family (create, write, read, count) routes through shell dispatch.
   Service is retained (Reload on restart); 1-byte-per-slot capacity is a probe
   constraint, not a permanent design. `run_file_service_probe()` in
-  `scenario_218.mc` exercises the full create/write/read/count/error path.
+  `scenario_file_service.mc` exercises the full create/write/read/count/error path.
   SERVICE_COUNT is now 9.
 
 - Next open: decide whether to widen the file-service data model (requires 2D
   array support or a redesigned state record), or advance another service-system
   boundary identified in Phases 213–217.
+
+- Phase 220 (landed): bounded timer and task service follow-through. Added
+  `timer_service.mc` and `task_service.mc` as the tenth and eleventh
+  boot-wired services (TIMER_ENDPOINT_ID = 19, TASK_ENDPOINT_ID = 20;
+  SERVICE_COUNT = 11). Added compact shell command families for timer
+  create/cancel/query/expired and task submit/query/cancel/list. Timer restart
+  policy is retained reload; task restart policy is explicit reset. The
+  scenario probe is `run_timer_task_probe()` in `scenario_timer_task_service.mc` and the
+  focused reset-lane fixture is
+  `tests/system/kernel_reset_lane_phase220_timer_task_service`.
+
+- Next open: pressure a richer owner-local temporal model only if a real
+  admitted consumer cannot stay inside the bounded timer/task contracts.

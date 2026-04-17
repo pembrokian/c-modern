@@ -62,6 +62,10 @@ func lifecycle_target_endpoint(target: u8) u32 {
         return service_topology.TICKET_ENDPOINT_ID
     case serial_protocol.TARGET_FILE:
         return service_topology.FILE_ENDPOINT_ID
+    case serial_protocol.TARGET_TIMER:
+        return service_topology.TIMER_ENDPOINT_ID
+    case serial_protocol.TARGET_TASK:
+        return service_topology.TASK_ENDPOINT_ID
     default:
         return 0
     }
@@ -339,6 +343,72 @@ func handle(s: ShellServiceState, m: service_effect.Message) service_effect.Effe
                 return invalid_effect(SHELL_INVALID_SHAPE)
             }
             return service_effect.effect_send(s.pid, service_topology.FILE_ENDPOINT_ID, 0, payload)
+        default:
+            return invalid_effect(SHELL_INVALID_COMMAND)
+        }
+
+    case serial_protocol.CMD_M:
+        switch op {
+        case serial_protocol.CMD_C:
+            payload[0] = serial_protocol.CMD_C
+            payload[1] = m.payload[2]
+            payload[2] = m.payload[3]
+            return service_effect.effect_send(s.pid, service_topology.TIMER_ENDPOINT_ID, 3, payload)
+        case serial_protocol.CMD_X:
+            if !bang3(m) {
+                return invalid_effect(SHELL_INVALID_SHAPE)
+            }
+            payload[0] = serial_protocol.CMD_X
+            payload[1] = m.payload[2]
+            return service_effect.effect_send(s.pid, service_topology.TIMER_ENDPOINT_ID, 2, payload)
+        case serial_protocol.CMD_Q:
+            if !bang3(m) {
+                return invalid_effect(SHELL_INVALID_SHAPE)
+            }
+            payload[0] = serial_protocol.CMD_Q
+            payload[1] = m.payload[2]
+            return service_effect.effect_send(s.pid, service_topology.TIMER_ENDPOINT_ID, 2, payload)
+        case serial_protocol.CMD_E:
+            if !bang3(m) {
+                return invalid_effect(SHELL_INVALID_SHAPE)
+            }
+            payload[0] = serial_protocol.CMD_E
+            payload[1] = m.payload[2]
+            return service_effect.effect_send(s.pid, service_topology.TIMER_ENDPOINT_ID, 2, payload)
+        default:
+            return invalid_effect(SHELL_INVALID_COMMAND)
+        }
+
+    case serial_protocol.CMD_J:
+        switch op {
+        case serial_protocol.CMD_S:
+            if !bang3(m) {
+                return invalid_effect(SHELL_INVALID_SHAPE)
+            }
+            payload[0] = serial_protocol.CMD_S
+            payload[1] = m.payload[2]
+            return service_effect.effect_send(s.pid, service_topology.TASK_ENDPOINT_ID, 2, payload)
+        case serial_protocol.CMD_Q:
+            if !bang3(m) {
+                return invalid_effect(SHELL_INVALID_SHAPE)
+            }
+            payload[0] = serial_protocol.CMD_Q
+            payload[1] = m.payload[2]
+            return service_effect.effect_send(s.pid, service_topology.TASK_ENDPOINT_ID, 2, payload)
+        case serial_protocol.CMD_C:
+            if !bang3(m) {
+                return invalid_effect(SHELL_INVALID_SHAPE)
+            }
+            payload[0] = serial_protocol.CMD_C
+            payload[1] = m.payload[2]
+            return service_effect.effect_send(s.pid, service_topology.TASK_ENDPOINT_ID, 2, payload)
+        case serial_protocol.CMD_L:
+            if !bang3(m) {
+                return invalid_effect(SHELL_INVALID_SHAPE)
+            }
+            payload[0] = serial_protocol.CMD_L
+            payload[1] = m.payload[2]
+            return service_effect.effect_send(s.pid, service_topology.TASK_ENDPOINT_ID, 2, payload)
         default:
             return invalid_effect(SHELL_INVALID_COMMAND)
         }

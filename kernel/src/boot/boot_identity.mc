@@ -113,6 +113,10 @@ func bootrestart_outcome_for_endpoint(s: KernelBootState, endpoint: u32) Restart
         return s.ticket_restart_outcome
     case service_topology.FILE_ENDPOINT_ID:
         return s.file_restart_outcome
+    case service_topology.TIMER_ENDPOINT_ID:
+        return s.timer_restart_outcome
+    case service_topology.TASK_ENDPOINT_ID:
+        return s.task_restart_outcome
     default:
         return RestartOutcome.None
     }
@@ -120,7 +124,7 @@ func bootrestart_outcome_for_endpoint(s: KernelBootState, endpoint: u32) Restart
 
 func bootsummary_payload_for_endpoint(s: KernelBootState, endpoint: u32) [4]u8 {
     participation: RetainedSummaryParticipation = RetainedSummaryParticipation.None
-    if endpoint == service_topology.LOG_ENDPOINT_ID || endpoint == service_topology.KV_ENDPOINT_ID || endpoint == service_topology.QUEUE_ENDPOINT_ID {
+    if endpoint == service_topology.LOG_ENDPOINT_ID || endpoint == service_topology.KV_ENDPOINT_ID || endpoint == service_topology.QUEUE_ENDPOINT_ID || endpoint == service_topology.FILE_ENDPOINT_ID || endpoint == service_topology.TIMER_ENDPOINT_ID {
         participation = RetainedSummaryParticipation.Service
     }
     mark: service_identity.ServiceMark = bootmark_for_endpoint(s, endpoint)
@@ -154,6 +158,14 @@ func boot_file_mark(s: KernelBootState) service_identity.ServiceMark {
     return service_identity.service_mark(service_topology.FILE_ENDPOINT_ID, s.file.state.pid, s.file.generation)
 }
 
+func boot_timer_mark(s: KernelBootState) service_identity.ServiceMark {
+    return service_identity.service_mark(service_topology.TIMER_ENDPOINT_ID, s.timer.state.pid, s.timer.generation)
+}
+
+func boot_task_mark(s: KernelBootState) service_identity.ServiceMark {
+    return service_identity.service_mark(service_topology.TASK_ENDPOINT_ID, s.task.state.pid, s.task.generation)
+}
+
 func bootmark_for_endpoint(s: KernelBootState, endpoint: u32) service_identity.ServiceMark {
     switch endpoint {
     case service_topology.LOG_ENDPOINT_ID:
@@ -170,6 +182,10 @@ func bootmark_for_endpoint(s: KernelBootState, endpoint: u32) service_identity.S
         return boot_ticket_mark(s)
     case service_topology.FILE_ENDPOINT_ID:
         return boot_file_mark(s)
+    case service_topology.TIMER_ENDPOINT_ID:
+        return boot_timer_mark(s)
+    case service_topology.TASK_ENDPOINT_ID:
+        return boot_task_mark(s)
     default:
         return service_identity.service_mark(endpoint, 0, 0)
     }

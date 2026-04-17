@@ -40,6 +40,12 @@ void RunWorkflowKernelResetLaneCase(const std::filesystem::path& source_root,
     RunWorkflowKernelResetLaneSuite(source_root, binary_root, mc_path);
 }
 
+void RunWorkflowKernelResetLaneFullCase(const std::filesystem::path& source_root,
+                                        const std::filesystem::path& binary_root,
+                                        const std::filesystem::path& mc_path) {
+    RunWorkflowKernelResetLaneFullSuite(source_root, binary_root, mc_path);
+}
+
 struct WorkflowTestCase {
     std::string_view name;
     void (*fn)(const std::filesystem::path&, const std::filesystem::path&, const std::filesystem::path&);

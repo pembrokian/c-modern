@@ -5,7 +5,9 @@ import log_service
 import queue_service
 import serial_shell_path
 import service_identity
+import task_service
 import ticket_service
+import timer_service
 import transfer_grant
 import transfer_service
 
@@ -112,6 +114,7 @@ func bootrestart_transfer(s: KernelBootState, transfer: transfer_service.Transfe
 func bootrestart_ticket(s: KernelBootState, ticket: ticket_service.TicketServiceState) KernelBootState {
     return s with { ticket.state: ticket, ticket.generation: s.ticket.generation + 1 }
 }
+
 func bootwith_file(s: KernelBootState, file: file_service.FileServiceState) KernelBootState {
     return s with { file.state: file }
 }
@@ -122,4 +125,28 @@ func bootwith_file_restart_outcome(s: KernelBootState, outcome: RestartOutcome) 
 
 func bootrestart_file(s: KernelBootState, file: file_service.FileServiceState) KernelBootState {
     return s with { file.state: file, file.generation: s.file.generation + 1 }
+}
+
+func bootwith_timer(s: KernelBootState, timer: timer_service.TimerServiceState) KernelBootState {
+    return s with { timer.state: timer }
+}
+
+func bootwith_timer_restart_outcome(s: KernelBootState, outcome: RestartOutcome) KernelBootState {
+    return s with { timer_restart_outcome: outcome }
+}
+
+func bootrestart_timer(s: KernelBootState, timer: timer_service.TimerServiceState) KernelBootState {
+    return s with { timer.state: timer, timer.generation: s.timer.generation + 1 }
+}
+
+func bootwith_task(s: KernelBootState, task: task_service.TaskServiceState) KernelBootState {
+    return s with { task.state: task }
+}
+
+func bootwith_task_restart_outcome(s: KernelBootState, outcome: RestartOutcome) KernelBootState {
+    return s with { task_restart_outcome: outcome }
+}
+
+func bootrestart_task(s: KernelBootState, task: task_service.TaskServiceState) KernelBootState {
+    return s with { task.state: task, task.generation: s.task.generation + 1 }
 }

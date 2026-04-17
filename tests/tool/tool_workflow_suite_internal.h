@@ -21,4 +21,8 @@ void RunWorkflowKernelResetLaneSuite(const std::filesystem::path& source_root,
                                      const std::filesystem::path& binary_root,
                                      const std::filesystem::path& mc_path);
 
+void RunWorkflowKernelResetLaneFullSuite(const std::filesystem::path& source_root,
+                                         const std::filesystem::path& binary_root,
+                                         const std::filesystem::path& mc_path);
+
 }  // namespace mc::tool_tests

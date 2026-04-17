@@ -11,7 +11,7 @@ func cmd(payload: [4]u8) syscall.ReceiveObservation {
 }
 
 func smoke_topology_is_enumerable() bool {
-    expected: [9]u32
+    expected: [11]u32
     expected[0] = service_topology.SERIAL_ENDPOINT_ID
     expected[1] = service_topology.SHELL_ENDPOINT_ID
     expected[2] = service_topology.LOG_ENDPOINT_ID
@@ -21,8 +21,10 @@ func smoke_topology_is_enumerable() bool {
     expected[6] = service_topology.QUEUE_ENDPOINT_ID
     expected[7] = service_topology.TICKET_ENDPOINT_ID
     expected[8] = service_topology.FILE_ENDPOINT_ID
+    expected[9] = service_topology.TIMER_ENDPOINT_ID
+    expected[10] = service_topology.TASK_ENDPOINT_ID
 
-    if service_topology.service_count() != 9 {
+    if service_topology.service_count() != 11 {
         return false
     }
     for i in 0..service_topology.service_count() {
@@ -35,7 +37,7 @@ func smoke_topology_is_enumerable() bool {
         }
     }
 
-    invalid: service_topology.ServiceSlot = service_topology.service_slot_at(9)
+    invalid: service_topology.ServiceSlot = service_topology.service_slot_at(11)
     if service_topology.service_slot_is_valid(invalid) {
         return false
     }

@@ -24,7 +24,9 @@ import service_state
 import service_topology
 import shell_service
 import syscall
+import task_service
 import ticket_service
+import timer_service
 import transfer_grant
 import transfer_service
 
@@ -121,6 +123,10 @@ func lifecycle_metadata(state: *boot.KernelBootState, target: u8) u8 {
         return u8(queue_service.queue_len(current.queue.state))
     case serial_protocol.TARGET_FILE:
         return u8(file_service.file_count(current.file.state))
+    case serial_protocol.TARGET_TIMER:
+        return u8(timer_service.timer_active_count(current.timer.state))
+    case serial_protocol.TARGET_TASK:
+        return u8(task_service.task_active_count(current.task.state))
     default:
         return 0
     }
@@ -313,6 +319,20 @@ func dispatch_file(state: *boot.KernelBootState, msg: service_effect.Message) se
     return file_result.effect
 }
 
+func dispatch_timer(state: *boot.KernelBootState, msg: service_effect.Message) service_effect.Effect {
+    current: boot.KernelBootState = *state
+    timer_result: timer_service.TimerResult = timer_service.handle(current.timer.state, msg)
+    *state = boot.bootwith_timer(current, timer_result.state)
+    return timer_result.effect
+}
+
+func dispatch_task(state: *boot.KernelBootState, msg: service_effect.Message) service_effect.Effect {
+    current: boot.KernelBootState = *state
+    task_result: task_service.TaskResult = task_service.handle(current.task.state, msg)
+    *state = boot.bootwith_task(current, task_result.state)
+    return task_result.effect
+}
+
 func lifecycle_invalid_reply(state: *boot.KernelBootState, target: u8) service_effect.Effect {
     return shell_service.invalid_effect(shell_service.SHELL_INVALID_COMMAND)
 }
@@ -360,6 +380,10 @@ func leaf_route(endpoint: u32) LeafRoute {
         return LeafRoute{ endpoint: endpoint, reply: dispatch_ticket }
     case service_topology.FILE_ENDPOINT_ID:
         return LeafRoute{ endpoint: endpoint, reply: dispatch_file }
+    case service_topology.TIMER_ENDPOINT_ID:
+        return LeafRoute{ endpoint: endpoint, reply: dispatch_timer }
+    case service_topology.TASK_ENDPOINT_ID:
+        return LeafRoute{ endpoint: endpoint, reply: dispatch_task }
     default:
         return LeafRoute{ endpoint: endpoint, reply: dispatch_invalid_endpoint }
     }

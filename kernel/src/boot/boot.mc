@@ -16,7 +16,9 @@ import service_identity
 import service_topology
 import shell_service
 import syscall
+import task_service
 import ticket_service
+import timer_service
 import transfer_grant
 import transfer_service
 
@@ -58,6 +60,10 @@ struct KernelBootState {
     ticket_restart_outcome: RestartOutcome
     file: ServiceCell<file_service.FileServiceState>
     file_restart_outcome: RestartOutcome
+    timer: ServiceCell<timer_service.TimerServiceState>
+    timer_restart_outcome: RestartOutcome
+    task: ServiceCell<task_service.TaskServiceState>
+    task_restart_outcome: RestartOutcome
     grants: transfer_grant.GrantTable
 }
 
@@ -71,6 +77,8 @@ func kernel_init() KernelBootState {
     transfer_slot := service_topology.TRANSFER_SLOT
     ticket_slot := service_topology.TICKET_SLOT
     file_slot := service_topology.FILE_SLOT
+    timer_slot := service_topology.TIMER_SLOT
+    task_slot := service_topology.TASK_SLOT
 
     path_state := serial_shell_path.path_init(serial_service.serial_init(serial_slot.pid, 1), shell_service.shell_init(shell_slot.pid, 1), shell_slot.endpoint)
     log_cell := ServiceCell<log_service.LogServiceState>{ state: log_service.log_init(log_slot.pid, 1), generation: 1 }
@@ -80,6 +88,8 @@ func kernel_init() KernelBootState {
     transfer_cell := ServiceCell<transfer_service.TransferServiceState>{ state: transfer_service.transfer_init(transfer_slot.pid, 1), generation: 1 }
     ticket_cell := ServiceCell<ticket_service.TicketServiceState>{ state: ticket_service.ticket_init(ticket_slot.pid, 1, 1), generation: 1 }
     file_cell := ServiceCell<file_service.FileServiceState>{ state: file_service.file_init(file_slot.pid, 1), generation: 1 }
+    timer_cell := ServiceCell<timer_service.TimerServiceState>{ state: timer_service.timer_init(timer_slot.pid, 1), generation: 1 }
+    task_cell := ServiceCell<task_service.TaskServiceState>{ state: task_service.task_init(task_slot.pid, 1), generation: 1 }
 
     return KernelBootState{
         path_state: path_state,
@@ -101,6 +111,10 @@ func kernel_init() KernelBootState {
         ticket_restart_outcome: RestartOutcome.None,
         file: file_cell,
         file_restart_outcome: RestartOutcome.None,
+        timer: timer_cell,
+        timer_restart_outcome: RestartOutcome.None,
+        task: task_cell,
+        task_restart_outcome: RestartOutcome.None,
         grants: transfer_grant.grant_init()
     }
 }

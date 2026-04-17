@@ -41,6 +41,8 @@ This file is a fast orientation map for agents working in this repository.
   - `src/kv_service.mc`: bounded key-value-service retained table state, explicit missing-key, unavailable, and overwrite consequences, fixed key-value-write plus restart-pressure log markers, and retained-state observation records
   - `src/echo_service.mc`: bounded echo-service protocol state, request-derived reply payload, and exchange observation records
   - `src/transfer_service.mc`: bounded transfer-service protocol state, copied emit payload, and transfer observation records
+  - `src/timer_service.mc`: bounded timer-service state, id-scoped create/cancel/query/expired operations, and explicit active/expired/cancelled classification
+  - `src/task_service.mc`: bounded task-service state, id-scoped submit/query/cancel/list operations, and explicit active/failed/cancelled classification
   - `src/serial_service.mc`: bounded serial-service ingress state plus one service-owned copied receive-frame log, one fixed forwarded composition request observation, one aggregate-reply observation, and one service-local malformed-input classification path
   - `src/state.mc`: kernel descriptor, process-slot, task-slot, ready-queue, and boot-log records
   - `src/address_space.mc`: bounded address-space, mapping, user-entry-frame, and child-bootstrap construction records with translation-root ownership delegated to `mmu`

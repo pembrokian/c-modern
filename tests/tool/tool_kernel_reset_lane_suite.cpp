@@ -1,11 +1,14 @@
 #include <array>
 #include <chrono>
+#include <cstdlib>
 #include <filesystem>
+#include <future>
 #include <iostream>
 #include <sstream>
 #include <set>
 #include <string>
 #include <string_view>
+#include <thread>
 #include <vector>
 
 #include "tests/support/process_utils.h"
@@ -14,13 +17,11 @@
 
 namespace {
 
-using mc::test_support::CopyDirectoryTree;
 using mc::test_support::Fail;
 using mc::test_support::ReadFile;
-using mc::test_support::RunCommand;
 using mc::test_support::RunCommandCapture;
 using mc::test_support::WriteFile;
-using namespace mc::tool_tests;
+using mc::tool_tests::BuildProjectTargetAndCapture;
 
 struct ResetLaneScenario {
     std::string_view label;
@@ -32,6 +33,9 @@ struct ResetLaneScenario {
     std::string_view run_output_name;
     std::string_view build_context;
     std::string_view run_context;
+    bool include_in_fast = false;
+    int build_warn_ms = 0;
+    int run_warn_ms = 0;
     bool requires_clean_build = false;
 };
 
@@ -41,10 +45,77 @@ struct ResetLaneScenarioTiming {
     std::chrono::milliseconds run_duration {};
 };
 
+enum class ResetLaneMode {
+    fast,
+    full,
+};
+
 std::string FormatDuration(std::chrono::milliseconds duration) {
     std::ostringstream stream;
     stream << duration.count() << "ms";
     return stream.str();
+}
+
+int ParsePositiveEnvOrDefault(const char* name,
+                              int fallback) {
+    const char* value = std::getenv(name);
+    if (value == nullptr || *value == '\0') {
+        return fallback;
+    }
+
+    char* end = nullptr;
+    const long parsed = std::strtol(value, &end, 10);
+    if (end == value || *end != '\0' || parsed <= 0) {
+        return fallback;
+    }
+    return static_cast<int>(parsed);
+}
+
+std::size_t DetermineResetLaneParallelism(std::size_t scenario_count) {
+    const unsigned int hardware = std::thread::hardware_concurrency();
+    const int fallback = hardware == 0 ? 4 : static_cast<int>(hardware);
+    const int requested = ParsePositiveEnvOrDefault("MC_RESET_LANE_JOBS", fallback);
+    const std::size_t bounded = std::max<std::size_t>(1, static_cast<std::size_t>(requested));
+    return std::min(bounded, std::max<std::size_t>(1, scenario_count));
+}
+
+std::string TimingFlagsForScenario(const ResetLaneScenario& scenario,
+                                   const ResetLaneScenarioTiming& timing,
+                                   bool enable_per_scenario_warnings,
+                                   int* slow_build_count,
+                                   int* slow_run_count) {
+    if (!enable_per_scenario_warnings) {
+        return {};
+    }
+    std::vector<std::string_view> flags;
+    if (scenario.build_warn_ms > 0 && timing.build_duration.count() > scenario.build_warn_ms) {
+        flags.push_back("slow-build");
+        *slow_build_count += 1;
+    }
+    if (scenario.run_warn_ms > 0 && timing.run_duration.count() > scenario.run_warn_ms) {
+        flags.push_back("slow-run");
+        *slow_run_count += 1;
+    }
+    if (flags.empty()) {
+        return {};
+    }
+
+    std::ostringstream stream;
+    stream << " flags=";
+    for (std::size_t i = 0; i < flags.size(); ++i) {
+        if (i > 0) {
+            stream << ',';
+        }
+        stream << flags[i];
+    }
+    return stream.str();
+}
+
+int ResetLaneWallWarnMs(ResetLaneMode mode) {
+    if (mode == ResetLaneMode::fast) {
+        return ParsePositiveEnvOrDefault("MC_RESET_LANE_FAST_WARN_MS", 12000);
+    }
+    return ParsePositiveEnvOrDefault("MC_RESET_LANE_FULL_WARN_MS", 30000);
 }
 
 std::filesystem::path ParseBuiltExecutablePath(std::string_view build_output,
@@ -231,50 +302,63 @@ ResetLaneScenarioTiming RunKernelResetLaneScenario(const std::filesystem::path& 
     };
 }
 
-constexpr std::array<ResetLaneScenario, 42> kResetLaneScenarios = {{
-    {"repo project", "", "", "kernel_reset_lane_repo_build", "kernel", "kernel_reset_lane_repo_build_output.txt", "kernel_reset_lane_repo_run_output.txt", "kernel reset lane repo project build", "kernel reset lane repo project run"},
-    {"smoke", "tests/smoke/kernel_reset_lane_serial_round_trip", "kernel_reset_lane_smoke_project", "kernel_reset_lane_smoke_build", "app", "kernel_reset_lane_smoke_build_output.txt", "kernel_reset_lane_smoke_run_output.txt", "kernel reset lane smoke build", "kernel reset lane smoke run"},
-    {"retained state", "tests/system/kernel_reset_lane_retained_log", "kernel_reset_lane_retained_state_project", "kernel_reset_lane_retained_state_build", "app", "kernel_reset_lane_retained_state_build_output.txt", "kernel_reset_lane_retained_state_run_output.txt", "kernel reset lane retained-state build", "kernel reset lane retained-state run"},
-    {"observability", "tests/system/kernel_reset_lane_serial_observability", "kernel_reset_lane_observability_project", "kernel_reset_lane_observability_build", "app", "kernel_reset_lane_observability_build_output.txt", "kernel_reset_lane_observability_run_output.txt", "kernel reset lane observability build", "kernel reset lane observability run"},
-    {"kv roundtrip", "tests/system/kernel_reset_lane_kv_roundtrip", "kernel_reset_lane_kv_roundtrip_project", "kernel_reset_lane_kv_roundtrip_build", "app", "kernel_reset_lane_kv_roundtrip_build_output.txt", "kernel_reset_lane_kv_roundtrip_run_output.txt", "kernel reset lane kv-roundtrip build", "kernel reset lane kv-roundtrip run"},
-    {"service composition", "tests/system/kernel_reset_lane_service_composition", "kernel_reset_lane_service_composition_project", "kernel_reset_lane_service_composition_build", "app", "kernel_reset_lane_service_composition_build_output.txt", "kernel_reset_lane_service_composition_run_output.txt", "kernel reset lane service composition build", "kernel reset lane service composition run"},
-    {"boot", "tests/smoke/kernel_reset_lane_boot", "kernel_reset_lane_boot_project", "kernel_reset_lane_boot_build", "app", "kernel_reset_lane_boot_build_output.txt", "kernel_reset_lane_boot_run_output.txt", "kernel reset lane boot build", "kernel reset lane boot run"},
-    {"image", "tests/smoke/kernel_reset_lane_image", "kernel_reset_lane_image_project", "kernel_reset_lane_image_build", "app", "kernel_reset_lane_image_build_output.txt", "kernel_reset_lane_image_run_output.txt", "kernel reset lane image build", "kernel reset lane image run"},
-    {"service identity", "tests/system/kernel_reset_lane_service_identity", "kernel_reset_lane_service_identity_project", "kernel_reset_lane_service_identity_build", "app", "kernel_reset_lane_service_identity_build_output.txt", "kernel_reset_lane_service_identity_run_output.txt", "kernel reset lane service identity build", "kernel reset lane service identity run"},
-    {"temporal backpressure", "tests/system/kernel_reset_lane_temporal_backpressure", "kernel_reset_lane_temporal_backpressure_project", "kernel_reset_lane_temporal_backpressure_build", "app", "kernel_reset_lane_temporal_backpressure_build_output.txt", "kernel_reset_lane_temporal_backpressure_run_output.txt", "kernel reset lane temporal backpressure build", "kernel reset lane temporal backpressure run"},
-    {"multi client", "tests/system/kernel_reset_lane_multi_client", "kernel_reset_lane_multi_client_project", "kernel_reset_lane_multi_client_build", "app", "kernel_reset_lane_multi_client_build_output.txt", "kernel_reset_lane_multi_client_run_output.txt", "kernel reset lane multi-client build", "kernel reset lane multi-client run"},
-    {"long lived coherence", "tests/system/kernel_reset_lane_long_lived_coherence", "kernel_reset_lane_long_lived_coherence_project", "kernel_reset_lane_long_lived_coherence_build", "app", "kernel_reset_lane_long_lived_coherence_build_output.txt", "kernel_reset_lane_long_lived_coherence_run_output.txt", "kernel reset lane long-lived coherence build", "kernel reset lane long-lived coherence run"},
-    {"cross service failure", "tests/system/kernel_reset_lane_cross_service_failure", "kernel_reset_lane_cross_service_failure_project", "kernel_reset_lane_cross_service_failure_build", "app", "kernel_reset_lane_cross_service_failure_build_output.txt", "kernel_reset_lane_cross_service_failure_run_output.txt", "kernel reset lane cross-service failure build", "kernel reset lane cross-service failure run"},
-    {"phase 159 observability", "tests/system/kernel_reset_lane_observability", "kernel_reset_lane_phase159_observability_project", "kernel_reset_lane_phase159_observability_build", "app", "kernel_reset_lane_phase159_observability_build_output.txt", "kernel_reset_lane_phase159_observability_run_output.txt", "kernel reset lane phase 159 observability build", "kernel reset lane phase 159 observability run"},
-    {"phase 160 model boundary", "tests/system/kernel_reset_lane_model_boundary", "kernel_reset_lane_phase160_model_boundary_project", "kernel_reset_lane_phase160_model_boundary_build", "app", "kernel_reset_lane_phase160_model_boundary_build_output.txt", "kernel_reset_lane_phase160_model_boundary_run_output.txt", "kernel reset lane phase 160 model boundary build", "kernel reset lane phase 160 model boundary run"},
-    {"phase 161 delivery witness", "tests/system/kernel_reset_lane_delivery_witness", "kernel_reset_lane_phase161_delivery_witness_project", "kernel_reset_lane_phase161_delivery_witness_build", "app", "kernel_reset_lane_phase161_delivery_witness_build_output.txt", "kernel_reset_lane_phase161_delivery_witness_run_output.txt", "kernel reset lane phase 161 delivery witness build", "kernel reset lane phase 161 delivery witness run"},
-    {"phase 170 static topology", "tests/system/kernel_reset_lane_static_topology", "kernel_reset_lane_phase170_static_topology_project", "kernel_reset_lane_phase170_static_topology_build", "app", "kernel_reset_lane_phase170_static_topology_build_output.txt", "kernel_reset_lane_phase170_static_topology_run_output.txt", "kernel reset lane phase 170 static topology build", "kernel reset lane phase 170 static topology run"},
-    {"phase 173 smp boundary", "tests/system/kernel_reset_lane_smp_boundary", "kernel_reset_lane_phase173_smp_boundary_project", "kernel_reset_lane_phase173_smp_boundary_build", "app", "kernel_reset_lane_phase173_smp_boundary_build_output.txt", "kernel_reset_lane_phase173_smp_boundary_run_output.txt", "kernel reset lane phase 173 smp boundary build", "kernel reset lane phase 173 smp boundary run"},
-    {"phase 176 growth", "tests/system/kernel_reset_lane_phase176_growth", "kernel_reset_lane_phase176_growth_project", "kernel_reset_lane_phase176_growth_build", "app", "kernel_reset_lane_phase176_growth_build_output.txt", "kernel_reset_lane_phase176_growth_run_output.txt", "kernel reset lane phase 176 growth build", "kernel reset lane phase 176 growth run"},
-    {"phase 177 hostile shell", "tests/system/kernel_reset_lane_phase177_hostile_shell", "kernel_reset_lane_phase177_hostile_shell_project", "kernel_reset_lane_phase177_hostile_shell_build", "app", "kernel_reset_lane_phase177_hostile_shell_build_output.txt", "kernel_reset_lane_phase177_hostile_shell_run_output.txt", "kernel reset lane phase 177 hostile shell build", "kernel reset lane phase 177 hostile shell run"},
-    {"phase 178 topology restart", "tests/system/kernel_reset_lane_phase178_topology_restart", "kernel_reset_lane_phase178_topology_restart_project", "kernel_reset_lane_phase178_topology_restart_build", "app", "kernel_reset_lane_phase178_topology_restart_build_output.txt", "kernel_reset_lane_phase178_topology_restart_run_output.txt", "kernel reset lane phase 178 topology restart build", "kernel reset lane phase 178 topology restart run"},
-    {"phase 179 retained reload", "tests/system/kernel_reset_lane_phase179_retained_reload", "kernel_reset_lane_phase179_retained_reload_project", "kernel_reset_lane_phase179_retained_reload_build", "app", "kernel_reset_lane_phase179_retained_reload_build_output.txt", "kernel_reset_lane_phase179_retained_reload_run_output.txt", "kernel reset lane phase 179 retained reload build", "kernel reset lane phase 179 retained reload run"},
-    {"phase 181 kv retained reload", "tests/system/kernel_reset_lane_phase181_kv_retained_reload", "kernel_reset_lane_phase181_kv_retained_reload_project", "kernel_reset_lane_phase181_kv_retained_reload_build", "app", "kernel_reset_lane_phase181_kv_retained_reload_build_output.txt", "kernel_reset_lane_phase181_kv_retained_reload_run_output.txt", "kernel reset lane phase 181 kv retained reload build", "kernel reset lane phase 181 kv retained reload run"},
-    {"phase 183 endpoint authority", "tests/system/kernel_reset_lane_phase183_endpoint_authority", "kernel_reset_lane_phase183_endpoint_authority_project", "kernel_reset_lane_phase183_endpoint_authority_build", "app", "kernel_reset_lane_phase183_endpoint_authority_build_output.txt", "kernel_reset_lane_phase183_endpoint_authority_run_output.txt", "kernel reset lane phase 183 endpoint authority build", "kernel reset lane phase 183 endpoint authority run"},
-    {"phase 184 capability leakage", "tests/system/kernel_reset_lane_phase184_capability_leakage", "kernel_reset_lane_phase184_capability_leakage_project", "kernel_reset_lane_phase184_capability_leakage_build", "app", "kernel_reset_lane_phase184_capability_leakage_build_output.txt", "kernel_reset_lane_phase184_capability_leakage_run_output.txt", "kernel reset lane phase 184 capability leakage build", "kernel reset lane phase 184 capability leakage run"},
-    {"phase 185 transferred handle", "tests/system/kernel_reset_lane_phase185_transferred_handle", "kernel_reset_lane_phase185_transferred_handle_project", "kernel_reset_lane_phase185_transferred_handle_build", "app", "kernel_reset_lane_phase185_transferred_handle_build_output.txt", "kernel_reset_lane_phase185_transferred_handle_run_output.txt", "kernel reset lane phase 185 transferred handle build", "kernel reset lane phase 185 transferred handle run"},
-    {"phase 198 multi-handle transfer", "tests/system/kernel_reset_lane_phase198_multi_handle_transfer", "kernel_reset_lane_phase198_multi_handle_transfer_project", "kernel_reset_lane_phase198_multi_handle_transfer_build", "app", "kernel_reset_lane_phase198_multi_handle_transfer_build_output.txt", "kernel_reset_lane_phase198_multi_handle_transfer_run_output.txt", "kernel reset lane phase 198 multi-handle transfer build", "kernel reset lane phase 198 multi-handle transfer run"},
-    {"phase 187 retained queue reload", "tests/system/kernel_reset_lane_phase187_retained_queue_reload", "kernel_reset_lane_phase187_retained_queue_reload_project", "kernel_reset_lane_phase187_retained_queue_reload_build", "app", "kernel_reset_lane_phase187_retained_queue_reload_build_output.txt", "kernel_reset_lane_phase187_retained_queue_reload_run_output.txt", "kernel reset lane phase 187 retained queue reload build", "kernel reset lane phase 187 retained queue reload run"},
-    {"phase 188 ticket restart", "tests/system/kernel_reset_lane_phase188_ticket_restart", "kernel_reset_lane_phase188_ticket_restart_project", "kernel_reset_lane_phase188_ticket_restart_build", "app", "kernel_reset_lane_phase188_ticket_restart_build_output.txt", "kernel_reset_lane_phase188_ticket_restart_run_output.txt", "kernel reset lane phase 188 ticket restart build", "kernel reset lane phase 188 ticket restart run"},
-    {"phase 189 shell lifecycle", "tests/system/kernel_reset_lane_phase189_shell_lifecycle", "kernel_reset_lane_phase189_shell_lifecycle_project", "kernel_reset_lane_phase189_shell_lifecycle_build", "app", "kernel_reset_lane_phase189_shell_lifecycle_build_output.txt", "kernel_reset_lane_phase189_shell_lifecycle_run_output.txt", "kernel reset lane phase 189 shell lifecycle build", "kernel reset lane phase 189 shell lifecycle run"},
-    {"phase 193 shell identity", "tests/system/kernel_reset_lane_phase193_shell_identity", "kernel_reset_lane_phase193_shell_identity_project", "kernel_reset_lane_phase193_shell_identity_build", "app", "kernel_reset_lane_phase193_shell_identity_build_output.txt", "kernel_reset_lane_phase193_shell_identity_run_output.txt", "kernel reset lane phase 193 shell identity build", "kernel reset lane phase 193 shell identity run"},
-    {"phase 196 queue observability", "tests/system/kernel_reset_lane_phase196_queue_observability", "kernel_reset_lane_phase196_queue_observability_project", "kernel_reset_lane_phase196_queue_observability_build", "app", "kernel_reset_lane_phase196_queue_observability_build_output.txt", "kernel_reset_lane_phase196_queue_observability_run_output.txt", "kernel reset lane phase 196 queue observability build", "kernel reset lane phase 196 queue observability run"},
-    {"phase 197 retained coordination", "tests/system/kernel_reset_lane_phase197_retained_coordination", "kernel_reset_lane_phase197_retained_coordination_project", "kernel_reset_lane_phase197_retained_coordination_build", "app", "kernel_reset_lane_phase197_retained_coordination_build_output.txt", "kernel_reset_lane_phase197_retained_coordination_run_output.txt", "kernel reset lane phase 197 retained coordination build", "kernel reset lane phase 197 retained coordination run"},
-    {"phase 200 workset identity", "tests/system/kernel_reset_lane_phase200_workset_identity", "kernel_reset_lane_phase200_workset_identity_project", "kernel_reset_lane_phase200_workset_identity_build", "app", "kernel_reset_lane_phase200_workset_identity_build_output.txt", "kernel_reset_lane_phase200_workset_identity_run_output.txt", "kernel reset lane phase 200 workset identity build", "kernel reset lane phase 200 workset identity run"},
-    {"phase 201 retained audit coordination", "tests/system/kernel_reset_lane_phase201_retained_audit_coordination", "kernel_reset_lane_phase201_retained_audit_coordination_project", "kernel_reset_lane_phase201_retained_audit_coordination_build", "app", "kernel_reset_lane_phase201_retained_audit_coordination_build_output.txt", "kernel_reset_lane_phase201_retained_audit_coordination_run_output.txt", "kernel reset lane phase 201 retained audit coordination build", "kernel reset lane phase 201 retained audit coordination run"},
-    {"phase 206 retained summary", "tests/system/kernel_reset_lane_phase206_retained_summary", "kernel_reset_lane_phase206_retained_summary_project", "kernel_reset_lane_phase206_retained_summary_build", "app", "kernel_reset_lane_phase206_retained_summary_build_output.txt", "kernel_reset_lane_phase206_retained_summary_run_output.txt", "kernel reset lane phase 206 retained summary build", "kernel reset lane phase 206 retained summary run"},
-    {"phase 208 retained policy", "tests/system/kernel_reset_lane_phase208_retained_policy", "kernel_reset_lane_phase208_retained_policy_project", "kernel_reset_lane_phase208_retained_policy_build", "app", "kernel_reset_lane_phase208_retained_policy_build_output.txt", "kernel_reset_lane_phase208_retained_policy_run_output.txt", "kernel reset lane phase 208 retained policy build", "kernel reset lane phase 208 retained policy run"},
-    {"phase 212 authority inspection", "tests/system/kernel_reset_lane_phase212_authority_inspection", "kernel_reset_lane_phase212_authority_inspection_project", "kernel_reset_lane_phase212_authority_inspection_build", "app", "kernel_reset_lane_phase212_authority_inspection_build_output.txt", "kernel_reset_lane_phase212_authority_inspection_run_output.txt", "kernel reset lane phase 212 authority inspection build", "kernel reset lane phase 212 authority inspection run"},
-    {"phase 214 service state", "tests/system/kernel_reset_lane_phase214_service_state", "kernel_reset_lane_phase214_service_state_project", "kernel_reset_lane_phase214_service_state_build", "app", "kernel_reset_lane_phase214_service_state_build_output.txt", "kernel_reset_lane_phase214_service_state_run_output.txt", "kernel reset lane phase 214 service state build", "kernel reset lane phase 214 service state run"},
-    {"phase 215 queue pressure", "tests/system/kernel_reset_lane_phase215_queue_pressure", "kernel_reset_lane_phase215_queue_pressure_project", "kernel_reset_lane_phase215_queue_pressure_build", "app", "kernel_reset_lane_phase215_queue_pressure_build_output.txt", "kernel_reset_lane_phase215_queue_pressure_run_output.txt", "kernel reset lane phase 215 queue pressure build", "kernel reset lane phase 215 queue pressure run"},
-    {"phase 216 stall consequence", "tests/system/kernel_reset_lane_phase216_stall_consequence", "kernel_reset_lane_phase216_stall_consequence_project", "kernel_reset_lane_phase216_stall_consequence_build", "app", "kernel_reset_lane_phase216_stall_consequence_build_output.txt", "kernel_reset_lane_phase216_stall_consequence_run_output.txt", "kernel reset lane phase 216 stall consequence build", "kernel reset lane phase 216 stall consequence run"},
-    {"phase 217 retained durable boundary", "tests/system/kernel_reset_lane_phase217_retained_durable_boundary", "kernel_reset_lane_phase217_retained_durable_boundary_project", "kernel_reset_lane_phase217_retained_durable_boundary_build", "app", "kernel_reset_lane_phase217_retained_durable_boundary_build_output.txt", "kernel_reset_lane_phase217_retained_durable_boundary_run_output.txt", "kernel reset lane phase 217 retained durable boundary build", "kernel reset lane phase 217 retained durable boundary run"},
+constexpr std::array<ResetLaneScenario, 43> kResetLaneScenarios = {{
+    {"repo project", "", "", "kernel_reset_lane_repo_build", "kernel", "kernel_reset_lane_repo_build_output.txt", "kernel_reset_lane_repo_run_output.txt", "kernel reset lane repo project build", "kernel reset lane repo project run", true, 2000, 100},
+    {"smoke", "tests/smoke/kernel_reset_lane_serial_round_trip", "kernel_reset_lane_smoke_project", "kernel_reset_lane_smoke_build", "app", "kernel_reset_lane_smoke_build_output.txt", "kernel_reset_lane_smoke_run_output.txt", "kernel reset lane smoke build", "kernel reset lane smoke run", true, 900, 100},
+    {"retained state", "tests/system/kernel_reset_lane_retained_log", "kernel_reset_lane_retained_state_project", "kernel_reset_lane_retained_state_build", "app", "kernel_reset_lane_retained_state_build_output.txt", "kernel_reset_lane_retained_state_run_output.txt", "kernel reset lane retained-state build", "kernel reset lane retained-state run", true, 900, 100},
+    {"observability", "tests/system/kernel_reset_lane_serial_observability", "kernel_reset_lane_observability_project", "kernel_reset_lane_observability_build", "app", "kernel_reset_lane_observability_build_output.txt", "kernel_reset_lane_observability_run_output.txt", "kernel reset lane observability build", "kernel reset lane observability run", false, 900, 100},
+    {"kv roundtrip", "tests/system/kernel_reset_lane_kv_roundtrip", "kernel_reset_lane_kv_roundtrip_project", "kernel_reset_lane_kv_roundtrip_build", "app", "kernel_reset_lane_kv_roundtrip_build_output.txt", "kernel_reset_lane_kv_roundtrip_run_output.txt", "kernel reset lane kv-roundtrip build", "kernel reset lane kv-roundtrip run", false, 900, 100},
+    {"service composition", "tests/system/kernel_reset_lane_service_composition", "kernel_reset_lane_service_composition_project", "kernel_reset_lane_service_composition_build", "app", "kernel_reset_lane_service_composition_build_output.txt", "kernel_reset_lane_service_composition_run_output.txt", "kernel reset lane service composition build", "kernel reset lane service composition run", false, 900, 100},
+    {"boot", "tests/smoke/kernel_reset_lane_boot", "kernel_reset_lane_boot_project", "kernel_reset_lane_boot_build", "app", "kernel_reset_lane_boot_build_output.txt", "kernel_reset_lane_boot_run_output.txt", "kernel reset lane boot build", "kernel reset lane boot run", false, 900, 100},
+    {"image", "tests/smoke/kernel_reset_lane_image", "kernel_reset_lane_image_project", "kernel_reset_lane_image_build", "app", "kernel_reset_lane_image_build_output.txt", "kernel_reset_lane_image_run_output.txt", "kernel reset lane image build", "kernel reset lane image run", false, 2000, 100},
+    {"service identity", "tests/system/kernel_reset_lane_service_identity", "kernel_reset_lane_service_identity_project", "kernel_reset_lane_service_identity_build", "app", "kernel_reset_lane_service_identity_build_output.txt", "kernel_reset_lane_service_identity_run_output.txt", "kernel reset lane service identity build", "kernel reset lane service identity run", true, 900, 100},
+    {"temporal backpressure", "tests/system/kernel_reset_lane_temporal_backpressure", "kernel_reset_lane_temporal_backpressure_project", "kernel_reset_lane_temporal_backpressure_build", "app", "kernel_reset_lane_temporal_backpressure_build_output.txt", "kernel_reset_lane_temporal_backpressure_run_output.txt", "kernel reset lane temporal backpressure build", "kernel reset lane temporal backpressure run", false, 900, 100},
+    {"multi client", "tests/system/kernel_reset_lane_multi_client", "kernel_reset_lane_multi_client_project", "kernel_reset_lane_multi_client_build", "app", "kernel_reset_lane_multi_client_build_output.txt", "kernel_reset_lane_multi_client_run_output.txt", "kernel reset lane multi-client build", "kernel reset lane multi-client run", false, 900, 100},
+    {"long lived coherence", "tests/system/kernel_reset_lane_long_lived_coherence", "kernel_reset_lane_long_lived_coherence_project", "kernel_reset_lane_long_lived_coherence_build", "app", "kernel_reset_lane_long_lived_coherence_build_output.txt", "kernel_reset_lane_long_lived_coherence_run_output.txt", "kernel reset lane long-lived coherence build", "kernel reset lane long-lived coherence run", false, 900, 100},
+    {"cross service failure", "tests/system/kernel_reset_lane_cross_service_failure", "kernel_reset_lane_cross_service_failure_project", "kernel_reset_lane_cross_service_failure_build", "app", "kernel_reset_lane_cross_service_failure_build_output.txt", "kernel_reset_lane_cross_service_failure_run_output.txt", "kernel reset lane cross-service failure build", "kernel reset lane cross-service failure run", false, 900, 100},
+    {"observability boundary", "tests/system/kernel_reset_lane_observability", "kernel_reset_lane_phase159_observability_project", "kernel_reset_lane_phase159_observability_build", "app", "kernel_reset_lane_phase159_observability_build_output.txt", "kernel_reset_lane_phase159_observability_run_output.txt", "kernel reset lane phase 159 observability build", "kernel reset lane phase 159 observability run", false, 900, 100},
+    {"model boundary", "tests/system/kernel_reset_lane_model_boundary", "kernel_reset_lane_phase160_model_boundary_project", "kernel_reset_lane_phase160_model_boundary_build", "app", "kernel_reset_lane_phase160_model_boundary_build_output.txt", "kernel_reset_lane_phase160_model_boundary_run_output.txt", "kernel reset lane phase 160 model boundary build", "kernel reset lane phase 160 model boundary run", false, 900, 100},
+    {"delivery witness", "tests/system/kernel_reset_lane_delivery_witness", "kernel_reset_lane_phase161_delivery_witness_project", "kernel_reset_lane_phase161_delivery_witness_build", "app", "kernel_reset_lane_phase161_delivery_witness_build_output.txt", "kernel_reset_lane_phase161_delivery_witness_run_output.txt", "kernel reset lane phase 161 delivery witness build", "kernel reset lane phase 161 delivery witness run", false, 900, 100},
+    {"static topology", "tests/system/kernel_reset_lane_static_topology", "kernel_reset_lane_phase170_static_topology_project", "kernel_reset_lane_phase170_static_topology_build", "app", "kernel_reset_lane_phase170_static_topology_build_output.txt", "kernel_reset_lane_phase170_static_topology_run_output.txt", "kernel reset lane phase 170 static topology build", "kernel reset lane phase 170 static topology run", true, 900, 100},
+    {"smp boundary", "tests/system/kernel_reset_lane_smp_boundary", "kernel_reset_lane_phase173_smp_boundary_project", "kernel_reset_lane_phase173_smp_boundary_build", "app", "kernel_reset_lane_phase173_smp_boundary_build_output.txt", "kernel_reset_lane_phase173_smp_boundary_run_output.txt", "kernel reset lane phase 173 smp boundary build", "kernel reset lane phase 173 smp boundary run", false, 900, 100},
+    {"topology growth", "tests/system/kernel_reset_lane_phase176_growth", "kernel_reset_lane_phase176_growth_project", "kernel_reset_lane_phase176_growth_build", "app", "kernel_reset_lane_phase176_growth_build_output.txt", "kernel_reset_lane_phase176_growth_run_output.txt", "kernel reset lane phase 176 growth build", "kernel reset lane phase 176 growth run", false, 900, 100},
+    {"hostile shell", "tests/system/kernel_reset_lane_phase177_hostile_shell", "kernel_reset_lane_phase177_hostile_shell_project", "kernel_reset_lane_phase177_hostile_shell_build", "app", "kernel_reset_lane_phase177_hostile_shell_build_output.txt", "kernel_reset_lane_phase177_hostile_shell_run_output.txt", "kernel reset lane phase 177 hostile shell build", "kernel reset lane phase 177 hostile shell run", false, 900, 100},
+    {"topology restart", "tests/system/kernel_reset_lane_phase178_topology_restart", "kernel_reset_lane_phase178_topology_restart_project", "kernel_reset_lane_phase178_topology_restart_build", "app", "kernel_reset_lane_phase178_topology_restart_build_output.txt", "kernel_reset_lane_phase178_topology_restart_run_output.txt", "kernel reset lane phase 178 topology restart build", "kernel reset lane phase 178 topology restart run", true, 900, 100},
+    {"retained reload", "tests/system/kernel_reset_lane_phase179_retained_reload", "kernel_reset_lane_phase179_retained_reload_project", "kernel_reset_lane_phase179_retained_reload_build", "app", "kernel_reset_lane_phase179_retained_reload_build_output.txt", "kernel_reset_lane_phase179_retained_reload_run_output.txt", "kernel reset lane phase 179 retained reload build", "kernel reset lane phase 179 retained reload run", false, 900, 100},
+    {"kv retained reload", "tests/system/kernel_reset_lane_phase181_kv_retained_reload", "kernel_reset_lane_phase181_kv_retained_reload_project", "kernel_reset_lane_phase181_kv_retained_reload_build", "app", "kernel_reset_lane_phase181_kv_retained_reload_build_output.txt", "kernel_reset_lane_phase181_kv_retained_reload_run_output.txt", "kernel reset lane phase 181 kv retained reload build", "kernel reset lane phase 181 kv retained reload run", false, 900, 100},
+    {"endpoint authority", "tests/system/kernel_reset_lane_phase183_endpoint_authority", "kernel_reset_lane_phase183_endpoint_authority_project", "kernel_reset_lane_phase183_endpoint_authority_build", "app", "kernel_reset_lane_phase183_endpoint_authority_build_output.txt", "kernel_reset_lane_phase183_endpoint_authority_run_output.txt", "kernel reset lane phase 183 endpoint authority build", "kernel reset lane phase 183 endpoint authority run", false, 900, 100},
+    {"capability leakage", "tests/system/kernel_reset_lane_phase184_capability_leakage", "kernel_reset_lane_phase184_capability_leakage_project", "kernel_reset_lane_phase184_capability_leakage_build", "app", "kernel_reset_lane_phase184_capability_leakage_build_output.txt", "kernel_reset_lane_phase184_capability_leakage_run_output.txt", "kernel reset lane phase 184 capability leakage build", "kernel reset lane phase 184 capability leakage run", false, 900, 100},
+    {"transferred handle", "tests/system/kernel_reset_lane_phase185_transferred_handle", "kernel_reset_lane_phase185_transferred_handle_project", "kernel_reset_lane_phase185_transferred_handle_build", "app", "kernel_reset_lane_phase185_transferred_handle_build_output.txt", "kernel_reset_lane_phase185_transferred_handle_run_output.txt", "kernel reset lane phase 185 transferred handle build", "kernel reset lane phase 185 transferred handle run", false, 900, 100},
+    {"multi-handle transfer", "tests/system/kernel_reset_lane_phase198_multi_handle_transfer", "kernel_reset_lane_phase198_multi_handle_transfer_project", "kernel_reset_lane_phase198_multi_handle_transfer_build", "app", "kernel_reset_lane_phase198_multi_handle_transfer_build_output.txt", "kernel_reset_lane_phase198_multi_handle_transfer_run_output.txt", "kernel reset lane phase 198 multi-handle transfer build", "kernel reset lane phase 198 multi-handle transfer run", false, 1000, 100},
+    {"retained queue reload", "tests/system/kernel_reset_lane_phase187_retained_queue_reload", "kernel_reset_lane_phase187_retained_queue_reload_project", "kernel_reset_lane_phase187_retained_queue_reload_build", "app", "kernel_reset_lane_phase187_retained_queue_reload_build_output.txt", "kernel_reset_lane_phase187_retained_queue_reload_run_output.txt", "kernel reset lane phase 187 retained queue reload build", "kernel reset lane phase 187 retained queue reload run", false, 900, 100},
+    {"ticket restart", "tests/system/kernel_reset_lane_phase188_ticket_restart", "kernel_reset_lane_phase188_ticket_restart_project", "kernel_reset_lane_phase188_ticket_restart_build", "app", "kernel_reset_lane_phase188_ticket_restart_build_output.txt", "kernel_reset_lane_phase188_ticket_restart_run_output.txt", "kernel reset lane phase 188 ticket restart build", "kernel reset lane phase 188 ticket restart run", false, 900, 100},
+    {"shell lifecycle", "tests/system/kernel_reset_lane_phase189_shell_lifecycle", "kernel_reset_lane_phase189_shell_lifecycle_project", "kernel_reset_lane_phase189_shell_lifecycle_build", "app", "kernel_reset_lane_phase189_shell_lifecycle_build_output.txt", "kernel_reset_lane_phase189_shell_lifecycle_run_output.txt", "kernel reset lane phase 189 shell lifecycle build", "kernel reset lane phase 189 shell lifecycle run", false, 900, 100},
+    {"shell identity", "tests/system/kernel_reset_lane_phase193_shell_identity", "kernel_reset_lane_phase193_shell_identity_project", "kernel_reset_lane_phase193_shell_identity_build", "app", "kernel_reset_lane_phase193_shell_identity_build_output.txt", "kernel_reset_lane_phase193_shell_identity_run_output.txt", "kernel reset lane phase 193 shell identity build", "kernel reset lane phase 193 shell identity run", false, 900, 100},
+    {"queue observability", "tests/system/kernel_reset_lane_phase196_queue_observability", "kernel_reset_lane_phase196_queue_observability_project", "kernel_reset_lane_phase196_queue_observability_build", "app", "kernel_reset_lane_phase196_queue_observability_build_output.txt", "kernel_reset_lane_phase196_queue_observability_run_output.txt", "kernel reset lane phase 196 queue observability build", "kernel reset lane phase 196 queue observability run", false, 1000, 100},
+    {"retained coordination", "tests/system/kernel_reset_lane_phase197_retained_coordination", "kernel_reset_lane_phase197_retained_coordination_project", "kernel_reset_lane_phase197_retained_coordination_build", "app", "kernel_reset_lane_phase197_retained_coordination_build_output.txt", "kernel_reset_lane_phase197_retained_coordination_run_output.txt", "kernel reset lane phase 197 retained coordination build", "kernel reset lane phase 197 retained coordination run", true, 900, 100},
+    {"workset identity", "tests/system/kernel_reset_lane_phase200_workset_identity", "kernel_reset_lane_phase200_workset_identity_project", "kernel_reset_lane_phase200_workset_identity_build", "app", "kernel_reset_lane_phase200_workset_identity_build_output.txt", "kernel_reset_lane_phase200_workset_identity_run_output.txt", "kernel reset lane phase 200 workset identity build", "kernel reset lane phase 200 workset identity run", false, 1000, 100},
+    {"retained audit coordination", "tests/system/kernel_reset_lane_phase201_retained_audit_coordination", "kernel_reset_lane_phase201_retained_audit_coordination_project", "kernel_reset_lane_phase201_retained_audit_coordination_build", "app", "kernel_reset_lane_phase201_retained_audit_coordination_build_output.txt", "kernel_reset_lane_phase201_retained_audit_coordination_run_output.txt", "kernel reset lane phase 201 retained audit coordination build", "kernel reset lane phase 201 retained audit coordination run", false, 900, 100},
+    {"retained summary", "tests/system/kernel_reset_lane_phase206_retained_summary", "kernel_reset_lane_phase206_retained_summary_project", "kernel_reset_lane_phase206_retained_summary_build", "app", "kernel_reset_lane_phase206_retained_summary_build_output.txt", "kernel_reset_lane_phase206_retained_summary_run_output.txt", "kernel reset lane phase 206 retained summary build", "kernel reset lane phase 206 retained summary run", false, 900, 100},
+    {"retained policy", "tests/system/kernel_reset_lane_phase208_retained_policy", "kernel_reset_lane_phase208_retained_policy_project", "kernel_reset_lane_phase208_retained_policy_build", "app", "kernel_reset_lane_phase208_retained_policy_build_output.txt", "kernel_reset_lane_phase208_retained_policy_run_output.txt", "kernel reset lane phase 208 retained policy build", "kernel reset lane phase 208 retained policy run", false, 1000, 100},
+    {"authority inspection", "tests/system/kernel_reset_lane_phase212_authority_inspection", "kernel_reset_lane_phase212_authority_inspection_project", "kernel_reset_lane_phase212_authority_inspection_build", "app", "kernel_reset_lane_phase212_authority_inspection_build_output.txt", "kernel_reset_lane_phase212_authority_inspection_run_output.txt", "kernel reset lane phase 212 authority inspection build", "kernel reset lane phase 212 authority inspection run", false, 1000, 100},
+    {"service state", "tests/system/kernel_reset_lane_phase214_service_state", "kernel_reset_lane_phase214_service_state_project", "kernel_reset_lane_phase214_service_state_build", "app", "kernel_reset_lane_phase214_service_state_build_output.txt", "kernel_reset_lane_phase214_service_state_run_output.txt", "kernel reset lane phase 214 service state build", "kernel reset lane phase 214 service state run", true, 1000, 100},
+    {"queue pressure", "tests/system/kernel_reset_lane_phase215_queue_pressure", "kernel_reset_lane_phase215_queue_pressure_project", "kernel_reset_lane_phase215_queue_pressure_build", "app", "kernel_reset_lane_phase215_queue_pressure_build_output.txt", "kernel_reset_lane_phase215_queue_pressure_run_output.txt", "kernel reset lane phase 215 queue pressure build", "kernel reset lane phase 215 queue pressure run", true, 900, 100},
+    {"stall consequence", "tests/system/kernel_reset_lane_phase216_stall_consequence", "kernel_reset_lane_phase216_stall_consequence_project", "kernel_reset_lane_phase216_stall_consequence_build", "app", "kernel_reset_lane_phase216_stall_consequence_build_output.txt", "kernel_reset_lane_phase216_stall_consequence_run_output.txt", "kernel reset lane phase 216 stall consequence build", "kernel reset lane phase 216 stall consequence run", true, 900, 100},
+    {"retained durable boundary", "tests/system/kernel_reset_lane_phase217_retained_durable_boundary", "kernel_reset_lane_phase217_retained_durable_boundary_project", "kernel_reset_lane_phase217_retained_durable_boundary_build", "app", "kernel_reset_lane_phase217_retained_durable_boundary_build_output.txt", "kernel_reset_lane_phase217_retained_durable_boundary_run_output.txt", "kernel reset lane phase 217 retained durable boundary build", "kernel reset lane phase 217 retained durable boundary run", true, 1000, 100},
+    {"timer task service", "tests/system/kernel_reset_lane_phase220_timer_task_service", "kernel_reset_lane_phase220_timer_task_service_project", "kernel_reset_lane_phase220_timer_task_service_build", "app", "kernel_reset_lane_phase220_timer_task_service_build_output.txt", "kernel_reset_lane_phase220_timer_task_service_run_output.txt", "kernel reset lane phase 220 timer task service build", "kernel reset lane phase 220 timer task service run", true, 1000, 100},
 }};
+
+std::vector<const ResetLaneScenario*> SelectResetLaneScenarios(ResetLaneMode mode) {
+    std::vector<const ResetLaneScenario*> selected;
+    selected.reserve(kResetLaneScenarios.size());
+    for (const auto& scenario : kResetLaneScenarios) {
+        if (mode == ResetLaneMode::fast && !scenario.include_in_fast) {
+            continue;
+        }
+        selected.push_back(&scenario);
+    }
+    return selected;
+}
 
 std::set<std::string> CollectCoveredResetLaneFixturePaths() {
     std::set<std::string> covered_paths;
@@ -317,36 +401,96 @@ void ValidateResetLaneScenarioCoverage(const std::filesystem::path& source_root)
 
 namespace mc::tool_tests {
 
-void RunWorkflowKernelResetLaneSuite(const std::filesystem::path& source_root,
-                                     const std::filesystem::path& binary_root,
-                                     const std::filesystem::path& mc_path) {
+void RunWorkflowKernelResetLaneSuiteImpl(const std::filesystem::path& source_root,
+                                         const std::filesystem::path& binary_root,
+                                         const std::filesystem::path& mc_path,
+                                         ResetLaneMode mode) {
     const auto coverage_start = std::chrono::steady_clock::now();
     ValidateResetLaneScenarioCoverage(source_root);
     const auto coverage_end = std::chrono::steady_clock::now();
+    const auto execution_start = std::chrono::steady_clock::now();
 
-    std::vector<ResetLaneScenarioTiming> timings;
-    timings.reserve(kResetLaneScenarios.size());
+    const std::vector<const ResetLaneScenario*> selected = SelectResetLaneScenarios(mode);
+    const std::size_t jobs = DetermineResetLaneParallelism(selected.size());
+    const bool enable_per_scenario_warnings = jobs == 1;
+
+    std::vector<ResetLaneScenarioTiming> timings(selected.size());
     std::chrono::milliseconds total_build_duration {};
     std::chrono::milliseconds total_run_duration {};
+    int slow_build_count = 0;
+    int slow_run_count = 0;
 
-    for (const auto& scenario : kResetLaneScenarios) {
-        ResetLaneScenarioTiming timing =
-            RunKernelResetLaneScenario(source_root, binary_root, mc_path, scenario);
+    struct InFlightScenario {
+        std::size_t index = 0;
+        std::future<ResetLaneScenarioTiming> future;
+    };
+
+    std::vector<InFlightScenario> in_flight;
+    in_flight.reserve(jobs);
+
+    for (std::size_t index = 0; index < selected.size(); ++index) {
+        const ResetLaneScenario scenario = *selected[index];
+        if (in_flight.size() >= jobs) {
+            InFlightScenario current = std::move(in_flight.front());
+            timings[current.index] = current.future.get();
+            in_flight.erase(in_flight.begin());
+        }
+        in_flight.push_back(InFlightScenario{
+            .index = index,
+            .future = std::async(std::launch::async,
+                                 [source_root, binary_root, mc_path, scenario]() {
+                                     return RunKernelResetLaneScenario(source_root, binary_root, mc_path, scenario);
+                                 }),
+        });
+    }
+
+    for (auto& current : in_flight) {
+        timings[current.index] = current.future.get();
+    }
+
+    for (std::size_t index = 0; index < selected.size(); ++index) {
+        const auto& scenario = *selected[index];
+        const ResetLaneScenarioTiming& timing = timings[index];
         total_build_duration += timing.build_duration;
         total_run_duration += timing.run_duration;
+        const std::string flags = TimingFlagsForScenario(scenario,
+                                                         timing,
+                                                         enable_per_scenario_warnings,
+                                                         &slow_build_count,
+                                                         &slow_run_count);
         std::cout << "kernel-reset-lane: " << timing.label << " build="
                   << FormatDuration(timing.build_duration) << " run="
-                  << FormatDuration(timing.run_duration) << '\n';
-        timings.push_back(std::move(timing));
+                  << FormatDuration(timing.run_duration) << flags << '\n';
     }
 
     const std::chrono::milliseconds coverage_duration =
         std::chrono::duration_cast<std::chrono::milliseconds>(coverage_end - coverage_start);
+    const std::chrono::milliseconds wall_duration =
+        std::chrono::duration_cast<std::chrono::milliseconds>(std::chrono::steady_clock::now() - execution_start);
+    const std::string_view mode_label = mode == ResetLaneMode::fast ? "fast" : "full";
+    const bool slow_wall = wall_duration.count() > ResetLaneWallWarnMs(mode);
     std::cout << "kernel-reset-lane: coverage=" << FormatDuration(coverage_duration)
-              << " scenarios=" << timings.size() << " total-build="
-              << FormatDuration(total_build_duration) << " total-run="
-              << FormatDuration(total_run_duration) << " total="
-              << FormatDuration(coverage_duration + total_build_duration + total_run_duration) << '\n';
+              << " mode=" << mode_label << " parallel=" << jobs
+              << " scenarios=" << timings.size() << " wall=" << FormatDuration(wall_duration)
+              << " aggregate-build="
+              << FormatDuration(total_build_duration) << " aggregate-run="
+              << FormatDuration(total_run_duration) << " aggregate-total="
+              << FormatDuration(coverage_duration + total_build_duration + total_run_duration)
+              << (slow_wall ? " flags=slow-wall" : "")
+              << " slow-build=" << slow_build_count << " slow-run=" << slow_run_count
+              << '\n';
+}
+
+void RunWorkflowKernelResetLaneSuite(const std::filesystem::path& source_root,
+                                     const std::filesystem::path& binary_root,
+                                     const std::filesystem::path& mc_path) {
+    RunWorkflowKernelResetLaneSuiteImpl(source_root, binary_root, mc_path, ResetLaneMode::fast);
+}
+
+void RunWorkflowKernelResetLaneFullSuite(const std::filesystem::path& source_root,
+                                         const std::filesystem::path& binary_root,
+                                         const std::filesystem::path& mc_path) {
+    RunWorkflowKernelResetLaneSuiteImpl(source_root, binary_root, mc_path, ResetLaneMode::full);
 }
 
 }  // namespace mc::tool_tests

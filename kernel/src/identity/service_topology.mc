@@ -37,6 +37,8 @@ const TRANSFER_ENDPOINT_ID: u32 = 15
 const QUEUE_ENDPOINT_ID: u32 = 16
 const TICKET_ENDPOINT_ID: u32 = 17
 const FILE_ENDPOINT_ID: u32 = 18
+const TIMER_ENDPOINT_ID: u32 = 19
+const TASK_ENDPOINT_ID: u32 = 20
 
 // ServiceSlot records the static wiring for one boot service: which endpoint
 // it occupies and which pid owns it.  Both values are fixed at kernel_init
@@ -69,8 +71,10 @@ const TRANSFER_SLOT: ServiceSlot = { endpoint: TRANSFER_ENDPOINT_ID, pid: 6 }
 const QUEUE_SLOT: ServiceSlot = { endpoint: QUEUE_ENDPOINT_ID, pid: 7 }
 const TICKET_SLOT: ServiceSlot = { endpoint: TICKET_ENDPOINT_ID, pid: 8 }
 const FILE_SLOT: ServiceSlot = { endpoint: FILE_ENDPOINT_ID, pid: 9 }
+const TIMER_SLOT: ServiceSlot = { endpoint: TIMER_ENDPOINT_ID, pid: 10 }
+const TASK_SLOT: ServiceSlot = { endpoint: TASK_ENDPOINT_ID, pid: 11 }
 
-const SERVICE_SLOTS: [9]ServiceSlot = {
+const SERVICE_SLOTS: [11]ServiceSlot = {
     SERIAL_SLOT,
     SHELL_SLOT,
     LOG_SLOT,
@@ -79,10 +83,12 @@ const SERVICE_SLOTS: [9]ServiceSlot = {
     TRANSFER_SLOT,
     QUEUE_SLOT,
     TICKET_SLOT,
-    FILE_SLOT
+    FILE_SLOT,
+    TIMER_SLOT,
+    TASK_SLOT
 }
 
-const SERVICE_RESTART_MODES: [9]ServiceRestartMode = {
+const SERVICE_RESTART_MODES: [11]ServiceRestartMode = {
     ServiceRestartMode.None,
     ServiceRestartMode.None,
     ServiceRestartMode.Reload,
@@ -91,15 +97,17 @@ const SERVICE_RESTART_MODES: [9]ServiceRestartMode = {
     ServiceRestartMode.Reset,
     ServiceRestartMode.Reload,
     ServiceRestartMode.Reset,
-    ServiceRestartMode.Reload
+    ServiceRestartMode.Reload,
+    ServiceRestartMode.Reload,
+    ServiceRestartMode.Reset
 }
 
 // SERVICE_COUNT is the number of boot-wired services in the static topology.
 // Increment this when a new slot constant is added above.
-const SERVICE_COUNT: u32 = 9
+const SERVICE_COUNT: u32 = 11
 
 func service_count() usize {
-    return 9
+    return 11
 }
 
 func service_slot_at(index: usize) ServiceSlot {
@@ -166,6 +174,8 @@ func service_authority_class(endpoint: u32) ServiceAuthorityClass {
     case QUEUE_ENDPOINT_ID:
         return ServiceAuthorityClass.RetainedOwner
     case FILE_ENDPOINT_ID:
+        return ServiceAuthorityClass.RetainedOwner
+    case TIMER_ENDPOINT_ID:
         return ServiceAuthorityClass.RetainedOwner
     default:
         if endpoint_is_boot_wired(endpoint) {

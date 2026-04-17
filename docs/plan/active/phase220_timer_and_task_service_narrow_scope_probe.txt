@@ -3,15 +3,14 @@ Phase 220 -- Timer and Task Service Narrow Scope Probe
 
 Status
 ------
-ACTIVE
+COMPLETED (2026-04-17)
 
 Purpose
 -------
-Define the next two bounded service-pressure steps after the file-like owner:
-one timer owner slice and one task or work owner slice.
+Admit two bounded service-pressure steps after the file-like owner:
+one timer owner slice and one task owner slice.
 
-This phase doc is a planning-and-scope phase.
-It defines what to admit next and what to keep explicitly out of scope.
+This phase now records the implemented landing and retained non-goals.
 
 Repository status note
 ----------------------
@@ -45,6 +44,38 @@ Decision summary
 2. Task or work service follows timer only in a narrow owner-local shape.
 3. Durable log service remains deferred until Phase 217 durable triggers are
    met with a real admitted consumer.
+
+Implementation summary
+----------------------
+- Added `kernel/src/services/timer_service.mc` as a bounded timer owner with:
+  create (`MC<id><due>`), cancel (`MX<id>!`), state query (`MQ<id>!`), expired
+  query (`ME<window>!`), and explicit active/expired/cancelled state
+  classification.
+- Added `kernel/src/services/task_service.mc` as a bounded task owner with:
+  submit (`JS<opcode>!`), state query (`JQ<id>!`), cancel (`JC<id>!`), and
+  active-list query (`JL<window>!`) plus explicit active/cancelled/failed
+  classification.
+- Added shell and protocol wiring in `serial_protocol.mc`, `shell_service.mc`,
+  and `scenario_transport.mc`.
+- Added static topology admission in `service_topology.mc`:
+  `TIMER_ENDPOINT_ID = 19`, `TASK_ENDPOINT_ID = 20`, `SERVICE_COUNT = 11`,
+  `TIMER_SLOT.pid = 10`, `TASK_SLOT.pid = 11`.
+- Added boot and restart wiring across `boot.mc`, `boot_update.mc`,
+  `boot_identity.mc`, `init.mc`, `kernel_dispatch.mc`, and `service_state.mc`.
+  Timer restart mode is retained reload (`POLICY_KEEP`), task restart mode is
+  reset (`POLICY_CLEAR`).
+- Added deterministic scenario coverage in
+  `kernel/src/scenarios/scenario_timer_task_service.mc` and integrated it into
+  `kernel/src/scenarios/scenarios.mc`.
+- Added focused reset-lane fixture
+  `tests/system/kernel_reset_lane_phase220_timer_task_service` and registered
+  it in `tests/tool/tool_kernel_reset_lane_suite.cpp`.
+
+Compiler and toolchain boundary
+-------------------------------
+- No compiler, sema, MIR, backend, ABI, target, runtime, stdlib, or `hal`
+  widening was required for this phase. The landing stays in owner-local kernel
+  services, shell routing, topology, and restart policy owners.
 
 Slice A -- Timer service (first follow-through)
 -----------------------------------------------

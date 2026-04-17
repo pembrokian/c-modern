@@ -75,7 +75,7 @@ Source tree layout after this phase:
       scenario_audit_coordination.mc
       scenario_authority.mc
       scenario_coordination.mc
-      scenario_218.mc
+      scenario_file_service.mc
       scenario_durability.mc
       scenario_lifecycle.mc
       scenario_queue.mc
