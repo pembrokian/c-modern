@@ -10,6 +10,7 @@ struct QueueServiceState {
     slot: u32
     items: [QUEUE_CAPACITY]u8
     len: usize
+    stall_count: usize
 }
 
 struct QueueSnapshot {
@@ -23,11 +24,11 @@ struct QueueResult {
 }
 
 func queue_init(pid: u32, slot: u32) QueueServiceState {
-    return QueueServiceState{ pid: pid, slot: slot, items: primitives.zero_payload(), len: 0 }
+    return QueueServiceState{ pid: pid, slot: slot, items: primitives.zero_payload(), len: 0, stall_count: 0 }
 }
 
-func queuewith(s: QueueServiceState, items: [QUEUE_CAPACITY]u8, len: usize) QueueServiceState {
-    return QueueServiceState{ pid: s.pid, slot: s.slot, items: items, len: len }
+func queuewith(s: QueueServiceState, items: [QUEUE_CAPACITY]u8, len: usize, stall_count: usize) QueueServiceState {
+    return QueueServiceState{ pid: s.pid, slot: s.slot, items: items, len: len, stall_count: stall_count }
 }
 
 func queue_snapshot(s: QueueServiceState) QueueSnapshot {
@@ -35,7 +36,7 @@ func queue_snapshot(s: QueueServiceState) QueueSnapshot {
 }
 
 func queue_reload(pid: u32, slot: u32, snap: QueueSnapshot) QueueServiceState {
-    return QueueServiceState{ pid: pid, slot: slot, items: snap.items, len: snap.len }
+    return QueueServiceState{ pid: pid, slot: slot, items: snap.items, len: snap.len, stall_count: 0 }
 }
 
 func queue_push(s: QueueServiceState, value: u8) QueueServiceState {
@@ -44,7 +45,7 @@ func queue_push(s: QueueServiceState, value: u8) QueueServiceState {
     }
     next_items: [QUEUE_CAPACITY]u8 = s.items
     next_items[s.len] = value
-    return queuewith(s, next_items, s.len + 1)
+    return queuewith(s, next_items, s.len + 1, 0)
 }
 
 func queue_pop(s: QueueServiceState) QueueResult {
@@ -57,7 +58,7 @@ func queue_pop(s: QueueServiceState) QueueResult {
     }
     reply: [4]u8 = primitives.zero_payload()
     reply[0] = s.items[0]
-    return QueueResult{ state: queuewith(s, next_items, s.len - 1), effect: service_effect.effect_reply(syscall.SyscallStatus.Ok, 1, reply) }
+    return QueueResult{ state: queuewith(s, next_items, s.len - 1, s.stall_count), effect: service_effect.effect_reply(syscall.SyscallStatus.Ok, 1, reply) }
 }
 
 func queue_count(s: QueueServiceState) QueueResult {
@@ -87,17 +88,28 @@ func handle(s: QueueServiceState, m: service_effect.Message) QueueResult {
         if m.payload[0] == serial_protocol.CMD_P {
             return queue_peek(s)
         }
+        if m.payload[0] == serial_protocol.CMD_W {
+            return QueueResult{ state: s, effect: service_effect.effect_reply(syscall.SyscallStatus.Ok, s.stall_count, primitives.zero_payload()) }
+        }
         return QueueResult{ state: s, effect: service_effect.effect_reply(syscall.SyscallStatus.InvalidArgument, 0, primitives.zero_payload()) }
     }
     if m.payload_len != 1 {
         return QueueResult{ state: s, effect: service_effect.effect_reply(syscall.SyscallStatus.InvalidArgument, 0, primitives.zero_payload()) }
     }
     if s.len >= QUEUE_CAPACITY {
-        return QueueResult{ state: s, effect: service_effect.effect_reply(syscall.SyscallStatus.Exhausted, 0, primitives.zero_payload()) }
+        stalled: QueueServiceState = queuewith(s, s.items, s.len, s.stall_count + 1)
+        if s.stall_count > 0 {
+            return QueueResult{ state: stalled, effect: service_effect.effect_reply(syscall.SyscallStatus.WouldBlock, 0, primitives.zero_payload()) }
+        }
+        return QueueResult{ state: stalled, effect: service_effect.effect_reply(syscall.SyscallStatus.Exhausted, 0, primitives.zero_payload()) }
     }
     return QueueResult{ state: queue_push(s, m.payload[0]), effect: service_effect.effect_reply(syscall.SyscallStatus.Ok, 0, primitives.zero_payload()) }
 }
 
 func queue_len(s: QueueServiceState) usize {
     return s.len
+}
+
+func queue_stall_count(s: QueueServiceState) usize {
+    return s.stall_count
 }

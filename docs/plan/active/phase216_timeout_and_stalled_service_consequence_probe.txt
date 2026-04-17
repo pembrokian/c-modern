@@ -2,9 +2,7 @@ Phase 216 -- Timeout And Stalled-Service Consequence Probe
 ==========================================================
 
 Status
-------
-PROPOSED
-
+ACTIVE
 Purpose
 -------
 Define one bounded visible consequence for lack of progress on an admitted

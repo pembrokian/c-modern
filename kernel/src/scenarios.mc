@@ -9,6 +9,7 @@ import scenario_retained_policy
 import scenario_queue
 import scenario_retained_summary
 import scenario_restart
+import scenario_stall
 import scenario_steps
 import scenario_transfer
 import scenario_workset_identity
@@ -61,5 +62,10 @@ func run(state: *boot.KernelBootState) i32 {
     if result != 0 {
         return result
     }
-    return scenario_retained_summary.run_retained_summary_probe()
+    result = scenario_retained_summary.run_retained_summary_probe()
+    if result != 0 {
+        return result
+    }
+    stall_state := boot.kernel_init()
+    return scenario_stall.run_stall_probe(&stall_state)
 }

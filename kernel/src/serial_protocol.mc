@@ -42,6 +42,7 @@ const CMD_P: u8 = 80   // 'P' — peek
 const CMD_U: u8 = 85   // 'U' — use
 const CMD_X: u8 = 88   // 'X' — lifecycle control family
 const CMD_BANG: u8 = 33  // '!' — end-of-argument sentinel
+const CMD_W: u8 = 87   // 'W' — stall-count query
 
 const TARGET_SERIAL: u8 = 83    // 'S'
 const TARGET_SHELL: u8 = 72     // 'H'
@@ -141,6 +142,10 @@ func encode_queue_count() [4]u8 {
 
 func encode_queue_peek() [4]u8 {
     return ipc.payload_byte(CMD_Q, CMD_P, CMD_BANG, CMD_BANG)
+}
+
+func encode_queue_stall_count() [4]u8 {
+    return ipc.payload_byte(CMD_Q, CMD_W, CMD_BANG, CMD_BANG)
 }
 
 func encode_ticket_issue() [4]u8 {

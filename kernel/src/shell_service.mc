@@ -284,6 +284,13 @@ func handle(s: ShellServiceState, m: service_effect.Message) service_effect.Effe
             payload[0] = op
             payload[1] = serial_protocol.CMD_BANG
             return service_effect.effect_send(s.pid, service_topology.QUEUE_ENDPOINT_ID, 2, payload)
+        case serial_protocol.CMD_W:
+            if !bang23(m) {
+                return invalid_effect(SHELL_INVALID_SHAPE)
+            }
+            payload[0] = op
+            payload[1] = serial_protocol.CMD_BANG
+            return service_effect.effect_send(s.pid, service_topology.QUEUE_ENDPOINT_ID, 2, payload)
         default:
             return invalid_effect(SHELL_INVALID_COMMAND)
         }
