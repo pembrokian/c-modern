@@ -183,6 +183,10 @@ func cmd_workflow_schedule(id: u8, due: u8) syscall.ReceiveObservation {
     return serial_obs(DEFAULT_SERIAL_ROUTE.endpoint, DEFAULT_SERIAL_ROUTE.pid, serial_protocol.encode_workflow_schedule(id, due))
 }
 
+func cmd_workflow_update(name: u8, value: u8) syscall.ReceiveObservation {
+    return serial_obs(DEFAULT_SERIAL_ROUTE.endpoint, DEFAULT_SERIAL_ROUTE.pid, serial_protocol.encode_workflow_update(name, value))
+}
+
 func cmd_workflow_query(id: u8) syscall.ReceiveObservation {
     return serial_obs(DEFAULT_SERIAL_ROUTE.endpoint, DEFAULT_SERIAL_ROUTE.pid, serial_protocol.encode_workflow_query(id))
 }

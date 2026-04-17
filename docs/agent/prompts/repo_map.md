@@ -7,7 +7,7 @@ This file is a fast orientation map for agents working in this repository.
 - `CMakeLists.txt`: canonical build graph and CTest registration
 - `Makefile`: convenience wrapper around the CMake workflow
 - `README.md`: current repository summary and common commands
-- `kernel/`: repository-owned Veya kernel bring-up tree; currently at the Phase 234 durable named object-store slice over the hosted reset-lane workflow surface
+- `kernel/`: repository-owned Veya kernel bring-up tree; currently at the Phase 235 restart-safe named object update workflow slice over the hosted reset-lane workflow surface
 - `docs/agent/prompts/plan_spec.txt`: normative spec for the required structure of new per-phase plan documents
 - `docs/plan/admin/canopus_repo_layout_and_test_policy.txt`: current repository policy for Veya source, build, and test placement
 - `docs/plan/plan.txt`: authoritative multi-phase implementation plan
@@ -34,7 +34,7 @@ This file is a fast orientation map for agents working in this repository.
   - `docs/arch/veya/kernel_style_guide.txt`: required style guide for kernel/src/ service modules and kernel main.mc orchestration
   - `build.toml`: hosted reset-lane manifest used by the active workflow suite and the maintained reset-lane tool regressions
   - `src/main.mc`: explicit architecture entry plus thin root orchestration over the landed bounded service graph, including the durable journal owner, durable object-store owner, retained workflow owner, retained completion mailbox owner, and bounded delegation lease owner
-  - `src/services/object_store_service.mc`: bounded durable named-object owner with fixed-capacity create/read/replace semantics, owner-local artifact persistence, and explicit reload-on-restart follow-through
+  - `src/services/object_store_service.mc`: bounded durable named-object owner with fixed-capacity create/read/replace semantics, one owner-local workflow-facing update step, owner-local artifact persistence, and explicit reload-on-restart follow-through
   - `src/sched.mc`: scheduler-owned lifecycle validation for bounded spawn, wait, sleep, and wake follow-through
   - `src/lifecycle.mc`: lifecycle-owned task and process slot mutation for spawn, timer block, wake-to-ready, exit, and waited-child release follow-through
   - `src/debug/`: one logical `debug` module split through `module_sets.debug`, owning the running-system audit progression from the first running kernel slice through the current Phase 233 bounded delegation lease slice
@@ -44,7 +44,7 @@ This file is a fast orientation map for agents working in this repository.
   - `src/transfer_service.mc`: bounded transfer-service protocol state, copied emit payload, and transfer observation records
   - `src/timer_service.mc`: bounded timer-service state, id-scoped create/cancel/query/expired operations, and explicit active/expired/cancelled classification
   - `src/task_service.mc`: bounded task-service state, id-scoped submit/query/complete/cancel/list operations, and explicit active/done/failed/cancelled classification
-  - `src/workflow_service.mc`: bounded retained delayed-work owner tying timer expiry to task execution and restart-visible workflow state
+  - `src/workflow_service.mc`: bounded retained delayed-work owner tying timer expiry to task execution or one fixed-delay durable named-object update, journal-backed restart continuity, and completion-backed terminal outcomes
   - `src/completion_mailbox_service.mc`: bounded retained completion owner for workflow terminal outcomes plus explicit fetch/ack/take behavior
   - `src/lease_service.mc`: bounded retained temporary delegation owner for one completion-bound workflow lease path
   - `src/serial_service.mc`: bounded serial-service ingress state plus one service-owned copied receive-frame log, one fixed forwarded composition request observation, one aggregate-reply observation, and one service-local malformed-input classification path

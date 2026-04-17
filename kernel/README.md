@@ -50,6 +50,14 @@ The following modules are deferred until the named phase boundary forces them:
 
 Recent service targets
 
+- Phase 235 (landed): restart-safe named object update workflow. `workflow_service.mc`
+  now admits one compact `OW<name><value>` path that waits on the existing
+  restart-safe workflow substrate, applies one owner-local update through
+  `object_store_service.object_update(...)`, and delivers explicit updated,
+  rejected, or restart-cancelled outcomes through the existing completion
+  mailbox. The focused reset-lane fixture is
+  `tests/system/kernel_reset_lane_phase235_named_object_update_workflow`.
+
 - Phase 218 (landed): narrow file-service shape probe. `file_service.mc` admitted
   as the ninth boot-wired service (FILE_ENDPOINT_ID = 18, pid = 9). One compact
   CMD_F protocol family (create, write, read, count) routes through shell dispatch.
@@ -79,6 +87,7 @@ Recent service targets
   focused reset-lane fixture is
   `tests/system/kernel_reset_lane_phase220_timer_task_service`.
 
-- Next open: choose the next owner-local pressure only when one remaining
-  caller-visible gap becomes clearly stronger than the others without forcing
-  durability, namespace, or framework drift.
+- Next open: delegated durable-object mutation is now the strongest adjacent
+  pressure, but it should stay deferred until one bounded authority follow-
+  through can land without widening into sessions, ACLs, or a capability
+  framework.

@@ -343,7 +343,12 @@ func dispatch_lease(state: *boot.KernelBootState, msg: service_effect.Message) s
 
 func dispatch_workflow(state: *boot.KernelBootState, msg: service_effect.Message) service_effect.Effect {
     current: boot.KernelBootState = *state
-    step := workflow_service.step(current.workflow.state, current.timer.state, current.task.state, current.journal.state, current.completion.state, msg, u8(current.workset_generation))
+    step := workflow_service.step(current.workflow.state, current.timer.state, current.task.state, current.object_store.state, current.journal.state, current.completion.state, msg, u8(current.workset_generation))
+    if object_store_service.object_store_changed(current.object_store.state, step.object_store) {
+        if !object_store_service.object_store_persist(step.object_store) {
+            return service_effect.effect_reply(syscall.SyscallStatus.Closed, 0, primitives.zero_payload())
+        }
+    }
     if journal_service.journal_changed(current.journal.state, step.journal) {
         if !journal_service.journal_persist(step.journal) {
             return service_effect.effect_reply(syscall.SyscallStatus.Closed, 0, primitives.zero_payload())
@@ -352,6 +357,7 @@ func dispatch_workflow(state: *boot.KernelBootState, msg: service_effect.Message
     next := boot.bootwith_workflow(current, step.workflow)
     next = boot.bootwith_timer(next, step.timer)
     next = boot.bootwith_task(next, step.task)
+    next = boot.bootwith_object_store(next, step.object_store)
     next = boot.bootwith_journal(next, step.journal)
     next = boot.bootwith_completion(next, step.completion)
     *state = next

@@ -3,7 +3,7 @@ Phase 235 -- Restart-Safe Named Object Update Workflow
 
 Status
 ------
-PROPOSED
+IMPLEMENTED
 
 Purpose
 -------
@@ -124,6 +124,33 @@ Acceptance criteria
 - terminal outcomes are delivered through the existing completion mailbox
 - no scheduler, transaction, or dependency framework is introduced
 - durable mutation truth remains owned by the object store
+
+Implementation summary
+----------------------
+- Added one compact `OW<name><value>` workflow command that schedules a fixed-
+  delay durable named-object update without widening the four-byte shell frame.
+- Kept `workflow_service` owner-local by storing one active update record,
+  reusing journal lane B for restart continuity, and reusing the completion
+  mailbox for terminal outcome delivery.
+- Kept durable mutation in `object_store_service` through one owner-local
+  `object_update(...)` step that applies one replacement and rejects only
+  missing objects.
+- Added explicit update outcome states for successful update, rejected update,
+  and restart-cancelled update.
+- Added one deterministic scenario and one focused reset-lane fixture for the
+  named-object update workflow.
+
+Validation summary
+------------------
+- `Build debug`
+- `ctest --test-dir build/debug -R mc_tool_workflow_kernel_reset_lane_unit --output-on-failure`
+
+Deferred follow-up
+------------------
+- delegated durable-object mutation stays deferred to Phase 236
+- broader cross-owner durable transaction or rollback policy stays deferred
+- object-version or conflict truth stays deferred until delegated mutation
+  exposes a concrete race the current one-object workflow cannot carry
 
 Future follow-up
 ----------------

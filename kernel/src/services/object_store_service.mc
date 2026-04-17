@@ -225,6 +225,18 @@ func object_replace(s: ObjectStoreServiceState, name: u8, value: u8) ObjectStore
     return ObjectStoreResult{ state: object_with_slot(s, idx, replaced), effect: service_effect.effect_reply(syscall.SyscallStatus.Ok, 0, primitives.zero_payload()) }
 }
 
+func object_update(s: ObjectStoreServiceState, name: u8, value: u8) ObjectStoreResult {
+    idx := object_find(s, name)
+    if idx >= OBJECT_STORE_CAPACITY {
+        return ObjectStoreResult{ state: s, effect: service_effect.effect_reply(syscall.SyscallStatus.InvalidArgument, 0, primitives.zero_payload()) }
+    }
+    current := object_slot_at(s, idx)
+    if current.value == value {
+        return ObjectStoreResult{ state: s, effect: service_effect.effect_reply(syscall.SyscallStatus.Ok, 0, primitives.zero_payload()) }
+    }
+    return object_replace(s, name, value)
+}
+
 func handle(s: ObjectStoreServiceState, m: service_effect.Message) ObjectStoreResult {
     if m.payload_len < 2 {
         return ObjectStoreResult{ state: s, effect: service_effect.effect_reply(syscall.SyscallStatus.InvalidArgument, 0, primitives.zero_payload()) }

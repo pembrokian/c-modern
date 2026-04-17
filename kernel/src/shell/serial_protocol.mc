@@ -276,6 +276,10 @@ func encode_workflow_schedule(id: u8, due: u8) [4]u8 {
     return encode_two_args(CMD_O, CMD_S, id, due)
 }
 
+func encode_workflow_update(name: u8, value: u8) [4]u8 {
+    return encode_two_args(CMD_O, CMD_W, name, value)
+}
+
 func encode_workflow_query(id: u8) [4]u8 {
     return encode_one_arg(CMD_O, CMD_Q, id)
 }

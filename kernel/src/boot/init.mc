@@ -233,22 +233,16 @@ func restart_journal(state: boot.KernelBootState) boot.KernelBootState {
 
 func restart_workflow(state: boot.KernelBootState) boot.KernelBootState {
     workflow_slot := service_topology.WORKFLOW_SLOT
-    snap := workflow_service.workflow_snapshot(state.workflow.state)
+    snap := workflow_service.workflow_snapshot_record(state.workflow.state)
     generation: u8 = u8(state.workset_generation)
     reloaded := workflow_service.workflow_restart_reload(workflow_slot.pid, snap, state.journal.state.lane1, generation, true)
     next := state
     next_timer := state.timer.state
 
     if reloaded.state == workflow_service.WORKFLOW_STATE_WAITING {
-        timer_due := reloaded.due
-        if timer_due == 0 {
-            timer_due = 1
-        } else {
-            timer_due = timer_due + 1
-        }
+        timer_due := workflow_service.workflow_restart_timer_due(reloaded)
         timer_create_result := timer_service.timer_create(next_timer, workflow_service.WORKFLOW_TIMER_ID, timer_due)
         next_timer = timer_create_result.state
-        reloaded = workflow_service.workflowwith(reloaded, reloaded.id, timer_due, reloaded.opcode, reloaded.task, reloaded.state, reloaded.restart, reloaded.generation)
     } else {
         timer_cancel_result := timer_service.timer_cancel(next_timer, workflow_service.WORKFLOW_TIMER_ID)
         next_timer = timer_cancel_result.state

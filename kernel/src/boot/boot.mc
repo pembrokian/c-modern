@@ -111,7 +111,7 @@ func kernel_init() KernelBootState {
     timer_cell := ServiceCell<timer_service.TimerServiceState>{ state: timer_service.timer_init(timer_slot.pid, 1), generation: 1 }
     task_cell := ServiceCell<task_service.TaskServiceState>{ state: task_service.task_init(task_slot.pid, 1), generation: 1 }
     journal_cell := ServiceCell<journal_service.JournalServiceState>{ state: journal_service.journal_load(journal_slot.pid, 1), generation: 1 }
-    workflow_cell := ServiceCell<workflow_service.WorkflowServiceState>{ state: workflow_service.workflow_init(workflow_slot.pid), generation: 1 }
+    workflow_cell := ServiceCell<workflow_service.WorkflowServiceState>{ state: workflow_service.workflow_state_init(workflow_slot.pid), generation: 1 }
     lease_cell := ServiceCell<lease_service.LeaseServiceState>{ state: lease_service.lease_init(lease_slot.pid, 1), generation: 1 }
     completion_cell := ServiceCell<completion_mailbox_service.CompletionMailboxServiceState>{ state: completion_mailbox_service.completion_mailbox_init(completion_slot.pid, 1), generation: 1 }
     object_store_cell := ServiceCell<object_store_service.ObjectStoreServiceState>{ state: object_store_service.object_store_load(object_store_slot.pid, 1), generation: 1 }
