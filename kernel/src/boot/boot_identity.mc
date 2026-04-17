@@ -1,3 +1,4 @@
+import completion_mailbox_service
 import identity_taxonomy
 import file_service
 import journal_service
@@ -92,6 +93,8 @@ func bootstate_metadata_for_target(s: KernelBootState, target: u8) u8 {
         return u8(journal_service.journal_count(s.journal.state))
     case serial_protocol.TARGET_WORKFLOW:
         return u8(workflow_service.workflow_active_count(s.workflow.state))
+    case serial_protocol.TARGET_COMPLETION:
+        return u8(completion_mailbox_service.completion_backlog_count(s.completion.state))
     default:
         return 0
     }
@@ -183,6 +186,8 @@ func bootrestart_outcome_for_endpoint(s: KernelBootState, endpoint: u32) Restart
         return s.task_restart_outcome
     case service_topology.JOURNAL_ENDPOINT_ID:
         return s.journal_restart_outcome
+    case service_topology.COMPLETION_MAILBOX_ENDPOINT_ID:
+        return s.completion_restart_outcome
     default:
         return RestartOutcome.None
     }
@@ -190,7 +195,7 @@ func bootrestart_outcome_for_endpoint(s: KernelBootState, endpoint: u32) Restart
 
 func bootsummary_payload_for_endpoint(s: KernelBootState, endpoint: u32) [4]u8 {
     participation: RetainedSummaryParticipation = RetainedSummaryParticipation.None
-    if endpoint == service_topology.LOG_ENDPOINT_ID || endpoint == service_topology.KV_ENDPOINT_ID || endpoint == service_topology.QUEUE_ENDPOINT_ID || endpoint == service_topology.FILE_ENDPOINT_ID || endpoint == service_topology.TIMER_ENDPOINT_ID || endpoint == service_topology.JOURNAL_ENDPOINT_ID || endpoint == service_topology.WORKFLOW_ENDPOINT_ID {
+    if endpoint == service_topology.LOG_ENDPOINT_ID || endpoint == service_topology.KV_ENDPOINT_ID || endpoint == service_topology.QUEUE_ENDPOINT_ID || endpoint == service_topology.FILE_ENDPOINT_ID || endpoint == service_topology.TIMER_ENDPOINT_ID || endpoint == service_topology.JOURNAL_ENDPOINT_ID || endpoint == service_topology.WORKFLOW_ENDPOINT_ID || endpoint == service_topology.COMPLETION_MAILBOX_ENDPOINT_ID {
         participation = RetainedSummaryParticipation.Service
     }
     mark: service_identity.ServiceMark = bootmark_for_endpoint(s, endpoint)
@@ -244,6 +249,10 @@ func boot_workflow_mark(s: KernelBootState) service_identity.ServiceMark {
     return service_identity.service_mark(service_topology.WORKFLOW_ENDPOINT_ID, s.workflow.state.pid, s.workflow.generation)
 }
 
+func boot_completion_mark(s: KernelBootState) service_identity.ServiceMark {
+    return service_identity.service_mark(service_topology.COMPLETION_MAILBOX_ENDPOINT_ID, s.completion.state.pid, s.completion.generation)
+}
+
 func bootmark_for_endpoint(s: KernelBootState, endpoint: u32) service_identity.ServiceMark {
     switch endpoint {
     case service_topology.LOG_ENDPOINT_ID:
@@ -268,6 +277,8 @@ func bootmark_for_endpoint(s: KernelBootState, endpoint: u32) service_identity.S
         return boot_journal_mark(s)
     case service_topology.WORKFLOW_ENDPOINT_ID:
         return boot_workflow_mark(s)
+    case service_topology.COMPLETION_MAILBOX_ENDPOINT_ID:
+        return boot_completion_mark(s)
     default:
         return service_identity.service_mark(endpoint, 0, 0)
     }

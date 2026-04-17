@@ -33,6 +33,7 @@ func smoke_slot_endpoints_match_constants() bool {
     file_slot: service_topology.ServiceSlot = service_topology.FILE_SLOT
     timer_slot: service_topology.ServiceSlot = service_topology.TIMER_SLOT
     task_slot: service_topology.ServiceSlot = service_topology.TASK_SLOT
+    completion_slot: service_topology.ServiceSlot = service_topology.COMPLETION_MAILBOX_SLOT
 
     if serial_slot.endpoint != service_topology.SERIAL_ENDPOINT_ID {
         return false
@@ -67,12 +68,15 @@ func smoke_slot_endpoints_match_constants() bool {
     if task_slot.endpoint != service_topology.TASK_ENDPOINT_ID {
         return false
     }
+    if completion_slot.endpoint != service_topology.COMPLETION_MAILBOX_ENDPOINT_ID {
+        return false
+    }
     return true
 }
 
-// B: SERVICE_COUNT must equal 13 — the number of boot-wired slots.
-func smoke_service_count_is_thirteen() bool {
-    if service_topology.SERVICE_COUNT != 13 {
+// B: SERVICE_COUNT must equal 14 — the number of boot-wired slots.
+func smoke_service_count_is_fourteen() bool {
+    if service_topology.SERVICE_COUNT != 14 {
         return false
     }
     return true
@@ -94,7 +98,7 @@ func main() i32 {
     if smoke_slot_endpoints_match_constants() == false {
         return 1
     }
-    if smoke_service_count_is_thirteen() == false {
+    if smoke_service_count_is_fourteen() == false {
         return 2
     }
     if smoke_init_and_round_trip() == false {

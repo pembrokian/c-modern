@@ -3,6 +3,7 @@
 import boot
 import scenario_authority
 import scenario_audit_coordination
+import scenario_completion_mailbox
 import scenario_coordination
 import scenario_durability
 import scenario_journal_service
@@ -89,6 +90,10 @@ func run(state: *boot.KernelBootState) i32 {
         return result
     }
     result = scenario_workflow_service.run_workflow_service_probe()
+    if result != 0 {
+        return result
+    }
+    result = scenario_completion_mailbox.run_completion_mailbox_probe()
     if result != 0 {
         return result
     }

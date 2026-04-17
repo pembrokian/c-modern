@@ -329,7 +329,7 @@ ResetLaneScenarioTiming RunKernelResetLaneScenario(const std::filesystem::path& 
     };
 }
 
-constexpr std::array<ResetLaneScenario, 48> kResetLaneScenarios = {{
+constexpr std::array<ResetLaneScenario, 49> kResetLaneScenarios = {{
     {"repo project", "", "", "kernel_reset_lane_repo_build", "kernel", "kernel_reset_lane_repo_build_output.txt", "kernel_reset_lane_repo_run_output.txt", "kernel reset lane repo project build", "kernel reset lane repo project run", true, 2000, 100},
     {"smoke", "tests/smoke/kernel_reset_lane_serial_round_trip", "kernel_reset_lane_smoke_project", "kernel_reset_lane_smoke_build", "app", "kernel_reset_lane_smoke_build_output.txt", "kernel_reset_lane_smoke_run_output.txt", "kernel reset lane smoke build", "kernel reset lane smoke run", true, 900, 100},
     {"retained state", "tests/system/kernel_reset_lane_retained_log", "kernel_reset_lane_retained_state_project", "kernel_reset_lane_retained_state_build", "app", "kernel_reset_lane_retained_state_build_output.txt", "kernel_reset_lane_retained_state_run_output.txt", "kernel reset lane retained-state build", "kernel reset lane retained-state run", true, 900, 100},
@@ -378,6 +378,7 @@ constexpr std::array<ResetLaneScenario, 48> kResetLaneScenarios = {{
     {"task completion", "tests/system/kernel_reset_lane_phase225_task_completion", "kernel_reset_lane_phase225_task_completion_project", "kernel_reset_lane_phase225_task_completion_build", "app", "kernel_reset_lane_phase225_task_completion_build_output.txt", "kernel_reset_lane_phase225_task_completion_run_output.txt", "kernel reset lane phase 225 task completion build", "kernel reset lane phase 225 task completion run", true, 1000, 100},
     {"file growth", "tests/system/kernel_reset_lane_phase226_file_growth", "kernel_reset_lane_phase226_file_growth_project", "kernel_reset_lane_phase226_file_growth_build", "app", "kernel_reset_lane_phase226_file_growth_build_output.txt", "kernel_reset_lane_phase226_file_growth_run_output.txt", "kernel reset lane phase 226 file growth build", "kernel reset lane phase 226 file growth run", true, 1000, 100},
     {"durable journal", "tests/system/kernel_reset_lane_phase230_durable_journal", "kernel_reset_lane_phase230_durable_journal_project", "kernel_reset_lane_phase230_durable_journal_build", "app", "kernel_reset_lane_phase230_durable_journal_build_output.txt", "kernel_reset_lane_phase230_durable_journal_run_output.txt", "kernel reset lane phase 230 durable journal build", "kernel reset lane phase 230 durable journal run", true, 1000, 100},
+    {"completion mailbox", "tests/system/kernel_reset_lane_phase232_completion_mailbox", "kernel_reset_lane_phase232_completion_mailbox_project", "kernel_reset_lane_phase232_completion_mailbox_build", "app", "kernel_reset_lane_phase232_completion_mailbox_build_output.txt", "kernel_reset_lane_phase232_completion_mailbox_run_output.txt", "kernel reset lane phase 232 completion mailbox build", "kernel reset lane phase 232 completion mailbox run", true, 1000, 100},
 }};
 
 std::vector<const ResetLaneScenario*> SelectResetLaneScenarios(ResetLaneMode mode) {

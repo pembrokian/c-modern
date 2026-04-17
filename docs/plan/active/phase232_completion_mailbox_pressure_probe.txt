@@ -3,7 +3,7 @@ Phase 232 -- Completion Mailbox Pressure Probe
 
 Status
 ------
-PROPOSED
+COMPLETED - 2026-04-17
 
 Purpose
 -------
@@ -56,6 +56,29 @@ Chosen slice for this phase
    workflow owner rather than introducing a cross-system buffering policy
 5. add one deterministic scenario and one reset-lane fixture proving ordinary
    completion delivery, full-queue rejection, and one stalled-delivery case
+
+Implemented slice
+-----------------
+- Added `kernel/src/services/completion_mailbox_service.mc` as one retained
+  owner-local bounded mailbox with fixed record fields `(id, state, restart,
+  generation)`, fixed capacity, explicit `Exhausted` on first full enqueue,
+  and explicit `WouldBlock` on repeated full enqueue.
+- Routed the owner through the existing flat kernel surfaces only:
+  `service_topology`, `boot`, `boot_update`, `boot_identity`, `init`,
+  `shell/serial_protocol`, `shell/shell_service`, and `kernel_dispatch`.
+- Kept the shell frame fixed at four bytes by adding one compact `CMD_V`
+  family for completion fetch, ack, and count instead of widening transport.
+- Changed `workflow_service` so terminal outcomes now flow through the mailbox
+  owner. Added one explicit internal `WORKFLOW_STATE_DELIVERING` state so a
+  mailbox-full workflow remains caller-visible and retryable without inventing
+  a scheduler, queue wrapper, or generic mailbox framework.
+- Kept retry policy owner-local: the mailbox owns backlog and repeated-full
+  consequence truth, while the workflow owner keeps one pending terminal
+  outcome and retries delivery on later steps.
+- Added `kernel/src/scenarios/scenario_completion_mailbox.mc`, one dedicated
+  reset-lane fixture under
+  `tests/system/kernel_reset_lane_phase232_completion_mailbox/`, and one
+  reset-lane table entry in `tests/tool/tool_kernel_reset_lane_suite.cpp`.
 
 Phase role in the larger sequence
 ---------------------------------
@@ -121,6 +144,22 @@ Validation expectations
   behavior
 - one focused reset-lane workflow fixture for the completion mailbox owner
 - grouped reset-lane workflow coverage for touched paths
+
+Validation performed
+--------------------
+- `cmake --build build/debug -j4`
+- `ctest --test-dir build/debug -R mc_tool_workflow_kernel_reset_lane_unit --output-on-failure`
+
+Notes from implementation
+-------------------------
+- The narrowest honest implementation was one retained completion owner, not a
+  queue generalization, not a generic message bus, and not a workflow or task
+  framework expansion.
+- Validation exposed one current compiler limitation around same-name local
+  bindings in disjoint sibling branches. The phase kept the workaround local by
+  using distinct temporary names in `workflow_service.mc` and records the
+  language follow-up in `docs/plan/backlog.txt` under Potential language
+  features instead of widening compiler work here.
 
 Exit criteria
 -------------

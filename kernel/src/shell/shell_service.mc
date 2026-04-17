@@ -150,6 +150,8 @@ func lifecycle_target_endpoint(target: u8) u32 {
         return service_topology.JOURNAL_ENDPOINT_ID
     case serial_protocol.TARGET_WORKFLOW:
         return service_topology.WORKFLOW_ENDPOINT_ID
+    case serial_protocol.TARGET_COMPLETION:
+        return service_topology.COMPLETION_MAILBOX_ENDPOINT_ID
     default:
         return 0
     }
@@ -522,6 +524,30 @@ func route_workflow(s: ShellServiceState, m: service_effect.Message, op: u8) ser
     return dispatch(WORKFLOW_ROUTES, s, m, op)
 }
 
+func completion_fetch(s: ShellServiceState, m: service_effect.Message) service_effect.Effect {
+    return forward_two(s, service_topology.COMPLETION_MAILBOX_ENDPOINT_ID, serial_protocol.CMD_F, serial_protocol.CMD_BANG)
+}
+
+func completion_ack(s: ShellServiceState, m: service_effect.Message) service_effect.Effect {
+    return forward_two(s, service_topology.COMPLETION_MAILBOX_ENDPOINT_ID, serial_protocol.CMD_A, serial_protocol.CMD_BANG)
+}
+
+func completion_count(s: ShellServiceState, m: service_effect.Message) service_effect.Effect {
+    return forward_two(s, service_topology.COMPLETION_MAILBOX_ENDPOINT_ID, serial_protocol.CMD_C, serial_protocol.CMD_BANG)
+}
+
+const COMPLETION_ROUTES: [5]OpHandler = [5]OpHandler{
+    OpHandler{ op: serial_protocol.CMD_F, check: bang23, run: completion_fetch },
+    OpHandler{ op: serial_protocol.CMD_A, check: bang23, run: completion_ack },
+    OpHandler{ op: serial_protocol.CMD_C, check: bang23, run: completion_count },
+    UNUSED_ROUTE,
+    UNUSED_ROUTE
+}
+
+func route_completion(s: ShellServiceState, m: service_effect.Message, op: u8) service_effect.Effect {
+    return dispatch(COMPLETION_ROUTES, s, m, op)
+}
+
 func ticket_issue(s: ShellServiceState, m: service_effect.Message) service_effect.Effect {
     return forward_empty(s, service_topology.TICKET_ENDPOINT_ID)
 }
@@ -580,6 +606,9 @@ func handle(s: ShellServiceState, m: service_effect.Message) service_effect.Effe
 
     case serial_protocol.CMD_O:
         return route_workflow(s, m, op)
+
+    case serial_protocol.CMD_V:
+        return route_completion(s, m, op)
 
     case serial_protocol.CMD_T:
         return route_ticket(s, m, op)

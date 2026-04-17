@@ -14,6 +14,7 @@
 // fixed.
 
 import boot
+import completion_mailbox_service
 import echo_service
 import file_service
 import journal_service
@@ -71,6 +72,8 @@ func restart_policy_for_target(target: u8) RestartPolicyInfo {
         return restart_policy_single(target, serial_protocol.POLICY_KEEP)
     case serial_protocol.TARGET_WORKFLOW:
         return restart_policy_single(target, serial_protocol.POLICY_KEEP)
+    case serial_protocol.TARGET_COMPLETION:
+        return restart_policy_single(target, serial_protocol.POLICY_KEEP)
     default:
         return RestartPolicyInfo{ target: 0, owner0: serial_protocol.PARTICIPANT_NONE, owner1: serial_protocol.PARTICIPANT_NONE, policy: serial_protocol.PARTICIPANT_NONE }
     }
@@ -113,6 +116,8 @@ func restart(state: boot.KernelBootState, endpoint: u32) boot.KernelBootState {
         return restart_journal(state)
     case service_topology.WORKFLOW_ENDPOINT_ID:
         return restart_workflow(state)
+    case service_topology.COMPLETION_MAILBOX_ENDPOINT_ID:
+        return restart_completion_mailbox(state)
     default:
         return state
     }
@@ -224,7 +229,7 @@ func restart_workflow(state: boot.KernelBootState) boot.KernelBootState {
     next := state
     next_timer := state.timer.state
 
-    if workflow_service.workflow_is_active(reloaded) {
+    if reloaded.state == workflow_service.WORKFLOW_STATE_WAITING {
         timer_due := reloaded.due
         if timer_due == 0 {
             timer_due = 1
@@ -241,4 +246,11 @@ func restart_workflow(state: boot.KernelBootState) boot.KernelBootState {
 
     next = boot.bootwith_timer(next, next_timer)
     return boot.bootrestart_workflow(next, reloaded)
+}
+
+func restart_completion_mailbox(state: boot.KernelBootState) boot.KernelBootState {
+    slot := service_topology.COMPLETION_MAILBOX_SLOT
+    snap := completion_mailbox_service.completion_mailbox_snapshot(state.completion.state)
+    next := boot.bootrestart_completion(state, completion_mailbox_service.completion_mailbox_reload(slot.pid, 1, snap))
+    return boot.bootwith_completion_restart_outcome(next, boot.RestartOutcome.RetainedReloaded)
 }

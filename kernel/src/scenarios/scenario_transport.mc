@@ -179,6 +179,18 @@ func cmd_workflow_cancel(id: u8) syscall.ReceiveObservation {
     return serial_obs(DEFAULT_SERIAL_ROUTE.endpoint, DEFAULT_SERIAL_ROUTE.pid, serial_protocol.encode_workflow_cancel(id))
 }
 
+func cmd_completion_fetch() syscall.ReceiveObservation {
+    return serial_obs(DEFAULT_SERIAL_ROUTE.endpoint, DEFAULT_SERIAL_ROUTE.pid, serial_protocol.encode_completion_fetch())
+}
+
+func cmd_completion_ack() syscall.ReceiveObservation {
+    return serial_obs(DEFAULT_SERIAL_ROUTE.endpoint, DEFAULT_SERIAL_ROUTE.pid, serial_protocol.encode_completion_ack())
+}
+
+func cmd_completion_count() syscall.ReceiveObservation {
+    return serial_obs(DEFAULT_SERIAL_ROUTE.endpoint, DEFAULT_SERIAL_ROUTE.pid, serial_protocol.encode_completion_count())
+}
+
 func kv_count_obs(pid: u32) syscall.ReceiveObservation {
     return serial_obs(service_topology.SERIAL_ENDPOINT_ID, pid, serial_protocol.encode_kv_count())
 }

@@ -1,3 +1,4 @@
+import completion_mailbox_service
 import echo_service
 import file_service
 import journal_service
@@ -169,6 +170,18 @@ func bootwith_workflow(s: KernelBootState, workflow: workflow_service.WorkflowSe
     return s with { workflow.state: workflow }
 }
 
+func bootwith_completion(s: KernelBootState, completion: completion_mailbox_service.CompletionMailboxServiceState) KernelBootState {
+    return s with { completion.state: completion }
+}
+
+func bootwith_completion_restart_outcome(s: KernelBootState, outcome: RestartOutcome) KernelBootState {
+    return s with { completion_restart_outcome: outcome }
+}
+
 func bootrestart_workflow(s: KernelBootState, workflow: workflow_service.WorkflowServiceState) KernelBootState {
     return s with { workflow.state: workflow, workflow.generation: s.workflow.generation + 1 }
+}
+
+func bootrestart_completion(s: KernelBootState, completion: completion_mailbox_service.CompletionMailboxServiceState) KernelBootState {
+    return s with { completion.state: completion, completion.generation: s.completion.generation + 1 }
 }

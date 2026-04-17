@@ -50,6 +50,7 @@ const CMD_M: u8 = 77   // 'M' — timer command family
 const CMD_J: u8 = 74   // 'J' — task command family
 const CMD_Y: u8 = 89   // 'Y' — journal command family
 const CMD_O: u8 = 79   // 'O' — workflow command family
+const CMD_V: u8 = 86   // 'V' — completion mailbox command family
 
 const TARGET_SERIAL: u8 = 83    // 'S'
 const TARGET_SHELL: u8 = 72     // 'H'
@@ -66,6 +67,7 @@ const TARGET_TIMER: u8 = 77     // 'M'
 const TARGET_TASK: u8 = 74      // 'J'
 const TARGET_JOURNAL: u8 = 85   // 'U'
 const TARGET_WORKFLOW: u8 = 79  // 'O'
+const TARGET_COMPLETION: u8 = 66  // 'B'
 
 const PARTICIPANT_NONE: u8 = 78  // 'N'
 const POLICY_CLEAR: u8 = 67      // 'C'
@@ -90,166 +92,190 @@ const AUTHORITY_SCOPE_RETAINED: u8 = 82     // 'R'
 const AUTHORITY_SCOPE_COORDINATED: u8 = 67  // 'C'
 const AUTHORITY_SCOPE_DURABLE: u8 = 68      // 'D'
 
+func encode_no_args(cmd0: u8, cmd1: u8) [4]u8 {
+    return ipc.payload_byte(cmd0, cmd1, CMD_BANG, CMD_BANG)
+}
+
+func encode_one_arg(cmd0: u8, cmd1: u8, arg0: u8) [4]u8 {
+    return ipc.payload_byte(cmd0, cmd1, arg0, CMD_BANG)
+}
+
+func encode_two_args(cmd0: u8, cmd1: u8, arg0: u8, arg1: u8) [4]u8 {
+    return ipc.payload_byte(cmd0, cmd1, arg0, arg1)
+}
+
 func encode_echo(left: u8, right: u8) [4]u8 {
-    return ipc.payload_byte(CMD_E, CMD_C, left, right)
+    return encode_two_args(CMD_E, CMD_C, left, right)
 }
 
 func encode_log_append(value: u8) [4]u8 {
-    return ipc.payload_byte(CMD_L, CMD_A, value, CMD_BANG)
+    return encode_one_arg(CMD_L, CMD_A, value)
 }
 
 func encode_log_tail() [4]u8 {
-    return ipc.payload_byte(CMD_L, CMD_T, CMD_BANG, CMD_BANG)
+    return encode_no_args(CMD_L, CMD_T)
 }
 
 func encode_kv_set(key: u8, value: u8) [4]u8 {
-    return ipc.payload_byte(CMD_K, CMD_S, key, value)
+    return encode_two_args(CMD_K, CMD_S, key, value)
 }
 
 func encode_kv_get(key: u8) [4]u8 {
-    return ipc.payload_byte(CMD_K, CMD_G, key, CMD_BANG)
+    return encode_one_arg(CMD_K, CMD_G, key)
 }
 
 func encode_kv_count() [4]u8 {
-    return ipc.payload_byte(CMD_K, CMD_C, CMD_BANG, CMD_BANG)
+    return encode_no_args(CMD_K, CMD_C)
 }
 
 func encode_lifecycle_query(target: u8) [4]u8 {
-    return ipc.payload_byte(CMD_X, CMD_Q, target, CMD_BANG)
+    return encode_one_arg(CMD_X, CMD_Q, target)
 }
 
 func encode_lifecycle_authority(target: u8) [4]u8 {
-    return ipc.payload_byte(CMD_X, CMD_A, target, CMD_BANG)
+    return encode_one_arg(CMD_X, CMD_A, target)
 }
 
 func encode_lifecycle_state(target: u8) [4]u8 {
-    return ipc.payload_byte(CMD_X, CMD_C, target, CMD_BANG)
+    return encode_one_arg(CMD_X, CMD_C, target)
 }
 
 func encode_lifecycle_durability(target: u8) [4]u8 {
-    return ipc.payload_byte(CMD_X, CMD_D, target, CMD_BANG)
+    return encode_one_arg(CMD_X, CMD_D, target)
 }
 
 func encode_lifecycle_identity(target: u8) [4]u8 {
-    return ipc.payload_byte(CMD_X, CMD_I, target, CMD_BANG)
+    return encode_one_arg(CMD_X, CMD_I, target)
 }
 
 func encode_lifecycle_policy(target: u8) [4]u8 {
-    return ipc.payload_byte(CMD_X, CMD_P, target, CMD_BANG)
+    return encode_one_arg(CMD_X, CMD_P, target)
 }
 
 func encode_lifecycle_summary(target: u8) [4]u8 {
-    return ipc.payload_byte(CMD_X, CMD_S, target, CMD_BANG)
+    return encode_one_arg(CMD_X, CMD_S, target)
 }
 
 func encode_lifecycle_compare(target: u8) [4]u8 {
-    return ipc.payload_byte(CMD_X, CMD_M, target, CMD_BANG)
+    return encode_one_arg(CMD_X, CMD_M, target)
 }
 
 func encode_lifecycle_restart(target: u8) [4]u8 {
-    return ipc.payload_byte(CMD_X, CMD_R, target, CMD_BANG)
+    return encode_one_arg(CMD_X, CMD_R, target)
 }
 
 func encode_queue_enqueue(value: u8) [4]u8 {
-    return ipc.payload_byte(CMD_Q, CMD_A, value, CMD_BANG)
+    return encode_one_arg(CMD_Q, CMD_A, value)
 }
 
 func encode_queue_dequeue() [4]u8 {
-    return ipc.payload_byte(CMD_Q, CMD_D, CMD_BANG, CMD_BANG)
+    return encode_no_args(CMD_Q, CMD_D)
 }
 
 func encode_queue_count() [4]u8 {
-    return ipc.payload_byte(CMD_Q, CMD_C, CMD_BANG, CMD_BANG)
+    return encode_no_args(CMD_Q, CMD_C)
 }
 
 func encode_queue_peek() [4]u8 {
-    return ipc.payload_byte(CMD_Q, CMD_P, CMD_BANG, CMD_BANG)
+    return encode_no_args(CMD_Q, CMD_P)
 }
 
 func encode_queue_stall_count() [4]u8 {
-    return ipc.payload_byte(CMD_Q, CMD_W, CMD_BANG, CMD_BANG)
+    return encode_no_args(CMD_Q, CMD_W)
 }
 
 func encode_ticket_issue() [4]u8 {
-    return ipc.payload_byte(CMD_T, CMD_I, CMD_BANG, CMD_BANG)
+    return encode_no_args(CMD_T, CMD_I)
 }
 
 func encode_ticket_use(epoch: u8, id: u8) [4]u8 {
-    return ipc.payload_byte(CMD_T, CMD_U, epoch, id)
+    return encode_two_args(CMD_T, CMD_U, epoch, id)
 }
 
 func encode_file_create(name: u8) [4]u8 {
-    return ipc.payload_byte(CMD_F, CMD_C, name, CMD_BANG)
+    return encode_one_arg(CMD_F, CMD_C, name)
 }
 
 func encode_file_write(name: u8, val: u8) [4]u8 {
-    return ipc.payload_byte(CMD_F, CMD_W, name, val)
+    return encode_two_args(CMD_F, CMD_W, name, val)
 }
 
 func encode_file_read(name: u8) [4]u8 {
-    return ipc.payload_byte(CMD_F, CMD_R, name, CMD_BANG)
+    return encode_one_arg(CMD_F, CMD_R, name)
 }
 
 func encode_file_count() [4]u8 {
-    return ipc.payload_byte(CMD_F, CMD_L, CMD_BANG, CMD_BANG)
+    return encode_no_args(CMD_F, CMD_L)
 }
 
 func encode_timer_create(id: u8, due: u8) [4]u8 {
-    return ipc.payload_byte(CMD_M, CMD_C, id, due)
+    return encode_two_args(CMD_M, CMD_C, id, due)
 }
 
 func encode_timer_cancel(id: u8) [4]u8 {
-    return ipc.payload_byte(CMD_M, CMD_X, id, CMD_BANG)
+    return encode_one_arg(CMD_M, CMD_X, id)
 }
 
 func encode_timer_query(id: u8) [4]u8 {
-    return ipc.payload_byte(CMD_M, CMD_Q, id, CMD_BANG)
+    return encode_one_arg(CMD_M, CMD_Q, id)
 }
 
 func encode_timer_expired(window: u8) [4]u8 {
-    return ipc.payload_byte(CMD_M, CMD_E, window, CMD_BANG)
+    return encode_one_arg(CMD_M, CMD_E, window)
 }
 
 func encode_task_submit(opcode: u8) [4]u8 {
-    return ipc.payload_byte(CMD_J, CMD_S, opcode, CMD_BANG)
+    return encode_one_arg(CMD_J, CMD_S, opcode)
 }
 
 func encode_task_query(id: u8) [4]u8 {
-    return ipc.payload_byte(CMD_J, CMD_Q, id, CMD_BANG)
+    return encode_one_arg(CMD_J, CMD_Q, id)
 }
 
 func encode_task_cancel(id: u8) [4]u8 {
-    return ipc.payload_byte(CMD_J, CMD_C, id, CMD_BANG)
+    return encode_one_arg(CMD_J, CMD_C, id)
 }
 
 func encode_task_complete(id: u8) [4]u8 {
-    return ipc.payload_byte(CMD_J, CMD_D, id, CMD_BANG)
+    return encode_one_arg(CMD_J, CMD_D, id)
 }
 
 func encode_task_list(window: u8) [4]u8 {
-    return ipc.payload_byte(CMD_J, CMD_L, window, CMD_BANG)
+    return encode_one_arg(CMD_J, CMD_L, window)
 }
 
 func encode_journal_append(name: u8, value: u8) [4]u8 {
-    return ipc.payload_byte(CMD_Y, CMD_A, name, value)
+    return encode_two_args(CMD_Y, CMD_A, name, value)
 }
 
 func encode_journal_replay(name: u8) [4]u8 {
-    return ipc.payload_byte(CMD_Y, CMD_R, name, CMD_BANG)
+    return encode_one_arg(CMD_Y, CMD_R, name)
 }
 
 func encode_journal_clear(name: u8) [4]u8 {
-    return ipc.payload_byte(CMD_Y, CMD_C, name, CMD_BANG)
+    return encode_one_arg(CMD_Y, CMD_C, name)
 }
 
 func encode_workflow_schedule(id: u8, due: u8) [4]u8 {
-    return ipc.payload_byte(CMD_O, CMD_S, id, due)
+    return encode_two_args(CMD_O, CMD_S, id, due)
 }
 
 func encode_workflow_query(id: u8) [4]u8 {
-    return ipc.payload_byte(CMD_O, CMD_Q, id, CMD_BANG)
+    return encode_one_arg(CMD_O, CMD_Q, id)
 }
 
 func encode_workflow_cancel(id: u8) [4]u8 {
-    return ipc.payload_byte(CMD_O, CMD_C, id, CMD_BANG)
+    return encode_one_arg(CMD_O, CMD_C, id)
+}
+
+func encode_completion_fetch() [4]u8 {
+    return encode_no_args(CMD_V, CMD_F)
+}
+
+func encode_completion_ack() [4]u8 {
+    return encode_no_args(CMD_V, CMD_A)
+}
+
+func encode_completion_count() [4]u8 {
+    return encode_no_args(CMD_V, CMD_C)
 }

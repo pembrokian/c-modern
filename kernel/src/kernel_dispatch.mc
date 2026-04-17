@@ -7,6 +7,7 @@
 // This module owns how an incoming observation is turned into an Effect.
 
 import boot
+import completion_mailbox_service
 import echo_service
 import file_service
 import journal_service
@@ -304,9 +305,16 @@ func dispatch_journal(state: *boot.KernelBootState, msg: service_effect.Message)
     return journal_result.effect
 }
 
+func dispatch_completion_mailbox(state: *boot.KernelBootState, msg: service_effect.Message) service_effect.Effect {
+    current: boot.KernelBootState = *state
+    result: completion_mailbox_service.CompletionMailboxResult = completion_mailbox_service.handle(current.completion.state, msg)
+    *state = boot.bootwith_completion(current, result.state)
+    return result.effect
+}
+
 func dispatch_workflow(state: *boot.KernelBootState, msg: service_effect.Message) service_effect.Effect {
     current: boot.KernelBootState = *state
-    step := workflow_service.step(current.workflow.state, current.timer.state, current.task.state, current.journal.state, msg, u8(current.workset_generation))
+    step := workflow_service.step(current.workflow.state, current.timer.state, current.task.state, current.journal.state, current.completion.state, msg, u8(current.workset_generation))
     if journal_service.journal_changed(current.journal.state, step.journal) {
         if !journal_service.journal_persist(step.journal) {
             return service_effect.effect_reply(syscall.SyscallStatus.Closed, 0, primitives.zero_payload())
@@ -316,6 +324,7 @@ func dispatch_workflow(state: *boot.KernelBootState, msg: service_effect.Message
     next = boot.bootwith_timer(next, step.timer)
     next = boot.bootwith_task(next, step.task)
     next = boot.bootwith_journal(next, step.journal)
+    next = boot.bootwith_completion(next, step.completion)
     *state = next
     return step.effect
 }
@@ -377,6 +386,8 @@ func leaf_route(endpoint: u32) LeafRoute {
         return LeafRoute{ endpoint: endpoint, reply: dispatch_journal }
     case service_topology.WORKFLOW_ENDPOINT_ID:
         return LeafRoute{ endpoint: endpoint, reply: dispatch_workflow }
+    case service_topology.COMPLETION_MAILBOX_ENDPOINT_ID:
+        return LeafRoute{ endpoint: endpoint, reply: dispatch_completion_mailbox }
     default:
         return LeafRoute{ endpoint: endpoint, reply: dispatch_invalid_endpoint }
     }
