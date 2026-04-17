@@ -411,6 +411,34 @@ void TestMissingFreestandingBootstrapTargetEmitsNotes(const std::filesystem::pat
                          "missing freestanding target should tell the user which manifest field to add");
 }
 
+void TestSelectorRegistrationIntegrityFollowsDescriptors(const std::filesystem::path& source_root,
+                                                         const std::filesystem::path& binary_root) {
+    const std::filesystem::path selector_script = source_root / "tools/select_tests.py";
+    const std::filesystem::path output_path = binary_root / "select_tests_registration_integrity_output.txt";
+
+    const auto [outcome, output] = RunCommandCapture({"/usr/bin/env",
+                                                      "python3",
+                                                      selector_script.generic_string(),
+                                                      "--source-root",
+                                                      source_root.generic_string(),
+                                                      "--changed",
+                                                      "tests/tool/workflow/kernel-reset-lane/case.toml",
+                                                      "--changed",
+                                                      "tests/tool/real_projects/issue-rollup/case.toml"},
+                                                     output_path,
+                                                     "selector registration integrity check");
+    if (!outcome.exited || outcome.exit_code != 0) {
+        Fail("select_tests.py should accept the discovered workflow and real-project descriptors:\n" + output);
+    }
+
+    ExpectOutputContains(output,
+                         "mc_tool_workflow_kernel_reset_lane_unit",
+                         "selector should keep the kernel reset lane workflow case registered");
+    ExpectOutputContains(output,
+                         "mc_tool_real_project_issue_rollup_unit",
+                         "selector should keep the issue-rollup real-project case registered");
+}
+
 }  // namespace
 
 namespace mc::tool_tests {
@@ -427,6 +455,7 @@ void RunWorkflowProjectValidationSuite(const std::filesystem::path& source_root,
     TestExecutableTargetRejectsNonStaticLibraryLink(binary_root, mc_path);
     TestUnsupportedFreestandingBootstrapTargetEmitsNotes(binary_root, mc_path);
     TestMissingFreestandingBootstrapTargetEmitsNotes(binary_root, mc_path);
+    TestSelectorRegistrationIntegrityFollowsDescriptors(source_root, binary_root);
 }
 
 }  // namespace mc::tool_tests

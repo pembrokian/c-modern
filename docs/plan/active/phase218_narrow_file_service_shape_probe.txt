@@ -15,9 +15,6 @@ Implementation notes
 --------------------
 - file_service.mc admitted as the bounded file-like owner; state is
   FileServiceState { pid, slot, names: [4]u8, data: [4]u8, lens: [4]u8, count }
-- That exact provisional storage shape became historical after Phase 221,
-  which replaced it with four explicit `FileSlot` records while preserving the
-  same bounded protocol and retained-versus-durable boundary.
 - FILE_ENDPOINT_ID = 18, pid = 9; added to service_topology.mc as FILE_SLOT and
   SERVICE_COUNT updated to 9
 - CMD_F (byte 'F') protocol family added to serial_protocol.mc with four
@@ -50,21 +47,13 @@ service ownership boundaries.
 
 Repository status note
 ----------------------
-- Phase 221 later replaced the provisional parallel-array state shape with an
-  explicit slot-in-state redesign while keeping the service owner local and the
-  protocol unchanged.
-- Phase 226 later widened the admitted file payload behavior from the original
-  one-byte probe cap to bounded retained append and bounded retained read up to
-  four bytes using the already-landed explicit `FileSlot` shape; the original
-  one-byte limit is historical context, not current repository truth.
 - The running-system slice already exposes an explicit retained-versus-durable
   boundary query and keeps durable state unadmitted.
 - Current support wording still excludes filesystem frameworks, durable logs,
   mountable namespaces, persistent object stores, and generalized recovery
   machinery.
-- The original one-byte probe has now served its purpose; later file growth
-  should still remain owner-local unless a stronger retained-versus-durable or
-  namespace pressure appears.
+- The next honest pressure step is to prototype one bounded file-like owner
+  surface and observe what semantics are truly needed.
 
 Problem being solved
 --------------------

@@ -35,6 +35,9 @@ Current structure
 - `real_projects/<case-name>/test.cpp`: case-local real-project
   implementation owner for that descriptor directory when the case has
   bespoke behavior.
+- `tools/tool_case_manifest.py`: shared descriptor loader that now also
+  checks descriptor family, runner, owned roots, and real-project co-located
+  `test.cpp` files before registration output is generated.
 - `../../docs/arch/c-lang/tools/grouped_tool_test_operator_reference.txt`:
   short operator-facing reference for grouped tool and real-project test
   maintenance.
@@ -49,6 +52,8 @@ Layout rule
   lookup.
 - Keep grouped workflow and real-project case identity descriptor-driven.
 - Keep descriptor semantics unified through `tools/tool_case_manifest.py`.
+- Keep the registration integrity check in the shared descriptor loader so
+  CMake and the local selector see the same ownership truth.
 - Add a new grouped workflow or real-project case by creating one adjacent
   `case.toml`, not by editing parallel case-name registries.
 - Keep Veya-facing execution proofs in this directory for now rather than

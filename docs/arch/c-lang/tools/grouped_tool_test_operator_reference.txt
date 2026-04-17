@@ -13,8 +13,9 @@ What owns grouped case identity
 - `tests/tool/real_projects/<case-name>/case.toml` owns grouped real-project
   case identity.
 - `tools/tool_case_manifest.py` is the one repository-owned descriptor
-  implementation path. It validates descriptors, emits grouped runner include
-  fragments, and emits CTest registration fragments.
+  implementation path. It validates descriptors, owned roots, and real-project
+  co-located implementation files, then emits grouped runner include
+  fragments and CTest registration fragments.
 
 What stays explicit
 

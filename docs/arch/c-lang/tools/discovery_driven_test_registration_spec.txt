@@ -43,7 +43,9 @@ Current landed scope
   checked-in source of truth for grouped real-project case identity.
 - `tools/tool_case_manifest.py` is now the one repository-owned descriptor
   implementation path used for grouped workflow and real-project descriptor
-  semantics.
+  semantics. It also validates descriptor family, runner, owned roots, and
+  real-project co-located `test.cpp` files before registration outputs are
+  generated.
 - `cmake/ToolTestRegistration.cmake` now calls that shared descriptor path at
   configure time and derives per-case CTest registration from it.
 - the grouped C++ runners now dispatch from generated case data derived from

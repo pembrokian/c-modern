@@ -3,7 +3,7 @@ Phase 228 -- Workflow Registration Hygiene Follow-Through
 
 Status
 ------
-PLANNED
+COMPLETED (2026-04-17)
 
 Purpose
 -------
@@ -63,6 +63,15 @@ Why this is the narrowest honest landing
 - The next maintenance risk is integrity drift, not missing abstraction.
 - One focused guard is enough to catch the class of errors that the new model
   can now make visible.
+
+Implementation note
+-------------------
+- The shared descriptor loader now validates descriptor family, runner, owned
+  roots, and real-project co-located `test.cpp` files before registration
+  outputs are generated.
+- `tests/tool/tool_project_validation_suite.cpp` exercises the selector over
+  representative workflow and real-project descriptors so the guard remains
+  covered by the workflow suite.
 
 Validation expectations
 -----------------------

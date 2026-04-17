@@ -19,6 +19,61 @@ class ToolCaseDescriptor:
     roots: tuple[str, ...]
 
 
+def _case_directory_for_descriptor(descriptor: ToolCaseDescriptor, source_root: Path) -> Path:
+    return source_root / Path(descriptor.descriptor_path).parent
+
+
+def verify_tool_case_descriptors(
+    descriptors: list[ToolCaseDescriptor],
+    source_root: Path,
+    relative_root: str,
+    expected_family: str,
+    expected_runner: str,
+) -> None:
+    seen_names: set[str] = set()
+    seen_selectors: set[str] = set()
+    seen_ctest_names: set[str] = set()
+
+    for descriptor in descriptors:
+        if descriptor.family != expected_family:
+            raise ValueError(
+                f"descriptor {descriptor.descriptor_path} has family '{descriptor.family}', expected '{expected_family}'"
+            )
+        if descriptor.runner != expected_runner:
+            raise ValueError(
+                f"descriptor {descriptor.descriptor_path} has runner '{descriptor.runner}', expected '{expected_runner}'"
+            )
+
+        if descriptor.name in seen_names:
+            raise ValueError(f"duplicate descriptor name '{descriptor.name}' in {relative_root}")
+        seen_names.add(descriptor.name)
+
+        if descriptor.selector in seen_selectors:
+            raise ValueError(f"duplicate descriptor selector '{descriptor.selector}' in {relative_root}")
+        seen_selectors.add(descriptor.selector)
+
+        ctest_name = ctest_name_for_descriptor(descriptor)
+        if ctest_name in seen_ctest_names:
+            raise ValueError(f"duplicate generated CTest name '{ctest_name}' in {relative_root}")
+        seen_ctest_names.add(ctest_name)
+
+        for owned_root in descriptor.roots:
+            owned_path = source_root / owned_root
+            if not owned_path.exists():
+                raise ValueError(
+                    f"descriptor {descriptor.descriptor_path} references missing owned path: {owned_root}"
+                )
+
+        case_directory = _case_directory_for_descriptor(descriptor, source_root)
+        if descriptor.family == "tool-real-project":
+            test_source = case_directory / "test.cpp"
+            if not test_source.exists():
+                raise ValueError(f"real-project descriptor {descriptor.descriptor_path} is missing {test_source.relative_to(source_root)}")
+
+    if len(seen_names) != len(descriptors) or len(seen_selectors) != len(descriptors):
+        raise ValueError(f"descriptor integrity check failed under {relative_root}")
+
+
 def parse_tool_case_descriptor(descriptor_path: Path, source_root: Path) -> ToolCaseDescriptor:
     values: dict[str, str] = {}
     arrays: dict[str, list[str]] = {}
@@ -92,15 +147,9 @@ def load_tool_case_descriptors(
     descriptors: list[ToolCaseDescriptor] = []
     for descriptor_path in descriptor_paths:
         descriptor = parse_tool_case_descriptor(descriptor_path, source_root)
-        if descriptor.family != expected_family:
-            raise ValueError(
-                f"descriptor {descriptor_path} has family '{descriptor.family}', expected '{expected_family}'"
-            )
-        if descriptor.runner != expected_runner:
-            raise ValueError(
-                f"descriptor {descriptor_path} has runner '{descriptor.runner}', expected '{expected_runner}'"
-            )
         descriptors.append(descriptor)
+
+    verify_tool_case_descriptors(descriptors, source_root, relative_root, expected_family, expected_runner)
     return descriptors
 
 
