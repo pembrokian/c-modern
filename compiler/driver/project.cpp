@@ -8,6 +8,7 @@
 #include <string_view>
 #include <unordered_set>
 
+#include "compiler/codegen_llvm/backend.h"
 #include "compiler/support/module_paths.h"
 
 namespace mc::driver {
@@ -38,6 +39,13 @@ bool IsPlainStartupName(std::string_view name) {
         }
     }
     return true;
+}
+
+std::string JoinBootstrapTargetChoices(const mc::codegen_llvm::TargetConfig& config) {
+    if (config.target_family.empty() || config.target_family == config.triple) {
+        return config.triple;
+    }
+    return config.triple + ", " + config.target_family;
 }
 
 struct ParsedValue {
@@ -292,6 +300,30 @@ void ReportTargetSelectionNotes(const ProjectFile& project,
         .span = mc::support::kDefaultSourceSpan,
         .severity = DiagnosticSeverity::kNote,
         .message = "pass --target <name> to select one target explicitly",
+    });
+}
+
+void ReportBootstrapTargetNotes(const ProjectFile& project,
+                                std::string_view target_name,
+                                support::DiagnosticSink& diagnostics) {
+    const auto config = mc::codegen_llvm::BootstrapTargetConfig();
+    diagnostics.Report({
+        .file_path = project.path,
+        .span = mc::support::kDefaultSourceSpan,
+        .severity = DiagnosticSeverity::kNote,
+        .message = "supported bootstrap targets: " + JoinBootstrapTargetChoices(config),
+    });
+
+    std::string target_assignment = "set [targets." + std::string(target_name) + "] target = \"" + config.triple + "\"";
+    if (!config.target_family.empty() && config.target_family != config.triple) {
+        target_assignment += " or \"" + config.target_family + "\"";
+    }
+    target_assignment += " in build.toml";
+    diagnostics.Report({
+        .file_path = project.path,
+        .span = mc::support::kDefaultSourceSpan,
+        .severity = DiagnosticSeverity::kNote,
+        .message = std::move(target_assignment),
     });
 }
 
@@ -891,6 +923,7 @@ std::optional<ProjectFile> LoadProjectFile(const std::filesystem::path& path,
                     .severity = DiagnosticSeverity::kError,
                     .message = "target '" + name + "' must declare an explicit freestanding target",
                 });
+                ReportBootstrapTargetNotes(project, name, diagnostics);
             }
             if (target.runtime_startup == "default") {
                 diagnostics.Report({

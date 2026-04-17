@@ -371,6 +371,46 @@ void TestUnsupportedFreestandingBootstrapTargetEmitsNotes(const std::filesystem:
                          "unsupported bootstrap target should tell the user which manifest field to change");
 }
 
+void TestMissingFreestandingBootstrapTargetEmitsNotes(const std::filesystem::path& binary_root,
+                                                      const std::filesystem::path& mc_path) {
+    const std::filesystem::path missing_target_root = binary_root / "missing_freestanding_target_project";
+    std::filesystem::remove_all(missing_target_root);
+    WriteFile(missing_target_root / "build.toml",
+              "schema = 1\n"
+              "project = \"phase223a-missing-freestanding-target\"\n"
+              "default = \"kernel\"\n"
+              "\n"
+              "[targets.kernel]\n"
+              "kind = \"exe\"\n"
+              "package = \"phase223a-missing-freestanding-target\"\n"
+              "root = \"src/main.mc\"\n"
+              "mode = \"debug\"\n"
+              "env = \"freestanding\"\n"
+              "\n"
+              "[targets.kernel.search_paths]\n"
+              "modules = [\"src\"]\n"
+              "\n"
+              "[targets.kernel.runtime]\n"
+              "startup = \"kernel_entry\"\n");
+    WriteFile(missing_target_root / "src/main.mc", "func main() i32 { return 0 }\n");
+
+    const std::string missing_target_output = BuildProjectTargetAndExpectFailure(mc_path,
+                                                                                 missing_target_root / "build.toml",
+                                                                                 binary_root / "missing_freestanding_target_build",
+                                                                                 "kernel",
+                                                                                 "missing_freestanding_target_output.txt",
+                                                                                 "missing freestanding target build");
+    ExpectOutputContains(missing_target_output,
+                         "target 'kernel' must declare an explicit freestanding target",
+                         "missing freestanding target should fail during project validation");
+    ExpectOutputContains(missing_target_output,
+                         "note: supported bootstrap targets:",
+                         "missing freestanding target should list supported bootstrap targets");
+    ExpectOutputContains(missing_target_output,
+                         "note: set [targets.kernel] target = \"",
+                         "missing freestanding target should tell the user which manifest field to add");
+}
+
 }  // namespace
 
 namespace mc::tool_tests {
@@ -386,6 +426,7 @@ void RunWorkflowProjectValidationSuite(const std::filesystem::path& source_root,
     TestDuplicateTargetRootsFailEarly(binary_root, mc_path);
     TestExecutableTargetRejectsNonStaticLibraryLink(binary_root, mc_path);
     TestUnsupportedFreestandingBootstrapTargetEmitsNotes(binary_root, mc_path);
+    TestMissingFreestandingBootstrapTargetEmitsNotes(binary_root, mc_path);
 }
 
 }  // namespace mc::tool_tests

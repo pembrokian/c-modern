@@ -3,7 +3,7 @@ Phase 223A -- Project Validation Diagnostic Note Follow-Through
 
 Status
 ------
-ACTIVE
+COMPLETED
 
 Purpose
 -------
@@ -135,3 +135,30 @@ Why this is still a plausible next move
 - The grouped project-validation suite already provides a cheap focused
   validation surface.
 - This remains narrower than reopening any non-compiler error surface.
+
+Implementation outcome
+----------------------
+- Selected sub-defect: missing explicit freestanding `target` in
+  `compiler/driver/project.cpp`.
+- Landed one owner-local helper that emits additive notes naming the
+  supported bootstrap targets and the exact `[targets.<name>] target = ...`
+  manifest assignment to add.
+- Preserved the existing error string and kept builder, support-layer, and
+  non-compiler error surfaces unchanged.
+- Added one focused grouped regression in
+  `tests/tool/tool_project_validation_suite.cpp` covering the early
+  project-validation failure path.
+
+Validation
+----------
+- `Build debug`
+- `mc_tool_workflow_project_validation_unit`
+
+Closeout
+--------
+- Phase 223A is complete.
+- Maintained non-goals: no builder-owned repair, no support-layer redesign,
+  no source-level `errors.Error` widening, no compact kernel-status widening,
+  and no categories, fix-its, localization, or IDE integration work.
+- No new language limitation was encountered while landing this slice, so the
+  backlog `Potential language features` section does not need a new entry.
