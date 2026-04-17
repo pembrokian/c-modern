@@ -3,7 +3,7 @@ Phase 227 -- Retained Restart Identity Follow-Through
 
 Status
 ------
-PLANNED
+COMPLETED
 
 Purpose
 -------
@@ -67,6 +67,26 @@ Why this is the narrowest honest landing
   easier to compare, not about discovering new classes of retained behavior.
 - A single compact query keeps the shell contract bounded and keeps the work
   local to the modules that already own the underlying truth.
+
+Implemented outcome
+-------------------
+- `kernel/src/serial_protocol.mc` now admits one additive lifecycle
+  comparison query, `XM<target>!`, on the existing shell-visible lifecycle
+  family.
+- `kernel/src/boot/boot_identity.mc` continues to own the retained summary
+  truth and now exposes that same owner-local projection through a comparison
+  helper so the shell layer does not reconstruct retained state.
+- `kernel/src/kernel_dispatch.mc` and `kernel/src/shell/shell_service.mc`
+  now route the comparison query through the same bounded shell control hop
+  already used for lifecycle query, identity, summary, and restart.
+- `kernel/src/scenarios/scenario_retained_restart_identity.mc` now proves the
+  comparison path across fresh boot, ordinary restart, retained reload, and
+  coordinated retained reload.
+- `tests/system/kernel_reset_lane_phase227_retained_restart_identity/` adds
+  the focused reset-lane fixture for the new comparison contract, and the
+  grouped reset-lane workflow suite now owns it.
+- No compiler, sema, MIR, backend, ABI, target, runtime, stdlib, or `hal`
+  expansion was admitted in this phase.
 
 Validation expectations
 -----------------------

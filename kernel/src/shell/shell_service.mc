@@ -44,7 +44,7 @@ func bang23(m: service_effect.Message) bool {
 }
 
 func lifecycle_op_supported(op: u8) bool {
-    return op == serial_protocol.CMD_A || op == serial_protocol.CMD_C || op == serial_protocol.CMD_D || op == serial_protocol.CMD_I || op == serial_protocol.CMD_P || op == serial_protocol.CMD_S || op == serial_protocol.CMD_R
+    return op == serial_protocol.CMD_A || op == serial_protocol.CMD_C || op == serial_protocol.CMD_D || op == serial_protocol.CMD_I || op == serial_protocol.CMD_M || op == serial_protocol.CMD_P || op == serial_protocol.CMD_S || op == serial_protocol.CMD_R
 }
 
 func lifecycle_control(m: service_effect.Message) LifecycleControl {
@@ -160,6 +160,10 @@ func lifecycle_policy_effect(status: syscall.SyscallStatus, payload: [4]u8) serv
 }
 
 func lifecycle_summary_request(s: ShellServiceState, m: service_effect.Message) service_effect.Effect {
+    return service_effect.effect_send(s.pid, service_topology.SHELL_ENDPOINT_ID, m.payload_len, m.payload)
+}
+
+func lifecycle_compare_request(s: ShellServiceState, m: service_effect.Message) service_effect.Effect {
     return service_effect.effect_send(s.pid, service_topology.SHELL_ENDPOINT_ID, m.payload_len, m.payload)
 }
 
@@ -295,6 +299,14 @@ func handle(s: ShellServiceState, m: service_effect.Message) service_effect.Effe
                 }
             }
             return lifecycle_summary_request(s, m)
+        case serial_protocol.CMD_M:
+            if !identity_taxonomy.identity_target_is_lane(m.payload[2]) {
+                compare_endpoint: u32 = lifecycle_target_endpoint(m.payload[2])
+                if compare_endpoint == 0 || !service_topology.service_can_restart(compare_endpoint) {
+                    return invalid_effect(SHELL_INVALID_COMMAND)
+                }
+            }
+            return lifecycle_compare_request(s, m)
         case serial_protocol.CMD_R:
             if identity_taxonomy.identity_target_is_lane(m.payload[2]) {
                 return lifecycle_request(s, m)

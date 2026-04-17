@@ -19,6 +19,7 @@
 //   X Q <target> !  — lifecycle query
 //   X P <target> !  — lifecycle policy query
 //   X S <target> !  — retained summary query
+//   X M <target> !  — retained/restart comparison query
 //   X R <target> !  — explicit restart
 //
 // The CMD_* constants are shared between the encode side (this module) and
@@ -133,6 +134,10 @@ func encode_lifecycle_policy(target: u8) [4]u8 {
 
 func encode_lifecycle_summary(target: u8) [4]u8 {
     return ipc.payload_byte(CMD_X, CMD_S, target, CMD_BANG)
+}
+
+func encode_lifecycle_compare(target: u8) [4]u8 {
+    return ipc.payload_byte(CMD_X, CMD_M, target, CMD_BANG)
 }
 
 func encode_lifecycle_restart(target: u8) [4]u8 {

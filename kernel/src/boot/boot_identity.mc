@@ -197,6 +197,10 @@ func bootsummary_payload_for_target(s: KernelBootState, target: u8) [4]u8 {
     return bootsummary_payload_for_endpoint(s, endpoint)
 }
 
+func bootcomparison_payload_for_target(s: KernelBootState, target: u8) [4]u8 {
+    return bootsummary_payload_for_target(s, target)
+}
+
 func boot_echo_mark(s: KernelBootState) service_identity.ServiceMark {
     return service_identity.service_mark(service_topology.ECHO_ENDPOINT_ID, s.echo.state.pid, s.echo.generation)
 }

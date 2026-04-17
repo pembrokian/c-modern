@@ -197,6 +197,17 @@ func lifecycle_summary_reply(state: *boot.KernelBootState, target: u8) service_e
     return shell_service.lifecycle_summary_effect(syscall.SyscallStatus.Ok, boot.bootsummary_payload_for_endpoint(*state, summary_endpoint))
 }
 
+func lifecycle_compare_reply(state: *boot.KernelBootState, target: u8) service_effect.Effect {
+    if lifecycle_is_lane_target(target) {
+        return shell_service.lifecycle_summary_effect(syscall.SyscallStatus.Ok, boot.bootcomparison_payload_for_target(*state, target))
+    }
+    compare_endpoint: u32 = lifecycle_target_endpoint(target)
+    if compare_endpoint == 0 || !service_topology.service_can_restart(compare_endpoint) {
+        return shell_service.invalid_effect(shell_service.SHELL_INVALID_COMMAND)
+    }
+    return shell_service.lifecycle_summary_effect(syscall.SyscallStatus.Ok, boot.bootcomparison_payload_for_target(*state, target))
+}
+
 func lifecycle_restart_reply(state: *boot.KernelBootState, target: u8) service_effect.Effect {
     if target == serial_protocol.TARGET_AUDIT {
         *state = init.restart_retained_audit_lane(*state)
@@ -292,6 +303,8 @@ func lifecycle_route(op: u8) LifecycleRoute {
         return LifecycleRoute{ op: op, reply: lifecycle_policy_reply }
     case serial_protocol.CMD_S:
         return LifecycleRoute{ op: op, reply: lifecycle_summary_reply }
+    case serial_protocol.CMD_M:
+        return LifecycleRoute{ op: op, reply: lifecycle_compare_reply }
     case serial_protocol.CMD_R:
         return LifecycleRoute{ op: op, reply: lifecycle_restart_reply }
     default:
