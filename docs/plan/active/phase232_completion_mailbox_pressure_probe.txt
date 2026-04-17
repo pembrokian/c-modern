@@ -1,0 +1,139 @@
+Phase 232 -- Completion Mailbox Pressure Probe
+==============================================
+
+Status
+------
+PROPOSED
+
+Purpose
+-------
+Admit one bounded completion-facing mailbox owner so workflow and task outcome
+delivery becomes a real user-visible pressure surface instead of remaining a
+mix of direct queries and queue-local observations.
+
+This phase is the third step of the recoverable work pipeline. It should turn
+queue pressure, WouldBlock, Exhausted, and bounded delivery consequences into
+an actual completion path under load.
+
+Repository status note
+----------------------
+- Phase 196 added queue count and peek observability.
+- Phase 215 made explicit reject-on-full behavior visible.
+- Phase 216 made persistent stall and `WouldBlock` caller-visible.
+- Phase 231 is expected to create real workflow completions and failures that
+  now need a delivery surface stronger than repeated polling.
+
+Problem being solved
+--------------------
+- The repository can already model queue scarcity and stalled consequences, but
+  it still lacks a real completion consumer that forces those semantics to
+  matter in system behavior.
+- Without a mailbox-like owner, workflow and task outcomes risk falling back to
+  direct query loops, which under-stresses backpressure, delivery fairness, and
+  abandoned work.
+- A completion surface is the narrowest honest way to make queue pressure and
+  delivery failure operational without widening into a general messaging or
+  process framework.
+
+Core rule
+---------
+- Keep the mailbox bounded and owner-local.
+- Focus on completion or failure delivery only.
+- Keep queue pressure consequences explicit.
+- Prefer rejection, bounded retry, or explicit drop over hidden buffering.
+- Do not widen into subscriptions, discovery, generic mailbox frameworks, or a
+  second IPC system.
+
+Chosen slice for this phase
+---------------------------
+1. add one `completion_mailbox_service` owner under `kernel/src/services/`
+2. admit one compact operation family only:
+   - enqueue a workflow or task completion record
+   - fetch or acknowledge the next available completion record
+   - query bounded completion backlog state if needed to keep the owner honest
+3. make full-queue and stall consequences caller-visible on the completion path
+4. if bounded retry is required, keep it inside the completion owner or the
+   workflow owner rather than introducing a cross-system buffering policy
+5. add one deterministic scenario and one reset-lane fixture proving ordinary
+   completion delivery, full-queue rejection, and one stalled-delivery case
+
+Phase role in the larger sequence
+---------------------------------
+- Phase 232 is where queue pressure becomes real workflow delivery pressure.
+- It should consume the workflow outcomes created by Phase 231.
+- It may use the Phase 230 journal only if completion recovery across restart
+  becomes a real caller-visible need; otherwise keep completion delivery
+  restart semantics explicit and bounded.
+- Phase 233 should use this completion lane to expose stale delegation or grant
+  invalidation outcomes when authority-bearing workflows fail.
+
+Relevant backlog items this phase intentionally brings under pressure
+--------------------------------------------------------------------
+- queue observability bounded to count and peek
+- queue-pressure policy owner-local with explicit reject-on-full semantics
+- stall-consequence classification owner-local to queue_service
+- task-service follow-through bounded to explicit work-state consequences
+- compact status and classifier reporting only if a caller-visible gap is
+  actually exposed by completion consumers
+
+Concretely, this phase is expected to exercise the backlog themes currently
+recorded in:
+- `docs/plan/backlog.txt` queue observability, pressure, and stall entries
+  after Phases 196, 215, and 216
+- `docs/plan/backlog.txt` task follow-through after Phase 225
+- `docs/plan/backlog.txt` compact status widening deferral only if completion
+  consumers prove the current compact contract insufficient
+
+Questions this phase must answer
+--------------------------------
+1. Is one completion-only mailbox enough to create meaningful delivery
+   pressure?
+2. Which failure truth is honest on full delivery paths: reject, retry,
+   explicit drop, or explicit abandoned completion?
+3. Does the existing compact status payload remain sufficient once outcomes are
+   consumed indirectly instead of by direct query?
+4. Can delivery pressure stay owner-local, or does one later phase need a more
+   explicit cross-owner fairness story?
+
+Preferred implementation shape
+------------------------------
+- Keep the owner under `kernel/src/services/` and route it through the existing
+  shell and dispatch path.
+- Reuse current queue-owned consequence language where possible instead of
+  inventing new pressure terminology.
+- Keep any completion record shape fixed and small.
+- Prefer one explicit backlog query over a family of observability commands.
+
+Non-goals
+---------
+- no generic mailbox framework
+- no pub-sub system
+- no streaming transport or second IPC layer
+- no service discovery registry
+- no fairness framework unless one real outcome path proves the current model
+  dishonest
+- no process supervisor or operator dashboard
+
+Validation expectations
+-----------------------
+- `Build debug`
+- one focused scenario proving ordinary completion delivery and full-queue
+  behavior
+- one focused reset-lane workflow fixture for the completion mailbox owner
+- grouped reset-lane workflow coverage for touched paths
+
+Exit criteria
+-------------
+- one bounded completion mailbox can deliver workflow or task outcomes
+- full and stalled delivery paths are caller-visible and deterministic
+- queue pressure semantics become operational on a real completion path
+- no generic messaging framework is introduced
+
+Why this is the narrowest honest next move
+------------------------------------------
+- The queue backlog already records observability, full-queue, and stall truth,
+  but those truths still need a stronger consumer than inspection alone.
+- A completion mailbox makes delivery pressure real without opening a general
+  mailbox or scheduler framework.
+- It also creates the right setup for authority-bearing workflow failures in
+  the following delegation phase.

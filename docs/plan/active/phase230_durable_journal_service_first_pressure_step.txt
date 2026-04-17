@@ -1,0 +1,146 @@
+Phase 230 -- Durable Journal Service First Pressure Step
+========================================================
+
+Status
+------
+PROPOSED
+
+Purpose
+-------
+Admit the first deliberately pressure-building service after the recent
+owner-local follow-through wave: one bounded durable journal owner that makes
+crash-surviving named records, explicit replay, and recovery truth executable
+without widening into a filesystem, storage framework, or package system.
+
+This phase is the first step of a recoverable work pipeline. It is meant to
+create pressure, not just clean up already-admitted surfaces.
+
+Repository status note
+----------------------
+- Phase 217 made the retained-versus-durable boundary explicit but intentionally
+  did not admit durable storage.
+- Phase 218 admitted a narrow file-like owner to pressure names and operation
+  shape without opening persistence.
+- Phase 226 widened the current file owner from one-byte write-once behavior to
+  bounded retained append and retained prefix read.
+- Phase 227 improved retained restart identity comparison, but still stayed on
+  the retained side of the boundary.
+- The backlog now has enough deferred durable and retained coordination entries
+  that the next honest move is to admit one real durable owner rather than
+  another inspection surface.
+
+Problem being solved
+--------------------
+- The current running-system slice can model retained state and restart policy,
+  but it still cannot prove one bounded durable recovery story.
+- Without a real durable owner, the retained-versus-durable boundary remains
+  mostly classificatory rather than capability-forcing.
+- Several backlog entries around retained reload, file-like growth, and
+  coordinated retained identity are waiting for a consumer that makes recovery,
+  replay, and durable naming unavoidable.
+
+Core rule
+---------
+- Admit one durable owner only.
+- Keep the durable contract append-only and replay-oriented.
+- Keep names fixed and bounded.
+- Keep recovery explicit and testable.
+- Do not widen into general filesystem, delete, truncate, directories, or
+  mountable namespaces.
+
+Chosen slice for this phase
+---------------------------
+1. add one `journal_service` owner under `kernel/src/services/`
+2. admit one compact operation family only:
+   - append one bounded record to a named journal lane
+   - replay records from a named lane in deterministic order
+   - clear or rotate a named lane only if the owner requires one bounded reset
+     operation to stay testable
+3. make durability explicit across restart and rebuild the journal from the
+   durable owner rather than from retained boot state
+4. keep record payload shape fixed and small so the pressure stays on durable
+   semantics, recovery, and naming rather than on protocol width
+5. add one deterministic scenario and one reset-lane workflow proving replay
+   after restart
+
+Phase role in the larger sequence
+---------------------------------
+- Phase 230 creates the durable substrate for the later workflow lane.
+- Phase 231 should consume this journal rather than inventing its own hidden
+  persistence path.
+- Phase 232 should use it for completion records or mailbox recovery only if a
+  real consumer proves that necessary.
+- Phase 233 should use it to expose stale delegation and recovery ordering
+  truth, not to become a general authority store.
+
+Relevant backlog items this phase intentionally brings under pressure
+--------------------------------------------------------------------
+- retained-versus-durable state classification
+- file-like service growth
+- file-service payload semantics
+- retained-state reload explicit and init-owned
+- coordinated retained identity bounded to one explicit workset marker
+- second-bundle retained coordination explicit and flat
+
+Concretely, this phase is expected to exercise the backlog themes currently
+recorded in:
+- `docs/plan/backlog.txt` durable boundary and file-like entries after Phases
+  217, 218, and 226
+- `docs/plan/backlog.txt` retained reload and coordinated retained entries
+  after Phases 179, 200, and 201
+
+Questions this phase must answer
+--------------------------------
+1. What is the narrowest durable record shape that still creates real replay
+   pressure?
+2. Which parts of recovery belong in `journal_service` versus boot or init?
+3. Does one durable owner remain honest without a filesystem namespace or path
+   graph?
+4. Which existing retained coordination helpers become insufficient once one
+   owner is truly durable rather than merely retained?
+
+Preferred implementation shape
+------------------------------
+- Keep the owner under `kernel/src/services/journal_service.mc`.
+- Route compact commands through the existing shell and dispatch surfaces.
+- Keep dispatch on the post-Phase-224 narrow-routing boundary.
+- Prefer one small durable artifact or host-backed lane with explicit test
+  setup over a generic persistence layer.
+- If the phase needs metadata projection, keep it owner-local or boot-owned;
+  do not add a dashboard or registry.
+
+Non-goals
+---------
+- no filesystem framework
+- no path graph or directories
+- no durable object store beyond append-only journal lanes
+- no package manager or installer workflow
+- no hidden persistence hooks in task, file, queue, or transfer owners
+- no supervisor framework
+- no compiler, sema, MIR, runtime, or stdlib widening unless a concrete
+  language limitation is encountered while implementing the durable owner
+
+Validation expectations
+-----------------------
+- `Build debug`
+- one focused scenario proving append, restart, and replay
+- one focused reset-lane workflow fixture for the durable journal owner
+- grouped workflow coverage if the phase touches the existing reset-lane suite
+
+Exit criteria
+-------------
+- one named durable journal lane survives restart and replays deterministically
+- the durable contract stays bounded, append-only, and owner-local
+- retained-versus-durable pressure becomes executable rather than purely
+  classificatory
+- no filesystem, namespace, or storage framework is introduced
+
+Why this is the narrowest honest next move
+------------------------------------------
+- The repository has already exhausted several retained-only follow-through
+  gains without yet proving one durable recovery capability.
+- A bounded journal owner creates immediate pressure on naming, replay,
+  recovery, and restart ordering.
+- That pressure is exactly what the later workflow, mailbox, and delegation
+  phases need, while still stopping well short of a filesystem or durable
+  object framework.

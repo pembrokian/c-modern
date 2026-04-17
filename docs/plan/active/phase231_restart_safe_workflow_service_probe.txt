@@ -1,0 +1,145 @@
+Phase 231 -- Restart-Safe Workflow Service Probe
+================================================
+
+Status
+------
+PROPOSED
+
+Purpose
+-------
+Admit one bounded `workflow_service` that ties timer expiry to task execution,
+retry budget, and restart-visible cancellation or resumption so the repository
+stops treating timer, task, and restart identity as mostly separate local
+surfaces.
+
+This phase is the second step of the recoverable work pipeline. It should spend
+the durable pressure created by Phase 230 rather than inventing a new framework.
+
+Repository status note
+----------------------
+- Phase 220 admitted bounded `timer_service` and `task_service` owners.
+- Phase 225 completed one missing task consequence by making `DONE` reachable.
+- Phase 227 improved retained restart identity comparison across fixed targets.
+- The backlog still keeps timer growth, task follow-through, queue pressure,
+  and restart identity explicit and bounded because there has not yet been a
+  consumer that forces those surfaces to interact as one workflow.
+
+Problem being solved
+--------------------
+- Timer and task currently exist, but not as a real delayed-work system.
+- Restart identity and retained policy currently exist, but not as a real
+  workflow continuity contract.
+- Without one owner that binds timer, task, retry, and restart truth together,
+  further progress risks collapsing back into local inspections and one-off
+  consequence refinements.
+
+Core rule
+---------
+- Keep workflow ownership local to one service.
+- Admit explicit state transitions only.
+- Make restart continuity explicit: resume, cancel, or replay must be visible
+  and testable.
+- Use bounded retry or backoff only if a real caller-visible consequence needs
+  it.
+- Do not widen into a scheduler framework, process model, session model, or
+  generic job system.
+
+Chosen slice for this phase
+---------------------------
+1. add one `workflow_service` owner under `kernel/src/services/`
+2. admit one compact workflow model only:
+   - schedule delayed work against an existing timer id or due tick
+   - bind that delayed work to one bounded task submission or execution opcode
+   - query workflow state
+   - cancel workflow explicitly
+3. make restart behavior explicit for pending and in-flight workflows:
+   - resume if the underlying journal and policy say resume
+   - cancel if prerequisite state or generation truth invalidates the workflow
+   - record the outcome so callers can observe what happened
+4. if bounded retry is admitted, keep it inside a fixed retry budget rather
+   than opening a policy framework
+5. add one deterministic scenario and one reset-lane fixture proving timer to
+   task progression, restart behavior, and one failure path
+
+Phase role in the larger sequence
+---------------------------------
+- Phase 231 is the first true cross-owner pressure phase in the sequence.
+- It should consume Phase 230's durable journal as its explicit restart or
+  replay substrate when persistence is required.
+- Phase 232 should observe workflow completions and failures rather than
+  inventing an unrelated queue consumer.
+- Phase 233 should pressure authority and stale generation handling through
+  workflow-owned delegation cases.
+
+Relevant backlog items this phase intentionally brings under pressure
+--------------------------------------------------------------------
+- timer-service growth bounded to compact timeout and cancellation
+- task-service follow-through bounded to explicit work-state consequences
+- queue-pressure policy owner-local to queue_service
+- stall-consequence classification owner-local to queue_service
+- restart identity as a split contract rather than a framework
+- coordinated retained identity bounded to one explicit workset marker
+
+Concretely, this phase is expected to exercise the backlog themes currently
+recorded in:
+- `docs/plan/backlog.txt` timer and task entries after Phases 220 and 225
+- `docs/plan/backlog.txt` queue pressure and stall entries after Phases 215 and
+  216
+- `docs/plan/backlog.txt` restart identity and coordinated retained identity
+  entries after Phases 182 and 200
+
+Questions this phase must answer
+--------------------------------
+1. Is one workflow owner enough to bind timer and task honestly without a
+   scheduler framework?
+2. Which workflow states must survive restart, and which must be explicitly
+   cancelled?
+3. When a prerequisite generation changes, is cancellation enough or is one
+   bounded retry surface required?
+4. Does queue pressure remain local to queue owners, or does delayed work
+   expose a new cross-owner consequence that must still be represented owner-
+   locally?
+
+Preferred implementation shape
+------------------------------
+- Keep shell vocabulary compact and fixed-target.
+- Keep timer and task semantics in their existing owners; `workflow_service`
+  should compose them, not subsume them.
+- If persistence is needed, consume the Phase 230 journal explicitly rather
+  than hiding persistence in boot or init.
+- Keep restart outcome projection in the current boot or init identity owners
+  when possible rather than reconstructing it in shell.
+
+Non-goals
+---------
+- no scheduler framework
+- no process or session model
+- no worker pool or quota system
+- no supervisor policy or autonomic restart
+- no generalized dependency graph
+- no durable workflow registry beyond what is needed for one bounded workflow
+  owner
+
+Validation expectations
+-----------------------
+- `Build debug`
+- one focused scenario proving delayed execution and one restart outcome
+- one focused reset-lane workflow fixture for the workflow owner
+- grouped reset-lane coverage for touched workflow paths
+
+Exit criteria
+-------------
+- one bounded workflow can progress from scheduled to running to completed or
+  cancelled using existing timer and task owners
+- restart behavior for that workflow is explicit, deterministic, and testable
+- any retry behavior remains bounded and owner-local
+- no scheduler, session, or supervisor framework is introduced
+
+Why this is the narrowest honest next move
+------------------------------------------
+- Timer and task are already admitted, but they have not yet created the kind
+  of system pressure that exposes real workflow weaknesses.
+- A bounded workflow owner forces restart continuity, state transitions, queue
+  consequences, and recovery policy into one executable path.
+- That is stronger pressure than another timer or task inspection query, while
+  still far smaller than a general scheduler or process system.

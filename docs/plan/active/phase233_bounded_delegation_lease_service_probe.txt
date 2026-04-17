@@ -1,0 +1,152 @@
+Phase 233 -- Bounded Delegation Lease Service Probe
+===================================================
+
+Status
+------
+PROPOSED
+
+Purpose
+-------
+Admit one bounded delegation or lease owner that issues temporary authority for
+named workflow or data operations, allows one explicit handoff across the
+service chain, and makes stale generation or restart invalidation executable.
+
+This phase is the fourth step of the recoverable work pipeline. It is the phase
+that should tell the repository whether the current authority model is actually
+strong enough under real service interaction or merely coherent under small
+local workloads.
+
+Repository status note
+----------------------
+- Phase 182 made restart identity explicit through stable routing plus explicit
+  generation change.
+- Phases 184 and 185 repaired the handle-bearing receive boundary and kept one
+  explicit transfer exception.
+- Phase 198 kept multi-handle transfer bounded to one transfer owner and one
+  concrete pair shape.
+- Phases 209 and 212 turned the authority vocabulary and inspection model into
+  explicit repository-owned surfaces.
+- The backlog still keeps authority transfer, restart-visible user-issued
+  state, endpoint naming, and future authority changes tightly bounded because
+  no real service workload has yet forced them together.
+
+Problem being solved
+--------------------
+- The repository has a carefully articulated authority model, but not yet a
+  strong workload that forces temporary delegation, stale-handle invalidation,
+  and restart-visible authority loss through one visible service chain.
+- Without that pressure, authority surfaces can remain internally consistent
+  without proving they are sufficient.
+- A bounded delegation or lease owner is the narrowest honest way to create
+  that pressure without jumping to sessions, ACLs, or a capability framework.
+
+Core rule
+---------
+- Keep delegation temporary and bounded.
+- Keep the public endpoint model intact unless a real contradiction is proven.
+- Make stale generation and restart invalidation explicit.
+- Keep the transfer path narrow and auditable.
+- Do not widen into sessions, authentication, generic rights algebra, or a new
+  authority framework.
+
+Chosen slice for this phase
+---------------------------
+1. add one `lease_service` or `delegation_service` owner under
+   `kernel/src/services/`
+2. admit one compact operation family only:
+   - issue one bounded temporary lease or delegation token for a named object,
+     workflow, or journal lane
+   - consume that lease on one explicit follow-through path
+   - query or observe stale, invalid, or already-consumed outcomes
+3. tie lease validity to existing generation or restart identity where honest
+4. allow exactly one explicit service-chain handoff if needed to prove the
+   authority model under workflow pressure
+5. add one deterministic scenario and one reset-lane fixture proving valid
+   delegation, stale-after-restart rejection, and one consumed-twice or stale-
+   generation failure
+
+Phase role in the larger sequence
+---------------------------------
+- Phase 233 spends the workload created by Phases 230 through 232.
+- It should pressure durable records, workflows, and completion delivery with
+  one real temporary-authority path.
+- If this phase remains honest without broader changes, the repository earns a
+  much stronger claim that its current authority model is sufficient for the
+  admitted slice.
+- If it fails, that failure should point to one narrow follow-through, not to a
+  preemptive framework.
+
+Relevant backlog items this phase intentionally brings under pressure
+--------------------------------------------------------------------
+- restart-visible user-issued state local to `ticket_service`
+- restart identity as a split contract rather than a framework
+- endpoint ids as stable public names and routing keys
+- received-handle authority explicit at the dispatch gateway
+- transferred-handle runtime path bounded to one monotonic grant table and one
+  transfer-only service
+- future authority changes framed through the Phase 209 ownership vocabulary
+
+Concretely, this phase is expected to exercise the backlog themes currently
+recorded in:
+- `docs/plan/backlog.txt` authority and restart identity entries after Phases
+  182, 183, 185, 198, 209, and 212
+- `docs/plan/backlog.txt` ticket-service restart-visible user-issued state
+  entry after Phase 188
+
+Questions this phase must answer
+--------------------------------
+1. Can one temporary lease or delegation owner stay honest on top of the
+   current public-endpoint and transfer-only exception model?
+2. Is generation-based stale rejection sufficient, or does the service chain
+   expose one narrower missing contract?
+3. Which authority facts belong in the new owner versus the existing transfer
+   owner, boot identity helpers, and shell-visible inspection paths?
+4. Does one real delegation workload still fit the current authority vocabulary
+   without inventing new exception language?
+
+Preferred implementation shape
+------------------------------
+- Prefer reusing current transfer-owner machinery where possible rather than
+  creating a second unrelated grant path.
+- Keep shell inspection additive and compact if the phase needs one new query.
+- Keep restart and generation truth in the current identity owners rather than
+  reconstructing it in shell or dispatch.
+- Keep dispatch on the narrow routing and gating boundary already reasserted in
+  Phase 224.
+
+Non-goals
+---------
+- no session model
+- no authentication system
+- no ACL or capability framework
+- no generic rights algebra
+- no dynamic endpoint assignment
+- no supervisor framework
+- no durable authority registry beyond the bounded lease owner if one replay
+  path is required for correctness
+
+Validation expectations
+-----------------------
+- `Build debug`
+- one focused scenario proving ordinary delegation and one stale-after-restart
+  failure
+- one focused reset-lane workflow fixture for the lease or delegation owner
+- grouped reset-lane workflow coverage for touched workflow, transfer, and
+  authority paths
+
+Exit criteria
+-------------
+- one bounded temporary delegation path works across the admitted service chain
+- stale or restarted authority is rejected deterministically and visibly
+- the current authority model is pressure-tested by real workload rather than
+  only by inspection
+- no session, authentication, or capability framework is introduced
+
+Why this is the narrowest honest next move
+------------------------------------------
+- The repository already has more authority structure than most of the current
+  workloads need.
+- A bounded delegation owner is the fastest way to determine whether that
+  structure is genuinely sufficient under real restart and workflow pressure.
+- It creates a strong forcing function while still staying inside the current
+  endpoint, transfer, and identity model.
