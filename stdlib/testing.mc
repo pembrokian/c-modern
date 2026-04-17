@@ -11,7 +11,8 @@ func is_ok(err: errors.Error) bool {
 
 @private
 func report_failure(message: str) *i32 {
-    _ = io.write_line(message)
+    if errors.is_err(io.write_line(message)) {
+    }
     return fail()
 }
 
@@ -55,11 +56,16 @@ func print_i32_mismatch(label: str, actual: i32, expected: i32) *i32 {
     actual_text: str = str{ ptr: actual_bytes.ptr, len: actual_bytes.len }
     expected_text: str = str{ ptr: expected_bytes.ptr, len: expected_bytes.len }
 
-    _ = io.write(label)
-    _ = io.write(": got ")
-    _ = io.write(actual_text)
-    _ = io.write(", want ")
-    _ = io.write_line(expected_text)
+    if errors.is_err(io.write(label)) {
+    }
+    if errors.is_err(io.write(": got ")) {
+    }
+    if errors.is_err(io.write(actual_text)) {
+    }
+    if errors.is_err(io.write(", want ")) {
+    }
+    if errors.is_err(io.write_line(expected_text)) {
+    }
     return fail()
 }
 
@@ -103,11 +109,16 @@ func print_usize_mismatch(label: str, actual: usize, expected: usize) *i32 {
     actual_text: str = str{ ptr: actual_bytes.ptr, len: actual_bytes.len }
     expected_text: str = str{ ptr: expected_bytes.ptr, len: expected_bytes.len }
 
-    _ = io.write(label)
-    _ = io.write(": got ")
-    _ = io.write(actual_text)
-    _ = io.write(", want ")
-    _ = io.write_line(expected_text)
+    if errors.is_err(io.write(label)) {
+    }
+    if errors.is_err(io.write(": got ")) {
+    }
+    if errors.is_err(io.write(actual_text)) {
+    }
+    if errors.is_err(io.write(", want ")) {
+    }
+    if errors.is_err(io.write_line(expected_text)) {
+    }
     return fail()
 }
 
@@ -181,10 +192,14 @@ func expect_i32_eq(actual: i32, expected: i32) *i32 {
 
 func expect_str_eq(actual: str, expected: str) *i32 {
     if !strings.eq(actual, expected) {
-        _ = io.write("expect_str_eq failed: got ")
-        _ = io.write(actual)
-        _ = io.write(", want ")
-        _ = io.write_line(expected)
+        if errors.is_err(io.write("expect_str_eq failed: got ")) {
+        }
+        if errors.is_err(io.write(actual)) {
+        }
+        if errors.is_err(io.write(", want ")) {
+        }
+        if errors.is_err(io.write_line(expected)) {
+        }
         return fail()
     }
     return nil

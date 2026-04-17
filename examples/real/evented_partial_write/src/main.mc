@@ -10,7 +10,8 @@ const STATE_WRITE_RESPONSE: i32 = 1
 const STATE_READ_ACK: i32 = 2
 
 func close_ignored(file: io.File) {
-    _ = io.close(file)
+    if errors.is_err(io.close(file)) {
+    }
 }
 
 func poller_remove_ignored(poller: *io.Poller, file: io.File) {

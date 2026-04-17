@@ -10,13 +10,13 @@ mode = "debug"
 env = "hosted"
 
 [targets.app.search_paths]
-modules = ["src", "__KERNEL_NEW_SRC__"]
+modules = ["src", "__KERNEL_NEW_SRC__", "__KERNEL_NEW_SRC__/boot", "__KERNEL_NEW_SRC__/identity", "__KERNEL_NEW_SRC__/services", "__KERNEL_NEW_SRC__/shell", "__KERNEL_NEW_SRC__/scenarios", "__KERNEL_NEW_SRC__/transport"]
 
 [targets.app.module_sets.boot]
 files = [
-    "__KERNEL_NEW_SRC__/boot.mc",
-    "__KERNEL_NEW_SRC__/boot_update.mc",
-    "__KERNEL_NEW_SRC__/boot_identity.mc"
+    "__KERNEL_NEW_SRC__/boot/boot.mc",
+    "__KERNEL_NEW_SRC__/boot/boot_update.mc",
+    "__KERNEL_NEW_SRC__/boot/boot_identity.mc"
 ]
 
 [targets.app.runtime]

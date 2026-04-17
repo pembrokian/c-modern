@@ -10,13 +10,22 @@ mode = "debug"
 env = "hosted"
 
 [targets.kernel.search_paths]
-modules = ["src", "../stdlib"]
+modules = [
+	"src",
+	"src/boot",
+	"src/identity",
+	"src/services",
+	"src/shell",
+	"src/scenarios",
+	"src/transport",
+	"../stdlib"
+]
 
 [targets.kernel.module_sets.boot]
 files = [
-	"src/boot.mc",
-	"src/boot_update.mc",
-	"src/boot_identity.mc"
+	"src/boot/boot.mc",
+	"src/boot/boot_update.mc",
+	"src/boot/boot_identity.mc"
 ]
 
 [targets.kernel.runtime]

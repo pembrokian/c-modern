@@ -21,7 +21,8 @@ func wait_ignored(child: *os.Child) {
     ignored_status: i32
     ignored_err: errors.Error
     ignored_status, ignored_err = os.wait(child)
-    _ = ignored_status
+    if ignored_status != 0 {
+    }
     if !errors.is_ok(ignored_err) {
         return
     }

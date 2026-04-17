@@ -1,0 +1,175 @@
+Phase 220 -- Timer and Task Service Narrow Scope Probe
+======================================================
+
+Status
+------
+ACTIVE
+
+Purpose
+-------
+Define the next two bounded service-pressure steps after the file-like owner:
+one timer owner slice and one task or work owner slice.
+
+This phase doc is a planning-and-scope phase.
+It defines what to admit next and what to keep explicitly out of scope.
+
+Repository status note
+----------------------
+- Phase 218 admitted one bounded file-like owner to pressure naming, identity,
+  operation shape, and failure contracts without widening into persistence
+  frameworks.
+- Current backlog still keeps queue pressure and stall consequences owner-local,
+  keeps lifecycle control fixed-target and compact, and keeps supervisor
+  framework growth deferred.
+- Durable storage remains explicitly unadmitted; durable logs are still deferred
+  until a real admitted consumer proves durable naming and recovery pressure.
+
+Problem being solved
+--------------------
+- The running-system slice has explicit queue pressure and stall classification,
+  but no owner-local temporal boundary for timeouts and wakeups.
+- The running-system slice has explicit restart identity and retained surfaces,
+  but no narrow owner-local work-item boundary that pressures cancellation,
+  in-flight state, and restart-visible continuity without admitting a process
+  model.
+
+Core rule
+---------
+- Keep each admitted service pressure step owner-local and compact.
+- Add one or two dimensions of pressure at a time, not subsystem frameworks.
+- Keep shell control and inspection fixed-target and deterministic.
+
+Decision summary
+----------------
+1. Timer service is the first admitted follow-through.
+2. Task or work service follows timer only in a narrow owner-local shape.
+3. Durable log service remains deferred until Phase 217 durable triggers are
+   met with a real admitted consumer.
+
+Slice A -- Timer service (first follow-through)
+-----------------------------------------------
+Intent
+- Add one compact timer owner that makes timeout, cancellation, and expiry
+  observation executable without admitting scheduler or interrupt frameworks.
+
+Admitted operation family (minimal)
+- create timer (bounded id, bounded due tick)
+- cancel timer (id)
+- query timer state (id)
+- query expired timers (bounded count window)
+
+Ownership boundaries
+- timer_service owner:
+  timer state, validation, cancellation semantics, expiry classification
+- kernel_dispatch:
+  endpoint routing, minimal decode, effect wiring only
+- shell:
+  compact command family and fixed-target query wiring only
+- boot and init:
+  restart policy and retained reload classification only if explicitly admitted
+
+State and identity
+- Timer ids are owner-local and bounded.
+- Restart behavior must be explicit:
+  either retained reload with explicit policy or explicit clear-on-restart.
+- No hidden lifecycle coupling to unrelated services.
+
+Failure contract
+- invalid timer id
+- exhausted timer capacity
+- malformed request
+- explicit cancelled-versus-expired distinction
+
+Non-goals (Timer)
+- no scheduler framework
+- no blocking receive or mailbox framework
+- no wall-clock or realtime API surface expansion
+- no dynamic discovery registry
+- no retry supervisor or watchdog policy
+
+Exit criteria (Timer)
+- one bounded timer owner is executable through existing shell control style
+- cancellation and expiry are caller-visible and deterministic
+- restart behavior is explicitly classified and test-covered
+- no framework growth beyond owner-local timer semantics
+
+Slice B -- Task or work service (second follow-through)
+-------------------------------------------------------
+Intent
+- Add one compact work-item owner that pressures identity, cancellation, queue
+  ownership, and failure propagation without admitting processes, sessions, or
+  supervisor machinery.
+
+Admitted operation family (minimal)
+- submit work (bounded payload or opcode)
+- query work state (id)
+- cancel work (id)
+- list active work (bounded summary window)
+
+Ownership boundaries
+- task_service owner:
+  work state machine, owner-local queueing, cancellation semantics, result or
+  failure classification
+- kernel_dispatch:
+  routing and minimal decode only
+- shell:
+  compact command family and fixed-target routing only
+- init:
+  explicit restart behavior only (no autonomic restart policy)
+
+State and continuity
+- Work ids are owner-local and bounded.
+- Restart-visible continuity must stay explicit:
+  either clear in-flight work on restart or retain only if explicitly admitted
+  and justified.
+- No hidden cross-service dependency graph.
+
+Failure contract
+- unknown work id
+- queue full or exhausted
+- cancelled
+- failed (owner-local bounded classification)
+
+Non-goals (Task)
+- no process model
+- no session framework
+- no dynamic worker pool framework
+- no cross-service orchestration graph
+- no generic scheduler or quota subsystem in this phase
+
+Exit criteria (Task)
+- one bounded task owner is executable and deterministic
+- submit/query/cancel/list path is explicit and test-covered
+- restart-visible behavior is explicit and caller-visible
+- no supervisor, process, or session framework was introduced
+
+Validation expectations
+-----------------------
+- one deterministic scenario for timer normal flow plus one failure case
+- one deterministic scenario for task normal flow plus one failure case
+- focused reset-lane fixtures for timer and task slices
+- grouped reset-lane workflow coverage remains green
+
+Documentation follow-through
+----------------------------
+- Update support wording only if admitted behavior changes public claims.
+- Keep backlog entries aligned with this phase boundary.
+- If durable pressure appears during implementation, route it through the
+  retained-versus-durable trigger path rather than widening this phase.
+
+Non-goals for the overall phase
+-------------------------------
+- no durable log subsystem
+- no filesystem or namespace framework
+- no dynamic service discovery registry
+- no capability or ACL framework expansion
+- no compiler, sema, MIR, runtime, or backend widening for these slices
+
+Why this is the narrowest honest next move
+------------------------------------------
+- Timer directly pressures already-admitted queue and stall consequences with
+  one owner-local temporal boundary.
+- Task pressures owner-local identity and cancellation without committing to a
+  broader process model.
+- Durable logs remain explicitly deferred until durable naming and recovery are
+  proven as the narrowest next owner.

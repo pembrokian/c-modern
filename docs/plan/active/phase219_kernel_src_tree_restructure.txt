@@ -1,0 +1,171 @@
+Phase 219 -- Kernel Source Tree Restructure
+===========================================
+
+Status
+------
+ACTIVE
+
+Purpose
+-------
+Introduce a first layer of directory grouping under kernel/src/ so that the
+next 10–20 admitted modules do not make the root noisy.  This phase is a
+source-tree maintenance move only: no behavior changes, no new services, no
+new compiler features.
+
+Problem being solved
+--------------------
+After Phase 218, kernel/src/ holds approximately 48 .mc files at a single flat
+level.  The groupings (boot wiring, service owners, identity/topology, shell
+transport, scenarios, low-level transport primitives) are visible in the naming
+conventions but have no structural expression.  As the next wave of services
+and pressure steps arrives, the flat root will become the place where files
+accumulate without a home.
+
+A modest first grouping can absorb the next 10–20 files without forcing a
+larger reorganization and without changing any import names.
+
+Approach
+--------
+Module resolution is flat: `import boot` finds `boot.mc` in the first
+matching search root.  Moving files into subdirectories does not require
+changing any import statement; it only requires adding the new subdirectory
+paths to `search_paths.modules` in the relevant build.toml files.
+
+Changes made
+------------
+Source tree layout after this phase:
+
+  kernel/src/
+    main.mc                  -- entry: init-plus-loop (root)
+    kernel_dispatch.mc       -- dispatch routing (root; dispatch audit target)
+    event_codes.mc           -- shared serial-shell event constants (root)
+
+    boot/
+      boot.mc                -- KernelBootState, kernel_init, kernel_dispatch_step
+      boot_identity.mc       -- per-service boot marks and restart outcome query
+      boot_update.mc         -- bootwith_* and bootrestart_* wrappers
+      init.mc                -- restart policy, retained reload, lifecycle
+
+    identity/
+      service_identity.mc    -- ServiceRef, generation markers
+      service_state.mc       -- lifecycle class and state classification
+      service_topology.mc    -- endpoint IDs, pids, authority class
+      identity_taxonomy.mc   -- shared identity taxonomy types
+
+    services/
+      echo_service.mc
+      file_service.mc
+      kv_service.mc
+      log_service.mc
+      queue_service.mc
+      ticket_service.mc
+      transfer_grant.mc
+      transfer_service.mc
+
+    shell/
+      serial_protocol.mc     -- compact shell protocol byte family
+      serial_service.mc      -- serial path forwarding service
+      serial_shell_event_log.mc  -- ring-buffer observability
+      serial_shell_path.mc   -- shell routing path
+      shell_service.mc       -- shell command dispatch
+
+    scenarios/
+      scenarios.mc           -- orchestration entry
+      scenario_assert.mc
+      scenario_audit_coordination.mc
+      scenario_authority.mc
+      scenario_coordination.mc
+      scenario_218.mc
+      scenario_durability.mc
+      scenario_lifecycle.mc
+      scenario_queue.mc
+      scenario_restart.mc
+      scenario_retained_policy.mc
+      scenario_retained_summary.mc
+      scenario_service_state.mc
+      scenario_stall.mc
+      scenario_steps.mc
+      scenario_transfer.mc
+      scenario_transport.mc
+      scenario_workset_identity.mc
+
+    transport/
+      primitives.mc          -- low-level buffer and numeric primitives
+      syscall.mc             -- syscall interface
+      ipc.mc                 -- IPC message primitives
+      service_effect.mc      -- Message and Effect types
+
+    debug/                   -- reserved; empty
+
+Files updated
+-------------
+- kernel/build.toml: search_paths.modules and module_sets.boot paths
+- kernel/README.md: source tree documentation
+- tests/smoke/kernel_reset_lane_*/build.toml: 3 files
+- tests/system/kernel_reset_lane_*/build.toml: 38 files
+
+Import statements in all .mc files are unchanged.  The compiler resolves
+bare import names against the flat list of search roots in build.toml.
+
+Root rationale
+--------------
+Three files stay at src/ root:
+- main.mc: entry point; intentionally thin per the style guide main.mc limit.
+- kernel_dispatch.mc: central routing layer; kept at root to mark it as the
+  dispatch audit target rather than hiding it inside a group.
+- event_codes.mc: shared constants consumed by both kernel_dispatch.mc
+  (producer) and serial_shell_event_log.mc (consumer) in shell/; keeping it
+  at root avoids a cross-group import dependency for shared constants.
+
+debug/ note
+-----------
+debug/ is admitted as an empty reserved subdirectory.  It is the natural home
+for future narrow probe modules (fault injection helpers, deterministic replay
+stubs, or introspection probes) that do not belong in services/ or scenarios/.
+
+Dispatch ownership note
+-----------------------
+As part of reviewing the layout, the following dispatch ownership boundaries
+were identified and documented for the next audit step:
+
+  dispatch (kernel_dispatch.mc):
+    endpoint lookup, routing, minimal decode, effect wiring
+
+  service owner:
+    operation semantics, validation, state mutation, failure consequence,
+    summary generation
+
+  boot (boot/, init.mc):
+    lifecycle policy, retained policy, restart coordination
+
+  shell (shell/):
+    user-facing command vocabulary, protocol decode
+
+The risk identified: if dispatch is not periodically audited, it can slowly
+accumulate protocol parsing, ownership rules, restart policy, and
+service-specific consequence logic that properly belongs in owner-local modules.
+See docs/plan/backlog.txt for the dispatch audit backlog entry added by this
+phase.
+
+Validation
+----------
+All tests pass after the restructure:
+- cmake --build build/debug -j4: clean
+- mc_tool_workflow_kernel_reset_lane_unit: passes (all 41 fixture scenarios)
+- mc_tool_workflow_*: passes
+- mc_tool_build_state_unit: passes
+Pre-existing real-project failures in stdlib/testing.mc are unrelated.
+
+Next open
+---------
+Three candidate next moves from the Phase 219 review:
+1. Pressure-test new service shapes: timer_service, task_service, config_service,
+   quota_service.  Each exercises a dimension not yet covered (temporal dispatch,
+   lifecycle scheduling, policy lookup, resource budgets).
+2. Admit one narrow durable owner (durable_log_service) to pressure append
+   semantics, recovery semantics, retained-vs-durable naming, and restart
+   consequences without committing to a full filesystem.
+3. Dispatch ownership audit: explicitly re-assert what belongs in
+   kernel_dispatch.mc versus service-local protocol decode versus boot policy
+   versus shell command translation, before dispatch becomes the hidden center
+   of gravity.
