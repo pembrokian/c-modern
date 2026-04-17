@@ -1476,6 +1476,12 @@ void RunCodegenExecutableProjectSuite(const std::filesystem::path& source_root,
                     0,
                     {});
 
+    RunBuiltFixture(mc_path,
+                    source_root / "tests/compiler/codegen/array_equality.mc",
+                    work_root / "array_equality_build",
+                    0,
+                    {});
+
     RunBuiltFixtureWithIrSnippets(mc_path,
                                   source_root / "examples/canonical/shared_counter_mutex.mc",
                                   work_root / "shared_counter_mutex_build",

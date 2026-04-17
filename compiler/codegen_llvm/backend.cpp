@@ -1052,6 +1052,64 @@ std::string EmitAggregateStackSlot(const ExecutableValue& value,
     return slot_name;
 }
 
+bool EmitAggregateEqualityComparison(const ExecutableValue& lhs,
+                                     const ExecutableValue& rhs,
+                                     std::size_t function_index,
+                                     std::size_t block_index,
+                                     std::size_t instruction_index,
+                                     std::string_view suffix,
+                                     std::vector<std::string>& output_lines,
+                                     std::string& eq_result) {
+    const std::string lhs_slot = EmitAggregateStackSlot(lhs,
+                                                        function_index,
+                                                        block_index,
+                                                        instruction_index,
+                                                        std::string(suffix) + ".lhs.slot",
+                                                        output_lines);
+    const std::string rhs_slot = EmitAggregateStackSlot(rhs,
+                                                        function_index,
+                                                        block_index,
+                                                        instruction_index,
+                                                        std::string(suffix) + ".rhs.slot",
+                                                        output_lines);
+
+    const std::string temp = LLVMTempName(function_index, block_index, instruction_index) + "." + std::string(suffix);
+    std::string current_eq = "true";
+    std::size_t offset = 0;
+    std::size_t chunk_index = 0;
+    while (offset < lhs.type.size) {
+        std::size_t chunk_size = 8;
+        if (lhs.type.size - offset < chunk_size) {
+            chunk_size = lhs.type.size - offset;
+        }
+        if (chunk_size != 8 && chunk_size != 4 && chunk_size != 2) {
+            chunk_size = 1;
+        }
+
+        const std::string lhs_ptr = temp + ".lhs.ptr." + std::to_string(chunk_index);
+        const std::string rhs_ptr = temp + ".rhs.ptr." + std::to_string(chunk_index);
+        output_lines.push_back(lhs_ptr + " = getelementptr inbounds i8, ptr " + lhs_slot + ", i64 " + std::to_string(offset));
+        output_lines.push_back(rhs_ptr + " = getelementptr inbounds i8, ptr " + rhs_slot + ", i64 " + std::to_string(offset));
+
+        const std::string chunk_type = "i" + std::to_string(chunk_size * 8);
+        const std::string lhs_chunk = temp + ".lhs.chunk." + std::to_string(chunk_index);
+        const std::string rhs_chunk = temp + ".rhs.chunk." + std::to_string(chunk_index);
+        const std::string chunk_eq = temp + ".chunk.eq." + std::to_string(chunk_index);
+        const std::string next_eq = temp + ".eq." + std::to_string(chunk_index);
+        output_lines.push_back(lhs_chunk + " = load " + chunk_type + ", ptr " + lhs_ptr + ", align 1");
+        output_lines.push_back(rhs_chunk + " = load " + chunk_type + ", ptr " + rhs_ptr + ", align 1");
+        output_lines.push_back(chunk_eq + " = icmp eq " + chunk_type + " " + lhs_chunk + ", " + rhs_chunk);
+        output_lines.push_back(next_eq + " = and i1 " + current_eq + ", " + chunk_eq);
+        current_eq = next_eq;
+
+        offset += chunk_size;
+        chunk_index += 1;
+    }
+
+    eq_result = current_eq;
+    return true;
+}
+
 std::string PreferredOperandType(const ExecutableValue& lhs,
                                  const ExecutableValue& rhs) {
     if (!IsProcedureSourceType(lhs.type.source_name) && lhs.type.source_name != "int_literal") {
@@ -2172,6 +2230,35 @@ bool EmitBinaryInstruction(const mir::Instruction& instruction,
                             output_lines,
                             emitted);
             return emitted;
+        }
+        if (!lhs.type.backend_name.empty() &&
+            (lhs.type.backend_name.front() == '[' || lhs.type.backend_name.front() == '{')) {
+            if (instruction.op != "==" && instruction.op != "!=") {
+                ReportBackendError(source_path,
+                                   "LLVM bootstrap executable emission only supports aggregate comparison for '==' and '!=' in function '" +
+                                       state.function->name + "' block '" + block.label + "'",
+                                   diagnostics);
+                return false;
+            }
+
+            std::string aggregate_eq;
+            if (!EmitAggregateEqualityComparison(lhs,
+                                                rhs,
+                                                function_index,
+                                                block_index,
+                                                instruction_index,
+                                                "aggregate.compare",
+                                                output_lines,
+                                                aggregate_eq)) {
+                return false;
+            }
+            if (instruction.op == "==") {
+                output_lines.push_back(temp + " = and i1 true, " + aggregate_eq);
+            } else {
+                output_lines.push_back(temp + " = xor i1 " + aggregate_eq + ", true");
+            }
+            RecordExecutableValue(state, instruction.result, temp, result_type);
+            return true;
         }
         const std::string operand_type = PreferredOperandType(lhs, rhs);
         const std::string compare_opcode = IsFloatType(lhs.type) ? "fcmp" : "icmp";

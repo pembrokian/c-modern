@@ -322,13 +322,17 @@ func step(s: WorkflowServiceState, timer: timer_service.TimerServiceState, task:
 
     if msg.payload[0] == WORKFLOW_OP_SCHEDULE {
         prepared := workflow_prepare_schedule(next_workflow, generation)
+        scheduled := handle(prepared, msg)
+        if service_effect.effect_reply_status(scheduled.effect) != syscall.SyscallStatus.Ok {
+            next_journal = workflow_sync_journal(journal, next_workflow)
+            return WorkflowStepResult{ workflow: next_workflow, timer: next_timer, task: next_task, journal: next_journal, effect: scheduled.effect }
+        }
         create := timer_service.timer_create(next_timer, WORKFLOW_TIMER_ID, msg.payload[2])
         next_timer = create.state
         if service_effect.effect_reply_status(create.effect) != syscall.SyscallStatus.Ok {
             next_journal = workflow_sync_journal(journal, next_workflow)
             return WorkflowStepResult{ workflow: next_workflow, timer: next_timer, task: next_task, journal: next_journal, effect: create.effect }
         }
-        scheduled := handle(prepared, msg)
         next_workflow = scheduled.state
         next_journal = workflow_sync_journal(journal, next_workflow)
         return WorkflowStepResult{ workflow: next_workflow, timer: next_timer, task: next_task, journal: next_journal, effect: scheduled.effect }
