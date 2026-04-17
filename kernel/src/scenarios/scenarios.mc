@@ -7,6 +7,7 @@ import scenario_completion_mailbox
 import scenario_coordination
 import scenario_durability
 import scenario_journal_service
+import scenario_lease_service
 import scenario_lifecycle
 import scenario_retained_policy
 import scenario_queue
@@ -94,6 +95,10 @@ func run(state: *boot.KernelBootState) i32 {
         return result
     }
     result = scenario_completion_mailbox.run_completion_mailbox_probe()
+    if result != 0 {
+        return result
+    }
+    result = scenario_lease_service.run_lease_service_probe()
     if result != 0 {
         return result
     }

@@ -3,7 +3,7 @@ Phase 233 -- Bounded Delegation Lease Service Probe
 
 Status
 ------
-PROPOSED
+LANDED
 
 Purpose
 -------
@@ -49,21 +49,59 @@ Core rule
 - Do not widen into sessions, authentication, generic rights algebra, or a new
   authority framework.
 
-Chosen slice for this phase
----------------------------
-1. add one `lease_service` or `delegation_service` owner under
-   `kernel/src/services/`
-2. admit one compact operation family only:
-   - issue one bounded temporary lease or delegation token for a named object,
-     workflow, or journal lane
-   - consume that lease on one explicit follow-through path
-   - query or observe stale, invalid, or already-consumed outcomes
-3. tie lease validity to existing generation or restart identity where honest
-4. allow exactly one explicit service-chain handoff if needed to prove the
-   authority model under workflow pressure
-5. add one deterministic scenario and one reset-lane fixture proving valid
-   delegation, stale-after-restart rejection, and one consumed-twice or stale-
-   generation failure
+Landed slice
+------------
+1. add one retained `lease_service` owner under `kernel/src/services/`
+2. keep the shell surface to one compact `CMD_Z` family only:
+  - `issue` one temporary lease for a completed workflow id
+  - `consume` that lease exactly once from another pid
+  - report `stale` and `invalid` failures explicitly
+3. bind lease validity to the current completion-mailbox generation instead of
+  inventing a new authority epoch or framework
+4. keep the only follow-through path explicit and narrow:
+  `lease_service` consumes a valid lease and then calls
+  `completion_mailbox_take(...)` for that same workflow completion record
+5. add one deterministic runtime probe and one reset-lane fixture proving:
+  - delegated consume from another pid succeeds
+  - completion-mailbox restart invalidates older leases deterministically
+  - consumed-twice reuse is rejected deterministically
+
+Implementation summary
+----------------------
+- `lease_service` is a small retained owner with fixed-capacity lease records:
+  `(lease_id, workflow_id, completion_generation)`.
+- Lease issuance is bounded and owner-local.  The service does not mint generic
+  rights, sessions, or reusable capabilities.
+- Lease consume is bounded to one admitted real workload: fetching one queued
+  workflow completion through the existing completion mailbox owner.
+- Completion restart invalidates older leases because the lease stores the
+  completion-mailbox generation current at issue time.
+- Fresh lease issuance after restart stays valid because it binds to the new
+  completion generation while the retained completion entry itself still lives
+  in the mailbox owner.
+- The service keeps current transport constraints intact: one four-byte shell
+  frame, one fixed target, no new discovery or authority metadata channel.
+
+Files landed
+------------
+- `kernel/src/services/lease_service.mc`
+- `kernel/src/services/completion_mailbox_service.mc`
+- `kernel/src/kernel_dispatch.mc`
+- `kernel/src/boot/boot.mc`
+- `kernel/src/boot/boot_update.mc`
+- `kernel/src/boot/init.mc`
+- `kernel/src/boot/boot_identity.mc`
+- `kernel/src/identity/service_topology.mc`
+- `kernel/src/identity/service_state.mc`
+- `kernel/src/shell/serial_protocol.mc`
+- `kernel/src/shell/shell_service.mc`
+- `kernel/src/scenarios/scenario_lease_service.mc`
+- `tests/system/kernel_reset_lane_phase233_delegation_lease/`
+
+Validation
+----------
+- `Build debug`
+- `mc_tool_workflow_kernel_reset_lane_unit`
 
 Phase role in the larger sequence
 ---------------------------------
@@ -141,6 +179,11 @@ Exit criteria
 - the current authority model is pressure-tested by real workload rather than
   only by inspection
 - no session, authentication, or capability framework is introduced
+
+Exit status
+-----------
+- satisfied through one lease owner, one completion follow-through path, one
+  restart-visible stale rejection, and one reset-lane fixture
 
 Why this is the narrowest honest next move
 ------------------------------------------

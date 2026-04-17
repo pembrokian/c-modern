@@ -78,6 +78,32 @@ func completion_mailbox_fetch(s: CompletionMailboxServiceState) CompletionMailbo
     return CompletionMailboxResult{ state: s, effect: service_effect.effect_reply(syscall.SyscallStatus.Ok, 4, payload) }
 }
 
+func completion_mailbox_take(s: CompletionMailboxServiceState, id: u8) CompletionMailboxResult {
+    if s.len == 0 || s.ids[0] != id {
+        return CompletionMailboxResult{ state: s, effect: service_effect.effect_reply(syscall.SyscallStatus.InvalidArgument, 0, primitives.zero_payload()) }
+    }
+
+    payload: [4]u8 = primitives.zero_payload()
+    payload[0] = s.ids[0]
+    payload[1] = s.states[0]
+    payload[2] = s.restarts[0]
+    payload[3] = s.gens[0]
+
+    ids: [MAILBOX_CAPACITY]u8 = primitives.zero_payload()
+    states: [MAILBOX_CAPACITY]u8 = primitives.zero_payload()
+    restarts: [MAILBOX_CAPACITY]u8 = primitives.zero_payload()
+    gens: [MAILBOX_CAPACITY]u8 = primitives.zero_payload()
+    for i in 1..s.len {
+        ids[i - 1] = s.ids[i]
+        states[i - 1] = s.states[i]
+        restarts[i - 1] = s.restarts[i]
+        gens[i - 1] = s.gens[i]
+    }
+
+    next := mailboxwith(s, ids, states, restarts, gens, s.len - 1, s.stall_count)
+    return CompletionMailboxResult{ state: next, effect: service_effect.effect_reply(syscall.SyscallStatus.Ok, 4, payload) }
+}
+
 func completion_mailbox_ack(s: CompletionMailboxServiceState) CompletionMailboxResult {
     if s.len == 0 {
         return CompletionMailboxResult{ state: s, effect: service_effect.effect_reply(syscall.SyscallStatus.InvalidArgument, 0, primitives.zero_payload()) }

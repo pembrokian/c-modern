@@ -150,6 +150,8 @@ func lifecycle_target_endpoint(target: u8) u32 {
         return service_topology.JOURNAL_ENDPOINT_ID
     case serial_protocol.TARGET_WORKFLOW:
         return service_topology.WORKFLOW_ENDPOINT_ID
+    case serial_protocol.TARGET_LEASE:
+        return service_topology.LEASE_ENDPOINT_ID
     case serial_protocol.TARGET_COMPLETION:
         return service_topology.COMPLETION_MAILBOX_ENDPOINT_ID
     default:
@@ -548,6 +550,30 @@ func route_completion(s: ShellServiceState, m: service_effect.Message, op: u8) s
     return dispatch(COMPLETION_ROUTES, s, m, op)
 }
 
+func lease_issue(s: ShellServiceState, m: service_effect.Message) service_effect.Effect {
+    return forward_two(s, service_topology.LEASE_ENDPOINT_ID, serial_protocol.CMD_I, m.payload[2])
+}
+
+func lease_consume(s: ShellServiceState, m: service_effect.Message) service_effect.Effect {
+    payload: [4]u8 = primitives.zero_payload()
+    payload[0] = serial_protocol.CMD_U
+    payload[1] = m.payload[2]
+    payload[2] = m.payload[3]
+    return forward_payload(s, service_topology.LEASE_ENDPOINT_ID, 3, payload)
+}
+
+const LEASE_ROUTES: [5]OpHandler = [5]OpHandler{
+    OpHandler{ op: serial_protocol.CMD_I, check: bang3, run: lease_issue },
+    OpHandler{ op: serial_protocol.CMD_U, check: anymsg, run: lease_consume },
+    UNUSED_ROUTE,
+    UNUSED_ROUTE,
+    UNUSED_ROUTE
+}
+
+func route_lease(s: ShellServiceState, m: service_effect.Message, op: u8) service_effect.Effect {
+    return dispatch(LEASE_ROUTES, s, m, op)
+}
+
 func ticket_issue(s: ShellServiceState, m: service_effect.Message) service_effect.Effect {
     return forward_empty(s, service_topology.TICKET_ENDPOINT_ID)
 }
@@ -606,6 +632,9 @@ func handle(s: ShellServiceState, m: service_effect.Message) service_effect.Effe
 
     case serial_protocol.CMD_O:
         return route_workflow(s, m, op)
+
+    case serial_protocol.CMD_Z:
+        return route_lease(s, m, op)
 
     case serial_protocol.CMD_V:
         return route_completion(s, m, op)

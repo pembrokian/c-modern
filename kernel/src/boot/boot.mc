@@ -9,6 +9,7 @@ import echo_service
 import file_service
 import journal_service
 import kv_service
+import lease_service
 import log_service
 import queue_service
 import serial_service
@@ -71,7 +72,9 @@ struct KernelBootState {
     journal: ServiceCell<journal_service.JournalServiceState>
     journal_restart_outcome: RestartOutcome
     workflow: ServiceCell<workflow_service.WorkflowServiceState>
+    lease: ServiceCell<lease_service.LeaseServiceState>
     completion: ServiceCell<completion_mailbox_service.CompletionMailboxServiceState>
+    lease_restart_outcome: RestartOutcome
     completion_restart_outcome: RestartOutcome
     grants: transfer_grant.GrantTable
 }
@@ -90,6 +93,7 @@ func kernel_init() KernelBootState {
     task_slot := service_topology.TASK_SLOT
     journal_slot := service_topology.JOURNAL_SLOT
     workflow_slot := service_topology.WORKFLOW_SLOT
+    lease_slot := service_topology.LEASE_SLOT
     completion_slot := service_topology.COMPLETION_MAILBOX_SLOT
 
     path_state := serial_shell_path.path_init(serial_service.serial_init(serial_slot.pid, 1), shell_service.shell_init(shell_slot.pid, 1), shell_slot.endpoint)
@@ -104,6 +108,7 @@ func kernel_init() KernelBootState {
     task_cell := ServiceCell<task_service.TaskServiceState>{ state: task_service.task_init(task_slot.pid, 1), generation: 1 }
     journal_cell := ServiceCell<journal_service.JournalServiceState>{ state: journal_service.journal_load(journal_slot.pid, 1), generation: 1 }
     workflow_cell := ServiceCell<workflow_service.WorkflowServiceState>{ state: workflow_service.workflow_init(workflow_slot.pid), generation: 1 }
+    lease_cell := ServiceCell<lease_service.LeaseServiceState>{ state: lease_service.lease_init(lease_slot.pid, 1), generation: 1 }
     completion_cell := ServiceCell<completion_mailbox_service.CompletionMailboxServiceState>{ state: completion_mailbox_service.completion_mailbox_init(completion_slot.pid, 1), generation: 1 }
 
     return KernelBootState{
@@ -133,7 +138,9 @@ func kernel_init() KernelBootState {
         journal: journal_cell,
         journal_restart_outcome: RestartOutcome.None,
         workflow: workflow_cell,
+        lease: lease_cell,
         completion: completion_cell,
+        lease_restart_outcome: RestartOutcome.None,
         completion_restart_outcome: RestartOutcome.None,
         grants: transfer_grant.grant_init()
     }

@@ -56,6 +56,12 @@ Record one maintained repository position after Phase 213 published one reusable
 Record one maintained repository position after Phase 214 admitted one compact service-state inspection surface without opening registries, dashboards, or compiler surfaces.
 Record one maintained repository position after Phase 217 admitted one compact retained-versus-durable boundary query without opening storage frameworks, persistence mechanisms, or compiler surfaces.
 Record one maintained repository position after Phase 230 admitted one bounded durable journal owner without opening a filesystem framework, persistence registry, or compiler wave.
+Record one maintained repository position after Phase 231 admitted one retained workflow owner without opening scheduler, process, or compiler frameworks.
+Record one maintained repository position after Phase 232 admitted one retained completion mailbox owner without opening mailbox frameworks, subscriptions, or compiler surfaces.
+Record one maintained repository position after Phase 233 admitted one bounded delegation lease owner without opening sessions, capability frameworks, or compiler surfaces.
+Record one maintained repository position after Phase 231 admitted one retained workflow owner without opening scheduler, process, or compiler frameworks.
+Record one maintained repository position after Phase 232 admitted one retained completion mailbox owner without opening mailbox frameworks, subscriptions, or compiler surfaces.
+Record one maintained repository position after Phase 233 admitted one bounded delegation lease owner without opening sessions, capability frameworks, or compiler surfaces.
 Record one maintained repository position after Phase 202 retired the deleted freestanding legacy archive, refreshed active workflow and support docs, and kept reset-lane coverage anchored to the scenario table without opening a new framework or compiler wave.
 Record one maintained repository position after Phase 182 made restart identity explicit as stable routing plus replaced instance generation under the same endpoint and pid.
 Record one maintained repository position after Phase 183 made endpoint ids explicit stable public names and routing keys rather than authority tokens.

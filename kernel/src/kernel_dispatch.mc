@@ -15,6 +15,7 @@ import init
 import identity_taxonomy
 import event_codes
 import kv_service
+import lease_service
 import log_service
 import primitives
 import queue_service
@@ -312,6 +313,21 @@ func dispatch_completion_mailbox(state: *boot.KernelBootState, msg: service_effe
     return result.effect
 }
 
+func dispatch_lease(state: *boot.KernelBootState, msg: service_effect.Message) service_effect.Effect {
+    current: boot.KernelBootState = *state
+    lease_result := lease_service.handle(current.lease.state, msg, u8(current.completion.generation))
+    next := boot.bootwith_lease(current, lease_result.state)
+    if lease_result.op != lease_service.LEASE_OP_TAKE {
+        *state = next
+        return lease_result.effect
+    }
+
+    completion_result := completion_mailbox_service.completion_mailbox_take(current.completion.state, lease_result.workflow)
+    next = boot.bootwith_completion(next, completion_result.state)
+    *state = next
+    return completion_result.effect
+}
+
 func dispatch_workflow(state: *boot.KernelBootState, msg: service_effect.Message) service_effect.Effect {
     current: boot.KernelBootState = *state
     step := workflow_service.step(current.workflow.state, current.timer.state, current.task.state, current.journal.state, current.completion.state, msg, u8(current.workset_generation))
@@ -386,6 +402,8 @@ func leaf_route(endpoint: u32) LeafRoute {
         return LeafRoute{ endpoint: endpoint, reply: dispatch_journal }
     case service_topology.WORKFLOW_ENDPOINT_ID:
         return LeafRoute{ endpoint: endpoint, reply: dispatch_workflow }
+    case service_topology.LEASE_ENDPOINT_ID:
+        return LeafRoute{ endpoint: endpoint, reply: dispatch_lease }
     case service_topology.COMPLETION_MAILBOX_ENDPOINT_ID:
         return LeafRoute{ endpoint: endpoint, reply: dispatch_completion_mailbox }
     default:

@@ -41,7 +41,8 @@ const TIMER_ENDPOINT_ID: u32 = 19
 const TASK_ENDPOINT_ID: u32 = 20
 const JOURNAL_ENDPOINT_ID: u32 = 21
 const WORKFLOW_ENDPOINT_ID: u32 = 22
-const COMPLETION_MAILBOX_ENDPOINT_ID: u32 = 23
+const LEASE_ENDPOINT_ID: u32 = 23
+const COMPLETION_MAILBOX_ENDPOINT_ID: u32 = 24
 
 // ServiceSlot records the static wiring for one boot service: which endpoint
 // it occupies and which pid owns it.  Both values are fixed at kernel_init
@@ -79,9 +80,10 @@ const TIMER_SLOT: ServiceSlot = { endpoint: TIMER_ENDPOINT_ID, pid: 10 }
 const TASK_SLOT: ServiceSlot = { endpoint: TASK_ENDPOINT_ID, pid: 11 }
 const JOURNAL_SLOT: ServiceSlot = { endpoint: JOURNAL_ENDPOINT_ID, pid: 12 }
 const WORKFLOW_SLOT: ServiceSlot = { endpoint: WORKFLOW_ENDPOINT_ID, pid: 13 }
-const COMPLETION_MAILBOX_SLOT: ServiceSlot = { endpoint: COMPLETION_MAILBOX_ENDPOINT_ID, pid: 14 }
+const LEASE_SLOT: ServiceSlot = { endpoint: LEASE_ENDPOINT_ID, pid: 14 }
+const COMPLETION_MAILBOX_SLOT: ServiceSlot = { endpoint: COMPLETION_MAILBOX_ENDPOINT_ID, pid: 15 }
 
-const SERVICE_SLOTS: [14]ServiceSlot = {
+const SERVICE_SLOTS: [15]ServiceSlot = {
     SERIAL_SLOT,
     SHELL_SLOT,
     LOG_SLOT,
@@ -95,10 +97,11 @@ const SERVICE_SLOTS: [14]ServiceSlot = {
     TASK_SLOT,
     JOURNAL_SLOT,
     WORKFLOW_SLOT,
+    LEASE_SLOT,
     COMPLETION_MAILBOX_SLOT
 }
 
-const SERVICE_RESTART_MODES: [14]ServiceRestartMode = {
+const SERVICE_RESTART_MODES: [15]ServiceRestartMode = {
     ServiceRestartMode.None,
     ServiceRestartMode.None,
     ServiceRestartMode.Reload,
@@ -112,15 +115,16 @@ const SERVICE_RESTART_MODES: [14]ServiceRestartMode = {
     ServiceRestartMode.Reset,
     ServiceRestartMode.Reload,
     ServiceRestartMode.Reload,
+    ServiceRestartMode.Reset,
     ServiceRestartMode.Reload
 }
 
 // SERVICE_COUNT is the number of boot-wired services in the static topology.
 // Increment this when a new slot constant is added above.
-const SERVICE_COUNT: u32 = 14
+const SERVICE_COUNT: u32 = 15
 
 func service_count() usize {
-    return 14
+    return 15
 }
 
 func service_slot_at(index: usize) ServiceSlot {
@@ -193,6 +197,8 @@ func service_authority_class(endpoint: u32) ServiceAuthorityClass {
     case JOURNAL_ENDPOINT_ID:
         return ServiceAuthorityClass.DurableOwner
     case WORKFLOW_ENDPOINT_ID:
+        return ServiceAuthorityClass.RetainedOwner
+    case LEASE_ENDPOINT_ID:
         return ServiceAuthorityClass.RetainedOwner
     case COMPLETION_MAILBOX_ENDPOINT_ID:
         return ServiceAuthorityClass.RetainedOwner

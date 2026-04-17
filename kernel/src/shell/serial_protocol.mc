@@ -51,6 +51,7 @@ const CMD_J: u8 = 74   // 'J' — task command family
 const CMD_Y: u8 = 89   // 'Y' — journal command family
 const CMD_O: u8 = 79   // 'O' — workflow command family
 const CMD_V: u8 = 86   // 'V' — completion mailbox command family
+const CMD_Z: u8 = 90   // 'Z' — lease command family
 
 const TARGET_SERIAL: u8 = 83    // 'S'
 const TARGET_SHELL: u8 = 72     // 'H'
@@ -67,6 +68,7 @@ const TARGET_TIMER: u8 = 77     // 'M'
 const TARGET_TASK: u8 = 74      // 'J'
 const TARGET_JOURNAL: u8 = 85   // 'U'
 const TARGET_WORKFLOW: u8 = 79  // 'O'
+const TARGET_LEASE: u8 = 90     // 'Z'
 const TARGET_COMPLETION: u8 = 66  // 'B'
 
 const PARTICIPANT_NONE: u8 = 78  // 'N'
@@ -266,6 +268,14 @@ func encode_workflow_query(id: u8) [4]u8 {
 
 func encode_workflow_cancel(id: u8) [4]u8 {
     return encode_one_arg(CMD_O, CMD_C, id)
+}
+
+func encode_lease_issue(workflow: u8) [4]u8 {
+    return encode_one_arg(CMD_Z, CMD_I, workflow)
+}
+
+func encode_lease_consume(id: u8, workflow: u8) [4]u8 {
+    return encode_two_args(CMD_Z, CMD_U, id, workflow)
 }
 
 func encode_completion_fetch() [4]u8 {

@@ -4,7 +4,7 @@ runner = "mc_tool_workflow_tests"
 selector = "kernel-reset-lane-full"
 function = "RunWorkflowKernelResetLaneFullCase"
 roots = [
-  "tests/tool/tool_kernel_reset_lane_suite.cpp",
-  "kernel/",
-  "stdlib/",
+	"tests/tool/tool_kernel_reset_lane_suite.cpp",
+	"kernel/",
+	"stdlib/",
 ]

@@ -43,6 +43,7 @@ struct ResetLaneScenarioTiming {
     std::string label;
     std::chrono::milliseconds build_duration {};
     std::chrono::milliseconds run_duration {};
+    bool reused_cached_build = false;
 };
 
 struct InFlightScenario {
@@ -199,6 +200,75 @@ std::string LoadKernelResetLaneFixtureFile(const std::filesystem::path& source_r
     return text;
 }
 
+bool TreeHasNewerWriteTime(const std::filesystem::path& path,
+                          std::filesystem::file_time_type reference_time) {
+    if (!std::filesystem::exists(path)) {
+        return false;
+    }
+    if (std::filesystem::is_regular_file(path)) {
+        return std::filesystem::last_write_time(path) > reference_time;
+    }
+    if (!std::filesystem::is_directory(path)) {
+        return false;
+    }
+
+    for (const auto& entry : std::filesystem::recursive_directory_iterator(path)) {
+        if (!entry.is_regular_file()) {
+            continue;
+        }
+        if (std::filesystem::last_write_time(entry.path()) > reference_time) {
+            return true;
+        }
+    }
+    return false;
+}
+
+bool CanReuseResetLaneBuild(const std::filesystem::path& source_root,
+                           const std::filesystem::path& project_root,
+                           const std::filesystem::path& project_path,
+                           const std::filesystem::path& build_dir,
+                           const std::filesystem::path& mc_path,
+                           const ResetLaneScenario& scenario,
+                           std::filesystem::path* executable_path) {
+    if (scenario.requires_clean_build) {
+        return false;
+    }
+
+    const std::filesystem::path build_output_path =
+        build_dir / std::string(scenario.build_output_name);
+    if (!std::filesystem::exists(build_output_path)) {
+        return false;
+    }
+
+    const std::filesystem::path cached_executable =
+        ParseBuiltExecutablePath(ReadFile(build_output_path), scenario.build_context);
+    if (!std::filesystem::exists(cached_executable)) {
+        return false;
+    }
+
+    const std::filesystem::file_time_type executable_time =
+        std::filesystem::last_write_time(cached_executable);
+    if (std::filesystem::last_write_time(mc_path) > executable_time) {
+        return false;
+    }
+
+    const std::array<std::filesystem::path, 5> relevant_roots = {
+        project_root,
+        project_path,
+        source_root / "kernel" / "src",
+        source_root / "stdlib",
+        source_root / "runtime",
+    };
+    for (const auto& root : relevant_roots) {
+        if (TreeHasNewerWriteTime(root, executable_time)) {
+            return false;
+        }
+    }
+
+    *executable_path = cached_executable;
+    return true;
+}
+
 void WriteFileIfChanged(const std::filesystem::path& path,
                         std::string_view contents) {
     if (std::filesystem::exists(path) && ReadFile(path) == contents) {
@@ -287,29 +357,42 @@ ResetLaneScenarioTiming RunKernelResetLaneScenario(const std::filesystem::path& 
                                                    const std::filesystem::path& binary_root,
                                                    const std::filesystem::path& mc_path,
                                                    const ResetLaneScenario& scenario) {
+    std::filesystem::path project_root;
     std::filesystem::path project_path;
     if (scenario.fixture_relative_path.empty()) {
+        project_root = source_root / "kernel";
         project_path = source_root / "kernel" / "build.toml";
     } else {
         const std::filesystem::path fixture_root = source_root / std::string(scenario.fixture_relative_path);
-        const std::filesystem::path project_root = binary_root / std::string(scenario.project_dir_name);
+        project_root = binary_root / std::string(scenario.project_dir_name);
         project_path = InstallKernelResetLaneFixtureProject(source_root, fixture_root, project_root);
     }
 
     const std::filesystem::path build_dir = binary_root / std::string(scenario.build_dir_name);
+    std::filesystem::path executable_path;
+    bool reused_cached_build = false;
     if (scenario.requires_clean_build) {
         std::filesystem::remove_all(build_dir);
     }
     const auto build_start = std::chrono::steady_clock::now();
-    const std::string build_output = BuildProjectTargetAndCapture(mc_path,
-                                                                  project_path,
-                                                                  build_dir,
-                                                                  scenario.target_name,
-                                                                  scenario.build_output_name,
-                                                                  std::string(scenario.build_context));
+    if (CanReuseResetLaneBuild(source_root,
+                               project_root,
+                               project_path,
+                               build_dir,
+                               mc_path,
+                               scenario,
+                               &executable_path)) {
+        reused_cached_build = true;
+    } else {
+        const std::string build_output = BuildProjectTargetAndCapture(mc_path,
+                                                                      project_path,
+                                                                      build_dir,
+                                                                      scenario.target_name,
+                                                                      scenario.build_output_name,
+                                                                      std::string(scenario.build_context));
+        executable_path = ParseBuiltExecutablePath(build_output, scenario.build_context);
+    }
     const auto build_end = std::chrono::steady_clock::now();
-    const std::filesystem::path executable_path =
-        ParseBuiltExecutablePath(build_output, scenario.build_context);
 
     std::vector<std::string> command = {executable_path.generic_string()};
 
@@ -326,10 +409,11 @@ ResetLaneScenarioTiming RunKernelResetLaneScenario(const std::filesystem::path& 
             std::chrono::duration_cast<std::chrono::milliseconds>(build_end - build_start),
         .run_duration =
             std::chrono::duration_cast<std::chrono::milliseconds>(run_end - run_start),
+        .reused_cached_build = reused_cached_build,
     };
 }
 
-constexpr std::array<ResetLaneScenario, 49> kResetLaneScenarios = {{
+constexpr std::array<ResetLaneScenario, 50> kResetLaneScenarios = {{
     {"repo project", "", "", "kernel_reset_lane_repo_build", "kernel", "kernel_reset_lane_repo_build_output.txt", "kernel_reset_lane_repo_run_output.txt", "kernel reset lane repo project build", "kernel reset lane repo project run", true, 2000, 100},
     {"smoke", "tests/smoke/kernel_reset_lane_serial_round_trip", "kernel_reset_lane_smoke_project", "kernel_reset_lane_smoke_build", "app", "kernel_reset_lane_smoke_build_output.txt", "kernel_reset_lane_smoke_run_output.txt", "kernel reset lane smoke build", "kernel reset lane smoke run", true, 900, 100},
     {"retained state", "tests/system/kernel_reset_lane_retained_log", "kernel_reset_lane_retained_state_project", "kernel_reset_lane_retained_state_build", "app", "kernel_reset_lane_retained_state_build_output.txt", "kernel_reset_lane_retained_state_run_output.txt", "kernel reset lane retained-state build", "kernel reset lane retained-state run", true, 900, 100},
@@ -379,6 +463,7 @@ constexpr std::array<ResetLaneScenario, 49> kResetLaneScenarios = {{
     {"file growth", "tests/system/kernel_reset_lane_phase226_file_growth", "kernel_reset_lane_phase226_file_growth_project", "kernel_reset_lane_phase226_file_growth_build", "app", "kernel_reset_lane_phase226_file_growth_build_output.txt", "kernel_reset_lane_phase226_file_growth_run_output.txt", "kernel reset lane phase 226 file growth build", "kernel reset lane phase 226 file growth run", true, 1000, 100},
     {"durable journal", "tests/system/kernel_reset_lane_phase230_durable_journal", "kernel_reset_lane_phase230_durable_journal_project", "kernel_reset_lane_phase230_durable_journal_build", "app", "kernel_reset_lane_phase230_durable_journal_build_output.txt", "kernel_reset_lane_phase230_durable_journal_run_output.txt", "kernel reset lane phase 230 durable journal build", "kernel reset lane phase 230 durable journal run", true, 1000, 100},
     {"completion mailbox", "tests/system/kernel_reset_lane_phase232_completion_mailbox", "kernel_reset_lane_phase232_completion_mailbox_project", "kernel_reset_lane_phase232_completion_mailbox_build", "app", "kernel_reset_lane_phase232_completion_mailbox_build_output.txt", "kernel_reset_lane_phase232_completion_mailbox_run_output.txt", "kernel reset lane phase 232 completion mailbox build", "kernel reset lane phase 232 completion mailbox run", true, 1000, 100},
+    {"delegation lease", "tests/system/kernel_reset_lane_phase233_delegation_lease", "kernel_reset_lane_phase233_delegation_lease_project", "kernel_reset_lane_phase233_delegation_lease_build", "app", "kernel_reset_lane_phase233_delegation_lease_build_output.txt", "kernel_reset_lane_phase233_delegation_lease_run_output.txt", "kernel reset lane phase 233 delegation lease build", "kernel reset lane phase 233 delegation lease run", true, 1000, 100},
 }};
 
 std::vector<const ResetLaneScenario*> SelectResetLaneScenarios(ResetLaneMode mode) {
@@ -459,7 +544,7 @@ void RunWorkflowKernelResetLaneSuiteImpl(const std::filesystem::path& source_roo
     for (std::size_t index = 0; index < selected.size(); ++index) {
         const ResetLaneScenario scenario = *selected[index];
         if (in_flight.size() >= jobs) {
-            while (!CollectCompletedResetLaneScenario(&timings, &in_flight)) {
+            if (!CollectCompletedResetLaneScenario(&timings, &in_flight)) {
                 InFlightScenario current = std::move(in_flight.front());
                 current.future.wait();
                 timings[current.index] = current.future.get();
@@ -497,7 +582,9 @@ void RunWorkflowKernelResetLaneSuiteImpl(const std::filesystem::path& source_roo
                                                          &slow_run_count);
         std::cout << "kernel-reset-lane: " << timing.label << " build="
                   << FormatDuration(timing.build_duration) << " run="
-                  << FormatDuration(timing.run_duration) << flags << '\n';
+                  << FormatDuration(timing.run_duration)
+                  << (timing.reused_cached_build ? " cache=hit" : " cache=miss")
+                  << flags << '\n';
     }
 
     const std::chrono::milliseconds coverage_duration =

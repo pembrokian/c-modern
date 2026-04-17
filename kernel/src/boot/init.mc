@@ -19,6 +19,7 @@ import echo_service
 import file_service
 import journal_service
 import kv_service
+import lease_service
 import log_service
 import queue_service
 import serial_protocol
@@ -72,6 +73,8 @@ func restart_policy_for_target(target: u8) RestartPolicyInfo {
         return restart_policy_single(target, serial_protocol.POLICY_KEEP)
     case serial_protocol.TARGET_WORKFLOW:
         return restart_policy_single(target, serial_protocol.POLICY_KEEP)
+    case serial_protocol.TARGET_LEASE:
+        return restart_policy_single(target, serial_protocol.POLICY_CLEAR)
     case serial_protocol.TARGET_COMPLETION:
         return restart_policy_single(target, serial_protocol.POLICY_KEEP)
     default:
@@ -116,6 +119,8 @@ func restart(state: boot.KernelBootState, endpoint: u32) boot.KernelBootState {
         return restart_journal(state)
     case service_topology.WORKFLOW_ENDPOINT_ID:
         return restart_workflow(state)
+    case service_topology.LEASE_ENDPOINT_ID:
+        return restart_lease(state)
     case service_topology.COMPLETION_MAILBOX_ENDPOINT_ID:
         return restart_completion_mailbox(state)
     default:
@@ -246,6 +251,12 @@ func restart_workflow(state: boot.KernelBootState) boot.KernelBootState {
 
     next = boot.bootwith_timer(next, next_timer)
     return boot.bootrestart_workflow(next, reloaded)
+}
+
+func restart_lease(state: boot.KernelBootState) boot.KernelBootState {
+    slot := service_topology.LEASE_SLOT
+    next := boot.bootrestart_lease(state, lease_service.lease_init(slot.pid, 1))
+    return boot.bootwith_lease_restart_outcome(next, boot.RestartOutcome.OrdinaryReplaced)
 }
 
 func restart_completion_mailbox(state: boot.KernelBootState) boot.KernelBootState {

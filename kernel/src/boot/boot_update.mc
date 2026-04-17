@@ -3,6 +3,7 @@ import echo_service
 import file_service
 import journal_service
 import kv_service
+import lease_service
 import log_service
 import queue_service
 import serial_shell_path
@@ -170,6 +171,14 @@ func bootwith_workflow(s: KernelBootState, workflow: workflow_service.WorkflowSe
     return s with { workflow.state: workflow }
 }
 
+func bootwith_lease(s: KernelBootState, lease: lease_service.LeaseServiceState) KernelBootState {
+    return s with { lease.state: lease }
+}
+
+func bootwith_lease_restart_outcome(s: KernelBootState, outcome: RestartOutcome) KernelBootState {
+    return s with { lease_restart_outcome: outcome }
+}
+
 func bootwith_completion(s: KernelBootState, completion: completion_mailbox_service.CompletionMailboxServiceState) KernelBootState {
     return s with { completion.state: completion }
 }
@@ -180,6 +189,10 @@ func bootwith_completion_restart_outcome(s: KernelBootState, outcome: RestartOut
 
 func bootrestart_workflow(s: KernelBootState, workflow: workflow_service.WorkflowServiceState) KernelBootState {
     return s with { workflow.state: workflow, workflow.generation: s.workflow.generation + 1 }
+}
+
+func bootrestart_lease(s: KernelBootState, lease: lease_service.LeaseServiceState) KernelBootState {
+    return s with { lease.state: lease, lease.generation: s.lease.generation + 1 }
 }
 
 func bootrestart_completion(s: KernelBootState, completion: completion_mailbox_service.CompletionMailboxServiceState) KernelBootState {
