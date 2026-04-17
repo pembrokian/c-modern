@@ -661,7 +661,10 @@ func workflow_restart_reload(pid: u32, snap: WorkflowSnapshotRecord, lane: journ
     }
     if workflow_is_delivering(current) {
         delivery := workflow_delivery_state(workflow_delivery_outcome(current), workflow_delivery_status(current))
-        return workflow_restate(current, workflow_payload_delivery(delivery.outcome, delivery.status), current.state, WORKFLOW_RESTART_NONE, current.generation)
+        if !keep {
+            return workflow_restate(current, workflow_payload_delivery(delivery.outcome, delivery.status), current.state, WORKFLOW_RESTART_CANCELLED, generation)
+        }
+        return workflow_restate(current, workflow_payload_delivery(delivery.outcome, delivery.status), current.state, WORKFLOW_RESTART_RESUMED, generation)
     }
     if !workflow_is_active(current) {
         return workflow_restate(current, workflow_payload_from_state(current), current.state, WORKFLOW_RESTART_NONE, current.generation)

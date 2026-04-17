@@ -3,7 +3,7 @@ Phase 237 -- Named Object Update Recovery And Delivery Pressure
 
 Status
 ------
-PROPOSED
+IMPLEMENTED
 
 Purpose
 -------
@@ -18,8 +18,8 @@ stress outcome delivery and recovery on that lane before changing domains.
 Repository status note
 ----------------------
 - Phase 232 already made completion delivery and queue-style backpressure real.
-- Phase 235 is expected to produce durable object update outcomes.
-- Phase 236 is expected to produce delegated durable mutation outcomes.
+- Phase 235 already produces durable object update outcomes.
+- Phase 236 already produces delegated durable mutation outcomes.
 - The repository still lacks one phase whose primary job is to make those
   outcomes contend with backlog, stall, and restart timing on a durable-data
   path.
@@ -116,6 +116,34 @@ Test obligations
 - one focused reset-lane fixture for the composed named-object processing lane
 - `mc_tool_workflow_kernel_reset_lane_unit`
 - `mc_tool_workflow_kernel_reset_lane_full_unit`
+
+Implemented slice
+-----------------
+- Kept backlog truth where it already belongs: `completion_mailbox_service`
+  still owns full-versus-stalled enqueue semantics, while
+  `workflow_service` keeps one pending terminal durable-update outcome in its
+  explicit `WORKFLOW_STATE_DELIVERING` retry state.
+- Repaired restart-visible delivery truth in `workflow_service` so a durable
+  update already applied to `object_store_service` but still blocked on
+  mailbox delivery reloads as `WORKFLOW_RESTART_RESUMED` or
+  `WORKFLOW_RESTART_CANCELLED` instead of silently resetting restart markers
+  to none.
+- Added one composed scenario,
+  `kernel/src/scenarios/scenario_named_object_delivery_pressure.mc`, that
+  proves delegated durable mutation, explicit mailbox-full `Exhausted` then
+  `WouldBlock` delivery pressure, durable object truth before completion
+  delivery succeeds, and restart-resumed delivery recovery.
+- Added one focused reset-lane fixture under
+  `tests/system/kernel_reset_lane_phase237_named_object_delivery_pressure/`,
+  registered it in `tests/tool/tool_kernel_reset_lane_suite.cpp`, and wired
+  the same scenario into `kernel/src/scenarios/scenarios.mc` so the full repo
+  project path exercises the same phase-owned behavior.
+
+Validation performed
+--------------------
+- `cmake --build build/debug -j4`
+- `ctest --test-dir build/debug -R mc_tool_workflow_kernel_reset_lane_unit --output-on-failure`
+- `ctest --test-dir build/debug -R mc_tool_workflow_kernel_reset_lane_full_unit --output-on-failure`
 
 Acceptance criteria
 -------------------
