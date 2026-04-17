@@ -1,0 +1,168 @@
+Phase 225 -- Bounded Next Service Pressure Audit
+================================================
+
+Status
+------
+ACTIVE
+
+Purpose
+-------
+Choose exactly one next owner-local running-system pressure step after the
+Phase 220 timer or task admission, the Phase 221 file-service state reshape,
+and the Phase 224 dispatch ownership cleanup.
+
+This phase is an evidence-gathering and selection phase for the next service
+owner. It is not permission to widen multiple kernel fronts at once.
+
+Repository status note
+----------------------
+- Phase 220 admitted bounded `timer_service` and `task_service` owners.
+- Phase 221 kept file-service growth owner-local through a slot-in-state
+  redesign rather than compiler expansion.
+- The backlog still records multiple active kernel follow-through themes:
+  queue behavior, ticket-service restart-visible state, retained coordination,
+  file-like growth, timer growth, and task growth.
+- The repository continues to defer supervisor frameworks, durable storage,
+  dynamic discovery, and broader orchestration models unless a real admitted
+  consumer proves them necessary.
+
+Problem being solved
+--------------------
+- Several bounded service-pressure candidates are plausible next moves, but
+  the repository should pick only one.
+- Without a selection phase, "next kernel work" can blur into multiple small
+  widenings across queue, timer, task, ticket, or retained-state owners.
+- The project needs one evidence-backed choice for the next owner-local service
+  slice and explicit deferral wording for the others.
+
+Core rule
+---------
+- Pick exactly one owner-local next service-pressure step.
+- Prefer the candidate with the strongest real admitted consumer pressure.
+- Keep the landing compact: one owner, one small command family addition or
+  one bounded state consequence, one scenario, one focused reset-lane fixture.
+- Defer all other candidate owners explicitly.
+
+Candidate owner families to re-audit
+------------------------------------
+1. Queue-service follow-through
+   - stronger observability or consequence surface beyond current count, peek,
+     pressure, and stall classification
+2. Timer-service follow-through
+   - one richer temporal consequence beyond current create, cancel, query, and
+     expired-window semantics
+3. Task-service follow-through
+   - one richer work-state or consequence path beyond current submit, query,
+     cancel, and list-active semantics
+4. Ticket-service follow-through
+   - one richer restart-visible user-issued state pressure that still stays
+     owner-local to `ticket_service`
+5. File-service follow-through
+   - one file-like owner-local step that remains inside retained-only semantics
+     and does not widen into durable storage
+
+Questions this phase must answer
+--------------------------------
+1. Which candidate owner now has the strongest real caller-visible pressure in
+   the admitted running-system slice?
+2. Can that pressure be closed honestly with one owner-local addition rather
+   than a framework?
+3. Which nearby candidates are still tempting but should remain explicitly
+   deferred?
+4. What is the narrowest executable proof for the selected owner?
+
+Allowed branch outcomes
+-----------------------
+Branch A -- queue follow-through
+- Outcome: one queue-owned addition is the strongest current pressure.
+- Admitted scope examples: one bounded query, one bounded consequence, or one
+  bounded owner-local state refinement.
+- Non-goals: mailbox framework, blocking queue redesign, telemetry framework.
+
+Branch B -- timer follow-through
+- Outcome: one timer-owned addition is the strongest current pressure.
+- Admitted scope examples: one richer expiry classification, one bounded
+  inspection surface, or one owner-local cancellation consequence refinement.
+- Non-goals: scheduler framework, wall-clock API, watchdog policy.
+
+Branch C -- task follow-through
+- Outcome: one task-owned addition is the strongest current pressure.
+- Admitted scope examples: one bounded state inspection, one failure or cancel
+  consequence refinement, or one small owner-local listing improvement.
+- Non-goals: process model, session model, worker-pool framework.
+
+Branch D -- ticket follow-through
+- Outcome: one ticket-owned restart-visible state pressure is now the strongest
+  current boundary.
+- Admitted scope examples: one bounded metadata or consequence refinement that
+  stays local to ticket issuance and consumption.
+- Non-goals: authentication framework, session framework, transfer model.
+
+Branch E -- explicit deferral
+- Outcome: no candidate currently shows stronger pressure than the others.
+- Required follow-through: sharpen backlog wording so the next owner is chosen
+  only when a real admitted consumer makes it obvious.
+
+Selection criteria
+------------------
+The selected branch must satisfy all of the following:
+- it pressures a current admitted owner rather than inventing a new subsystem
+- it is caller-visible in the running system rather than purely aesthetic
+- it can be closed with one owner-local addition and one narrow executable
+  proof
+- it is stronger than reopening durability, supervisor, or discovery fronts
+
+Suggested audit method
+----------------------
+1. Re-survey the active running-system owners and their current compact command
+   and inspection surfaces.
+2. Identify where a caller today still hits a real visibility or consequence
+   gap.
+3. Compare the candidate owners using one pressure matrix:
+   caller-visible gap, narrowest honest fix, executable proof cost, and
+   framework risk.
+4. Select exactly one branch and defer the others explicitly.
+
+Preferred deliverables
+----------------------
+- one audit note naming the candidate owner families and the chosen branch
+- one evidence-backed recommendation for Branch A, B, C, D, or E
+- if a branch is selected: one follow-on implementation plan scoped to that
+  owner only
+- explicit non-goals for the non-selected owners
+
+Validation expectations
+-----------------------
+- conclusions must cite real current command, restart, or inspection paths in
+  the running-system tree
+- the recommended proof shape must stay within one owner-local scenario and one
+  focused reset-lane fixture
+- the audit must not recommend framework growth based on aesthetics alone
+
+Exit criteria
+-------------
+- the repository has one chosen next service-pressure owner or one explicit
+  deferral outcome
+- the non-selected candidate owners are explicitly deferred rather than left as
+  vague co-equal possibilities
+- the chosen next move, if any, is small enough to stay owner-local and
+  executable
+
+Non-goals for this phase
+------------------------
+- no supervisor framework
+- no durable storage or filesystem framework
+- no capability or ACL framework expansion
+- no dynamic service discovery registry
+- no scheduler, session, or orchestration framework growth
+- no compiler, sema, MIR, backend, runtime, stdlib, or `hal` widening unless a
+  later selected owner proves that as the narrowest blocker
+
+Why this is the narrowest honest next move
+------------------------------------------
+- The repository has several plausible service fronts, but the discipline of
+  recent phases has been to widen one owner at a time.
+- A bounded selection audit preserves that discipline and prevents several
+  adjacent small kernel ideas from landing as one unfocused wave.
+- The next honest service step should be chosen by real caller-visible pressure
+  rather than by taste or by which owner is easiest to edit.

@@ -1,0 +1,130 @@
+Phase 223C -- Compiler Manifest Diagnostic Formatting Repair
+============================================================
+
+Status
+------
+ACTIVE
+
+Purpose
+-------
+Land one narrow compiler-owned formatting or action-guidance repair in the
+ compiler regression manifest path after Phase 223 chose a project-build
+ failure instead of a manifest-formatting defect.
+
+This phase is intentionally small. It is not a broader manifest redesign or a
+ new parser framework.
+
+Repository status note
+----------------------
+- Phase 222 selected compiler diagnostics as the current active error surface.
+- Phase 223 deliberately chose a builder-owned project-build failure with an
+  admitted grouped workflow consumer.
+- `compiler/driver/driver.cpp` still contains compiler regression manifest
+  diagnostics that are technically correct but terse, for example:
+  - invalid manifest entry
+  - unknown regression kind
+  - missing expectation path
+  - malformed run-output entry
+- Those failures are still on an admitted compiler-visible path, even if they
+  are less central than project builds.
+
+Problem being solved
+--------------------
+- The compiler regression manifest path still compresses multiple actionable
+  facts into short error lines with little recovery guidance.
+- Users can see that a manifest entry is invalid, but not always the exact
+  accepted entry shape or next correction.
+- The repository needs a candidate plan for cleaning up that path while it is
+  still focused on diagnostic truth repairs.
+
+Core rule
+---------
+- Keep the landing local to the manifest parser in `compiler/driver/driver.cpp`.
+- Repair exactly one manifest diagnostic family through additive notes or one
+  bounded formatting clarification.
+- Do not widen the general compiler-manifest model, test framework, or driver
+  ownership boundaries in the same phase.
+
+Current owner path
+------------------
+- Primary owner:
+  - `compiler/driver/driver.cpp`
+- Diagnostic surface:
+  - `compiler/support/diagnostics.h`
+  - `compiler/support/diagnostics.cpp`
+- Likely downstream validation surface:
+  - compiler-regression workflow or nearby driver regression coverage
+
+Good candidate defect shapes
+----------------------------
+1. `invalid compiler regression manifest entry`
+   - likely additive note: expected token shape for one line
+2. `unknown compiler regression kind: ...`
+   - likely additive note: accepted kinds (`check-pass`, `check-fail`, `mir`,
+     `run-output`) if those remain current
+3. `compiler regression entry is missing an expectation path`
+   - likely additive note: which entry kinds require expectation files
+4. `run-output regression entry must include exit code and stdout expectation path`
+   - likely additive note: exact expected field order
+
+Selection rule
+--------------
+The chosen defect for 223C must satisfy all of the following:
+- it is emitted by the manifest parser in `compiler/driver/driver.cpp`
+- it affects an admitted compiler-visible workflow
+- the next correction can be stated honestly through one or two note lines or
+  one bounded formatting improvement
+- the regression can be validated without broad unrelated workflow churn
+
+Preferred implementation shape
+------------------------------
+- Keep existing error text when practical and add note lines for accepted
+  shapes instead of replacing everything with a large formatted message.
+- If a single formatted error line is clearer than multiple notes, keep the
+  repair local and deterministic.
+- Prefer small helper functions for accepted-kind or accepted-shape strings
+  rather than ad hoc string duplication.
+
+Suggested execution order
+-------------------------
+1. Pick one manifest diagnostic family with the strongest action gap.
+2. Add one local formatting or note helper in `compiler/driver/driver.cpp`.
+3. Emit the improved diagnostic for that family only.
+4. Add one focused regression covering the chosen manifest failure.
+5. Validate with the narrowest build plus focused driver or workflow test.
+
+Deliverables
+------------
+- one concrete compiler-manifest diagnostic formatting or note repair
+- one focused regression for the chosen failure family
+- one closeout note naming the maintained non-goals
+
+Validation expectations
+-----------------------
+- `Build debug`
+- the narrowest driver or workflow regression that exercises the chosen manifest
+  failure path
+- no unrelated churn in project-validation, builder, or kernel-status tests
+
+Exit criteria
+-------------
+- one compiler regression manifest failure is more actionable than before
+- the change remains local to `compiler/driver/driver.cpp`
+- the selected path is covered by focused regression coverage
+- the phase does not broaden into a manifest-system redesign
+
+Non-goals
+---------
+- no compiler regression manifest redesign
+- no generalized schema system
+- no categories, fix-its, localization, or IDE protocol integration
+- no source-level `errors.Error` widening
+- no compact kernel-status widening
+
+Why this is still a plausible next move
+---------------------------------------
+- The manifest parser remains a real compiler-visible failure path.
+- Its diagnostics are still denser and less action-shaped than the recently
+  improved project/build failures.
+- A small local repair here would continue the current diagnostic-truth work
+  without broadening into another subsystem.

@@ -65,7 +65,7 @@ Implementation summary
   Timer restart mode is retained reload (`POLICY_KEEP`), task restart mode is
   reset (`POLICY_CLEAR`).
 - Added deterministic scenario coverage in
-  `kernel/src/scenarios/scenario_timer_task_service.mc` and integrated it into
+  `kernel/src/scenarios/scenario_220.mc` and integrated it into
   `kernel/src/scenarios/scenarios.mc`.
 - Added focused reset-lane fixture
   `tests/system/kernel_reset_lane_phase220_timer_task_service` and registered

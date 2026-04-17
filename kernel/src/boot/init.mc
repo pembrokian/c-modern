@@ -177,11 +177,12 @@ func restart_ticket(state: boot.KernelBootState) boot.KernelBootState {
 
 func restart_file(state: boot.KernelBootState) boot.KernelBootState {
     file_slot := service_topology.FILE_SLOT
-    snap_names: [4]u8 = state.file.state.names
-    snap_data: [4]u8 = state.file.state.data
-    snap_lens: [4]u8 = state.file.state.lens
+    snap_slot0: file_service.FileSlot = state.file.state.slot0
+    snap_slot1: file_service.FileSlot = state.file.state.slot1
+    snap_slot2: file_service.FileSlot = state.file.state.slot2
+    snap_slot3: file_service.FileSlot = state.file.state.slot3
     snap_count: usize = state.file.state.count
-    reloaded: file_service.FileServiceState = file_service.FileServiceState{ pid: file_slot.pid, slot: 1, names: snap_names, data: snap_data, lens: snap_lens, count: snap_count }
+    reloaded: file_service.FileServiceState = file_service.FileServiceState{ pid: file_slot.pid, slot: 1, slot0: snap_slot0, slot1: snap_slot1, slot2: snap_slot2, slot3: snap_slot3, count: snap_count }
     next := boot.bootrestart_file(state, reloaded)
     return boot.bootwith_file_restart_outcome(next, boot.RestartOutcome.RetainedReloaded)
 }

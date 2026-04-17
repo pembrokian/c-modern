@@ -15,6 +15,9 @@ Implementation notes
 --------------------
 - file_service.mc admitted as the bounded file-like owner; state is
   FileServiceState { pid, slot, names: [4]u8, data: [4]u8, lens: [4]u8, count }
+- That exact provisional storage shape became historical after Phase 221,
+  which replaced it with four explicit `FileSlot` records while preserving the
+  same bounded protocol and retained-versus-durable boundary.
 - FILE_ENDPOINT_ID = 18, pid = 9; added to service_topology.mc as FILE_SLOT and
   SERVICE_COUNT updated to 9
 - CMD_F (byte 'F') protocol family added to serial_protocol.mc with four
@@ -35,10 +38,10 @@ Implementation notes
 - service_state.mc: TARGET_FILE → STATE_CLASS_RETAINED
 - service_topology.mc: FILE_ENDPOINT_ID in service_authority_class →
   RetainedOwner
-- scenario_file_service.mc: run_file_service_probe() — 13 steps, fail codes 2180–2190
+- scenario_218.mc: run_file_service_probe() — 13 steps, fail codes 2180–2190
 - scenario_transport.mc: cmd_file_create, cmd_file_write, cmd_file_read,
   cmd_file_count helpers
-- scenarios.mc: import scenario_file_service, call run_file_service_probe()
+- scenarios.mc: import scenario_218, call run_file_service_probe()
 - Design choice: 1 byte per file slot (lens[i]=0 or 1, data[i] is the byte) —
   chosen because the language has no 2D fixed array syntax, and 1-byte capacity
   is sufficient for a shape probe; see decision_log.txt and backlog.txt
@@ -47,6 +50,9 @@ service ownership boundaries.
 
 Repository status note
 ----------------------
+- Phase 221 later replaced the provisional parallel-array state shape with an
+  explicit slot-in-state redesign while keeping the service owner local and the
+  protocol unchanged.
 - The running-system slice already exposes an explicit retained-versus-durable
   boundary query and keeps durable state unadmitted.
 - Current support wording still excludes filesystem frameworks, durable logs,

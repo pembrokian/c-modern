@@ -1,0 +1,240 @@
+Phase 222 -- Error Surface Pressure Audit
+=========================================
+
+Status
+------
+COMPLETED (Branch B)
+
+Purpose
+-------
+Audit the repository's current approach to errors and diagnostics to identify
+where real pressure now exists, where the current design is still sufficient,
+and which single owner should receive the next narrow improvement if any.
+
+This phase is an evidence-gathering and boundary-classification phase.  It is
+not a blanket admission to widen all "error handling" surfaces at once.
+
+Repository status note
+----------------------
+- The language-level error-handling model is already settled in the slice
+  register: explicit error returns, no exceptions, and no hidden propagation.
+- The compiler support layer already owns a small diagnostic model:
+  `Diagnostic { file_path, span, severity, message }` plus one-line rendering
+  through `FormatDiagnostic(...)`.
+- Phase 190 already repaired the most concrete recent compiler-diagnostic truth
+  gap by restoring exact multi-file module part path and line ownership without
+  reopening AST identity or a broader diagnostics redesign.
+- Phase 175 explicitly deferred widening `stdlib/errors.mc` after auditing real
+  consumers and finding only binary `is_err()` / `is_ok()` production use.
+- Kernel and reset-lane user-facing failure reporting is intentionally compact:
+  `SyscallStatus` values, bounded payload bytes, and narrow classifier replies
+  such as `?C` and `?S` rather than human-readable messages.
+
+Problem being solved
+--------------------
+The repository now has multiple error-reporting surfaces that are easy to lump
+together under one vague "improve errors" request even though they serve
+different owners and constraints:
+
+1. compiler diagnostics
+2. source-level `errors.Error` values in stdlib and real programs
+3. compact kernel or protocol status reporting
+
+Those surfaces are intentionally not the same mechanism.  Current planning
+pressure is therefore not "make errors richer" in the abstract; it is to find
+out whether one of those owners now has a concrete truth gap worth reopening,
+or whether the right outcome is another explicit deferral.
+
+Core rule
+---------
+This phase must classify pressure before admitting implementation work.
+
+- Do not conflate compiler diagnostics with source-level `Error` values.
+- Do not treat compact kernel status bytes as a failed version of the stdlib
+  `Error` model.
+- Do not use this audit to smuggle in exceptions, hidden propagation, heap-
+  backed error objects, cause chains, generic diagnostics frameworks, or a
+  text-shell redesign.
+- Prefer one narrow owner-local follow-through if real pressure exists.
+- Prefer explicit deferral if no single owner is honestly blocked.
+
+Current evidence to re-audit
+----------------------------
+Compiler diagnostics surface
+- `compiler/support/diagnostics.h` defines only four diagnostic facts:
+  path, span, severity, and message.
+- `compiler/support/diagnostics.cpp` renders diagnostics as one line and stores
+  them in a flat sink with no grouping, notes, categories, fix-its, or origin
+  metadata.
+- `DiagnosticSeverity` includes `kWarning` and `kNote`, but the current code
+  base appears to rely almost entirely on `kError` reporting.
+- `compiler/support/source_manager.cpp` and import-resolution helpers emit
+  direct user-visible diagnostic strings at the support layer.
+- Phase 190 proved that targeted ownership fixes can land honestly without
+  reopening the whole diagnostic model.
+
+Source-level `Error` surface
+- `stdlib/errors.mc` still uses the settled scalar kind/code encoding.
+- Phase 175 found that admitted real programs do not branch on `kind()` or
+  `code()` in production and do not render human-readable messages to users.
+- Current examples still overwhelmingly use binary `is_ok()` / `is_err()` flow
+  control and fixed exit codes.
+- The strongest current question is not representation correctness but whether
+  any newly admitted program has become opaque enough that kind/code plus local
+  control-flow context is no longer sufficient.
+
+Kernel and compact runtime status surface
+- Kernel services intentionally expose compact `SyscallStatus` results such as
+  `InvalidArgument`, `InvalidEndpoint`, `InvalidCapability`, and `Exhausted`.
+- The shell already widened once, narrowly, to distinguish hostile-user causes
+  with `?C` and `?S` while deliberately stopping short of text diagnostics.
+- Several services also use one-byte or two-byte classifier payloads where the
+  status enum alone is intentionally coarse.
+- The strongest current question is whether any admitted caller can no longer
+  recover or present enough truth from the compact status-plus-payload model.
+
+Questions this phase must answer
+--------------------------------
+1. Does the compiler have a real diagnostic truth gap that is now more pressing
+   than any source-level `Error` widening?
+2. Has any admitted source program reached a user-facing point where scalar
+   kind/code errors are no longer actionable without additive message or cause
+   data?
+3. Has any kernel or reset-lane caller outgrown the current bounded status and
+   classifier-byte model?
+4. Are there cross-surface naming or contract mismatches that look like "error
+   complexity" but are actually a narrower ownership bug similar to Phase 190
+   or Phase 67?
+5. If more than one surface shows pressure, which one is the narrowest honest
+   next owner and which others should stay deferred?
+
+Suggested audit method
+----------------------
+1. Re-survey compiler diagnostic emission sites in `compiler/support`, parser,
+   sema, MIR, driver, and grouped tool flows.
+2. Re-survey admitted real programs and canonical examples for production use
+   of `errors.Error`, especially any new user-facing output paths.
+3. Re-survey reset-lane shell and service flows for cases where coarse status
+   codes are currently supplemented by payload bytes, classifier bytes, or
+   ad hoc caller-side interpretation.
+4. Separate true representation pressure from simpler ownership repairs.
+5. End the phase with exactly one of the branch outcomes below.
+
+Allowed branch outcomes
+-----------------------
+Branch A -- explicit deferral
+- Outcome: no surface is currently blocked enough to justify widening.
+- Required follow-through: sharpen backlog and decision-log triggers so the
+  repository stops reopening "improve errors" discussions without evidence.
+
+Branch B -- compiler diagnostics follow-through
+- Outcome: one compiler-owned diagnostic limitation is now the narrowest real
+  defect.
+- Admitted scope examples: additive origin metadata, bounded multi-line or note
+  support, improved ownership of support-layer diagnostics, or one formatting
+  truth repair.
+- Non-goals: full diagnostic engine, categories, fix-it infrastructure,
+  localized messages, IDE protocol work, or a general warning framework.
+
+Branch C -- source-level `Error` follow-through
+- Outcome: at least one admitted production call site is genuinely opaque after
+  kind/code plus local context.
+- Admitted scope examples: bounded optional message slice or explicit cause
+  field if the Phase 175 trigger is actually met.
+- Non-goals: heap-backed error objects, hidden propagation, stack unwinding,
+  exceptions, or an implicit `try` surface.
+
+Branch D -- compact status follow-through
+- Outcome: one kernel or protocol owner needs slightly more caller-visible
+  truth than the current bounded classifier model carries.
+- Admitted scope examples: one additive classifier byte, one small payload
+  refinement, or one owner-local reply-shape clarification.
+- Non-goals: text shells, large human-readable diagnostics channels, runtime
+  logging frameworks, or cross-kernel error-object unification.
+
+Preferred success criteria
+--------------------------
+- The audit names all currently active error-reporting owners explicitly.
+- The audit produces a pressure matrix with real evidence rather than taste.
+- The phase ends with one recommended next owner or an explicit deferral.
+- Revisit triggers are updated so future work can distinguish between:
+  - compiler diagnostic truth gaps
+  - source-level `Error` opacity
+  - compact protocol classification limits
+- No implementation phase is admitted on more than one surface at once.
+
+Why this is the narrowest honest next move
+------------------------------------------
+- The repository already has one settled error-handling architecture, but it no
+  longer has one single "error surface" in practice.
+- Recent work shows that the highest-value fixes have been owner-local truth
+  repairs, not broad redesigns: Phase 190 for compiler diagnostics, Phase 67
+  for filesystem error-contract mismatch, and Phase 177 for shell-side compact
+  classification.
+- Phase 175 also shows the opposite case: a seemingly obvious widening can be
+  the wrong move when no real admitted consumer is blocked.
+- A pressure audit is therefore the correct next phase before admitting more
+  machinery.
+
+Deliverables
+------------
+- one audit note or closeout that surveys the three active error-reporting
+  owners
+- one evidence-backed recommendation for Branch A, B, C, or D
+- updated backlog or decision-log wording if the outcome is explicit deferral
+- if a branch is selected, one narrowly scoped follow-on phase plan for the
+  chosen owner only
+
+Validation expectations
+-----------------------
+- Any conclusions about compiler diagnostics must cite real emission or consumer
+  sites in the current tree.
+- Any conclusions about `stdlib/errors.mc` must cite admitted production use,
+  not test-only assertions.
+- Any conclusions about kernel or shell error reporting must cite real compact
+  protocol paths and show why status-plus-payload truth is or is not enough.
+- The audit must not recommend broad redesign based solely on aesthetics.
+
+Exit criteria
+-------------
+- The repository has one current planning document that separates compiler
+  diagnostics, source-level `Error`, and compact runtime status surfaces.
+- The next error-related follow-through, if any, is routed to exactly one of
+  those owners.
+- The document records clear non-goals so "improve errors" cannot expand into
+  exceptions, generic frameworks, or multi-surface redesign by drift.
+
+Phase 222 closeout
+------------------
+Branch decision
+- Branch B selected: compiler diagnostics follow-through.
+
+Evidence summary
+- Compiler diagnostics: real pressure present. `DiagnosticSeverity` had
+  `kWarning` and `kNote` available but target-selection errors only surfaced as
+  single dense error lines, which forced actionable guidance into one message
+  rather than structured diagnostics.
+- Source-level `errors.Error`: no new blocking pressure. Admitted real
+  programs still overwhelmingly use `errors.is_ok(...)` or `errors.is_err(...)`
+  for control flow; production `kind()` and `code()` branching remains rare and
+  mostly test-side.
+- Compact kernel status: no blocking pressure. Current service and shell
+  classifier model remains actionable under admitted workflows (`SyscallStatus`
+  plus compact payload classifiers such as `?C` and `?S`).
+
+Implemented follow-through (real implementation)
+- Added note diagnostics for project target-selection failures in
+  `compiler/driver/project.cpp`:
+  - unknown explicit `--target` now emits additive notes for available targets
+    and explicit target selection guidance
+  - missing default target in multi-target projects now emits the same additive
+    note pair
+- Kept existing error strings unchanged for compatibility and additive closure.
+- Extended tool workflow regression coverage in
+  `tests/tool/tool_project_validation_suite.cpp` to assert the new note lines.
+
+Explicit non-expansion decisions recorded by this phase
+- Do not widen source-level `stdlib/errors.mc` representation in this phase.
+- Do not widen compact kernel/runtime status protocols in this phase.
+- Do not admit broad compiler diagnostic frameworks (categories, fix-its,
+  localization, IDE protocol integration).

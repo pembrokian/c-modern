@@ -1,0 +1,172 @@
+Phase 223 -- Compiler Diagnostic Truth Repair Follow-Through
+============================================================
+
+Status
+------
+COMPLETED
+
+Purpose
+-------
+Land one more compiler-owned diagnostic truth repair after Phase 222 selected
+compiler diagnostics as the only active error surface with real current
+pressure.
+
+This phase is intentionally narrow. It is not a blanket diagnostic-engine
+expansion phase.
+
+Repository status note
+----------------------
+- Phase 222 explicitly selected Branch B: compiler diagnostics follow-through.
+- Phase 222 already landed one additive improvement in
+  `compiler/driver/project.cpp`: target-selection failures now emit note
+  diagnostics for available targets and explicit selection guidance.
+- Phase 211 already completed the older local binding-or-assignment cleanup, so
+  that compiler candidate is no longer the next honest follow-through.
+- The repository still intentionally defers `stdlib/errors.mc` widening and
+  compact kernel-status widening unless a stronger admitted consumer appears.
+
+Problem being solved
+--------------------
+- The compiler still emits many dense single-line errors with no additive note
+  structure outside the narrow target-selection path improved in Phase 222.
+- Support-layer, builder, and project-mode failures can still hide ownership or
+  recovery truth inside one error string even though the diagnostic surface now
+  supports notes.
+- The repository needs one more bounded proof that compiler diagnostics can be
+  improved owner-locally without reopening categories, fix-its, or a framework.
+
+Core rule
+---------
+- Choose exactly one real compiler-owned diagnostic truth gap.
+- Repair it additively through notes, formatting, or ownership clarification.
+- Keep the landing local to the owner that already emits the defect.
+- Do not widen source-level `Error` representation or kernel compact-status
+  protocols in this phase.
+
+Current owner path
+------------------
+- Diagnostic surface owner:
+  - `compiler/support/diagnostics.h`
+  - `compiler/support/diagnostics.cpp`
+- Dense project and driver diagnostics:
+  - `compiler/driver/project.cpp`
+  - `compiler/driver/builder.cpp`
+  - `compiler/driver/driver.cpp`
+- Potential downstream compiler-owned consumer paths:
+  - grouped tool regressions under `tests/tool/`
+  - parser, sema, MIR, and MCI owners if a truth gap is shown there
+
+Admitted work for this phase
+----------------------------
+1. Identify one concrete diagnostic path whose current output is technically
+   correct but operationally weak.
+2. Improve that path through one or both of:
+   - additive `kNote` diagnostics
+   - bounded formatting or origin truth repair
+3. Add the narrowest regression coverage that asserts the improved output.
+4. Stop after one owner-local repair; do not accumulate multiple unrelated
+   diagnostic cleanups under the same phase.
+
+Good candidate defect shapes
+----------------------------
+- project or builder failures where the current error omits the next concrete
+  user action and that action can be expressed as one or two additive notes
+- support-layer or builder diagnostics whose source ownership is currently too
+  coarse and can be repaired without reopening AST identity or a richer origin
+  model
+- one formatting truth repair where the current line is technically correct but
+  compresses multiple actionable facts into one message
+
+Explicitly deferred in this phase
+---------------------------------
+- source-level `errors.Error` widening
+- compact kernel or shell status widening
+- full diagnostic categories
+- fix-it infrastructure
+- localized messages
+- IDE protocol integration
+- broad warning-framework admission
+- multi-surface "improve errors" redesign
+
+Selection rule
+--------------
+The chosen defect must satisfy all of the following:
+- it is compiler-owned rather than stdlib- or kernel-owned
+- it affects an admitted workflow or compiler-visible failure path
+- it can be fixed honestly through additive notes, formatting, or ownership
+  clarification rather than a new framework
+- it is narrower than any currently known source-level `Error` or compact
+  status pressure
+
+Suggested execution order
+-------------------------
+1. Re-survey current diagnostic emission sites in the driver, builder, and
+   support layers for another dense or ownership-blurred path.
+2. Pick one defect and document why it is narrower than reopening any other
+   error surface.
+3. Land one additive change in the owning file.
+4. Add one focused regression in the closest consumer suite.
+5. Verify the change with a focused build and suite run.
+
+Deliverables
+------------
+- one concrete compiler-owned diagnostic truth repair
+- one focused regression covering the repaired path
+- one closeout note or implementation summary naming the chosen owner and the
+  maintained non-goals
+
+Implementation summary
+----------------------
+- Chosen owner-local defect: bootstrap target validation in
+  `compiler/driver/builder.cpp`.
+- Repaired path: freestanding project targets that request an unsupported
+  bootstrap target now emit additive note diagnostics naming the supported
+  bootstrap target values and the exact `build.toml` field to change.
+- Focused regression: `tests/tool/tool_project_validation_suite.cpp` now
+  asserts the added notes for the unsupported-target builder failure.
+- Maintained non-goals: no diagnostic categories, fix-its, localization, IDE
+  protocol work, source-level `errors.Error` widening, or compact kernel-status
+  widening were admitted.
+
+Closeout note
+-------------
+- This landing keeps the improvement fully local to the builder-owned bootstrap
+  target validation path instead of widening the diagnostic model.
+- The added notes are intentionally simple and action-shaped: they name the
+  accepted bootstrap target values and the exact manifest assignment to change.
+- Future diagnostic work still needs a fresh owner-local truth gap; this phase
+  does not authorize broad compiler diagnostic expansion.
+
+Validation expectations
+-----------------------
+- `Build debug`
+- the narrowest compiler or tool regression suite that exercises the chosen
+  path
+- no unrelated churn in source-level error or compact protocol tests
+
+Exit criteria
+-------------
+- one compiler-owned diagnostic path is more actionable than before through an
+  additive owner-local repair
+- the change does not broaden into a general diagnostic-engine redesign
+- the selected path is covered by focused regression coverage
+- the phase records explicit non-goals so future work does not treat the
+  landing as permission for broad diagnostic growth
+
+Risks to watch
+--------------
+- the chosen defect may tempt a broader formatting cleanup; keep the slice to
+  one owner-local truth repair
+- support-layer ownership fixes can accidentally broaden into general origin
+  metadata work; stop at the narrowest honest repair
+- grouped tool assertions can become brittle if the new output depends on
+  unstable formatting rather than durable note content
+
+Why this is the narrowest honest next move
+------------------------------------------
+- Phase 222 already separated compiler diagnostics from source-level `Error`
+  and kernel compact-status surfaces.
+- The repository has a fresh proof that additive note diagnostics can improve
+  user truth without widening the underlying model.
+- A second bounded compiler-owned repair is a better next step than reopening a
+  completed compiler cleanup or broadening unrelated error surfaces.

@@ -1,0 +1,126 @@
+Phase 223B -- Support-Layer Diagnostic Origin Truth Repair
+==========================================================
+
+Status
+------
+ACTIVE
+
+Purpose
+-------
+Land one compiler-owned diagnostic truth repair focused on origin ownership in
+ support or support-adjacent code after Phases 222 and 223 demonstrated that
+ owner-local additive repairs are the right level for the current pressure.
+
+This phase is intentionally narrow. It is not a general diagnostic-metadata or
+ source-identity redesign.
+
+Repository status note
+----------------------
+- Phase 190 already repaired one concrete semantic diagnostic ownership bug for
+  multi-file logical modules by restoring exact contributing part file and line
+  ownership without reopening AST identity broadly.
+- Phase 222 chose compiler diagnostics as the next honest error-surface owner.
+- Phase 223 chose an action-guidance repair in the builder instead of an
+  origin-repair path.
+- The repository still has support-layer and support-adjacent diagnostics that
+  may be technically correct but source-owned too coarsely.
+
+Problem being solved
+--------------------
+- Some driver or support diagnostics can still report a failure on a coarse
+  owning path when the real actionable origin is narrower.
+- That makes the failure harder to trace even when the message text itself is
+  correct.
+- The repository needs one more proof that a narrow ownership repair can land
+  without reopening AST identity, full source mapping, or a richer diagnostic
+  framework.
+
+Core rule
+---------
+- Choose exactly one diagnostic path whose origin truth is currently too coarse.
+- Repair the ownership locally in the current owner path.
+- Do not widen the general diagnostic model beyond what the chosen owner needs.
+- Prefer file-path or span-truth repair over richer metadata structures.
+
+Current owner path
+------------------
+- Potential owners:
+  - `compiler/support/diagnostics.h`
+  - `compiler/support/diagnostics.cpp`
+  - `compiler/support/source_manager.cpp`
+  - support-adjacent driver code in `compiler/driver/*.cpp`
+- Likely downstream validation owners:
+  - grouped tool regressions under `tests/tool/`
+  - parser or sema fixture owners if the chosen path is compiler-check-only
+
+Good candidate defect shapes
+----------------------------
+- import-resolution failures where the message is right but the reported file
+  or span still points at a coarse caller path instead of the precise importer
+- builder or support helpers that collapse a more precise subordinate path onto
+  one root project path unnecessarily
+- support-layer helpers that can recover a narrower origin from already-landed
+  data without inventing new identity infrastructure
+
+Selection rule
+--------------
+The chosen defect must satisfy all of the following:
+- it is compiler-owned
+- the current origin is observably too coarse for an admitted workflow
+- the repair can be made with existing ownership data or one narrow local
+  thread-through, not a framework
+- focused regression coverage can assert the repaired origin deterministically
+
+Preferred implementation shape
+------------------------------
+- Reuse existing path or span data before inventing new metadata.
+- If one narrow thread-through is required, keep it limited to the chosen owner
+  path and one immediate consumer.
+- Prefer preserving current message wording while changing only path/span truth
+  unless the chosen defect also needs a small bounded message clarification.
+
+Suggested execution order
+-------------------------
+1. Re-survey support and support-adjacent diagnostics for one concrete coarse-
+   origin failure.
+2. Pick the narrowest one with the cheapest focused regression.
+3. Repair the path/span ownership locally.
+4. Add one focused regression asserting the repaired origin.
+5. Validate with the narrowest build plus focused test surface.
+
+Deliverables
+------------
+- one concrete support-layer or support-adjacent origin-truth repair
+- one focused regression covering the repaired ownership path
+- one closeout note stating why this did not require a broader model change
+
+Validation expectations
+-----------------------
+- `Build debug`
+- the narrowest grouped workflow or fixture suite that exercises the chosen path
+- no unrelated churn in note formatting, kernel-status, or stdlib error tests
+
+Exit criteria
+-------------
+- one compiler-owned diagnostic now reports a narrower, more honest origin than
+  before
+- the change remains owner-local and additive
+- no AST identity redesign, category system, or richer diagnostic metadata
+  framework was admitted
+
+Non-goals
+---------
+- no broad support-layer rewrite
+- no general path-provenance framework
+- no categories, fix-its, localization, or IDE protocol work
+- no source-level `errors.Error` widening
+- no compact kernel-status widening
+
+Why this is still a plausible next move
+---------------------------------------
+- Phase 190 already proved that origin truth repairs can be high value without
+  becoming architectural drift.
+- There may still be one or two remaining coarse-origin failures worth closing
+  while the repository is focused on compiler diagnostics.
+- This stays inside the compiler-owned surface and remains narrower than any
+  non-compiler error expansion.

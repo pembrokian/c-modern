@@ -11,14 +11,23 @@ const FILE_OP_CREATE: u8 = 67   // 'C'
 const FILE_OP_WRITE: u8 = 87    // 'W'
 const FILE_OP_READ: u8 = 82     // 'R'
 
-// Each file holds a 1-byte name token, one stored data byte, and a written
-// flag (0 = empty, 1 = data present).  Retained-only: no durable substrate.
+struct FileSlot {
+    name: u8
+    used: bool
+    len: u8
+    data0: u8
+    data1: u8
+    data2: u8
+    data3: u8
+}
+
 struct FileServiceState {
     pid: u32
     slot: u32
-    names: [FILE_CAPACITY]u8
-    data: [FILE_CAPACITY]u8
-    lens: [FILE_CAPACITY]u8
+    slot0: FileSlot
+    slot1: FileSlot
+    slot2: FileSlot
+    slot3: FileSlot
     count: usize
 }
 
@@ -27,18 +36,62 @@ struct FileResult {
     effect: service_effect.Effect
 }
 
-func file_init(pid: u32, slot: u32) FileServiceState {
-    return FileServiceState{ pid: pid, slot: slot, names: primitives.zero_payload(), data: primitives.zero_payload(), lens: primitives.zero_payload(), count: 0 }
+func empty_file_slot() FileSlot {
+    return FileSlot{ name: 0, used: false, len: 0, data0: 0, data1: 0, data2: 0, data3: 0 }
 }
 
-func filewith(s: FileServiceState, names: [FILE_CAPACITY]u8, data: [FILE_CAPACITY]u8, lens: [FILE_CAPACITY]u8, count: usize) FileServiceState {
-    return FileServiceState{ pid: s.pid, slot: s.slot, names: names, data: data, lens: lens, count: count }
+func file_init(pid: u32, slot: u32) FileServiceState {
+    empty := empty_file_slot()
+    return FileServiceState{ pid: pid, slot: slot, slot0: empty, slot1: empty, slot2: empty, slot3: empty, count: 0 }
+}
+
+func filewith(s: FileServiceState, slot0: FileSlot, slot1: FileSlot, slot2: FileSlot, slot3: FileSlot, count: usize) FileServiceState {
+    return FileServiceState{ pid: s.pid, slot: s.slot, slot0: slot0, slot1: slot1, slot2: slot2, slot3: slot3, count: count }
+}
+
+func file_slot_at(s: FileServiceState, idx: usize) FileSlot {
+    if idx == 0 {
+        return s.slot0
+    }
+    if idx == 1 {
+        return s.slot1
+    }
+    if idx == 2 {
+        return s.slot2
+    }
+    return s.slot3
+}
+
+func file_with_slot(s: FileServiceState, idx: usize, slot: FileSlot) FileServiceState {
+    if idx == 0 {
+        return filewith(s, slot, s.slot1, s.slot2, s.slot3, s.count)
+    }
+    if idx == 1 {
+        return filewith(s, s.slot0, slot, s.slot2, s.slot3, s.count)
+    }
+    if idx == 2 {
+        return filewith(s, s.slot0, s.slot1, slot, s.slot3, s.count)
+    }
+    return filewith(s, s.slot0, s.slot1, s.slot2, slot, s.count)
+}
+
+func file_append_slot(s: FileServiceState, slot: FileSlot) FileServiceState {
+    if s.count == 0 {
+        return filewith(s, slot, s.slot1, s.slot2, s.slot3, 1)
+    }
+    if s.count == 1 {
+        return filewith(s, s.slot0, slot, s.slot2, s.slot3, 2)
+    }
+    if s.count == 2 {
+        return filewith(s, s.slot0, s.slot1, slot, s.slot3, 3)
+    }
+    return filewith(s, s.slot0, s.slot1, s.slot2, slot, 4)
 }
 
 // file_find returns the slot index for name, or FILE_CAPACITY if not found.
 func file_find(s: FileServiceState, name: u8) usize {
     for i in 0..s.count {
-        if s.names[i] == name {
+        if file_slot_at(s, i).name == name {
             return i
         }
     }
@@ -53,9 +106,8 @@ func file_create(s: FileServiceState, name: u8) FileResult {
     if s.count >= FILE_CAPACITY {
         return FileResult{ state: s, effect: service_effect.effect_reply(syscall.SyscallStatus.Exhausted, 0, primitives.zero_payload()) }
     }
-    next_names: [FILE_CAPACITY]u8 = s.names
-    next_names[s.count] = name
-    return FileResult{ state: filewith(s, next_names, s.data, s.lens, s.count + 1), effect: service_effect.effect_reply(syscall.SyscallStatus.Ok, 0, primitives.zero_payload()) }
+    created := FileSlot{ name: name, used: true, len: 0, data0: 0, data1: 0, data2: 0, data3: 0 }
+    return FileResult{ state: file_append_slot(s, created), effect: service_effect.effect_reply(syscall.SyscallStatus.Ok, 0, primitives.zero_payload()) }
 }
 
 func file_write(s: FileServiceState, name: u8, val: u8) FileResult {
@@ -63,14 +115,12 @@ func file_write(s: FileServiceState, name: u8, val: u8) FileResult {
     if idx >= FILE_CAPACITY {
         return FileResult{ state: s, effect: service_effect.effect_reply(syscall.SyscallStatus.InvalidArgument, 0, primitives.zero_payload()) }
     }
-    if s.lens[idx] >= 1 {
+    slot := file_slot_at(s, idx)
+    if slot.len >= 1 {
         return FileResult{ state: s, effect: service_effect.effect_reply(syscall.SyscallStatus.Exhausted, 0, primitives.zero_payload()) }
     }
-    next_data: [FILE_CAPACITY]u8 = s.data
-    next_lens: [FILE_CAPACITY]u8 = s.lens
-    next_data[idx] = val
-    next_lens[idx] = 1
-    return FileResult{ state: filewith(s, s.names, next_data, next_lens, s.count), effect: service_effect.effect_reply(syscall.SyscallStatus.Ok, 0, primitives.zero_payload()) }
+    written := slot with { len: 1, data0: val }
+    return FileResult{ state: file_with_slot(s, idx, written), effect: service_effect.effect_reply(syscall.SyscallStatus.Ok, 0, primitives.zero_payload()) }
 }
 
 func file_read(s: FileServiceState, name: u8) FileResult {
@@ -78,9 +128,10 @@ func file_read(s: FileServiceState, name: u8) FileResult {
     if idx >= FILE_CAPACITY {
         return FileResult{ state: s, effect: service_effect.effect_reply(syscall.SyscallStatus.InvalidArgument, 0, primitives.zero_payload()) }
     }
+    slot := file_slot_at(s, idx)
     reply: [4]u8 = primitives.zero_payload()
-    reply[0] = s.data[idx]
-    return FileResult{ state: s, effect: service_effect.effect_reply(syscall.SyscallStatus.Ok, usize(s.lens[idx]), reply) }
+    reply[0] = slot.data0
+    return FileResult{ state: s, effect: service_effect.effect_reply(syscall.SyscallStatus.Ok, usize(slot.len), reply) }
 }
 
 func handle(s: FileServiceState, m: service_effect.Message) FileResult {

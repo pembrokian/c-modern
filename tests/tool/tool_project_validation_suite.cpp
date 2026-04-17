@@ -65,6 +65,12 @@ void TestUnknownTargetListsAvailableTargets(const std::filesystem::path& binary_
     ExpectOutputContains(output,
                          "unknown target in project file: missing; available targets: app, tool",
                          "unknown target should list the available targets");
+    ExpectOutputContains(output,
+                         "note: available targets: app, tool",
+                         "unknown target should emit available-target note");
+    ExpectOutputContains(output,
+                         "note: pass --target <name> to select one target explicitly",
+                         "unknown target should emit explicit target guidance");
 }
 
 void TestMissingDefaultTargetFails(const std::filesystem::path& binary_root,
@@ -115,6 +121,12 @@ void TestMissingDefaultTargetFails(const std::filesystem::path& binary_root,
     ExpectOutputContains(missing_default_output,
                          "project file does not declare a default target; available targets: first, second; pass --target <name>",
                          "missing default target diagnostic");
+    ExpectOutputContains(missing_default_output,
+                         "note: available targets: first, second",
+                         "missing default should emit available-target note");
+    ExpectOutputContains(missing_default_output,
+                         "note: pass --target <name> to select one target explicitly",
+                         "missing default should emit explicit target guidance");
 
     const std::filesystem::path explicit_target_build_dir = binary_root / "explicit_target_build";
     std::filesystem::remove_all(explicit_target_build_dir);
@@ -318,6 +330,47 @@ void TestExecutableTargetRejectsNonStaticLibraryLink(const std::filesystem::path
                          "non-static linked targets should fail with a clear project-graph diagnostic");
 }
 
+void TestUnsupportedFreestandingBootstrapTargetEmitsNotes(const std::filesystem::path& binary_root,
+                                                          const std::filesystem::path& mc_path) {
+    const std::filesystem::path unsupported_target_root = binary_root / "unsupported_freestanding_target_project";
+    std::filesystem::remove_all(unsupported_target_root);
+    WriteFile(unsupported_target_root / "build.toml",
+              "schema = 1\n"
+              "project = \"phase223-unsupported-freestanding-target\"\n"
+              "default = \"kernel\"\n"
+              "\n"
+              "[targets.kernel]\n"
+              "kind = \"exe\"\n"
+              "package = \"phase223-unsupported-freestanding-target\"\n"
+              "root = \"src/main.mc\"\n"
+              "mode = \"debug\"\n"
+              "env = \"freestanding\"\n"
+              "target = \"bogus-target\"\n"
+              "\n"
+              "[targets.kernel.search_paths]\n"
+              "modules = [\"src\"]\n"
+              "\n"
+              "[targets.kernel.runtime]\n"
+              "startup = \"kernel_entry\"\n");
+    WriteFile(unsupported_target_root / "src/main.mc", "func main() i32 { return 0 }\n");
+
+    const std::string unsupported_target_output = BuildProjectTargetAndExpectFailure(mc_path,
+                                                                                     unsupported_target_root / "build.toml",
+                                                                                     binary_root / "unsupported_freestanding_target_build",
+                                                                                     "kernel",
+                                                                                     "unsupported_freestanding_target_output.txt",
+                                                                                     "unsupported freestanding target build");
+    ExpectOutputContains(unsupported_target_output,
+                         "target 'kernel' requests unsupported bootstrap target: bogus-target",
+                         "freestanding target selection should reject unsupported bootstrap targets");
+    ExpectOutputContains(unsupported_target_output,
+                         "note: supported bootstrap targets:",
+                         "unsupported bootstrap target should list supported values");
+    ExpectOutputContains(unsupported_target_output,
+                         "note: set [targets.kernel] target = \"",
+                         "unsupported bootstrap target should tell the user which manifest field to change");
+}
+
 }  // namespace
 
 namespace mc::tool_tests {
@@ -332,6 +385,7 @@ void RunWorkflowProjectValidationSuite(const std::filesystem::path& source_root,
     TestDuplicateModuleRootFailsEarly(binary_root, mc_path);
     TestDuplicateTargetRootsFailEarly(binary_root, mc_path);
     TestExecutableTargetRejectsNonStaticLibraryLink(binary_root, mc_path);
+    TestUnsupportedFreestandingBootstrapTargetEmitsNotes(binary_root, mc_path);
 }
 
 }  // namespace mc::tool_tests

@@ -278,6 +278,23 @@ std::vector<std::string> SortedTargetNames(const ProjectFile& project) {
     return names;
 }
 
+void ReportTargetSelectionNotes(const ProjectFile& project,
+                                support::DiagnosticSink& diagnostics) {
+    const std::string available = JoinSortedNames(SortedTargetNames(project));
+    diagnostics.Report({
+        .file_path = project.path,
+        .span = mc::support::kDefaultSourceSpan,
+        .severity = DiagnosticSeverity::kNote,
+        .message = "available targets: " + available,
+    });
+    diagnostics.Report({
+        .file_path = project.path,
+        .span = mc::support::kDefaultSourceSpan,
+        .severity = DiagnosticSeverity::kNote,
+        .message = "pass --target <name> to select one target explicitly",
+    });
+}
+
 std::optional<std::string> ParseQuotedString(std::string_view text) {
     if (text.size() < 2 || text.front() != '"' || text.back() != '"') {
         return std::nullopt;
@@ -1103,6 +1120,7 @@ const ProjectTarget* SelectProjectTarget(const ProjectFile& project,
             .message = "unknown target in project file: " + *explicit_target +
                        "; available targets: " + JoinSortedNames(SortedTargetNames(project)),
         });
+        ReportTargetSelectionNotes(project, diagnostics);
         return nullptr;
     }
 
@@ -1121,6 +1139,7 @@ const ProjectTarget* SelectProjectTarget(const ProjectFile& project,
         .message = "project file does not declare a default target; available targets: " +
                    JoinSortedNames(SortedTargetNames(project)) + "; pass --target <name>",
     });
+    ReportTargetSelectionNotes(project, diagnostics);
     return nullptr;
 }
 

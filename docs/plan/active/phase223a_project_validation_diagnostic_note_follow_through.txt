@@ -1,0 +1,137 @@
+Phase 223A -- Project Validation Diagnostic Note Follow-Through
+===============================================================
+
+Status
+------
+ACTIVE
+
+Purpose
+-------
+Land one more compiler-owned diagnostic truth repair in the project-validation
+owner after Phase 223 chose the builder-owned unsupported-bootstrap-target path
+as the narrowest immediate follow-through.
+
+This phase is intentionally narrow. It does not reopen the diagnostic model,
+and it does not authorize another multi-owner sweep.
+
+Repository status note
+----------------------
+- Phase 222 already landed additive notes in `compiler/driver/project.cpp` for
+  target selection failures.
+- Phase 223 deliberately chose the builder-owned unsupported-bootstrap-target
+  path in `compiler/driver/builder.cpp` rather than returning to another
+  project-validation defect in the same phase.
+- The project-validation layer in `compiler/driver/project.cpp` still owns
+  several dense freestanding manifest failures before the builder runs.
+- The repository still intentionally defers source-level `errors.Error`
+  widening, compact kernel-status widening, categories, fix-its, localization,
+  and IDE integration.
+
+Problem being solved
+--------------------
+- Freestanding manifest validation still emits dense early errors such as:
+  - missing explicit freestanding `target`
+  - missing explicit freestanding `runtime.startup`
+  - invalid freestanding runtime startup name
+- Those failures are technically correct, but they still hide the next
+  concrete manifest action in one error line.
+- Because they are emitted before the builder runs, they cannot reuse the
+  builder-owned Phase 223 note path directly.
+
+Core rule
+---------
+- Keep the landing local to `compiler/driver/project.cpp`.
+- Improve exactly one project-validation failure family through additive notes
+  or bounded formatting.
+- Do not widen the support-layer model or builder layer in the same phase.
+- Do not reopen broad diagnostic-engine work.
+
+Current owner path
+------------------
+- Primary owner:
+  - `compiler/driver/project.cpp`
+- Diagnostic surface used by the owner:
+  - `compiler/support/diagnostics.h`
+  - `compiler/support/diagnostics.cpp`
+- Closest regression owner:
+  - `tests/tool/tool_project_validation_suite.cpp`
+
+Candidate defect shapes inside this phase
+-----------------------------------------
+1. Missing freestanding `target`
+   - current error: `target '<name>' must declare an explicit freestanding target`
+   - likely additive note repair:
+     - supported bootstrap targets
+     - exact manifest field to set
+2. Missing freestanding `runtime.startup`
+   - current error: `target '<name>' must declare an explicit freestanding runtime startup`
+   - likely additive note repair:
+     - exact manifest field to add
+     - startup-name shape guidance
+3. Invalid freestanding runtime startup name
+   - current error already names the bad value, but may still need one note on
+     the accepted name shape rather than only the rejection
+
+Selection rule
+--------------
+The chosen sub-defect for 223A must satisfy all of the following:
+- it is emitted by `compiler/driver/project.cpp`, not by the builder
+- it occurs on an admitted project-mode workflow
+- one or two additive notes can state the next user action honestly
+- the chosen path can be covered by one focused grouped workflow regression
+
+Preferred implementation shape
+------------------------------
+- Factor one small project-validation helper beside the existing
+  target-selection note helper instead of widening the support layer.
+- Reuse the existing one-line error strings when possible and add note lines
+  rather than changing compatibility-sensitive error text unnecessarily.
+- Keep notes action-shaped, for example:
+  - `supported bootstrap targets: ...`
+  - `set [targets.<name>] target = "..." in build.toml`
+  - `add [targets.<name>.runtime] startup = "..." in build.toml`
+  - `freestanding startup names must be plain alphanumeric or '_'`
+
+Suggested execution order
+-------------------------
+1. Pick one freestanding project-validation failure family.
+2. Add one owner-local note helper in `compiler/driver/project.cpp`.
+3. Emit additive notes for that one family only.
+4. Add one focused case in `tests/tool/tool_project_validation_suite.cpp`.
+5. Validate with a focused build and `mc_tool_workflow_project_validation_unit`.
+
+Deliverables
+------------
+- one concrete project-validation diagnostic truth repair
+- one focused grouped workflow regression covering the chosen path
+- one closeout note naming the selected sub-defect and maintained non-goals
+
+Validation expectations
+-----------------------
+- `Build debug`
+- `mc_tool_workflow_project_validation_unit`
+- no unrelated churn in builder, support-layer, or kernel-status tests
+
+Exit criteria
+-------------
+- one project-validation freestanding manifest failure is more actionable than
+  before through additive notes or bounded formatting
+- the change remains local to `compiler/driver/project.cpp`
+- the repair is covered by focused grouped workflow regression coverage
+- the phase does not broaden into support-layer redesign or builder cleanup
+
+Non-goals
+---------
+- no builder-owned repair in this phase
+- no support-layer origin metadata redesign
+- no source-level `errors.Error` widening
+- no compact kernel-status widening
+- no categories, fix-its, localization, or IDE protocol integration
+
+Why this is still a plausible next move
+---------------------------------------
+- The project-validation layer still owns real dense failures before the
+  builder runs.
+- The grouped project-validation suite already provides a cheap focused
+  validation surface.
+- This remains narrower than reopening any non-compiler error surface.

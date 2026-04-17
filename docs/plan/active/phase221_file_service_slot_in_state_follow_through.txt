@@ -1,0 +1,212 @@
+Phase 221 -- File Service Slot-In-State Follow-Through
+======================================================
+
+Status
+------
+COMPLETED (2026-04-17)
+
+Purpose
+-------
+Redesign the bounded file-service owner from parallel primitive arrays into an
+explicit slot-in-state record shape, while keeping the landing inside the
+existing kernel service boundary and without reopening 2D array support.
+
+This phase is a real implementation follow-through, not a compiler-expansion
+phase. It spends already-admitted record-update support on a narrower, more
+coherent file-state model.
+
+This document now records the landed owner-local redesign and maintained
+non-goals.
+
+Repository status note
+----------------------
+- Phase 218 admitted one narrow retained-only file-like owner with compact
+  create/write/read/count semantics.
+- The implemented Phase 218 state shape is intentionally provisional:
+  `names: [4]u8`, `data: [4]u8`, `lens: [4]u8`, `count: usize`.
+- Phase 221 has now replaced that provisional shape with one explicit
+  `FileSlot` record per named slot inside `FileServiceState`.
+- The repository already records two-dimensional fixed arrays `[N][M]T` as a
+  potential language feature, but that feature is not admitted today.
+- The language already supports explicit immutable record update and nested
+  field-path follow-through from Phases 195 and 199.
+
+Implementation summary
+----------------------
+- Added `FileSlot` to `kernel/src/services/file_service.mc` with one compact
+  owner-local slot shape: `name`, `used`, `len`, `data0`, `data1`, `data2`,
+  `data3`.
+- Reshaped `FileServiceState` to hold `slot0`, `slot1`, `slot2`, and `slot3`
+  instead of the old parallel `names`, `data`, and `lens` arrays.
+- Added owner-local helpers in `file_service.mc` for empty-slot construction,
+  fixed-slot reads, fixed-slot replacement, and append-at-count insertion.
+- Rewrote create, write, read, and find semantics in terms of explicit slot
+  records while keeping the existing compact protocol and one-byte stored-data
+  behavior unchanged.
+- Updated `kernel/src/boot/init.mc` so retained restart reload copies the four
+  explicit slots honestly instead of reconstructing the old parallel arrays.
+- Preserved the existing shell routing, endpoint ids, retained classification,
+  restart policy, and scenario behavior.
+
+Compiler and toolchain boundary
+-------------------------------
+- No compiler, sema, MIR, backend, ABI, target, runtime, stdlib, or `hal`
+  widening was required for this phase.
+- No new language limitation was encountered during this landing. The existing
+  recorded 2D-array limitation remains historical context, not an active Phase
+  221 blocker.
+
+Validation summary
+------------------
+- `Build_CMakeTools` completed successfully after the slot-in-state landing.
+- `mc_tool_workflow_kernel_reset_lane_unit` passed after the redesign.
+
+Problem being solved
+--------------------
+- The current file-service state stores each per-file concept in a separate
+  parallel array. That is executable, but it splits one logical file slot
+  across multiple fields and makes later widening awkward.
+- File semantics want one owner-local slot concept: name token, occupancy,
+  bounded data bytes, and any future slot-local metadata should move together.
+- Adding 2D arrays now would solve only one storage detail while leaving the
+  larger state-coherence problem open.
+- A slot-in-state redesign is the better long-term owner shape if it can stay
+  within already-admitted language features.
+
+Core rule
+---------
+- Redesign file state around explicit file-slot records.
+- Keep mutation explicit and immutable through record replacement.
+- Do not reopen compiler, sema, MIR, backend, ABI, target, runtime, stdlib, or
+  `hal` unless a real blocker proves the slot-in-state shape cannot be landed
+  honestly with existing language support.
+- Keep durable behavior unadmitted.
+
+Chosen slice for this phase
+---------------------------
+1. Replace the current parallel-array file state with explicit slot records.
+2. Keep file capacity fixed and small (`4` slots).
+3. Keep routing, protocol family, endpoint ids, restart policy, and retained
+   classification unchanged unless the slot redesign forces a narrow additive
+   inspection update.
+4. Prefer fixed named slots in state over array-of-struct mutation if the
+   latter remains awkward in the current compiler/backend.
+5. Widen per-slot data only if it can be expressed cleanly through the slot
+   record shape without introducing 2D arrays.
+
+Preferred implementation shape
+------------------------------
+State path
+- Add one explicit `FileSlot` record, for example:
+  - `name: u8`
+  - `used: bool` or `used: u8`
+  - `len: u8`
+  - `data0`, `data1`, `data2`, `data3`: `u8` if a 4-byte bounded payload is
+    admitted in this phase
+- Reshape `FileServiceState` to hold:
+  - `pid: u32`
+  - `slot: u32`
+  - `slot0: FileSlot`
+  - `slot1: FileSlot`
+  - `slot2: FileSlot`
+  - `slot3: FileSlot`
+  - `count: usize`
+
+Why fixed named slots are preferred here
+- Fixed named slots keep each logical file entry coherent without depending on
+  array-of-struct mutation support.
+- Existing record-update support can rebuild one slot and then rebuild the
+  enclosing service state explicitly.
+- This avoids spending the phase on compiler work for `[N]FileSlot` update
+  ergonomics.
+
+Owner path
+- Keep file semantics in `kernel/src/services/file_service.mc`.
+- Keep shell command parsing and protocol bytes in existing shell owners.
+- Keep restart reload explicit and init-owned.
+
+Semantics to preserve
+---------------------
+- create/open remains idempotent by name token
+- read from missing file remains `InvalidArgument`
+- write to missing file remains `InvalidArgument`
+- write beyond admitted bounded capacity returns explicit failure
+- retained reload semantics stay explicit and truthful
+- no durable naming, directory graph, or mount model is introduced
+
+Key design decision for this phase
+----------------------------------
+Phase 221 should prefer a slot-in-state record redesign over adding 2D array
+syntax. The better long-term pressure is owner-local file-slot coherence, not a
+new aggregate storage primitive.
+
+If the phase widens payload beyond one byte, do it as part of the slot record
+shape itself (for example `data0..data3` plus `len`) rather than by admitting
+`[4][N]u8`.
+
+Suggested execution order
+-------------------------
+1. Define `FileSlot` and an explicit empty-slot constructor/helper.
+2. Reshape `FileServiceState` from parallel arrays to fixed named slots.
+3. Add owner-local helpers:
+   - `file_slot_at(...)` or equivalent read helper
+   - `file_find(...)`
+   - `file_write_slot(...)` or equivalent explicit slot replacement helper
+4. Rewrite create/write/read/count in terms of slot records.
+5. Keep restart reload explicit by snapshotting or copying the new state shape
+   without changing the retained-versus-durable boundary.
+6. Refresh scenario and reset-lane fixtures only where payload or count
+   expectations change.
+7. Refresh planning wording if the landed slot shape materially changes the
+   public explanation of the file-service boundary.
+
+Deliverables
+------------
+- one `FileSlot` record shape owned by the file service
+- one slot-in-state `FileServiceState` redesign replacing the parallel arrays
+- updated owner-local helpers for create, write, read, and find
+- retained reload wiring updated to copy the new state honestly
+- bounded scenario and reset-lane validation updates if needed
+
+Validation expectations
+-----------------------
+- the tree must continue to build after the slot redesign lands
+- the focused file-service scenario must remain green
+- grouped kernel reset-lane workflow coverage must remain green
+- retained-policy, service-state, and retained-versus-durable fixtures must
+  remain green unless expected outputs intentionally widen
+
+Exit criteria
+-------------
+- the file service no longer stores one logical slot across parallel arrays
+- each file slot is represented as one explicit owner-local record
+- the landing uses already-admitted language features only
+- no 2D array support is added
+- no filesystem framework, durable storage subsystem, or recovery framework is
+  introduced
+
+Non-goals
+---------
+- no two-dimensional fixed array support `[N][M]T`
+- no array-of-struct mutation feature work
+- no directory hierarchy or namespace model
+- no durable log, object store, or persistence framework
+- no compiler-facing storage abstraction feature
+- no general collection or container framework for kernel services
+
+Why this is the narrowest honest next move
+------------------------------------------
+- Phase 218 already proved the file-service protocol and owner boundary are
+  real; the remaining pressure is state shape coherence.
+- A slot-in-state redesign improves the file owner model directly, while 2D
+  arrays would improve only one storage mechanism.
+- Fixed named slots plus record update fit the current language and backend
+  more honestly than reopening aggregate collection mutation.
+
+Acceptance criteria for this document
+-------------------------------------
+- Phase 221 is explicitly framed as a file-state redesign, not a language
+  feature phase.
+- The phase prefers slot-in-state records over 2D arrays and explains why.
+- Scope, non-goals, and validation keep the work inside the owner-local kernel
+  boundary.

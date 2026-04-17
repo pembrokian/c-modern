@@ -1,0 +1,152 @@
+Phase 224 -- Kernel Dispatch Ownership Reassertion
+==================================================
+
+Status
+------
+ACTIVE
+
+Purpose
+-------
+Reassert the four-owner boundary around `kernel_dispatch.mc` before the next
+wave of running-system growth turns dispatch into the hidden center of gravity.
+
+This is a kernel source-ownership maintenance phase. It is not a new service,
+not a transport redesign, and not a framework admission.
+
+Repository status note
+----------------------
+- Phase 219 explicitly identified dispatch ownership drift as the next kernel
+  maintenance risk after the source-tree restructure.
+- The current tree now has multiple owner families under `kernel/src/`:
+  dispatch, shell, boot or init, identity, transport, and service-local
+  modules.
+- Phases 220 through 222 landed additional running-system pressure, but did not
+  yet perform the explicit dispatch re-audit named in the backlog.
+
+Problem being solved
+--------------------
+- `kernel_dispatch.mc` is the narrow runtime chokepoint where endpoint lookup,
+  shell-driven control, service routing, and effect execution meet.
+- If left unaudited, dispatch can slowly accumulate:
+  - protocol parsing that belongs in shell or service owners
+  - restart or lifecycle policy that belongs in boot or init owners
+  - service-specific validation or consequence logic that belongs in the owning
+    service module
+  - summary or classification logic that belongs in service, identity, or
+    boot-owned helpers
+- The repository needs a deliberate ownership pass before adding another batch
+  of services or control surfaces.
+
+Core rule
+---------
+- Dispatch owns endpoint lookup, routing, minimal decode, and effect wiring.
+- Services own operation semantics, validation, state mutation, and failure
+  consequences.
+- Boot or init owns lifecycle policy, restart coordination, and retained
+  policy.
+- Shell owns user-facing command vocabulary and compact protocol decode.
+
+Current owner map to reassert
+-----------------------------
+- dispatch owner:
+  - `kernel/src/kernel_dispatch.mc`
+- boot or lifecycle owners:
+  - `kernel/src/boot/boot.mc`
+  - `kernel/src/boot/init.mc`
+  - `kernel/src/identity/service_state.mc`
+  - `kernel/src/identity/service_topology.mc`
+- shell owners:
+  - `kernel/src/shell/shell_service.mc`
+  - `kernel/src/shell/serial_protocol.mc`
+- service owners:
+  - modules under `kernel/src/services/`
+
+Chosen slice for this phase
+---------------------------
+1. Walk every decision point in `kernel_dispatch.mc` and classify it by owner.
+2. Move any misplaced logic to the nearest honest owner.
+3. Keep dispatch behavior unchanged unless ownership repair requires a narrow,
+   behavior-preserving refactor.
+4. Add or refresh focused tests only where ownership movement changes the
+   executable path shape enough to require new coverage.
+
+Audit questions this phase must answer
+--------------------------------------
+1. Which branches in `kernel_dispatch.mc` are true dispatch routing and should
+   remain there?
+2. Which branches decode user-facing protocol bytes that should live in shell
+   owners instead?
+3. Which restart, retained, or lifecycle decisions belong in boot or init
+   helpers rather than dispatch?
+4. Which service-specific validations or consequences currently leak into
+   dispatch and should move back into service modules?
+5. Are there shared classifications now better owned by identity or topology
+   helpers instead of by dispatch-local logic?
+
+Allowed work in this phase
+--------------------------
+- additive helper extraction to owner-local modules
+- small routing refactors that keep the behavior the same while clarifying
+  ownership
+- moving shell or service decode logic to the nearest existing owner
+- moving restart or retained policy projection to boot or init owners
+
+Non-goals
+---------
+- no supervisor framework
+- no routing table or registry framework
+- no capability model widening
+- no shell protocol redesign
+- no new service admission by itself
+- no transport or effect-model redesign unless a concrete blocker makes the
+  ownership repair impossible without a tiny local follow-through
+
+Suggested execution order
+-------------------------
+1. Classify `kernel_dispatch.mc` top to bottom by the four-owner model.
+2. Name the smallest set of misplaced logic slices.
+3. Move the most obviously misplaced slice first and validate behavior.
+4. Continue owner-local repairs one slice at a time.
+5. Stop once dispatch is back to lookup, minimal decode, routing, and effect
+  wiring rather than reopening adjacent abstractions.
+
+Deliverables
+------------
+- one ownership classification of current dispatch logic
+- one or more local code moves from dispatch to service, shell, boot, or
+  identity owners as needed
+- refreshed focused test coverage if the moved logic changes the observable
+  execution path enough to need it
+- one closeout summary stating what remains intentionally dispatch-owned
+
+Validation expectations
+-----------------------
+- `Build debug`
+- focused reset-lane workflow coverage
+- the narrowest kernel reset-lane fixtures touching the moved paths
+- no unrelated source-tree or service-behavior widening
+
+Exit criteria
+-------------
+- `kernel_dispatch.mc` is explicitly re-audited against the four-owner model
+- any clearly misplaced logic has moved to its honest owner
+- dispatch remains a narrow routing layer rather than a hidden service-policy
+  hub
+- no framework growth was admitted under the name of an ownership cleanup
+
+Risks to watch
+--------------
+- ownership moves can accidentally change shell-visible behavior if validation
+  is not kept narrow and immediate
+- it is easy to over-extract helpers and create a framework-like layer; prefer
+  moving logic to the nearest already-admitted owner instead
+- some logic may be shared rather than misplaced; in those cases prefer a
+  small owner-local helper in topology, identity, or boot code rather than
+  leaving duplicative classification inside dispatch
+
+Why this is the narrowest honest next move
+------------------------------------------
+- The source-tree restructure already made the owner families visible.
+- The backlog explicitly names dispatch drift as an active maintenance risk.
+- Doing the ownership reassertion before the next service wave is cheaper and
+  more honest than waiting until dispatch already carries service-local policy.

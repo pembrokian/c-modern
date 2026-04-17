@@ -1,0 +1,343 @@
+Phase XXX -- Bounded Source-Level Error Explanation Follow-Through
+==================================================================
+
+Status
+------
+PROPOSED
+
+Purpose
+-------
+Admit one narrow source-level follow-through on top of the settled scalar
+`errors.Error` model: a bounded way for admitted programs to render short
+human-facing error text without reopening heap-backed error objects, hidden
+propagation, cause chains, or a broader diagnostics framework.
+
+This phase is intentionally the counterfactual follow-through that Phase 222
+did not choose. It exists as a separate explicit phase so the repository can
+evaluate and, if desired, implement the widening honestly rather than smuggling
+it in under the compiler-diagnostics branch.
+
+Repository status note
+----------------------
+- `stdlib/errors.mc` currently exposes a scalar encoded `Error` plus `kind()`
+  and `code()` inspectors.
+- Phase 175 explicitly deferred widening because admitted real programs still
+  used binary `is_ok()` or `is_err()` flow control and fixed exit codes.
+- Phase 222 re-audited the surface and again chose not to widen `errors.Error`
+  because current production pressure still falls below the existing trigger.
+- This document records what the narrowest honest widening would look like if
+  the repository decides to take it anyway.
+
+Core rule
+---------
+- Keep the scalar `Error` ABI unchanged.
+- Add one bounded explanation surface only.
+- Prefer stable short phrases over rich prose.
+- Require one real admitted consumer migration so the phase is not proof-only.
+- Do not widen compiler diagnostics, compact kernel status, or propagation
+  semantics as part of this phase.
+
+Problem being solved
+--------------------
+Current admitted programs can classify errors through `kind()` and `code()`,
+but they still need to hard-code their own user-facing text or fall back to a
+fixed numeric exit code with no explanatory output.
+
+If the repository decides that this is worth improving before stronger consumer
+pressure appears, the narrowest honest move is not a richer `Error` object.
+It is one additive explanation helper that maps the existing scalar contract to
+short stable text.
+
+What this phase would admit
+---------------------------
+One additive stdlib helper family in `stdlib/errors.mc`:
+
+- `describe_kind(kind: ErrorKind) str`
+- `describe(err: Error) str`
+
+Optional narrow companion helpers if the implementation needs them:
+
+- `describe_io_code(code: usize) str`
+- `describe_net_code(code: usize) str`
+- `describe_sync_code(code: usize) str`
+
+The preferred public surface is still just `describe(err)` plus, if useful,
+`describe_kind(kind)`.
+
+What this phase would not admit
+-------------------------------
+- no heap-backed error objects
+- no message allocation policy
+- no wrapped causes
+- no exception or `try` surface
+- no hidden propagation
+- no runtime localization
+- no structured multi-field diagnostic objects in stdlib
+- no compiler changes unless a real language limitation is encountered while
+  implementing the helper
+
+Preferred API shape
+-------------------
+The narrowest public API is:
+
+```mc
+func describe_kind(kind: ErrorKind) str
+func describe(err: Error) str
+```
+
+Rationale:
+- `str` is the most direct user-facing text shape already used by admitted
+  programs and `io.write_line(...)` call sites.
+- Returning `str` avoids allocator policy and keeps messages static.
+- `describe_kind(...)` gives callers a stable coarse message even if specific
+  code coverage remains intentionally partial.
+- `describe(err)` allows the public caller surface to stay simple.
+
+Preferred message policy
+------------------------
+- Messages should be short, stable phrases rather than sentence-like prose.
+- The baseline message can be kind-level only when no code-specific text is
+  worth admitting yet.
+- Code-specific messages should be added only for codes already used by
+  admitted real consumers.
+
+Examples of acceptable output strings:
+- `ok`
+- `generic error`
+- `os error`
+- `io error`
+- `io short write`
+- `network error`
+- `sync error`
+- `utf8 decode error`
+
+Examples of non-goal output strings:
+- `The requested line filter subprocess failed because the pipe was closed`
+- `Error 7 while processing /tmp/foo.txt at line 83`
+- `filesystem subsystem failed: caused by host errno 2`
+
+Implementation sketch in `stdlib/errors.mc`
+-------------------------------------------
+The minimal implementation would keep the scalar ABI untouched and add one
+small table-driven switch layer.
+
+Illustrative shape:
+
+```mc
+func describe_kind(kind: ErrorKind) str {
+    switch kind {
+    case ERROR_KIND_NONE:
+        return "ok"
+    case ERROR_KIND_GENERIC:
+        return "generic error"
+    case ERROR_KIND_ERRNO:
+        return "host errno error"
+    case ERROR_KIND_IO:
+        return "io error"
+    case ERROR_KIND_UTF8:
+        return "utf8 error"
+    case ERROR_KIND_MEM:
+        return "memory error"
+    case ERROR_KIND_OS:
+        return "os error"
+    case ERROR_KIND_NET:
+        return "network error"
+    case ERROR_KIND_SYNC:
+        return "sync error"
+    case ERROR_KIND_USER:
+        return "user error"
+    default:
+        return "unknown error"
+    }
+}
+
+func describe(err: Error) str {
+    if is_ok(err) {
+        return "ok"
+    }
+
+    err_kind := kind(err)
+    err_code := code(err)
+    switch err_kind {
+    case ERROR_KIND_IO:
+        switch err_code {
+        case 1:
+            return "io short write"
+        default:
+            return describe_kind(err_kind)
+        }
+    case ERROR_KIND_UTF8:
+        switch err_code {
+        case 1:
+            return "utf8 decode error"
+        default:
+            return describe_kind(err_kind)
+        }
+    default:
+        return describe_kind(err_kind)
+    }
+}
+```
+
+This is intentionally small and additive. It does not alter `fail(...)`,
+`kind(...)`, `code(...)`, or any existing consumer.
+
+Preferred consumer migration
+----------------------------
+If this phase is admitted, it should migrate one real program so the new API is
+spent on an actual user-facing path.
+
+Best candidate:
+- `examples/real/line_filter_relay/`
+
+Why this program is the best owner:
+- It is already a real admitted consumer.
+- It already has explicit user-facing output through `io.write_line(...)`.
+- It crosses I/O and subprocess boundaries, so it is a plausible place for a
+  short explanatory message to matter.
+
+Illustrative before/after migration
+-----------------------------------
+Before:
+
+```mc
+err = line_filter_relay.run(argv[1])
+if !errors.is_ok(err) {
+    return 91
+}
+return 0
+```
+
+After:
+
+```mc
+err = line_filter_relay.run(argv[1])
+if !errors.is_ok(err) {
+    if io.write_line(errors.describe(err)) != 0 {
+        return 92
+    }
+    return 91
+}
+return 0
+```
+
+This keeps the current explicit control-flow shape and exit codes while adding
+one bounded human-facing explanation.
+
+Alternative consumer example
+----------------------------
+`examples/real/pipe_ready/src/main.mc` is also a viable candidate if the phase
+needs a smaller I/O-only migration.
+
+Illustrative shape:
+
+```mc
+err = run_probe()
+if !errors.is_ok(err) {
+    if io.write_line(errors.describe(err)) != 0 {
+        return PIPE_READY_ERR_PRINT_FAILED
+    }
+    return PIPE_READY_ERR_RUNTIME
+}
+return 0
+```
+
+Testing expectations
+--------------------
+This phase should add both stdlib-level and real-consumer validation.
+
+1. Stdlib regression coverage
+- extend `tests/stdlib/error_surface.mc`
+- verify:
+  - `describe(errors.ok()) == "ok"`
+  - `describe(errors.fail_io(1)) == "io short write"` if that code-specific
+    message is admitted
+  - unknown codes fall back to kind-level text
+
+Illustrative test shape:
+
+```mc
+func test_error_describe_io_short_write() *i32 {
+    msg := errors.describe(errors.fail_io(1))
+    return testing.expect_str_eq(msg, "io short write")
+}
+```
+
+2. Real program proof
+- update one admitted example to print the description on failure
+- prove the behavior through the existing real-project workflow suite if the
+  chosen project already has that path under test
+
+3. Documentation refresh
+- update stdlib spec wording in `docs/arch/c-lang/stdlib/stdlib_spec.txt`
+- update decision-log and backlog routing if the phase is accepted
+
+Potential implementation pitfalls
+---------------------------------
+1. Message stability drift
+- Once admitted, phrases become part of the public slice.
+- Mitigation: keep wording short and intentionally stable.
+
+2. Over-expansion through per-code exhaustiveness
+- Trying to name every code across every subsystem would turn this into a
+  message catalog phase.
+- Mitigation: admit kind-level defaults and only a few code-level overrides for
+  already-used real consumer codes.
+
+3. Smuggling richer policy into the helper
+- Do not include filenames, operation names, or dynamic context.
+- Those belong to the call site, not the shared error helper.
+
+Decision points that must stay explicit
+---------------------------------------
+1. Does `describe(err)` return only kind-level text, or does it include a
+   bounded set of code-level phrases?
+2. Which real admitted example owns the first migration?
+3. Is `describe_kind(...)` public, or only `describe(err)`?
+
+Recommended answers if this phase lands
+---------------------------------------
+1. Public: both `describe_kind(...)` and `describe(err)`
+2. First consumer: `line_filter_relay`
+3. Message coverage: kind-level for all kinds plus code-level text only for
+   already-admitted and already-observed codes in real consumers
+
+Why this is the narrowest honest widening
+-----------------------------------------
+- It preserves the current scalar `Error` ABI.
+- It keeps control flow explicit and local.
+- It improves one user-facing path without forcing allocator policy.
+- It avoids conflating source-level error rendering with compiler diagnostics or
+  compact kernel protocol status.
+
+Deliverables
+------------
+- additive `describe_kind(...)` and `describe(...)` in `stdlib/errors.mc`
+- one real admitted consumer migrated to print short error text
+- stdlib regression coverage for explanation mapping
+- refreshed stdlib specification wording
+- decision-log and backlog updates documenting the deliberate widening
+
+Validation expectations
+-----------------------
+- existing error ABI behavior must remain unchanged
+- all existing real projects must continue to build and test
+- one migrated real consumer must exercise the new helper in a genuine failure
+  path
+- wording tests must verify stable output for admitted messages
+
+Exit criteria
+-------------
+- source-level `Error` widening remains additive only
+- at least one real admitted program uses the new explanation helper
+- no heap-backed error-object policy is introduced
+- no hidden propagation or exception-like surface is introduced
+- no compiler or kernel error-surface widening is bundled into this phase
+
+Language limitation capture
+---------------------------
+This phase is not expected to require new language features. If implementation
+finds that returning or comparing static `str` values from `errors.mc` is more
+awkward than the current language and stdlib can honestly support, record that
+as a new backlog item under `Potential language features` rather than widening
+the design ad hoc.

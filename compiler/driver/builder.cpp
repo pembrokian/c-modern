@@ -104,6 +104,37 @@ std::string JoinPaths(const std::vector<std::filesystem::path>& paths) {
     return stream.str();
 }
 
+std::string JoinBootstrapTargetChoices(const mc::codegen_llvm::TargetConfig& config) {
+    if (config.target_family.empty() || config.target_family == config.triple) {
+        return config.triple;
+    }
+    return config.triple + ", " + config.target_family;
+}
+
+void ReportBootstrapTargetNotes(const ProjectFile& project,
+                                const ProjectTarget& target,
+                                const mc::codegen_llvm::TargetConfig& config,
+                                support::DiagnosticSink& diagnostics) {
+    diagnostics.Report({
+        .file_path = project.path,
+        .span = support::kDefaultSourceSpan,
+        .severity = support::DiagnosticSeverity::kNote,
+        .message = "supported bootstrap targets: " + JoinBootstrapTargetChoices(config),
+    });
+
+    std::string target_assignment = "set [targets." + target.name + "] target = \"" + config.triple + "\"";
+    if (!config.target_family.empty() && config.target_family != config.triple) {
+        target_assignment += " or \"" + config.target_family + "\"";
+    }
+    target_assignment += " in build.toml";
+    diagnostics.Report({
+        .file_path = project.path,
+        .span = support::kDefaultSourceSpan,
+        .severity = support::DiagnosticSeverity::kNote,
+        .message = std::move(target_assignment),
+    });
+}
+
 constexpr std::size_t kMergedModulePartLineStride = 1000000;
 
 void OffsetSpan(support::SourceSpan& span, std::size_t line_offset) {
@@ -1526,12 +1557,14 @@ bool SupportsBootstrapTarget(const ProjectTarget& target,
                              support::DiagnosticSink& diagnostics) {
     if (target.target.empty()) {
         if (target.env == "freestanding") {
+            const auto config = mc::codegen_llvm::BootstrapTargetConfig();
             diagnostics.Report({
                 .file_path = project.path,
                 .span = support::kDefaultSourceSpan,
                 .severity = support::DiagnosticSeverity::kError,
                 .message = "target '" + target.name + "' must declare an explicit freestanding target",
             });
+            ReportBootstrapTargetNotes(project, target, config, diagnostics);
             return false;
         }
         return true;
@@ -1548,6 +1581,7 @@ bool SupportsBootstrapTarget(const ProjectTarget& target,
         .severity = support::DiagnosticSeverity::kError,
         .message = "target '" + target.name + "' requests unsupported bootstrap target: " + target.target,
     });
+    ReportBootstrapTargetNotes(project, target, config, diagnostics);
     return false;
 }
 
