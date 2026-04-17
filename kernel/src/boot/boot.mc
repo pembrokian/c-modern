@@ -22,6 +22,7 @@ import ticket_service
 import timer_service
 import transfer_grant
 import transfer_service
+import workflow_service
 
 enum RetainedSummaryParticipation {
     None,
@@ -68,6 +69,7 @@ struct KernelBootState {
     task_restart_outcome: RestartOutcome
     journal: ServiceCell<journal_service.JournalServiceState>
     journal_restart_outcome: RestartOutcome
+    workflow: ServiceCell<workflow_service.WorkflowServiceState>
     grants: transfer_grant.GrantTable
 }
 
@@ -84,6 +86,7 @@ func kernel_init() KernelBootState {
     timer_slot := service_topology.TIMER_SLOT
     task_slot := service_topology.TASK_SLOT
     journal_slot := service_topology.JOURNAL_SLOT
+    workflow_slot := service_topology.WORKFLOW_SLOT
 
     path_state := serial_shell_path.path_init(serial_service.serial_init(serial_slot.pid, 1), shell_service.shell_init(shell_slot.pid, 1), shell_slot.endpoint)
     log_cell := ServiceCell<log_service.LogServiceState>{ state: log_service.log_init(log_slot.pid, 1), generation: 1 }
@@ -96,6 +99,7 @@ func kernel_init() KernelBootState {
     timer_cell := ServiceCell<timer_service.TimerServiceState>{ state: timer_service.timer_init(timer_slot.pid, 1), generation: 1 }
     task_cell := ServiceCell<task_service.TaskServiceState>{ state: task_service.task_init(task_slot.pid, 1), generation: 1 }
     journal_cell := ServiceCell<journal_service.JournalServiceState>{ state: journal_service.journal_load(journal_slot.pid, 1), generation: 1 }
+    workflow_cell := ServiceCell<workflow_service.WorkflowServiceState>{ state: workflow_service.workflow_init(workflow_slot.pid), generation: 1 }
 
     return KernelBootState{
         path_state: path_state,
@@ -123,6 +127,7 @@ func kernel_init() KernelBootState {
         task_restart_outcome: RestartOutcome.None,
         journal: journal_cell,
         journal_restart_outcome: RestartOutcome.None,
+        workflow: workflow_cell,
         grants: transfer_grant.grant_init()
     }
 }

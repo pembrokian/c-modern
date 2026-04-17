@@ -8,8 +8,10 @@ import service_identity
 import service_state
 import serial_protocol
 import service_topology
+import shell_service
 import task_service
 import timer_service
+import workflow_service
 
 // Named ServiceRef accessors for the four boot-wired services.
 // These refs are stable across restart -- the endpoint_id never changes after
@@ -88,6 +90,8 @@ func bootstate_metadata_for_target(s: KernelBootState, target: u8) u8 {
         return u8(task_service.task_active_count(s.task.state))
     case serial_protocol.TARGET_JOURNAL:
         return u8(journal_service.journal_count(s.journal.state))
+    case serial_protocol.TARGET_WORKFLOW:
+        return u8(workflow_service.workflow_active_count(s.workflow.state))
     default:
         return 0
     }
@@ -186,7 +190,7 @@ func bootrestart_outcome_for_endpoint(s: KernelBootState, endpoint: u32) Restart
 
 func bootsummary_payload_for_endpoint(s: KernelBootState, endpoint: u32) [4]u8 {
     participation: RetainedSummaryParticipation = RetainedSummaryParticipation.None
-    if endpoint == service_topology.LOG_ENDPOINT_ID || endpoint == service_topology.KV_ENDPOINT_ID || endpoint == service_topology.QUEUE_ENDPOINT_ID || endpoint == service_topology.FILE_ENDPOINT_ID || endpoint == service_topology.TIMER_ENDPOINT_ID || endpoint == service_topology.JOURNAL_ENDPOINT_ID {
+    if endpoint == service_topology.LOG_ENDPOINT_ID || endpoint == service_topology.KV_ENDPOINT_ID || endpoint == service_topology.QUEUE_ENDPOINT_ID || endpoint == service_topology.FILE_ENDPOINT_ID || endpoint == service_topology.TIMER_ENDPOINT_ID || endpoint == service_topology.JOURNAL_ENDPOINT_ID || endpoint == service_topology.WORKFLOW_ENDPOINT_ID {
         participation = RetainedSummaryParticipation.Service
     }
     mark: service_identity.ServiceMark = bootmark_for_endpoint(s, endpoint)
@@ -236,6 +240,10 @@ func boot_journal_mark(s: KernelBootState) service_identity.ServiceMark {
     return service_identity.service_mark(service_topology.JOURNAL_ENDPOINT_ID, s.journal.state.pid, s.journal.generation)
 }
 
+func boot_workflow_mark(s: KernelBootState) service_identity.ServiceMark {
+    return service_identity.service_mark(service_topology.WORKFLOW_ENDPOINT_ID, s.workflow.state.pid, s.workflow.generation)
+}
+
 func bootmark_for_endpoint(s: KernelBootState, endpoint: u32) service_identity.ServiceMark {
     switch endpoint {
     case service_topology.LOG_ENDPOINT_ID:
@@ -258,6 +266,8 @@ func bootmark_for_endpoint(s: KernelBootState, endpoint: u32) service_identity.S
         return boot_task_mark(s)
     case service_topology.JOURNAL_ENDPOINT_ID:
         return boot_journal_mark(s)
+    case service_topology.WORKFLOW_ENDPOINT_ID:
+        return boot_workflow_mark(s)
     default:
         return service_identity.service_mark(endpoint, 0, 0)
     }

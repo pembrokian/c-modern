@@ -148,6 +148,8 @@ func lifecycle_target_endpoint(target: u8) u32 {
         return service_topology.TASK_ENDPOINT_ID
     case serial_protocol.TARGET_JOURNAL:
         return service_topology.JOURNAL_ENDPOINT_ID
+    case serial_protocol.TARGET_WORKFLOW:
+        return service_topology.WORKFLOW_ENDPOINT_ID
     default:
         return 0
     }
@@ -496,6 +498,30 @@ func route_task(s: ShellServiceState, m: service_effect.Message, op: u8) service
     return dispatch(TASK_ROUTES, s, m, op)
 }
 
+func workflow_schedule(s: ShellServiceState, m: service_effect.Message) service_effect.Effect {
+    return forward_three(s, service_topology.WORKFLOW_ENDPOINT_ID, serial_protocol.CMD_S, m.payload[2], m.payload[3])
+}
+
+func workflow_query(s: ShellServiceState, m: service_effect.Message) service_effect.Effect {
+    return forward_two(s, service_topology.WORKFLOW_ENDPOINT_ID, serial_protocol.CMD_Q, m.payload[2])
+}
+
+func workflow_cancel(s: ShellServiceState, m: service_effect.Message) service_effect.Effect {
+    return forward_two(s, service_topology.WORKFLOW_ENDPOINT_ID, serial_protocol.CMD_C, m.payload[2])
+}
+
+const WORKFLOW_ROUTES: [5]OpHandler = [5]OpHandler{
+    OpHandler{ op: serial_protocol.CMD_S, check: anymsg, run: workflow_schedule },
+    OpHandler{ op: serial_protocol.CMD_Q, check: bang3, run: workflow_query },
+    OpHandler{ op: serial_protocol.CMD_C, check: bang3, run: workflow_cancel },
+    UNUSED_ROUTE,
+    UNUSED_ROUTE
+}
+
+func route_workflow(s: ShellServiceState, m: service_effect.Message, op: u8) service_effect.Effect {
+    return dispatch(WORKFLOW_ROUTES, s, m, op)
+}
+
 func ticket_issue(s: ShellServiceState, m: service_effect.Message) service_effect.Effect {
     return forward_empty(s, service_topology.TICKET_ENDPOINT_ID)
 }
@@ -551,6 +577,9 @@ func handle(s: ShellServiceState, m: service_effect.Message) service_effect.Effe
 
     case serial_protocol.CMD_J:
         return route_task(s, m, op)
+
+    case serial_protocol.CMD_O:
+        return route_workflow(s, m, op)
 
     case serial_protocol.CMD_T:
         return route_ticket(s, m, op)

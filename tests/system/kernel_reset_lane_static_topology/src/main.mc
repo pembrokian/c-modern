@@ -70,9 +70,9 @@ func smoke_slot_endpoints_match_constants() bool {
     return true
 }
 
-// B: SERVICE_COUNT must equal 12 — the number of boot-wired slots.
-func smoke_service_count_is_twelve() bool {
-    if service_topology.SERVICE_COUNT != 12 {
+// B: SERVICE_COUNT must equal 13 — the number of boot-wired slots.
+func smoke_service_count_is_thirteen() bool {
+    if service_topology.SERVICE_COUNT != 13 {
         return false
     }
     return true
@@ -94,7 +94,7 @@ func main() i32 {
     if smoke_slot_endpoints_match_constants() == false {
         return 1
     }
-    if smoke_service_count_is_twelve() == false {
+    if smoke_service_count_is_thirteen() == false {
         return 2
     }
     if smoke_init_and_round_trip() == false {

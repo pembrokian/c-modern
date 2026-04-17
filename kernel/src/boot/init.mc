@@ -26,6 +26,7 @@ import task_service
 import ticket_service
 import timer_service
 import transfer_service
+import workflow_service
 
 struct RestartPolicyInfo {
     target: u8
@@ -68,6 +69,8 @@ func restart_policy_for_target(target: u8) RestartPolicyInfo {
         return restart_policy_single(target, serial_protocol.POLICY_CLEAR)
     case serial_protocol.TARGET_JOURNAL:
         return restart_policy_single(target, serial_protocol.POLICY_KEEP)
+    case serial_protocol.TARGET_WORKFLOW:
+        return restart_policy_single(target, serial_protocol.POLICY_KEEP)
     default:
         return RestartPolicyInfo{ target: 0, owner0: serial_protocol.PARTICIPANT_NONE, owner1: serial_protocol.PARTICIPANT_NONE, policy: serial_protocol.PARTICIPANT_NONE }
     }
@@ -108,6 +111,8 @@ func restart(state: boot.KernelBootState, endpoint: u32) boot.KernelBootState {
         return restart_task(state)
     case service_topology.JOURNAL_ENDPOINT_ID:
         return restart_journal(state)
+    case service_topology.WORKFLOW_ENDPOINT_ID:
+        return restart_workflow(state)
     default:
         return state
     }
@@ -209,4 +214,31 @@ func restart_journal(state: boot.KernelBootState) boot.KernelBootState {
     journal_slot := service_topology.JOURNAL_SLOT
     next := boot.bootrestart_journal(state, journal_service.journal_load(journal_slot.pid, 1))
     return boot.bootwith_journal_restart_outcome(next, boot.RestartOutcome.DurableReloaded)
+}
+
+func restart_workflow(state: boot.KernelBootState) boot.KernelBootState {
+    workflow_slot := service_topology.WORKFLOW_SLOT
+    snap := workflow_service.workflow_snapshot(state.workflow.state)
+    generation: u8 = u8(state.workset_generation)
+    reloaded := workflow_service.workflow_restart_reload(workflow_slot.pid, snap, state.journal.state.lane1, generation, true)
+    next := state
+    next_timer := state.timer.state
+
+    if workflow_service.workflow_is_active(reloaded) {
+        timer_due := reloaded.due
+        if timer_due == 0 {
+            timer_due = 1
+        } else {
+            timer_due = timer_due + 1
+        }
+        timer_create_result := timer_service.timer_create(next_timer, workflow_service.WORKFLOW_TIMER_ID, timer_due)
+        next_timer = timer_create_result.state
+        reloaded = workflow_service.workflowwith(reloaded, reloaded.id, timer_due, reloaded.opcode, reloaded.task, reloaded.state, reloaded.restart, reloaded.generation)
+    } else {
+        timer_cancel_result := timer_service.timer_cancel(next_timer, workflow_service.WORKFLOW_TIMER_ID)
+        next_timer = timer_cancel_result.state
+    }
+
+    next = boot.bootwith_timer(next, next_timer)
+    return boot.bootrestart_workflow(next, reloaded)
 }

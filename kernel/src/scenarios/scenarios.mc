@@ -14,6 +14,7 @@ import scenario_restart
 import scenario_stall
 import scenario_file_service
 import scenario_timer_task_service
+import scenario_workflow_service
 import scenario_steps
 import scenario_transfer
 import scenario_workset_identity
@@ -87,5 +88,13 @@ func run(state: *boot.KernelBootState) i32 {
     if result != 0 {
         return result
     }
-    return scenario_stall.run_stall_probe(&stall_state)
+    result = scenario_workflow_service.run_workflow_service_probe()
+    if result != 0 {
+        return result
+    }
+    result = scenario_stall.run_stall_probe(&stall_state)
+    if result != 0 {
+        return result
+    }
+    return 0
 }

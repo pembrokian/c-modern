@@ -6,17 +6,17 @@ import boot
 import service_state
 import syscall
 
-func expect_restart_identity(before: service_identity.ServiceMark, after: service_identity.ServiceMark, base: i32) i32 {
-    if !service_identity.marks_same_endpoint(before, after) {
+func expect_restart_identity(before_endpoint: u32, before_pid: u32, before_generation: u32, after_endpoint: u32, after_pid: u32, after_generation: u32, base: i32) i32 {
+    if before_endpoint != after_endpoint {
         return base
     }
-    if !service_identity.marks_same_pid(before, after) {
+    if before_pid != after_pid {
         return base + 1
     }
-    if service_identity.marks_same_instance(before, after) {
+    if before_generation == after_generation {
         return base + 2
     }
-    if service_identity.mark_generation(after) != service_identity.mark_generation(before) + 1 {
+    if after_generation != before_generation + 1 {
         return base + 3
     }
     return 0

@@ -6,6 +6,7 @@ import kernel_dispatch
 import scenario_assert
 import scenario_transport
 import service_effect
+import service_identity
 import service_topology
 import syscall
 import transfer_grant
@@ -163,7 +164,13 @@ func run_transfer_probe(state: *boot.KernelBootState) i32 {
     before: service_identity.ServiceMark = boot.boot_transfer_mark(*state)
     *state = init.restart(*state, service_topology.TRANSFER_ENDPOINT_ID)
     after: service_identity.ServiceMark = boot.boot_transfer_mark(*state)
-    restart_id: i32 = scenario_assert.expect_restart_identity(before, after, FAIL_TRANSFER_IDENTITY_BASE)
+    before_endpoint: u32 = service_identity.mark_endpoint(before)
+    before_pid: u32 = service_identity.mark_pid(before)
+    before_generation: u32 = service_identity.mark_generation(before)
+    after_endpoint: u32 = service_identity.mark_endpoint(after)
+    after_pid: u32 = service_identity.mark_pid(after)
+    after_generation: u32 = service_identity.mark_generation(after)
+    restart_id: i32 = scenario_assert.expect_restart_identity(before_endpoint, before_pid, before_generation, after_endpoint, after_pid, after_generation, FAIL_TRANSFER_IDENTITY_BASE)
     if restart_id != 0 {
         return restart_id
     }

@@ -29,6 +29,7 @@ import ticket_service
 import timer_service
 import transfer_grant
 import transfer_service
+import workflow_service
 
 // MAX_EFFECT_CHAIN_DEPTH guards against send loops between services.
 // If the chain exceeds this depth the original caller receives Exhausted.
@@ -303,6 +304,22 @@ func dispatch_journal(state: *boot.KernelBootState, msg: service_effect.Message)
     return journal_result.effect
 }
 
+func dispatch_workflow(state: *boot.KernelBootState, msg: service_effect.Message) service_effect.Effect {
+    current: boot.KernelBootState = *state
+    step := workflow_service.step(current.workflow.state, current.timer.state, current.task.state, current.journal.state, msg, u8(current.workset_generation))
+    if journal_service.journal_changed(current.journal.state, step.journal) {
+        if !journal_service.journal_persist(step.journal) {
+            return service_effect.effect_reply(syscall.SyscallStatus.Closed, 0, primitives.zero_payload())
+        }
+    }
+    next := boot.bootwith_workflow(current, step.workflow)
+    next = boot.bootwith_timer(next, step.timer)
+    next = boot.bootwith_task(next, step.task)
+    next = boot.bootwith_journal(next, step.journal)
+    *state = next
+    return step.effect
+}
+
 func lifecycle_invalid_reply(state: *boot.KernelBootState, target: u8) service_effect.Effect {
     return shell_service.invalid_effect(shell_service.SHELL_INVALID_COMMAND)
 }
@@ -358,6 +375,8 @@ func leaf_route(endpoint: u32) LeafRoute {
         return LeafRoute{ endpoint: endpoint, reply: dispatch_task }
     case service_topology.JOURNAL_ENDPOINT_ID:
         return LeafRoute{ endpoint: endpoint, reply: dispatch_journal }
+    case service_topology.WORKFLOW_ENDPOINT_ID:
+        return LeafRoute{ endpoint: endpoint, reply: dispatch_workflow }
     default:
         return LeafRoute{ endpoint: endpoint, reply: dispatch_invalid_endpoint }
     }

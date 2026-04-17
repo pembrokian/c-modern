@@ -40,6 +40,7 @@ const FILE_ENDPOINT_ID: u32 = 18
 const TIMER_ENDPOINT_ID: u32 = 19
 const TASK_ENDPOINT_ID: u32 = 20
 const JOURNAL_ENDPOINT_ID: u32 = 21
+const WORKFLOW_ENDPOINT_ID: u32 = 22
 
 // ServiceSlot records the static wiring for one boot service: which endpoint
 // it occupies and which pid owns it.  Both values are fixed at kernel_init
@@ -76,8 +77,9 @@ const FILE_SLOT: ServiceSlot = { endpoint: FILE_ENDPOINT_ID, pid: 9 }
 const TIMER_SLOT: ServiceSlot = { endpoint: TIMER_ENDPOINT_ID, pid: 10 }
 const TASK_SLOT: ServiceSlot = { endpoint: TASK_ENDPOINT_ID, pid: 11 }
 const JOURNAL_SLOT: ServiceSlot = { endpoint: JOURNAL_ENDPOINT_ID, pid: 12 }
+const WORKFLOW_SLOT: ServiceSlot = { endpoint: WORKFLOW_ENDPOINT_ID, pid: 13 }
 
-const SERVICE_SLOTS: [12]ServiceSlot = {
+const SERVICE_SLOTS: [13]ServiceSlot = {
     SERIAL_SLOT,
     SHELL_SLOT,
     LOG_SLOT,
@@ -89,10 +91,11 @@ const SERVICE_SLOTS: [12]ServiceSlot = {
     FILE_SLOT,
     TIMER_SLOT,
     TASK_SLOT,
-    JOURNAL_SLOT
+    JOURNAL_SLOT,
+    WORKFLOW_SLOT
 }
 
-const SERVICE_RESTART_MODES: [12]ServiceRestartMode = {
+const SERVICE_RESTART_MODES: [13]ServiceRestartMode = {
     ServiceRestartMode.None,
     ServiceRestartMode.None,
     ServiceRestartMode.Reload,
@@ -104,15 +107,16 @@ const SERVICE_RESTART_MODES: [12]ServiceRestartMode = {
     ServiceRestartMode.Reload,
     ServiceRestartMode.Reload,
     ServiceRestartMode.Reset,
+    ServiceRestartMode.Reload,
     ServiceRestartMode.Reload
 }
 
 // SERVICE_COUNT is the number of boot-wired services in the static topology.
 // Increment this when a new slot constant is added above.
-const SERVICE_COUNT: u32 = 12
+const SERVICE_COUNT: u32 = 13
 
 func service_count() usize {
-    return 12
+    return 13
 }
 
 func service_slot_at(index: usize) ServiceSlot {
@@ -184,6 +188,8 @@ func service_authority_class(endpoint: u32) ServiceAuthorityClass {
         return ServiceAuthorityClass.RetainedOwner
     case JOURNAL_ENDPOINT_ID:
         return ServiceAuthorityClass.DurableOwner
+    case WORKFLOW_ENDPOINT_ID:
+        return ServiceAuthorityClass.RetainedOwner
     default:
         if endpoint_is_boot_wired(endpoint) {
             return ServiceAuthorityClass.PublicEndpoint

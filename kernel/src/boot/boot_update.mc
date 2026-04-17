@@ -11,6 +11,7 @@ import ticket_service
 import timer_service
 import transfer_grant
 import transfer_service
+import workflow_service
 
 func bootwith_log(s: KernelBootState, log: log_service.LogServiceState) KernelBootState {
     return s with { log.state: log }
@@ -162,4 +163,12 @@ func bootwith_journal_restart_outcome(s: KernelBootState, outcome: RestartOutcom
 
 func bootrestart_journal(s: KernelBootState, journal: journal_service.JournalServiceState) KernelBootState {
     return s with { journal.state: journal, journal.generation: s.journal.generation + 1 }
+}
+
+func bootwith_workflow(s: KernelBootState, workflow: workflow_service.WorkflowServiceState) KernelBootState {
+    return s with { workflow.state: workflow }
+}
+
+func bootrestart_workflow(s: KernelBootState, workflow: workflow_service.WorkflowServiceState) KernelBootState {
+    return s with { workflow.state: workflow, workflow.generation: s.workflow.generation + 1 }
 }

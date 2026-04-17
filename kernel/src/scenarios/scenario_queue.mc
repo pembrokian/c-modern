@@ -125,7 +125,13 @@ func run_queue_observability_probe(state: *boot.KernelBootState) i32 {
     }
 
     queue_after: service_identity.ServiceMark = boot.boot_queue_mark(*state)
-    queue_id: i32 = scenario_assert.expect_restart_identity(queue_before, queue_after, FAIL_QUEUE_RESTART_IDENTITY_BASE)
+    queue_before_endpoint: u32 = service_identity.mark_endpoint(queue_before)
+    queue_before_pid: u32 = service_identity.mark_pid(queue_before)
+    queue_before_generation: u32 = service_identity.mark_generation(queue_before)
+    queue_after_endpoint: u32 = service_identity.mark_endpoint(queue_after)
+    queue_after_pid: u32 = service_identity.mark_pid(queue_after)
+    queue_after_generation: u32 = service_identity.mark_generation(queue_after)
+    queue_id: i32 = scenario_assert.expect_restart_identity(queue_before_endpoint, queue_before_pid, queue_before_generation, queue_after_endpoint, queue_after_pid, queue_after_generation, FAIL_QUEUE_RESTART_IDENTITY_BASE)
     if queue_id != 0 {
         return queue_id
     }

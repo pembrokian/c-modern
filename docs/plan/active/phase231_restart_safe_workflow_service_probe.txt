@@ -3,7 +3,7 @@ Phase 231 -- Restart-Safe Workflow Service Probe
 
 Status
 ------
-PROPOSED
+LANDED
 
 Purpose
 -------
@@ -126,6 +126,45 @@ Validation expectations
 - one focused scenario proving delayed execution and one restart outcome
 - one focused reset-lane workflow fixture for the workflow owner
 - grouped reset-lane coverage for touched workflow paths
+
+Implementation outcome
+----------------------
+- Landed one bounded retained `workflow_service` in `kernel/src/services/`
+  with one active workflow record, one reserved timer id, explicit
+  `WAITING/RUNNING/DONE/CANCELLED/FAILED` states, and explicit
+  `NONE/RESUMED/CANCELLED` restart markers.
+- Kept the phase kernel-local: the landing stayed inside topology, boot,
+  init, shell protocol and routing, dispatch, scenario coverage, and one
+  reset-lane fixture. No compiler, framework, scheduler, process, session,
+  or supervisor expansion was admitted.
+- Used `journal_service` lane B as the explicit restart substrate for the
+  workflow owner. The workflow now snapshots compact restart-visible state
+  into the journal, reloads from that lane on retained restart, and cancels
+  explicitly when prerequisite workset generation truth no longer matches.
+- Kept the shell contract honest under the fixed 4-byte serial protocol.
+  The schedule command now carries only `(id, due)` and uses `id` as the
+  bounded task opcode rather than widening the transport.
+- Restart follow-through is explicit in `init.restart_workflow(...)`:
+  retained reload rehydrates workflow state and rearms the reserved timer
+  with one-turn grace so callers can observe `WAITING + RESUMED` before the
+  workflow advances again; terminal reload cancels the reserved timer.
+
+Validation performed
+--------------------
+- `Build debug`
+- repo-project kernel run via `mc run --project kernel/build.toml --target kernel`
+- focused grouped reset-lane coverage: `mc_tool_workflow_kernel_reset_lane_unit`
+
+Notes
+-----
+- During implementation, one candidate design that carried a distinct task
+  opcode beside `(id, due)` proved incompatible with the admitted 4-byte shell
+  frame. The phase intentionally resolved that by narrowing the workflow
+  contract instead of widening protocol or compiler surfaces.
+- Validation also exposed a current compiler/MIR-lowering sensitivity around
+  certain value-projection helper call shapes. The landed code keeps the phase
+  moving with explicit scalar locals and records that limitation separately in
+  planning rather than expanding the implementation slice.
 
 Exit criteria
 -------------

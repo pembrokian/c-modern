@@ -49,6 +49,7 @@ const CMD_F: u8 = 70   // 'F' — file command family
 const CMD_M: u8 = 77   // 'M' — timer command family
 const CMD_J: u8 = 74   // 'J' — task command family
 const CMD_Y: u8 = 89   // 'Y' — journal command family
+const CMD_O: u8 = 79   // 'O' — workflow command family
 
 const TARGET_SERIAL: u8 = 83    // 'S'
 const TARGET_SHELL: u8 = 72     // 'H'
@@ -64,6 +65,7 @@ const TARGET_FILE: u8 = 70      // 'F'
 const TARGET_TIMER: u8 = 77     // 'M'
 const TARGET_TASK: u8 = 74      // 'J'
 const TARGET_JOURNAL: u8 = 85   // 'U'
+const TARGET_WORKFLOW: u8 = 79  // 'O'
 
 const PARTICIPANT_NONE: u8 = 78  // 'N'
 const POLICY_CLEAR: u8 = 67      // 'C'
@@ -238,4 +240,16 @@ func encode_journal_replay(name: u8) [4]u8 {
 
 func encode_journal_clear(name: u8) [4]u8 {
     return ipc.payload_byte(CMD_Y, CMD_C, name, CMD_BANG)
+}
+
+func encode_workflow_schedule(id: u8, due: u8) [4]u8 {
+    return ipc.payload_byte(CMD_O, CMD_S, id, due)
+}
+
+func encode_workflow_query(id: u8) [4]u8 {
+    return ipc.payload_byte(CMD_O, CMD_Q, id, CMD_BANG)
+}
+
+func encode_workflow_cancel(id: u8) [4]u8 {
+    return ipc.payload_byte(CMD_O, CMD_C, id, CMD_BANG)
 }

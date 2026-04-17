@@ -87,7 +87,13 @@ func run_shell_lifecycle_probe(state: *boot.KernelBootState) i32 {
     }
 
     queue_after: service_identity.ServiceMark = boot.boot_queue_mark(*state)
-    queue_id: i32 = scenario_assert.expect_restart_identity(queue_before, queue_after, FAIL_LIFECYCLE_QUEUE_IDENTITY_BASE)
+    queue_before_endpoint: u32 = service_identity.mark_endpoint(queue_before)
+    queue_before_pid: u32 = service_identity.mark_pid(queue_before)
+    queue_before_generation: u32 = service_identity.mark_generation(queue_before)
+    queue_after_endpoint: u32 = service_identity.mark_endpoint(queue_after)
+    queue_after_pid: u32 = service_identity.mark_pid(queue_after)
+    queue_after_generation: u32 = service_identity.mark_generation(queue_after)
+    queue_id: i32 = scenario_assert.expect_restart_identity(queue_before_endpoint, queue_before_pid, queue_before_generation, queue_after_endpoint, queue_after_pid, queue_after_generation, FAIL_LIFECYCLE_QUEUE_IDENTITY_BASE)
     if queue_id != 0 {
         return queue_id
     }
@@ -125,7 +131,13 @@ func run_shell_lifecycle_probe(state: *boot.KernelBootState) i32 {
     }
 
     echo_after: service_identity.ServiceMark = boot.boot_echo_mark(*state)
-    echo_id: i32 = scenario_assert.expect_restart_identity(echo_before, echo_after, FAIL_LIFECYCLE_ECHO_IDENTITY_BASE)
+    echo_before_endpoint: u32 = service_identity.mark_endpoint(echo_before)
+    echo_before_pid: u32 = service_identity.mark_pid(echo_before)
+    echo_before_generation: u32 = service_identity.mark_generation(echo_before)
+    echo_after_endpoint: u32 = service_identity.mark_endpoint(echo_after)
+    echo_after_pid: u32 = service_identity.mark_pid(echo_after)
+    echo_after_generation: u32 = service_identity.mark_generation(echo_after)
+    echo_id: i32 = scenario_assert.expect_restart_identity(echo_before_endpoint, echo_before_pid, echo_before_generation, echo_after_endpoint, echo_after_pid, echo_after_generation, FAIL_LIFECYCLE_ECHO_IDENTITY_BASE)
     if echo_id != 0 {
         return echo_id
     }
