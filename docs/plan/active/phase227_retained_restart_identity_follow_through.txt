@@ -1,0 +1,86 @@
+Phase 227 -- Retained Restart Identity Follow-Through
+======================================================
+
+Status
+------
+PLANNED
+
+Purpose
+-------
+Close the next retained-state pressure after Phase 206 by making one more
+retained or restart identity comparison surface honest, while keeping the
+current owner-local model explicit and bounded.
+
+Repository status note
+----------------------
+- Phase 206 already admitted one compact retained-summary query on the
+  shell-visible control path.
+- Phase 200 already admitted `XIW!` as the workset-generation identity query.
+- Phase 193 already exposed restart-visible generation state for fixed
+  targets.
+- The current model is truthful but still fragmented across several narrow
+  queries and helpers, so callers must stitch together retained participation,
+  generation identity, and restart outcome by hand.
+
+Problem being solved
+--------------------
+- A caller can already ask for retained summary or restart identity, but the
+  current surface still spreads the truth across separate commands.
+- As more retained follow-through lands, that fragmentation will create more
+  ad hoc lookup pressure instead of one compact comparison surface.
+- The repository should improve retained inspectability before widening any
+  retained policy or bundle abstraction.
+
+Core rule
+---------
+- Keep the retained model explicit and owner-local.
+- Prefer one compact comparison contract over a family of new ad hoc queries.
+- Do not infer retained bundles dynamically.
+- Do not introduce persistence, durability, or a generic metadata framework.
+
+Chosen slice for this phase
+---------------------------
+1. add one bounded retained or restart identity comparison query on the
+   existing shell-visible control path
+2. make the query report the truthful fixed-target data needed to compare
+   retained participation, current generation marker, and last restart
+   outcome
+3. keep ownership in the existing boot and init modules rather than
+   reconstructing retained truth in the shell layer
+4. add one deterministic scenario and one focused reset-lane fixture proving
+   the new comparison surface across ordinary restart, retained reload, and
+   coordinated retained reload
+
+Non-goals
+---------
+- no bundle registry
+- no dynamic dependency graph
+- no persistence or durable-storage semantics
+- no supervisor policy or automatic restart
+- no broader operator dashboard
+
+Why this is the narrowest honest landing
+----------------------------------------
+- The repository already has enough retained truth to justify one more compact
+  comparison surface, but not enough evidence to justify a framework.
+- The remaining pressure is about making already-admitted retained identity
+  easier to compare, not about discovering new classes of retained behavior.
+- A single compact query keeps the shell contract bounded and keeps the work
+  local to the modules that already own the underlying truth.
+
+Validation expectations
+-----------------------
+- `Build debug`
+- one focused reset-lane workflow fixture for the new retained comparison
+  contract
+- the existing retained-summary and retained-identity workflow coverage must
+  continue to pass unchanged unless the new surface intentionally updates the
+  expected output
+
+Exit criteria
+-------------
+- one compact shell-visible comparison query can explain the retained or
+  restart truth of a fixed target without consulting several separate paths
+- the summary and identity truth remain owned by boot and init, not by shell
+- no bundle registry, persistence system, or discovery framework is introduced
+- the retained model becomes easier to compare without widening its policy

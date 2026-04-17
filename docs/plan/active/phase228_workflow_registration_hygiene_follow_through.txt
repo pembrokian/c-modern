@@ -1,0 +1,80 @@
+Phase 228 -- Workflow Registration Hygiene Follow-Through
+=========================================================
+
+Status
+------
+PLANNED
+
+Purpose
+-------
+Keep the grouped workflow and real-project registration model honest as the
+test surface grows by adding one explicit integrity check for descriptor and
+case-table agreement.
+
+Repository status note
+----------------------
+- Phase 203 moved grouped workflow and real-project case identity into
+  checked-in descriptors.
+- The current registration model is intentionally explicit for shared-layer
+  ownership, and `tools/select_tests.py` still carries those semantic rules.
+- The active workflow suites have enough structure now that drift between the
+  checked-in descriptors, generated grouped-runner tables, and explicit case
+  ownership would be a real maintenance problem.
+
+Problem being solved
+--------------------
+- Descriptor-driven registration removed the duplicated case-name inventories,
+  but it also created a new maintenance duty: keeping the descriptors, the
+  generated tables, and the explicit shared ownership rules aligned.
+- As more grouped cases accumulate, a missing descriptor or a stale table is
+  easier to introduce than to notice.
+- The repository should catch that drift with a small integrity check rather
+  than rebuilding the registration system as a framework.
+
+Core rule
+---------
+- Keep case identity source-controlled and explicit.
+- Keep shared-layer ownership rules visible in `tools/select_tests.py`.
+- Do not add hidden dependency inference.
+- Do not turn grouped case discovery into a new test DSL.
+
+Chosen slice for this phase
+---------------------------
+1. add one grouped-registration integrity check that validates descriptor
+   presence against the generated grouped workflow and real-project case
+   tables
+2. make the check fail clearly when a checked-in case is missing a descriptor,
+   has a stale table entry, or drifts out of the explicit ownership mapping
+3. keep the check local to the existing grouped workflow and real-project
+   registration path
+4. prove the new guard with one narrow fixture or metadata-driven test case
+
+Non-goals
+---------
+- no hidden dependency inference
+- no generic test framework or assertion DSL
+- no broad compiler, runtime, or kernel changes
+- no redesign of the explicit shared-layer ownership rules
+
+Why this is the narrowest honest landing
+----------------------------------------
+- The existing descriptor-driven model already solved the original duplication
+  problem.
+- The next maintenance risk is integrity drift, not missing abstraction.
+- One focused guard is enough to catch the class of errors that the new model
+  can now make visible.
+
+Validation expectations
+-----------------------
+- `Build debug`
+- the focused grouped workflow suite for the touched registration surface
+- the real-project grouped suite, if the check touches that table as well
+
+Exit criteria
+-------------
+- checked-in descriptors, generated grouped tables, and explicit ownership
+  rules cannot silently diverge
+- the workflow suite still derives case identity from descriptors rather than
+  from parallel handwritten lists
+- no hidden ownership inference or new testing framework is introduced
+- the grouped registration path remains explicit and easy to audit

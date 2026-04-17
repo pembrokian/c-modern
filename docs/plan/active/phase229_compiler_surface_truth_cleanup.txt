@@ -1,0 +1,84 @@
+Phase 229 -- Compiler Surface Truth Cleanup
+===========================================
+
+Status
+------
+PLANNED
+
+Purpose
+-------
+Continue the compiler-facing cleanup after Phase 211 by removing the last
+bootstrap-era wording and tightening one narrow diagnostic truth path where
+the current owner-local error surface can be more accurate.
+
+Repository status note
+----------------------
+- Phase 211 retired the old bare `name = expr` compatibility path and made
+  `:=` the intended inferred local binding spelling.
+- The backlog still prefers owner-local, additive diagnostics over broad error
+  surface redesign.
+- The compiler and driver path already has several small truth-repair wins on
+  project validation and manifest parsing, so the next cleanup should stay
+  equally local.
+
+Problem being solved
+--------------------
+- Some repository-owned material can still drift toward bootstrap-era wording
+  even after the syntax surface itself has been cleaned up.
+- The driver and project-validation path still has a few places where the
+  narrow truth is better expressed with a more accurate span or note than with
+  a generic failure.
+- The repository should keep these repairs additive and local instead of
+  reopening inference, binding, or a larger error framework.
+
+Core rule
+---------
+- Keep `:=` as the only inferred local binding spelling in repository-owned
+  material.
+- Keep `=` as assignment only.
+- Prefer one owner-local diagnostic truth repair over a broad error-engine
+  change.
+- Do not widen inference, casts, or parser semantics as part of this cleanup.
+
+Chosen slice for this phase
+---------------------------
+1. refresh the remaining repository-owned wording, examples, or fixtures that
+   still describe the retired bare-binding compatibility surface
+2. make one narrow compiler-driver diagnostic truth repair on the project or
+   manifest path, such as a better source span or note for a concrete failure
+3. keep the change additive and local to the current diagnostic owner
+4. update only the smallest set of fixtures needed to preserve deterministic
+   output
+
+Non-goals
+---------
+- no inference widening
+- no general error-object or fix-it framework
+- no parser or sema redesign beyond the already-admitted assignment-only
+  semantics
+- no broad diagnostic-engine overhaul
+
+Why this is the narrowest honest landing
+----------------------------------------
+- The syntax cleanup from Phase 211 already removed the real compatibility
+  surface.
+- What remains is mostly truth alignment: repository wording, fixture text,
+  and one or two owner-local driver diagnostics.
+- A small additive repair keeps the compiler surface honest without reopening
+  the larger language or diagnostics design.
+
+Validation expectations
+-----------------------
+- `Build debug`
+- targeted parser, sema, or MIR fixture coverage if repository-owned wording
+  changes touch those outputs
+- a focused driver or project-validation test if the diagnostic path changes
+
+Exit criteria
+-------------
+- repository-owned material no longer describes bare local `name = expr` as a
+  binding form
+- one concrete driver or project failure reports the truthful local span or
+  note rather than a generic or misleading origin
+- no new inference behavior or error framework is introduced
+- the compiler-facing cleanup stays owner-local and deterministic
