@@ -10,10 +10,12 @@ namespace {
 
 using mc::test_support::CopyDirectoryTree;
 using mc::test_support::ExpectOutputContains;
+using mc::test_support::Fail;
+using mc::test_support::RunCommandCapture;
 using mc::test_support::WriteFile;
-using mc::tool_tests::BuildProjectTargetAndExpectSuccess;
+using mc::tool_tests::BuildProjectTargetAndCapture;
 using mc::tool_tests::CheckProjectTargetAndExpectSuccess;
-using mc::tool_tests::RunProjectTargetAndExpectSuccess;
+using mc::tool_tests::ParseBuiltProjectExecutablePath;
 
 void ExpectIssueRollupRunOutput(std::string_view output,
                                 std::string_view expected_line,
@@ -130,20 +132,24 @@ void TestIssueRollupImportedAggregateConstPressure(const std::filesystem::path& 
     const std::filesystem::path build_dir = binary_root / "issue_rollup_aggregate_const_build";
     std::filesystem::remove_all(build_dir);
 
-    BuildProjectTargetAndExpectSuccess(mc_path,
-                                       cloned_project_path,
-                                       build_dir,
-                                       "",
-                                       "issue_rollup_aggregate_const_build_output.txt",
-                                       "issue rollup aggregate const executable build");
+    const std::string build_output = BuildProjectTargetAndCapture(mc_path,
+                                                                  cloned_project_path,
+                                                                  build_dir,
+                                                                  "",
+                                                                  "issue_rollup_aggregate_const_build_output.txt",
+                                                                  "issue rollup aggregate const executable build");
+    const std::filesystem::path executable_path = ParseBuiltProjectExecutablePath(
+        build_output,
+        "issue rollup aggregate const executable build");
 
-    const std::string run_output = RunProjectTargetAndExpectSuccess(mc_path,
-                                                                    cloned_project_path,
-                                                                    build_dir,
-                                                                    "",
-                                                                    cloned_project_root / "tests/sample.txt",
-                                                                    "issue_rollup_aggregate_const_run_output.txt",
-                                                                    "issue rollup aggregate const executable run");
+    const auto [run_outcome, run_output] =
+        RunCommandCapture({executable_path.generic_string(),
+                           (cloned_project_root / "tests/sample.txt").generic_string()},
+                          build_dir / "issue_rollup_aggregate_const_run_output.txt",
+                          "issue rollup aggregate const executable run");
+    if (!run_outcome.exited || run_outcome.exit_code != 0) {
+        Fail("issue rollup aggregate const executable run should succeed, got:\n" + run_output);
+    }
     ExpectIssueRollupRunOutput(run_output,
                                "issue-rollup-steady\n",
                                "phase58 issue rollup aggregate const executable run");

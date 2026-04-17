@@ -196,6 +196,9 @@ std::string BuildProjectTargetAndCapture(const std::filesystem::path& mc_path,
                                          std::string_view output_name,
                                          const std::string& context);
 
+std::filesystem::path ParseBuiltProjectExecutablePath(std::string_view build_output,
+                                                      std::string_view context);
+
 std::string BuildProjectTargetAndExpectFailure(const std::filesystem::path& mc_path,
                                                const std::filesystem::path& project_path,
                                                const std::filesystem::path& build_dir,

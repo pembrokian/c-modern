@@ -12,7 +12,9 @@ using mc::test_support::Fail;
 using mc::test_support::RunCommandCapture;
 using mc::test_support::WriteFile;
 using namespace mc::tool_tests;
+using mc::tool_tests::BuildProjectTargetAndCapture;
 using mc::tool_tests::BuildProjectTargetAndExpectFailure;
+using mc::tool_tests::ParseBuiltProjectExecutablePath;
 
 void TestProjectModeMultiFileModulesBuildAndRun(const std::filesystem::path& binary_root,
                                                 const std::filesystem::path& mc_path) {
@@ -79,19 +81,16 @@ void TestProjectModeMultiFileModulesBuildAndRun(const std::filesystem::path& bin
 
     const std::filesystem::path build_dir = binary_root / "multifile_build";
     std::filesystem::remove_all(build_dir);
-    BuildProjectTargetAndExpectSuccess(mc_path,
-                                       project_root / "build.toml",
-                                       build_dir,
-                                       "app",
-                                       "multifile_build_output.txt",
-                                       "multi-file module build");
+    const std::string build_output = BuildProjectTargetAndCapture(mc_path,
+                                                                  project_root / "build.toml",
+                                                                  build_dir,
+                                                                  "app",
+                                                                  "multifile_build_output.txt",
+                                                                  "multi-file module build");
+    const std::filesystem::path executable_path =
+        ParseBuiltProjectExecutablePath(build_output, "multi-file module build");
 
-    const auto [run_outcome, run_output] = RunCommandCapture({mc_path.generic_string(),
-                                                              "run",
-                                                              "--project",
-                                                              (project_root / "build.toml").generic_string(),
-                                                              "--build-dir",
-                                                              build_dir.generic_string()},
+    const auto [run_outcome, run_output] = RunCommandCapture({executable_path.generic_string()},
                                                              build_dir / "multifile_run_output.txt",
                                                              "multi-file module run");
     if (!run_outcome.exited || run_outcome.exit_code != 10) {

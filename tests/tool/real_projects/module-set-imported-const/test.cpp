@@ -8,10 +8,12 @@
 namespace {
 
 using mc::test_support::ExpectOutputContains;
+using mc::test_support::Fail;
+using mc::test_support::RunCommandCapture;
 using mc::test_support::WriteFile;
-using mc::tool_tests::BuildProjectTargetAndExpectSuccess;
+using mc::tool_tests::BuildProjectTargetAndCapture;
 using mc::tool_tests::CheckProjectTargetAndExpectSuccess;
-using mc::tool_tests::RunProjectTargetAndExpectSuccess;
+using mc::tool_tests::ParseBuiltProjectExecutablePath;
 
 }  // namespace
 
@@ -93,20 +95,23 @@ void TestModuleSetImportedConstFollowThrough(const std::filesystem::path& source
     const std::filesystem::path build_dir = binary_root / "module_set_imported_const_build";
     std::filesystem::remove_all(build_dir);
 
-    BuildProjectTargetAndExpectSuccess(mc_path,
-                                       project_path,
-                                       build_dir,
-                                       "",
-                                       "module_set_imported_const_build_output.txt",
-                                       "module-set imported const follow-through build");
+    const std::string build_output = BuildProjectTargetAndCapture(mc_path,
+                                                                  project_path,
+                                                                  build_dir,
+                                                                  "",
+                                                                  "module_set_imported_const_build_output.txt",
+                                                                  "module-set imported const follow-through build");
+    const std::filesystem::path executable_path = ParseBuiltProjectExecutablePath(
+        build_output,
+        "module-set imported const follow-through build");
 
-    RunProjectTargetAndExpectSuccess(mc_path,
-                                     project_path,
-                                     build_dir,
-                                     "",
-                                     project_path,
-                                     "module_set_imported_const_run_output.txt",
-                                     "module-set imported const follow-through run");
+    const auto [run_outcome, run_output] = RunCommandCapture({executable_path.generic_string(),
+                                                              project_path.generic_string()},
+                                                             build_dir / "module_set_imported_const_run_output.txt",
+                                                             "module-set imported const follow-through run");
+    if (!run_outcome.exited || run_outcome.exit_code != 0) {
+        Fail("module-set imported const follow-through run should succeed, got:\n" + run_output);
+    }
 }
 
 }  // namespace mc::tool_tests

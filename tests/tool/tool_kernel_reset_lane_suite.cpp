@@ -17,6 +17,7 @@ namespace {
 using mc::test_support::CopyDirectoryTree;
 using mc::test_support::Fail;
 using mc::test_support::ReadFile;
+using mc::test_support::RunCommand;
 using mc::test_support::RunCommandCapture;
 using mc::test_support::WriteFile;
 using namespace mc::tool_tests;
@@ -44,6 +45,37 @@ std::string FormatDuration(std::chrono::milliseconds duration) {
     std::ostringstream stream;
     stream << duration.count() << "ms";
     return stream.str();
+}
+
+std::filesystem::path ParseBuiltExecutablePath(std::string_view build_output,
+                                               std::string_view context) {
+    constexpr std::string_view kPrefix = "built target ";
+    const size_t line_start = build_output.rfind(kPrefix);
+    if (line_start == std::string_view::npos) {
+        Fail("expected build output summary for " + std::string(context) + ":\n" +
+             std::string(build_output));
+    }
+
+    const size_t arrow_pos = build_output.find(" -> ", line_start);
+    if (arrow_pos == std::string_view::npos) {
+        Fail("expected build output executable path for " + std::string(context) + ":\n" +
+             std::string(build_output));
+    }
+
+    const size_t path_start = arrow_pos + 4;
+    size_t path_end = build_output.find(" (", path_start);
+    if (path_end == std::string_view::npos) {
+        path_end = build_output.find('\n', path_start);
+    }
+    if (path_end == std::string_view::npos) {
+        path_end = build_output.size();
+    }
+    if (path_end <= path_start) {
+        Fail("expected non-empty executable path for " + std::string(context) + ":\n" +
+             std::string(build_output));
+    }
+
+    return std::filesystem::path(std::string(build_output.substr(path_start, path_end - path_start)));
 }
 
 std::string LoadKernelResetLaneFixtureFile(const std::filesystem::path& source_root,
@@ -171,24 +203,17 @@ ResetLaneScenarioTiming RunKernelResetLaneScenario(const std::filesystem::path& 
         std::filesystem::remove_all(build_dir);
     }
     const auto build_start = std::chrono::steady_clock::now();
-    BuildProjectTargetAndExpectSuccess(mc_path,
-                                       project_path,
-                                       build_dir,
-                                       scenario.target_name,
-                                       scenario.build_output_name,
-                                       std::string(scenario.build_context));
+    const std::string build_output = BuildProjectTargetAndCapture(mc_path,
+                                                                  project_path,
+                                                                  build_dir,
+                                                                  scenario.target_name,
+                                                                  scenario.build_output_name,
+                                                                  std::string(scenario.build_context));
     const auto build_end = std::chrono::steady_clock::now();
+    const std::filesystem::path executable_path =
+        ParseBuiltExecutablePath(build_output, scenario.build_context);
 
-    std::vector<std::string> command = {mc_path.generic_string(),
-                                        "run",
-                                        "--project",
-                                        project_path.generic_string()};
-    if (scenario.target_name != "app") {
-        command.push_back("--target");
-        command.push_back(std::string(scenario.target_name));
-    }
-    command.push_back("--build-dir");
-    command.push_back(build_dir.generic_string());
+    std::vector<std::string> command = {executable_path.generic_string()};
 
     const auto run_start = std::chrono::steady_clock::now();
     const auto [run_outcome, run_output] = RunCommandCapture(command,

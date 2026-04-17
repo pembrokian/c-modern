@@ -1099,6 +1099,37 @@ std::string BuildProjectTargetAndCapture(const std::filesystem::path& mc_path,
                                      ProjectCommandOutputMode::capture);
 }
 
+std::filesystem::path ParseBuiltProjectExecutablePath(std::string_view build_output,
+                                                      std::string_view context) {
+    constexpr std::string_view kPrefix = "built target ";
+    const size_t line_start = build_output.rfind(kPrefix);
+    if (line_start == std::string_view::npos) {
+        Fail("expected build output summary for " + std::string(context) + ":\n" +
+             std::string(build_output));
+    }
+
+    const size_t arrow_pos = build_output.find(" -> ", line_start);
+    if (arrow_pos == std::string_view::npos) {
+        Fail("expected build output executable path for " + std::string(context) + ":\n" +
+             std::string(build_output));
+    }
+
+    const size_t path_start = arrow_pos + 4;
+    size_t path_end = build_output.find(" (", path_start);
+    if (path_end == std::string_view::npos) {
+        path_end = build_output.find('\n', path_start);
+    }
+    if (path_end == std::string_view::npos) {
+        path_end = build_output.size();
+    }
+    if (path_end <= path_start) {
+        Fail("expected non-empty executable path for " + std::string(context) + ":\n" +
+             std::string(build_output));
+    }
+
+    return std::filesystem::path(std::string(build_output.substr(path_start, path_end - path_start)));
+}
+
 std::string BuildProjectTargetAndExpectFailure(const std::filesystem::path& mc_path,
                                                const std::filesystem::path& project_path,
                                                const std::filesystem::path& build_dir,
