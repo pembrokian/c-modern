@@ -64,6 +64,16 @@ ctest --test-dir build/debug -R 'mc_tool_real_project_.*_unit' --output-on-failu
 make select-tests
 ```
 
+Performance-sensitive validation guidance:
+
+- Prefer the narrowest owning test target first, especially for tool, workflow, build-state, and reset-lane changes.
+- Use `make select-tests` for changed-path iteration before running wider suites.
+- Treat dramatic test-time growth as a regression to diagnose, not just a CI nuisance to tolerate.
+- For workflow and build caching changes, run the owning test twice when practical: a cold pass can expose correctness problems, and the immediate warm pass can expose broken reuse or accidental rebuild churn.
+- The full reset-lane coverage surface is one maintained CTest case: `mc_tool_workflow_kernel_reset_lane_full_unit`.
+- Do not solve reset-lane full-suite slowness by adding manual shard maintenance. Prefer fixing reuse inside the owning runner.
+- `tests/tool/tool_kernel_reset_lane_suite.cpp` prints `cache=hit` or `cache=miss` plus aggregate build or run timing. If wall time jumps, inspect those per-scenario summaries before widening the investigation.
+
 ## Testing Conventions
 
 - `tests/compiler/parser`: parser fixtures and parse-fail diagnostics
@@ -81,6 +91,7 @@ Active grouped regression layout:
 - `tests/tool/tool_project_validation_suite.cpp`: target selection, import-root, duplicate-root, and project-graph validation
 - `tests/tool/tool_multifile_module_suite.cpp`: module-set and multi-file module validation
 - `tests/tool/tool_kernel_reset_lane_suite.cpp`: reset-lane kernel workflow validation and table-driven fixture runs
+- `mc_tool_workflow_kernel_reset_lane_full_unit`: full reset-lane repo-project plus checked-in fixture coverage inside one maintained grouped case, with per-scenario cached-build reporting
 - `tests/tool/tool_build_state_tests.cpp`: build-state, imported-artifact, and incremental rebuild driver
 - `tests/tool/tool_build_state_suite.cpp`: build-state grouped implementation
 - `tests/tool/tool_real_project_tests.cpp`: real-project workflow driver

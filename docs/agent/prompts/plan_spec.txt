@@ -1,0 +1,509 @@
+Plan Doc Specification
+======================
+
+Purpose
+-------
+This document defines the normative structure for per-phase plan documents in
+`docs/plan/active/`.
+
+The goal is not to replace the repository's current planning style. The goal
+is to make that style more explicit, more spec-driven, and more reviewable by
+requiring each phase plan to state:
+
+- the problem being solved
+- what the phase will not do
+- the invariants that must remain true
+- the required and forbidden surface changes
+- the test obligations and acceptance criteria
+- the expected future follow-up
+
+This spec is for planning documents first. Landed documents may append
+implementation notes, validation performed, and exit status, but those do not
+replace the planning obligations.
+
+Normative words
+---------------
+- MUST: required for a valid phase plan
+- SHOULD: strongly preferred unless there is a documented reason not to
+- MAY: optional when it improves clarity
+
+Scope
+-----
+This spec applies to new repository-owned phase plans and to major rewrites of
+existing active phase plans.
+
+This spec is not a requirement for:
+
+- backlog entries
+- decision-log entries
+- critique-response notes
+- archive summaries or closeout-only notes
+
+Core principles
+---------------
+Every phase plan MUST behave like an executable contract, not just a narrative
+essay.
+
+Each phase plan MUST:
+
+- describe one bounded problem
+- identify the smallest honest slice that solves that problem
+- protect existing architectural boundaries explicitly
+- define what evidence will count as success
+- define what changes are out of scope even if they look adjacent
+
+Each phase plan MUST NOT:
+
+- read like a generic wishlist
+- hide key constraints inside prose only
+- rely on implied non-goals or implied invariants
+- substitute tests or proofs for a real implementation when the phase claims a
+	real implementation landing
+- quietly widen compiler, runtime, tool, or kernel scope without stating that
+	widening as an explicit surface change
+
+Required document order
+-----------------------
+Each phase plan MUST use the following top-level section order.
+
+1. `Phase N -- <concise title>`
+2. `Status`
+3. `Purpose`
+4. `Repository status note`
+5. `Problem being solved`
+6. `Non-goals`
+7. `Invariants`
+8. `Required surface changes`
+9. `Forbidden changes`
+10. `Phase role in the larger sequence`
+11. `Relevant backlog items this phase intentionally brings under pressure`
+12. `Questions this phase must answer`
+13. `Preferred implementation shape`
+14. `Test obligations`
+15. `Acceptance criteria`
+16. `Future follow-up`
+
+The document MAY include additional sections after these if they materially
+improve clarity, but the required sections MUST appear and MUST remain easy to
+find.
+
+Required section semantics
+--------------------------
+
+Status
+------
+The `Status` section MUST state the current phase state in a short explicit
+form.
+
+Allowed values include:
+
+- `PROPOSED`
+- `IN PROGRESS`
+- `LANDED`
+- `COMPLETED`
+- `IMPLEMENTED`
+
+If the plan is no longer purely forward-looking, the status SHOULD include the
+date or short qualifier.
+
+Purpose
+-------
+The `Purpose` section MUST explain the bounded capability or repair being
+admitted.
+
+It MUST answer:
+
+- what capability the phase is introducing or repairing
+- why this phase exists now
+- why this slice is the next honest move rather than a broader framework step
+
+This section SHOULD stay high-level and short.
+
+Repository status note
+----------------------
+This section MUST summarize the local repository context that makes the phase
+necessary.
+
+It MUST:
+
+- name the immediately relevant prior phases, files, or decisions
+- describe what is already true
+- describe what is still missing
+
+It MUST NOT become a general repository history.
+
+Problem being solved
+--------------------
+This section is REQUIRED.
+
+It MUST describe the concrete contradiction, gap, or pressure point that the
+phase resolves.
+
+It SHOULD explain:
+
+- what is insufficient in the current repo state
+- why leaving the problem unresolved is dishonest or destabilizing
+- why the problem is real and not merely aesthetic
+
+The problem statement MUST be written as a current-repo problem, not as a
+generic industry problem.
+
+Non-goals
+---------
+This section is REQUIRED.
+
+It MUST list the tempting adjacent expansions that this phase explicitly will
+not do.
+
+Each non-goal SHOULD be concrete. Good examples:
+
+- no scheduler framework
+- no generic mailbox system
+- no capability algebra
+- no compiler widening beyond one stated follow-up trigger
+
+This section MUST make it easy for implementers and reviewers to reject scope
+creep.
+
+Invariants
+----------
+This section is REQUIRED.
+
+It MUST list the architectural or behavioral truths that must remain true after
+the phase lands.
+
+Invariants SHOULD be stated as obligations, not vague intentions. They SHOULD
+include boundaries such as:
+
+- ownership boundaries
+- transport-width limits
+- phase-boundary responsibilities
+- determinism requirements
+- existing public-surface constraints
+
+Each invariant SHOULD be falsifiable.
+
+Examples:
+
+- dispatch remains a routing and gating boundary only
+- the four-byte shell frame stays fixed
+- semantic truth stays in sema rather than moving into MIR
+- reset-lane full coverage remains one maintained grouped case
+
+Required surface changes
+------------------------
+This section is REQUIRED.
+
+It MUST enumerate the minimal admitted surfaces that are expected to change.
+
+This is the normative replacement for the older softer pattern around
+`Chosen slice for this phase`.
+
+Each item SHOULD identify one of:
+
+- a new owner or service
+- a bounded new command family
+- a required file or module touch set
+- a required public or user-visible behavior change
+- a required scenario or fixture addition
+
+This section MUST describe what the phase is allowed and expected to change.
+
+Forbidden changes
+-----------------
+This section is REQUIRED.
+
+It MUST describe changes that reviewers should reject even if they appear to
+solve the problem.
+
+This section differs from `Non-goals`:
+
+- `Non-goals` explains adjacent areas the phase is not trying to solve
+- `Forbidden changes` explains implementation moves that would violate the
+	phase contract
+
+Examples:
+
+- do not widen shell transport width
+- do not move owner-local truth into boot or dispatch merely to simplify code
+- do not add generic registries, dashboards, or frameworks
+- do not solve slowness by adding manual shard maintenance when reuse can be
+	repaired in the owning runner
+
+Phase role in the larger sequence
+---------------------------------
+This section MUST explain how the phase fits the surrounding plan chain.
+
+It SHOULD describe:
+
+- what earlier phase pressure it consumes
+- what later phases it is preparing
+- what follow-on work becomes possible only if this phase lands honestly
+
+Relevant backlog items this phase intentionally brings under pressure
+--------------------------------------------------------------------
+This section SHOULD remain in the current repository style.
+
+It MUST identify the backlog themes this phase is intentionally testing,
+forcing, or narrowing.
+
+It SHOULD reference concrete backlog entries or bounded themes rather than
+generic categories.
+
+Questions this phase must answer
+--------------------------------
+This section is REQUIRED.
+
+It MUST list the real design questions whose answers will determine whether the
+phase remains honest.
+
+Good questions are:
+
+- repo-local
+- architecturally meaningful
+- answerable by implementation and tests
+
+Bad questions are:
+
+- vague brainstorming prompts
+- product strategy questions unrelated to the implementation slice
+
+Preferred implementation shape
+------------------------------
+This section is REQUIRED.
+
+It MUST guide implementers toward the preferred bounded shape without forcing a
+line-by-line design.
+
+It SHOULD identify:
+
+- the intended owner
+- where truth should live
+- where composition should happen
+- which existing surfaces should be reused
+- which boundaries should not be crossed
+
+Test obligations
+----------------
+This section is REQUIRED.
+
+It replaces the looser older pattern around `Validation expectations`.
+
+It MUST state the minimum test evidence required before the phase can be
+claimed complete.
+
+It MUST distinguish between:
+
+- build obligations
+- focused scenario or fixture obligations
+- grouped-suite or workflow obligations when applicable
+
+It SHOULD call out performance-sensitive obligations when relevant. Examples:
+
+- run the owning target twice to confirm build reuse
+- inspect per-scenario cache summaries if suite time changes materially
+- prefer the narrowest owning grouped target before broad full-suite runs
+
+Acceptance criteria
+-------------------
+This section is REQUIRED.
+
+It replaces the older looser pattern around `Exit criteria`.
+
+It MUST define the observable conditions that must all be true for the phase to
+count as landed.
+
+Acceptance criteria MUST:
+
+- be checkable
+- correspond to the problem statement
+- reflect the invariants and non-goals
+- avoid hidden criteria that appear only in narrative prose
+
+Future follow-up
+----------------
+This section is REQUIRED.
+
+It MUST state what should happen next after this phase lands, without turning
+the current phase into a framework placeholder.
+
+This section SHOULD distinguish between:
+
+- likely immediate next pressure
+- deferred adjacent work
+- conditions that would justify reopening a bounded non-goal later
+
+If the phase exposes a language or tooling limitation, this section SHOULD say
+where that follow-up belongs, for example:
+
+- `docs/plan/backlog.txt`
+- `docs/plan/decision_log.txt`
+- a later phase plan
+
+Recommended optional sections
+-----------------------------
+The following sections are OPTIONAL but recommended when they materially help:
+
+- `Files expected to change`
+- `Concrete examples this phase should make possible`
+- `Failure modes to watch for`
+- `Migration or compatibility notes`
+
+These MAY be used, but they MUST NOT replace any required section above.
+
+Post-landing appendices
+-----------------------
+Once a phase lands, the plan MAY append landing-specific sections such as:
+
+- `Implemented shape`
+- `Implementation outcome`
+- `Implementation notes`
+- `Files landed`
+- `Validation performed`
+- `Exit status`
+- `Decision notes`
+
+These are useful, but they are post-landing appendices. They MUST NOT be used
+to avoid writing the forward-looking planning contract.
+
+Section writing rules
+---------------------
+Every required section SHOULD be concise, concrete, and reviewable.
+
+Phase plans SHOULD:
+
+- prefer short bullets over long diffuse paragraphs when enumerating contract
+	points
+- name actual files, services, commands, and tests when the repo already knows
+	them
+- describe one bounded slice rather than multiple loosely-related landings
+- keep the contract honest to the repository's current architecture
+
+Phase plans MUST NOT:
+
+- claim completion of a larger roadmap phase when the repo has only landed a
+	repository-bounded milestone
+- describe framework-scale future dreams as if they are part of the current
+	acceptance criteria
+- bury the real constraint in a late note while the earlier sections imply a
+	broader scope
+
+Mapping from current structure
+------------------------------
+Existing repository plans often use these headings:
+
+- `Purpose`
+- `Repository status note`
+- `Problem being solved`
+- `Core rule`
+- `Chosen slice for this phase`
+- `Questions this phase must answer`
+- `Preferred implementation shape`
+- `Non-goals`
+- `Validation expectations`
+- `Exit criteria`
+
+New plans SHOULD preserve that familiar voice, but MUST normalize the contract
+into the required structure above.
+
+Recommended mapping:
+
+- `Core rule` content should move into `Invariants` and `Forbidden changes`
+- `Chosen slice for this phase` content should move into `Required surface changes`
+- `Validation expectations` should move into `Test obligations`
+- `Exit criteria` should move into `Acceptance criteria`
+
+Authors MAY still keep a short `Core rule` subsection if it materially improves
+readability, but it is optional and cannot substitute for the required
+sections.
+
+Minimal phase template
+----------------------
+Use this structure for new plans:
+
+```text
+Phase N -- <title>
+==================
+
+Status
+------
+PROPOSED
+
+Purpose
+-------
+<1-2 short paragraphs>
+
+Repository status note
+----------------------
+- ...
+
+Problem being solved
+--------------------
+- ...
+
+Non-goals
+---------
+- ...
+
+Invariants
+----------
+- ...
+
+Required surface changes
+------------------------
+1. ...
+2. ...
+
+Forbidden changes
+-----------------
+- ...
+
+Phase role in the larger sequence
+---------------------------------
+- ...
+
+Relevant backlog items this phase intentionally brings under pressure
+--------------------------------------------------------------------
+- ...
+
+Questions this phase must answer
+--------------------------------
+1. ...
+2. ...
+
+Preferred implementation shape
+------------------------------
+- ...
+
+Test obligations
+----------------
+- Build debug
+- focused scenario or fixture ...
+- owning grouped suite ...
+
+Acceptance criteria
+-------------------
+- ...
+
+Future follow-up
+----------------
+- ...
+```
+
+Review checklist
+----------------
+A phase plan is ready for use only if the answer to every question below is
+yes:
+
+1. Does the document state a concrete repo-local problem?
+2. Does it state what the phase will not do?
+3. Does it protect the critical invariants explicitly?
+4. Does it enumerate the required surface changes rather than hinting at them?
+5. Does it enumerate forbidden implementation moves?
+6. Does it define concrete test obligations?
+7. Does it define acceptance criteria that can actually be checked?
+8. Does it identify the likely next follow-up without widening the current
+	 phase?
+9. Would a reviewer be able to reject scope creep using this document alone?
+
+If any answer is no, the plan is not yet specific enough.

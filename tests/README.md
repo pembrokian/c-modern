@@ -129,3 +129,14 @@ optional per-target fingerprint cache for repeated local reruns.
 
 The repository also exposes `make select-tests` as the low-friction wrapper
 for this workflow.
+
+## Test-Time Regression Guidance
+
+Large test-time jumps are usually a real maintenance signal, not just noise.
+
+- Prefer the narrowest owning target first so regressions stay local and easier to attribute.
+- When a change touches project build reuse, incremental behavior, or grouped workflow execution, run the owning target twice when practical: the first run checks correctness, and the second run checks whether intended reuse still works.
+- For tool workflow regressions, inspect whether the time is dominated by repeated project builds or by executable runtime before changing the suite shape.
+- The reset-lane full workflow surface is `mc_tool_workflow_kernel_reset_lane_full_unit`, not a family of maintained shard targets.
+- `tests/tool/tool_kernel_reset_lane_suite.cpp` prints per-scenario `cache=hit` or `cache=miss` plus aggregate build or run timing. Use that output to diagnose unexpected slowdowns.
+- If a suite becomes slow because build reuse stopped working, prefer fixing the owning cache or reuse path rather than adding manual shard bookkeeping.

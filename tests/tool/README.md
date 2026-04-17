@@ -63,5 +63,8 @@ Validation rule
 
 - During focused iteration, run the narrowest owning tool test target.
 - For active reset-lane kernel changes, prefer `mc_tool_workflow_kernel_reset_lane_unit`; it now builds and runs the repository-owned `kernel/build.toml` directly.
+- For reset-lane changes that may affect suite cost or build reuse, also run `mc_tool_workflow_kernel_reset_lane_full_unit` and inspect the per-scenario `cache=hit` or `cache=miss` summary from `tool_kernel_reset_lane_suite.cpp`.
+- If the first full run is correct, rerun it once immediately when practical. A large warm-run slowdown usually means build reuse regressed.
+- Keep the full reset-lane surface as one maintained grouped case. Prefer repairing cached-build reuse inside the runner over adding manual shard-count maintenance.
 - For cross-cutting driver or build changes, rerun the broader tool suite set
   before closing the change.

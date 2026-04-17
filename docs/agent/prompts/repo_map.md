@@ -7,7 +7,7 @@ This file is a fast orientation map for agents working in this repository.
 - `CMakeLists.txt`: canonical build graph and CTest registration
 - `Makefile`: convenience wrapper around the CMake workflow
 - `README.md`: current repository summary and common commands
-- `kernel/`: repository-owned Veya kernel bring-up tree; currently a Phase 150 one-system-rebuilt-cleanly target
+- `kernel/`: repository-owned Veya kernel bring-up tree; currently at the Phase 233 bounded delegation lease slice over the hosted reset-lane workflow surface
 - `docs/plan/admin/canopus_repo_layout_and_test_policy.txt`: current repository policy for Veya source, build, and test placement
 - `docs/plan/plan.txt`: authoritative multi-phase implementation plan
 - `docs/plan/backlog.txt`: implementation backlog and recurring follow-up themes
@@ -31,18 +31,20 @@ This file is a fast orientation map for agents working in this repository.
 - `kernel`
   - repository-owned Veya kernel sources rather than disposable proof-only fixtures
   - `docs/arch/veya/kernel_style_guide.txt`: required style guide for kernel/src/ service modules and kernel main.mc orchestration
-  - `build.toml`: hosted reset-lane manifest used by the active workflow suite
-  - `src/main.mc`: explicit architecture entry plus thin root orchestration over the landed first-user-entry, endpoint core, syscall IPC, interrupt classification, timer-owned tick delivery, MMU-owned translation-root construction, bounded init-owned multi-service orchestration, one bounded delegated request-reply follow-through, one bounded fixed service-directory publication step, one bounded image-contract hardening step, one bounded target-surface audit, one bounded next-plateau audit, one bounded delegation-chain stress step, one bounded invalidation and rejection audit step, one bounded authority lifetime classification step, one bounded service-death observation step, one bounded partial-failure propagation step, one bounded UART receive-frame ownership-boundary audit step, one bounded device-failure-containment audit step, one bounded optional completion-backed follow-through step, one bounded serial-ingress composed service graph step, one bounded serial shell command-routing step, one bounded long-lived log-service follow-through step, one bounded service-shape consolidation step, one bounded IPC-shape audit under real usage step, one bounded authority-ergonomics-under-reuse step, one bounded restart-contract step, one bounded rebuilt-system clean-second-pass step, and thin root orchestration across the owned scheduler, lifecycle, bootstrap helper, and debug audit modules
+  - `build.toml`: hosted reset-lane manifest used by the active workflow suite and the maintained reset-lane tool regressions
+  - `src/main.mc`: explicit architecture entry plus thin root orchestration over the landed bounded service graph, including the retained workflow owner, retained completion mailbox owner, and bounded delegation lease owner
   - `src/sched.mc`: scheduler-owned lifecycle validation for bounded spawn, wait, sleep, and wake follow-through
   - `src/lifecycle.mc`: lifecycle-owned task and process slot mutation for spawn, timer block, wake-to-ready, exit, and waited-child release follow-through
-  - `src/debug/`: one logical `debug` module split through `module_sets.debug`, owning Phase 108 image/program-cap audit, Phase 109 first-running-kernel-slice audit, Phase 110 ownership-split audit, Phase 111 lifecycle-ownership audit, Phase 112 syscall-boundary audit, Phase 113 interrupt-boundary audit, Phase 114 address-space/MMU audit, Phase 115 timer-ownership audit, Phase 116 MMU activation-barrier audit, Phase 117 init-orchestrated multi-service audit, Phase 118 delegated request-reply audit, Phase 119 namespace-pressure audit, Phase 120 running-system support audit, Phase 121 kernel image-contract hardening audit, Phase 122 target-surface audit, Phase 123 next-plateau audit, Phase 124 delegation-chain stress audit, Phase 125 invalidation and rejection audit, Phase 126 authority lifetime classification audit, Phase 128 service-death observation audit, Phase 129 partial-failure propagation audit, Phase 134 minimal device-service handoff audit, Phase 135 buffer ownership boundary audit, Phase 136 device failure containment audit, Phase 137 optional completion-backed follow-through audit, Phase 140 serial-ingress composed service-graph audit, Phase 141 interactive-service scope-freeze audit, Phase 142 serial shell command-routing audit, Phase 143 long-lived log-service audit, Phase 144 stateful key-value audit, Phase 145 service restart and usage-pressure audit, Phase 146 service-shape consolidation audit, Phase 147 IPC-shape audit under real usage, Phase 148 authority-ergonomics under reuse audit, Phase 149 restart-contract audit, and Phase 150 rebuilt-system audit
+  - `src/debug/`: one logical `debug` module split through `module_sets.debug`, owning the running-system audit progression from the first running kernel slice through the current Phase 233 bounded delegation lease slice
   - `src/log_service.mc`: bounded log-service protocol state, retained in-memory log state, explicit overwrite-on-full policy, acknowledgment payload, retained-log observation records, and handshake observation records
-  - `src/kv_service.mc`: bounded key-value-service retained table state, explicit missing-key and overwrite consequences, fixed key-value-write log markers, and retained-state observation records
   - `src/kv_service.mc`: bounded key-value-service retained table state, explicit missing-key, unavailable, and overwrite consequences, fixed key-value-write plus restart-pressure log markers, and retained-state observation records
   - `src/echo_service.mc`: bounded echo-service protocol state, request-derived reply payload, and exchange observation records
   - `src/transfer_service.mc`: bounded transfer-service protocol state, copied emit payload, and transfer observation records
   - `src/timer_service.mc`: bounded timer-service state, id-scoped create/cancel/query/expired operations, and explicit active/expired/cancelled classification
   - `src/task_service.mc`: bounded task-service state, id-scoped submit/query/complete/cancel/list operations, and explicit active/done/failed/cancelled classification
+  - `src/workflow_service.mc`: bounded retained delayed-work owner tying timer expiry to task execution and restart-visible workflow state
+  - `src/completion_mailbox_service.mc`: bounded retained completion owner for workflow terminal outcomes plus explicit fetch/ack/take behavior
+  - `src/lease_service.mc`: bounded retained temporary delegation owner for one completion-bound workflow lease path
   - `src/serial_service.mc`: bounded serial-service ingress state plus one service-owned copied receive-frame log, one fixed forwarded composition request observation, one aggregate-reply observation, and one service-local malformed-input classification path
   - `src/state.mc`: kernel descriptor, process-slot, task-slot, ready-queue, and boot-log records
   - `src/address_space.mc`: bounded address-space, mapping, user-entry-frame, and child-bootstrap construction records with translation-root ownership delegated to `mmu`
@@ -126,6 +128,7 @@ This file is a fast orientation map for agents working in this repository.
     - `tests/tool/tool_project_validation_suite.cpp`: target selection, import-root, duplicate-root, and project-graph validation
     - `tests/tool/tool_multifile_module_suite.cpp`: module-set and multi-file module validation
     - `tests/tool/tool_kernel_reset_lane_suite.cpp`: reset-lane kernel workflow validation and table-driven fixture runs
+    - `mc_tool_workflow_kernel_reset_lane_full_unit`: one maintained full reset-lane grouped case; performance work here should prefer per-scenario build reuse, not manual CTest shards
     - `tests/tool/tool_build_state_tests.cpp`: build-state and incremental rebuild driver
     - `tests/tool/tool_build_state_suite.cpp`: build-state grouped implementation
     - `tests/tool/tool_real_project_tests.cpp`: real-project workflow driver
@@ -202,6 +205,14 @@ This file is a fast orientation map for agents working in this repository.
 Focused grouped-suite checks that are often enough for tool or workflow work:
 
 - `ctest --test-dir build/debug -R 'mc_tool_workflow_.*_unit' --output-on-failure`
+- `ctest --test-dir build/debug -R '^mc_tool_workflow_kernel_reset_lane_full_unit$' --output-on-failure`
 - `ctest --test-dir build/debug -R mc_tool_build_state_unit --output-on-failure`
 - `ctest --test-dir build/debug -R 'mc_tool_real_project_.*_unit' --output-on-failure`
 - `ctest --test-dir build/debug -R 'mc_tool_(workflow|build_state|real_project)_unit' --output-on-failure`
+
+Performance-sensitive test guidance:
+
+- Prefer `make select-tests` and the owning grouped target before broader suites.
+- If a tool or workflow change touches build reuse, compare a first run and an immediate second run to catch reuse regressions.
+- The reset-lane full workflow suite reports per-scenario `cache=hit` or `cache=miss` and aggregate build or run timing from `tests/tool/tool_kernel_reset_lane_suite.cpp`; use that summary to diagnose test-time spikes before changing registration shape.
+- Keep reset-lane full coverage as one maintained case unless the repository intentionally changes the ownership model; do not reintroduce manual shard-count maintenance as the default answer to slower tests.
