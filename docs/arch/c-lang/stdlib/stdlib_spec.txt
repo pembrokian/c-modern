@@ -43,6 +43,7 @@ Toolchain companion module:
 `mem`
 - allocation interfaces and owning storage helpers
 - examples: `Allocator`, `Buffer<T>`, `heap_alloc`, `heap_free`, `default_allocator`, `alloc_value`, `alloc_array`, `buffer_new`, `buffer_free`, `slice_from_array`, `slice_from_buffer`, `copy_bytes`, `fill_bytes`
+- note: invalidation examples for `buffer_free`, arena reset, pool return, and unmap-style boundaries live in `mem_invalidation_examples.txt`
 
 `utf8`
 - UTF-8 validation and encode or decode primitives only

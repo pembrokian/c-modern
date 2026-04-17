@@ -9,6 +9,7 @@ Authority and scope:
 - `language_spec.txt` remains the semantic authority for the language.
 - `types_spec.txt` remains the authority for semantic type forms.
 - `allocation_spec.txt` remains the allocation-convention note.
+- `runtime/memory_architecture_note.txt` records staged runtime and kernel memory-strategy guidance outside the core language contract.
 - this document freezes the memory model, pointer provenance rules, aliasing rules, lifetime rules, and checked-invalid-operation boundaries for v0.2.
 - this document does not define a hidden runtime, GC, or ownership-tracking system.
 - this document defines the language contract for admitted behavior; the current bootstrap compiler may diagnose or dynamically trap only a subset of these rules.
@@ -48,6 +49,12 @@ Consequences:
 - `Slice<T>` and the canonical string type are non-owning views
 - `Buffer<T>` owns its storage
 - returning a view into temporary internal storage is invalid design
+
+Storage invalidation events:
+- storage may end through scope exit, explicit free, region or arena reset, pool-slot return, mapping teardown, or any equivalent runtime operation that ends the underlying storage contract
+- when storage ends, every pointer, slice, string view, or other borrowed view into that storage becomes invalid immediately
+- ending one storage region does not implicitly extend or relocate the lifetime of values borrowed from it
+- checked builds may trap some invalid uses after such events, but the language rule does not depend on dynamic trapping
 
 3. Initialization And Temporary Values
 
@@ -92,6 +99,7 @@ Provenance guidance:
 - pointers derived from a live object remain tied to that allocation for arithmetic, comparison, and dereference purposes
 - forming a pointer from an unrelated integer does not create valid ownership or lifetime facts by itself
 - outside explicit low-level APIs such as MMIO and FFI, forged pointers should be treated as unsafe and invalid to dereference unless they designate live storage established by the program or runtime contract
+- pointers into mapped or runtime-provided storage remain valid only while that storage remains live and accessible under the relevant runtime contract
 
 5. Object Representation And Aliasing Rules
 
@@ -141,11 +149,13 @@ Rules:
 - `Slice<T>` and string views borrow storage
 - fixed arrays are values, not heap owners
 - freeing storage invalidates all pointers and views into it
+- bulk-release operations such as arena reset, region release, pool return, and unmap invalidate all pointers and borrowed views into the released storage just as ordinary free does
 
 Consequences:
 - ownership transfers must be explicit in APIs
 - callers must not keep using a pointer, slice, or view after the underlying storage is released
 - allocator APIs should remain separate from ordinary value semantics
+- the language does not require arena, pool, slab, or page-allocation syntax; those remain library or runtime design choices
 
 8. Checked, Invalid, And Diagnosable Behavior
 
@@ -212,6 +222,7 @@ Guidance:
 - functions that return storage whose lifetime outlives the callee should return `Buffer<T>` or another owning type
 - functions that return views should return `Slice<T>` or the canonical string type as appropriate
 - libraries should not return borrowed views into temporary internal allocations
+- libraries should not return borrowed views tied to request-local, region-local, pool-local, or mapped storage unless that lifetime is part of the explicit API contract and remains valid after return
 
 11. Non-Goals
 

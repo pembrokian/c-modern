@@ -1,0 +1,235 @@
+Modern C - Runtime Memory Architecture Note
+
+Purpose
+
+This document records the recommended runtime and kernel-facing memory progression for Modern C systems work.
+It exists to keep allocator strategy, subsystem memory choices, and future kernel memory growth separate from the core language memory model.
+
+Authority and scope:
+- memory_model_spec.txt remains the authority for language-level storage validity, lifetime, aliasing, and pointer rules
+- allocation_spec.txt remains the authority for allocator protocol and allocation API conventions
+- runtime_spec.txt remains the broader authority for runtime boundaries
+- this document captures runtime and system-design guidance for choosing memory strategies as a system grows
+
+1. Core Position
+
+Rules:
+- allocator strategy is a runtime or library design choice, not a language primitive
+- the language should not gain allocator-specific syntax merely because a runtime adopts arenas, pools, slabs, or pages
+- more general memory machinery should be introduced only when simpler bounded approaches stop fitting the workload
+
+Guiding principle:
+- do not introduce a more general memory model until the simpler one becomes impossible
+
+Why:
+- early systems often live mostly in control-plane code
+- bounded state is easier to audit, test, and reason about
+- deterministic storage strategies fit the project's current direction better than a prematurely general heap-first design
+
+2. Current Pressure Profile
+
+The current repository shape is still dominated by control-plane work such as:
+- boot and setup
+- syscall routing
+- service identity
+- message passing
+- verifier and audit semantics
+- protocol encoding
+- state transitions
+- observability and proof surfaces
+
+That shape often works well with:
+- static arrays
+- fixed-size structs
+- bounded queues
+- compile-time limits
+- stack allocation
+- global arenas or fixed workspaces
+- append-only logs
+
+Consequence:
+- the project should not force a general-purpose heap or richer ownership machinery into the language before the workload actually requires it
+
+3. Recommended Progression
+
+The likely progression for kernel-shaped and freestanding systems work is:
+
+3A. Boot-time static memory
+
+Typical forms:
+- global arrays
+- fixed-size tables
+- compile-time buffers
+- singleton state
+
+Why:
+- simplest to verify
+- deterministic space use
+- no fragmentation or reclamation complexity
+
+3B. Bump or arena allocation
+
+Typical properties:
+- allocate by advancing a cursor
+- no per-object free
+- reset the whole arena at a phase or request boundary
+
+Good fit for:
+- parser scratch memory
+- verifier temporary state
+- IPC message assembly
+- boot-time initialization phases
+- short-lived request handling
+
+3C. Region-based memory
+
+Typical properties:
+- multiple arenas with distinct bulk lifetimes
+- one region per request, syscall, transaction, or subsystem phase
+- release by ending the region rather than freeing individual objects
+
+Good fit for:
+- one arena per syscall
+- one arena per process setup phase
+- one arena per driver transaction
+- one arena per filesystem operation
+
+Design bias:
+- prefer explicit lifetime boundaries over hidden reclamation
+
+3D. Fixed-size object pools
+
+Typical properties:
+- preallocated object arrays
+- slot reuse through a free list or bitmap
+- deterministic allocation cost
+- no general fragmentation
+
+Good fit for:
+- process records
+- thread records
+- endpoint descriptors
+- message descriptors
+- file handles
+- sockets
+- VM mapping descriptors
+
+3E. Slab allocators
+
+Typical properties:
+- per-size or per-type caches
+- good reuse for common kernel objects
+- less fragmentation than a general heap
+
+Good fit for:
+- vnode-like objects
+- IPC messages
+- scheduler nodes
+- page-table support structures
+- driver objects
+
+3F. Physical page allocator
+
+Typical properties:
+- tracks free and used physical pages
+- often starts as a bitmap or free-list allocator
+- may later grow buddy-style coalescing if fragmentation pressure justifies it
+
+Usually required once the system introduces:
+- virtual memory
+- page tables
+- user processes
+- mmap-like mappings
+- copy-on-write
+- DMA buffers
+
+3G. Virtual memory regions
+
+Typical properties:
+- explicit mappings
+- permissions and protection state
+- user versus kernel isolation
+- possible shared or lazily populated regions
+
+Consequence:
+- memory now becomes a first-class kernel subsystem rather than only an allocation policy question
+
+3H. General kernel heap
+
+Typical properties:
+- malloc or free equivalent for the kernel
+- layered on top of more specific allocators such as slabs and pages
+- useful when no narrower storage strategy fits
+
+Policy recommendation:
+- treat the general heap as a last resort rather than the default design center
+
+4. Allocation Preference Order
+
+Recommended preference order:
+- stack allocation first
+- then fixed arrays and bounded storage
+- then arenas or regions
+- then pools
+- then slabs
+- only then a general heap when no more specific strategy fits
+
+Why:
+- keeps lifetime and ownership understandable
+- preserves deterministic behavior where possible
+- reduces hidden reclamation and fragmentation pressure
+
+5. Language Versus Library Boundary
+
+Rules:
+- the language should describe ownership, lifetime, invalidation, and aliasing consequences that programs may rely on
+- libraries and runtimes should implement concrete allocation strategies such as arenas, pools, slabs, pages, and heaps
+- the language should not become a catalog of allocator-specific syntax
+
+Examples:
+- allocate from an arena: library
+- return storage tied to an arena lifetime: may justify future language-visible lifetime expression only if the compiler can prove something useful
+- allocate from a process pool: library
+- invalidate references when a pool slot is returned: language-level validity consequence
+- implement a page allocator: library or runtime
+- describe page-permission policy or address-space ownership: runtime or kernel architecture
+
+6. What The Current Language Actually Needs
+
+Near-term language-facing needs are still small:
+- borrowed versus owning view clarity
+- explicit invalidation when storage ends
+- no invented aliasing facts
+- explicit atomic and synchronization boundaries
+
+The current language does not need:
+- arena-specific syntax
+- pool-specific syntax
+- slab-specific syntax
+- a general ownership checker
+- a hidden borrow-tracking runtime
+
+7. Pressure That Justifies Reopening Language Features
+
+Consider new language support only when real code shows repeated pressure that libraries cannot express clearly enough.
+
+Examples of possible future triggers:
+- repeated invalid-escape bugs involving region-backed results
+- a clear need to express that a returned view cannot outlive a passed allocator or region
+- recurring inability to document borrowed versus owned results in APIs without compiler help
+- repeated use-after-release hazards around pool-managed objects that ordinary conventions cannot make obvious enough
+
+Any such feature should justify itself against these constraints:
+- it must make lifetime or ownership more visible
+- it must remain small and explicit
+- it must not smuggle in a hidden GC, hidden runtime, or complex borrow system
+
+8. Bottom Line
+
+Modern C should keep the language memory contract small and stable while letting runtimes adopt richer allocator stacks only when workload pressure requires them.
+
+Bottom line:
+- language defines validity and lifetime consequences
+- library defines allocation interfaces
+- runtime or kernel design chooses the storage strategy stack
+- general memory machinery should arrive in layers, not all at once

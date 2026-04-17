@@ -246,7 +246,7 @@ func restart_workflow(state: boot.KernelBootState) boot.KernelBootState {
     workflow_slot := service_topology.WORKFLOW_SLOT
     snap := workflow_service.workflow_snapshot_record(state.workflow.state)
     generation: u8 = u8(state.workset_generation)
-    reloaded := workflow_service.workflow_restart_reload(workflow_slot.pid, snap, state.journal.state.lane1, generation, true)
+    reloaded := workflow_service.workflow_restart_reload(workflow_slot.pid, snap, state.journal.state.lane1, generation, true, state.connection.state)
     next := state
     next_timer := state.timer.state
 

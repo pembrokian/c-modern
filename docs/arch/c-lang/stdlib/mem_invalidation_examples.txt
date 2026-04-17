@@ -1,0 +1,125 @@
+Modern C - mem Invalidation Examples Note
+
+Purpose
+
+This note gives concrete standard-library-facing examples of storage invalidation.
+It exists to connect the language memory model's invalidation rules to ordinary `mem`-style APIs without turning allocator strategy into a language feature.
+
+Authority and scope:
+- memory_model_spec.txt remains the authority for validity and lifetime rules
+- allocation_spec.txt remains the authority for allocator protocol and allocation API conventions
+- this note gives illustrative examples for library API design and documentation
+
+1. Core Rule
+
+When storage ends, all pointers and borrowed views into that storage become invalid.
+
+Examples of storage-ending operations:
+- `mem.buffer_free`
+- arena reset or deinit
+- region release
+- pool-slot return
+- mapping teardown or unmap
+
+The storage strategy differs across APIs, but the invalidation consequence is the same.
+
+2. Buffer Release
+
+Owned buffer example:
+
+```text
+buf, err = mem.buffer_new<ui8>(alloc, 64)
+if err != nil {
+    return err
+}
+
+view = mem.slice_from_buffer(buf)
+mem.buffer_free(&buf)
+
+// invalid: view now refers to released storage
+```
+
+Rule:
+- freeing an owning `Buffer<T>` invalidates all slices and raw pointers derived from its storage
+
+API guidance:
+- functions should not retain or return borrowed views into a buffer after releasing it
+
+3. Arena Reset Or Deinit
+
+Arena-backed example:
+
+```text
+arena = mem.arena_init(alloc, 4096)
+defer mem.arena_deinit(&arena)
+
+scratch = mem.arena_allocator(&arena)
+node, err = mem.alloc_value<Node>(scratch)
+if err != nil {
+    return err
+}
+
+// node remains valid only while arena is live
+```
+
+Rule:
+- resetting or deinitializing an arena invalidates all pointers and borrowed views derived from allocations in that arena
+
+API guidance:
+- APIs that return arena-backed results should keep the arena lifetime explicit in the surrounding contract rather than hiding it inside the callee
+
+4. Pool Slot Return
+
+Pool-backed example:
+
+```text
+proc = process_pool_alloc(pool)
+if proc == nil {
+    return errors.fail("no process slots")
+}
+
+process_pool_free(pool, proc)
+
+// invalid: proc now names returned storage
+```
+
+Rule:
+- returning an object to a pool invalidates pointers and borrowed views into that slot until the program reestablishes a valid object by a new allocation step
+
+API guidance:
+- pool APIs should make return-to-pool events explicit and should not imply stable identity after release
+
+5. Mapping Teardown
+
+Mapped-storage example:
+
+```text
+mapping, err = os.map_file(file, read_only)
+if err != nil {
+    return err
+}
+
+bytes = mapping.bytes
+os.unmap(&mapping)
+
+// invalid: bytes now refers to unmapped storage
+```
+
+Rule:
+- unmapping storage invalidates all pointers and borrowed views into that mapping even if the numeric address value still exists
+
+API guidance:
+- mapping APIs should prefer explicit owning mapping objects whose teardown point is visible in control flow
+
+6. Design Guidance For mem APIs
+
+Recommended guidance:
+- use owning types such as `Buffer<T>` when the callee creates storage meant to outlive the call
+- use borrowed views such as `Slice<T>` only when the caller can already see the underlying storage lifetime
+- keep bulk-release boundaries visible in API names and docs
+- do not hide arena reset, pool return, or unmap behind convenience helpers that make invalidation hard to notice
+
+Bottom line:
+- allocator families differ
+- invalidation rules do not
+- library APIs should make the storage-ending boundary obvious

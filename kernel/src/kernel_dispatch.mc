@@ -298,6 +298,35 @@ func dispatch_task(state: *boot.KernelBootState, msg: service_effect.Message) se
 
 func dispatch_connection(state: *boot.KernelBootState, msg: service_effect.Message) service_effect.Effect {
     current: boot.KernelBootState = *state
+    if msg.payload_len == 2 && msg.payload[0] == connection_service.CONNECTION_OP_EXECUTE {
+        prepared := connection_service.connection_execute_prepare(current.connection.state, msg.payload[1])
+        if service_effect.effect_has_reply(prepared.effect) == 1 {
+            return prepared.effect
+        }
+        step := workflow_service.workflow_step_schedule_connection(current.workflow.state, current.timer.state, current.task.state, current.object_store.state, current.journal.state, current.completion.state, prepared.request, msg.payload[1], prepared.opcode, u8(current.workset_generation))
+        if object_store_service.object_store_changed(current.object_store.state, step.object_store) {
+            if !object_store_service.object_store_persist(step.object_store) {
+                return service_effect.effect_reply(syscall.SyscallStatus.Closed, 0, primitives.zero_payload())
+            }
+        }
+        if journal_service.journal_changed(current.journal.state, step.journal) {
+            if !journal_service.journal_persist(step.journal) {
+                return service_effect.effect_reply(syscall.SyscallStatus.Closed, 0, primitives.zero_payload())
+            }
+        }
+        if service_effect.effect_reply_status(step.effect) != syscall.SyscallStatus.Ok {
+            return step.effect
+        }
+        next := boot.bootwith_connection(current, prepared.state)
+        next = boot.bootwith_workflow(next, step.workflow)
+        next = boot.bootwith_timer(next, step.timer)
+        next = boot.bootwith_task(next, step.task)
+        next = boot.bootwith_object_store(next, step.object_store)
+        next = boot.bootwith_journal(next, step.journal)
+        next = boot.bootwith_completion(next, step.completion)
+        *state = next
+        return step.effect
+    }
     connection_result: connection_service.ConnectionResult = connection_service.handle(current.connection.state, msg)
     *state = boot.bootwith_connection(current, connection_result.state)
     return connection_result.effect
@@ -361,7 +390,8 @@ func dispatch_lease(state: *boot.KernelBootState, msg: service_effect.Message) s
 
 func dispatch_workflow(state: *boot.KernelBootState, msg: service_effect.Message) service_effect.Effect {
     current: boot.KernelBootState = *state
-    step := workflow_service.step(current.workflow.state, current.timer.state, current.task.state, current.object_store.state, current.journal.state, current.completion.state, msg, u8(current.workset_generation))
+    previous_workflow := current.workflow.state
+    step := workflow_service.step(current.workflow.state, current.timer.state, current.task.state, current.object_store.state, current.journal.state, current.completion.state, current.connection.state, msg, u8(current.workset_generation))
     if object_store_service.object_store_changed(current.object_store.state, step.object_store) {
         if !object_store_service.object_store_persist(step.object_store) {
             return service_effect.effect_reply(syscall.SyscallStatus.Closed, 0, primitives.zero_payload())
@@ -378,6 +408,9 @@ func dispatch_workflow(state: *boot.KernelBootState, msg: service_effect.Message
     next = boot.bootwith_object_store(next, step.object_store)
     next = boot.bootwith_journal(next, step.journal)
     next = boot.bootwith_completion(next, step.completion)
+    if workflow_service.workflow_is_connection(previous_workflow) && !workflow_service.workflow_is_active(step.workflow) && previous_workflow.id != 0 {
+        next = boot.bootwith_connection(next, connection_service.connection_request_finish(next.connection.state, workflow_service.workflow_connection_slot(previous_workflow), previous_workflow.id))
+    }
     *state = next
     return step.effect
 }

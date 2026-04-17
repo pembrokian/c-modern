@@ -25,6 +25,7 @@ Ownership rules:
 Design bias:
 - if an operation allocates, that fact should be visible in the function signature or in the returned type
 - if an operation borrows caller storage, that fact should remain visible rather than being hidden behind implicit copies
+- if a library operation ends storage through free, reset, release, pool return, or unmap, all borrowed views into that storage become invalid immediately and the API should make that boundary obvious
 
 3. Prefer Non-Allocating APIs By Default
 

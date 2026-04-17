@@ -598,12 +598,16 @@ func connection_close(s: ShellServiceState, m: service_effect.Message) service_e
     return forward_three(s, service_topology.CONNECTION_ENDPOINT_ID, serial_protocol.CMD_C, m.payload[2], m.payload[3])
 }
 
+func connection_execute(s: ShellServiceState, m: service_effect.Message) service_effect.Effect {
+    return forward_two(s, service_topology.CONNECTION_ENDPOINT_ID, serial_protocol.CMD_X, m.payload[2])
+}
+
 const CONNECTION_ROUTES: [5]OpHandler = [5]OpHandler{
     OpHandler{ op: serial_protocol.CMD_O, check: anymsg, run: connection_open },
     OpHandler{ op: serial_protocol.CMD_R, check: anymsg, run: connection_receive },
     OpHandler{ op: serial_protocol.CMD_S, check: anymsg, run: connection_send },
     OpHandler{ op: serial_protocol.CMD_C, check: anymsg, run: connection_close },
-    UNUSED_ROUTE
+    OpHandler{ op: serial_protocol.CMD_X, check: bang3, run: connection_execute }
 }
 
 func route_connection(s: ShellServiceState, m: service_effect.Message, op: u8) service_effect.Effect {

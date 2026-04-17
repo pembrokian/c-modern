@@ -861,11 +861,8 @@ func parse_expr(p: *Parser) (*Expr, Error) {
     return node, nil
 }
 
-func build_ast(tokens: Slice<Token>) (*Expr, Error) {
-    arena = mem.arena_init(mem.default_allocator(), 64 * 1024)
-    defer mem.arena_deinit(&arena)
-
-    parser = Parser{ alloc: mem.arena_allocator(&arena), tokens: tokens, pos: 0 }
+func build_ast(arena: *mem.Arena, tokens: Slice<Token>) (*Expr, Error) {
+    parser = Parser{ alloc: mem.arena_allocator(arena), tokens: tokens, pos: 0 }
     return parse_expr(&parser)
 }
 
@@ -873,6 +870,7 @@ What this validates:
 - Arena or bump allocation stays a library concern, not a language feature
 - Custom allocators can participate through the same `Allocator` protocol
 - Reusable code can allocate through an abstract allocator without knowing the concrete storage policy
+- Arena-backed results keep their lifetime boundary visible in the API instead of escaping after deinit
 - The allocation convention supports compiler-style workloads without inventing new syntax
 
 Acceptance criteria for the language

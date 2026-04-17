@@ -5,6 +5,8 @@ Purpose
 This document explores the allocation convention for Modern C.
 The core semantics are already mostly decided: allocation is a library feature, not a language primitive, and allocation failure is explicit.
 
+Allocator strategy progression belongs in runtime and system design documents, not in the core language semantics. This file covers allocator protocol and API convention, not the full kernel or runtime memory architecture.
+
 What remains is to make the day-to-day convention coherent so APIs, examples, standard library modules, and runtime behavior all line up.
 
 Core recommendation
@@ -189,11 +191,16 @@ Modern C should not add arena syntax or region syntax in the language.
 
 Recommended convention:
 - arenas, bump allocators, pools, and regions are library types that implement the `Allocator` protocol or expose allocation functions compatible with it
+- page allocators, slab allocators, and general heaps likewise remain library or runtime surfaces rather than language features
 
 Why:
 - keeps the language core small
 - preserves explicit policy choice
 - avoids introducing lifetime magic into the type system
+
+Related boundary:
+- language-level validity rules still need to say what happens when storage ends through free, reset, release, pool return, or unmap
+- concrete choice of which allocator family a subsystem uses remains a runtime or library matter
 
 This is the Thompson-like cut: libraries, not language features.
 
@@ -218,6 +225,9 @@ Hosted builds:
 Freestanding builds:
 - no default allocator is assumed
 - code should accept explicit allocators or use target-specific allocation strategies
+
+Practical design guidance:
+- freestanding and kernel-shaped systems should usually prefer the narrowest storage strategy that fits: static storage first, then arenas or regions, then pools or slabs, and only later a general heap if workload pressure requires it
 - library code that requires allocation should say so in its API
 
 This keeps freestanding support real instead of nominal.

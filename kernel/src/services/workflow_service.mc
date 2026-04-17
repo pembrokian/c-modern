@@ -1,5 +1,6 @@
 import journal_service
 import completion_mailbox_service
+import connection_service
 import object_store_service
 import primitives
 import service_effect
@@ -27,15 +28,22 @@ const WORKFLOW_RESTART_NONE: u8 = 78       // 'N'
 const WORKFLOW_RESTART_RESUMED: u8 = 82    // 'R'
 const WORKFLOW_RESTART_CANCELLED: u8 = 67  // 'C'
 
-const WORKFLOW_KIND_OBJECT_UPDATE: u8 = 0
+const WORKFLOW_KIND_TASK: u8 = 0
+const WORKFLOW_KIND_OBJECT_UPDATE: u8 = 1
+const WORKFLOW_KIND_CONNECTION: u8 = 2
 const WORKFLOW_TIMER_ID: u8 = 1
 const WORKFLOW_DELIVERY_WOULDBLOCK: u8 = 2
 const WORKFLOW_DELIVERY_EXHAUSTED: u8 = 7
 const WORKFLOW_OBJECT_UPDATE_DELAY: u8 = 2
 const WORKFLOW_JOURNAL_LANE_LEN: usize = 4
+const WORKFLOW_CONNECTION_SLOT_MARKER: u8 = 128
+const WORKFLOW_STATE_CONNECTION_EXECUTED: u8 = 69          // 'E'
+const WORKFLOW_STATE_CONNECTION_CANCELLED: u8 = 89         // 'Y'
+const WORKFLOW_STATE_CONNECTION_RESTART_CANCELLED: u8 = 90 // 'Z'
 
 struct WorkflowServiceState {
     pid: u32
+    kind: u8
     id: u8
     due: u8
     opcode: u8
@@ -46,6 +54,7 @@ struct WorkflowServiceState {
 }
 
 struct WorkflowSnapshotRecord {
+    kind: u8
     id: u8
     due: u8
     opcode: u8
@@ -122,11 +131,11 @@ func workflow_step_result(workflow: WorkflowServiceState, timer: timer_service.T
 }
 
 func workflow_state_init(pid: u32) WorkflowServiceState {
-    return WorkflowServiceState{ pid: pid, id: 0, due: 0, opcode: 0, task: 0, state: WORKFLOW_STATE_IDLE, restart: WORKFLOW_RESTART_NONE, generation: 0 }
+    return WorkflowServiceState{ pid: pid, kind: WORKFLOW_KIND_TASK, id: 0, due: 0, opcode: 0, task: 0, state: WORKFLOW_STATE_IDLE, restart: WORKFLOW_RESTART_NONE, generation: 0 }
 }
 
-func workflow_state_raw(s: WorkflowServiceState, id: u8, due: u8, opcode: u8, task: u8, state: u8, restart: u8, generation: u8) WorkflowServiceState {
-    return WorkflowServiceState{ pid: s.pid, id: id, due: due, opcode: opcode, task: task, state: state, restart: restart, generation: generation }
+func workflow_state_raw(s: WorkflowServiceState, kind: u8, id: u8, due: u8, opcode: u8, task: u8, state: u8, restart: u8, generation: u8) WorkflowServiceState {
+    return WorkflowServiceState{ pid: s.pid, kind: kind, id: id, due: due, opcode: opcode, task: task, state: state, restart: restart, generation: generation }
 }
 
 func workflow_payload(due: u8, task: u8) WorkflowPayload {
@@ -172,8 +181,8 @@ func workflow_payload_from_state(s: WorkflowServiceState) WorkflowPayload {
     return workflow_payload(s.due, s.task)
 }
 
-func workflow_record(s: WorkflowServiceState, id: u8, opcode: u8, payload: WorkflowPayload, state: u8, restart: u8, generation: u8) WorkflowServiceState {
-    return workflow_state_raw(s, id, payload.due, opcode, payload.task, state, restart, generation)
+func workflow_record(s: WorkflowServiceState, kind: u8, id: u8, opcode: u8, payload: WorkflowPayload, state: u8, restart: u8, generation: u8) WorkflowServiceState {
+    return workflow_state_raw(s, kind, id, payload.due, opcode, payload.task, state, restart, generation)
 }
 
 func workflow_schedule_spec(id: u8, opcode: u8, payload: WorkflowPayload) WorkflowScheduleSpec {
@@ -189,21 +198,28 @@ func workflow_schedule_object_update_spec(name: u8, value: u8) WorkflowScheduleS
     return workflow_schedule_spec(id, WORKFLOW_KIND_OBJECT_UPDATE, workflow_payload_object_update(value))
 }
 
+func workflow_schedule_connection_spec(id: u8, slot: u8, opcode: u8) WorkflowScheduleSpec {
+    return workflow_schedule_spec(id, opcode, workflow_payload_wait(slot + WORKFLOW_CONNECTION_SLOT_MARKER))
+}
+
 func workflow_restate(s: WorkflowServiceState, payload: WorkflowPayload, state: u8, restart: u8, generation: u8) WorkflowServiceState {
-    return workflow_record(s, s.id, s.opcode, payload, state, restart, generation)
+    return workflow_record(s, s.kind, s.id, s.opcode, payload, state, restart, generation)
 }
 
 func workflow_snapshot_record(s: WorkflowServiceState) WorkflowSnapshotRecord {
-    return WorkflowSnapshotRecord{ id: s.id, due: s.due, opcode: s.opcode, task: s.task, state: s.state, restart: s.restart, generation: s.generation }
+    return WorkflowSnapshotRecord{ kind: s.kind, id: s.id, due: s.due, opcode: s.opcode, task: s.task, state: s.state, restart: s.restart, generation: s.generation }
 }
 
 func workflow_state_from_snapshot(pid: u32, snap: WorkflowSnapshotRecord) WorkflowServiceState {
-    return WorkflowServiceState{ pid: pid, id: snap.id, due: snap.due, opcode: snap.opcode, task: snap.task, state: snap.state, restart: snap.restart, generation: snap.generation }
+    return WorkflowServiceState{ pid: pid, kind: snap.kind, id: snap.id, due: snap.due, opcode: snap.opcode, task: snap.task, state: snap.state, restart: snap.restart, generation: snap.generation }
 }
 
 func workflow_lane_bytes(s: WorkflowServiceState) [4]u8 {
     data: [4]u8 = primitives.zero_payload()
     data[0] = s.state
+    if s.kind == WORKFLOW_KIND_CONNECTION {
+        data[0] = s.state + WORKFLOW_CONNECTION_SLOT_MARKER
+    }
     data[1] = s.id
     data[2] = s.due
     data[3] = s.opcode
@@ -257,11 +273,25 @@ func workflow_is_active(s: WorkflowServiceState) bool {
     return workflow_is_waiting(s) || workflow_is_running(s) || workflow_is_delivering(s)
 }
 
+func workflow_is_task(s: WorkflowServiceState) bool {
+    if !workflow_has_record(s) {
+        return false
+    }
+    return s.kind == WORKFLOW_KIND_TASK
+}
+
 func workflow_is_object_update(s: WorkflowServiceState) bool {
     if !workflow_has_record(s) {
         return false
     }
-    return s.opcode == WORKFLOW_KIND_OBJECT_UPDATE
+    return s.kind == WORKFLOW_KIND_OBJECT_UPDATE
+}
+
+func workflow_is_connection(s: WorkflowServiceState) bool {
+    if !workflow_has_record(s) {
+        return false
+    }
+    return s.kind == WORKFLOW_KIND_CONNECTION
 }
 
 func workflow_has_record(s: WorkflowServiceState) bool {
@@ -271,6 +301,10 @@ func workflow_has_record(s: WorkflowServiceState) bool {
 func workflow_object_workflow_id(name: u8) u8 {
     // Reserve workflow id 0 for the invalid or empty sentinel used on the wire.
     return name + 1
+}
+
+func workflow_connection_slot(s: WorkflowServiceState) u8 {
+    return s.due - WORKFLOW_CONNECTION_SLOT_MARKER
 }
 
 func workflow_object_name(s: WorkflowServiceState) u8 {
@@ -319,7 +353,7 @@ func workflow_can_schedule(s: WorkflowServiceState) bool {
 }
 
 func workflow_schedule_with_spec(s: WorkflowServiceState, spec: WorkflowScheduleSpec) WorkflowResult {
-    next := workflow_record(s, spec.id, spec.opcode, spec.payload, WORKFLOW_STATE_WAITING, WORKFLOW_RESTART_NONE, s.generation)
+    next := workflow_record(s, WORKFLOW_KIND_TASK, spec.id, spec.opcode, spec.payload, WORKFLOW_STATE_WAITING, WORKFLOW_RESTART_NONE, s.generation)
     return WorkflowResult{ state: next, effect: workflow_schedule_effect(spec.id, WORKFLOW_STATE_WAITING) }
 }
 
@@ -340,7 +374,21 @@ func workflow_schedule_object_update(s: WorkflowServiceState, name: u8, value: u
     if !workflow_can_schedule(s) {
         return WorkflowResult{ state: s, effect: workflow_reply_invalid() }
     }
-    return workflow_schedule_with_spec(s, workflow_schedule_object_update_spec(name, value))
+    spec := workflow_schedule_object_update_spec(name, value)
+    next := workflow_record(s, WORKFLOW_KIND_OBJECT_UPDATE, spec.id, spec.opcode, spec.payload, WORKFLOW_STATE_WAITING, WORKFLOW_RESTART_NONE, s.generation)
+    return WorkflowResult{ state: next, effect: workflow_schedule_effect(spec.id, WORKFLOW_STATE_WAITING) }
+}
+
+func workflow_schedule_connection(s: WorkflowServiceState, id: u8, slot: u8, opcode: u8) WorkflowResult {
+    if id == 0 || !connection_service.connection_slot_valid(connection_service.connection_find(slot)) || opcode == 0 {
+        return WorkflowResult{ state: s, effect: workflow_reply_invalid() }
+    }
+    if !workflow_can_schedule(s) {
+        return WorkflowResult{ state: s, effect: workflow_reply_invalid() }
+    }
+    spec := workflow_schedule_connection_spec(id, slot, opcode)
+    next := workflow_record(s, WORKFLOW_KIND_CONNECTION, spec.id, spec.opcode, spec.payload, WORKFLOW_STATE_WAITING, WORKFLOW_RESTART_NONE, s.generation)
+    return WorkflowResult{ state: next, effect: workflow_schedule_effect(spec.id, WORKFLOW_STATE_WAITING) }
 }
 
 func workflow_can_cancel(s: WorkflowServiceState, id: u8) bool {
@@ -351,7 +399,7 @@ func workflow_cancel(s: WorkflowServiceState, id: u8) WorkflowResult {
     if !workflow_can_cancel(s, id) {
         return WorkflowResult{ state: s, effect: workflow_reply_invalid() }
     }
-    next := workflow_restate(s, workflow_payload_terminal(), WORKFLOW_STATE_CANCELLED, s.restart, s.generation)
+    next := workflow_restate(s, workflow_payload_terminal(), workflow_cancelled_outcome(s), s.restart, s.generation)
     return WorkflowResult{ state: next, effect: service_effect.effect_reply(syscall.SyscallStatus.Ok, 0, primitives.zero_payload()) }
 }
 
@@ -401,8 +449,16 @@ func workflow_waiting_object_update(s: WorkflowServiceState, restart: u8, genera
     return workflow_restate(s, workflow_payload_object_update(workflow_object_value(s)), WORKFLOW_STATE_WAITING, restart, generation)
 }
 
+func workflow_waiting_connection(s: WorkflowServiceState, slot: u8, restart: u8, generation: u8) WorkflowServiceState {
+    return workflow_restate(s, workflow_payload_wait(slot + WORKFLOW_CONNECTION_SLOT_MARKER), WORKFLOW_STATE_WAITING, restart, generation)
+}
+
 func workflow_running_task(s: WorkflowServiceState, task: u8) WorkflowServiceState {
     return workflow_restate(s, workflow_payload_running(task), WORKFLOW_STATE_RUNNING, s.restart, s.generation)
+}
+
+func workflow_running_connection(s: WorkflowServiceState, slot: u8, task: u8) WorkflowServiceState {
+    return workflow_restate(s, workflow_payload(slot + WORKFLOW_CONNECTION_SLOT_MARKER, task), WORKFLOW_STATE_RUNNING, s.restart, s.generation)
 }
 
 func workflow_pending_delivery(s: WorkflowServiceState, outcome: u8, status: u8) WorkflowServiceState {
@@ -421,6 +477,26 @@ func workflow_delivery_status_code(status: syscall.SyscallStatus) u8 {
         return WORKFLOW_DELIVERY_EXHAUSTED
     }
     return 0
+}
+
+func workflow_connection_active(s: WorkflowServiceState, connection: connection_service.ConnectionServiceState) bool {
+    return connection_service.connection_request_active(connection, workflow_connection_slot(s), s.id)
+}
+
+func workflow_connection_cancel_result(s: WorkflowServiceState, timer: timer_service.TimerServiceState, task: task_service.TaskServiceState) WorkflowCancelExecution {
+    if workflow_is_waiting(s) {
+        cancel_timer := timer_service.timer_cancel(timer, WORKFLOW_TIMER_ID)
+        return WorkflowCancelExecution{ timer: cancel_timer.state, task: task, effect: cancel_timer.effect }
+    }
+    cancel_task := task_service.task_cancel(task, workflow_running_task_id(s))
+    return WorkflowCancelExecution{ timer: timer, task: cancel_task.state, effect: cancel_task.effect }
+}
+
+func workflow_connection_cancelled_state(s: WorkflowServiceState) u8 {
+    if s.restart == WORKFLOW_RESTART_CANCELLED {
+        return WORKFLOW_STATE_CONNECTION_RESTART_CANCELLED
+    }
+    return WORKFLOW_STATE_CONNECTION_CANCELLED
 }
 
 func workflow_schedule_due_for_message(m: service_effect.Message) u8 {
@@ -454,6 +530,9 @@ func workflow_query_status(s: WorkflowServiceState) syscall.SyscallStatus {
 }
 
 func workflow_cancelled_outcome(s: WorkflowServiceState) u8 {
+    if workflow_is_connection(s) {
+        return workflow_connection_cancelled_state(s)
+    }
     if workflow_is_object_update(s) {
         return WORKFLOW_STATE_OBJECT_CANCELLED
     }
@@ -476,10 +555,15 @@ func workflow_deliver_completion(s: WorkflowServiceState, completion: completion
     return WorkflowDeliveryResult{ workflow: workflow_pending_delivery(s, outcome, status), completion: queued.state }
 }
 
-func workflow_advance_waiting(s: WorkflowServiceState, timer: timer_service.TimerServiceState, task: task_service.TaskServiceState, object_store: object_store_service.ObjectStoreServiceState, completion: completion_mailbox_service.CompletionMailboxServiceState) WorkflowAdvanceResult {
+func workflow_advance_waiting(s: WorkflowServiceState, timer: timer_service.TimerServiceState, task: task_service.TaskServiceState, object_store: object_store_service.ObjectStoreServiceState, completion: completion_mailbox_service.CompletionMailboxServiceState, connection: connection_service.ConnectionServiceState) WorkflowAdvanceResult {
     next_task: task_service.TaskServiceState = task
     next_object_store: object_store_service.ObjectStoreServiceState = object_store
     next_completion: completion_mailbox_service.CompletionMailboxServiceState = completion
+
+    if workflow_is_connection(s) && !workflow_connection_active(s, connection) {
+        connection_cancelled_delivery := workflow_deliver_completion(s with { restart: WORKFLOW_RESTART_NONE }, next_completion, WORKFLOW_STATE_CONNECTION_CANCELLED)
+        return workflow_advance_result(connection_cancelled_delivery.workflow, timer, next_task, next_object_store, connection_cancelled_delivery.completion)
+    }
 
     idx := timer_service.timer_find(timer, WORKFLOW_TIMER_ID)
     if idx >= timer_service.TIMER_CAPACITY {
@@ -489,14 +573,17 @@ func workflow_advance_waiting(s: WorkflowServiceState, timer: timer_service.Time
 
     due := timer.due[idx]
     if timer.state[idx] == timer_service.TIMER_STATE_ACTIVE {
+        if workflow_is_connection(s) {
+            return workflow_advance_result(workflow_waiting_connection(s, workflow_connection_slot(s), s.restart, s.generation), timer, next_task, next_object_store, next_completion)
+        }
         if workflow_is_object_update(s) {
             return workflow_advance_result(workflow_waiting_object_update(s, s.restart, s.generation), timer, next_task, next_object_store, next_completion)
         }
         return workflow_advance_result(workflow_waiting_task(s, due, s.restart, s.generation), timer, next_task, next_object_store, next_completion)
     }
     if timer.state[idx] == timer_service.TIMER_STATE_CANCELLED {
-        cancelled_delivery := workflow_deliver_completion(s, next_completion, workflow_cancelled_outcome(s))
-        return workflow_advance_result(cancelled_delivery.workflow, timer, next_task, next_object_store, cancelled_delivery.completion)
+        timer_cancelled_delivery := workflow_deliver_completion(s, next_completion, workflow_cancelled_outcome(s))
+        return workflow_advance_result(timer_cancelled_delivery.workflow, timer, next_task, next_object_store, timer_cancelled_delivery.completion)
     }
     if timer.state[idx] != timer_service.TIMER_STATE_EXPIRED {
         if workflow_is_object_update(s) {
@@ -512,6 +599,23 @@ func workflow_advance_waiting(s: WorkflowServiceState, timer: timer_service.Time
         next_object_store = update.state
         update_delivery := workflow_deliver_completion(s, next_completion, workflow_object_update_outcome(update.effect))
         return workflow_advance_result(update_delivery.workflow, timer, next_task, next_object_store, update_delivery.completion)
+    }
+
+    if workflow_is_connection(s) {
+        connection_submit := task_service.task_submit(task, s.opcode)
+        next_task = connection_submit.state
+        if service_effect.effect_reply_status(connection_submit.effect) != syscall.SyscallStatus.Ok {
+            connection_submit_failed := workflow_deliver_completion(s, next_completion, WORKFLOW_STATE_CONNECTION_CANCELLED)
+            return workflow_advance_result(connection_submit_failed.workflow, timer, next_task, next_object_store, connection_submit_failed.completion)
+        }
+
+        connection_payload := service_effect.effect_reply_payload(connection_submit.effect)
+        if connection_payload[1] == task_service.TASK_STATE_FAILED {
+            immediate_cancel := workflow_deliver_completion(s, next_completion, WORKFLOW_STATE_CONNECTION_CANCELLED)
+            return workflow_advance_result(immediate_cancel.workflow, timer, next_task, next_object_store, immediate_cancel.completion)
+        }
+
+        return workflow_advance_result(workflow_running_connection(s, workflow_connection_slot(s), connection_payload[0]), timer, next_task, next_object_store, next_completion)
     }
 
     submit := task_service.task_submit(task, s.opcode)
@@ -530,17 +634,28 @@ func workflow_advance_waiting(s: WorkflowServiceState, timer: timer_service.Time
     return workflow_advance_result(workflow_running_task(s, payload[0]), timer, next_task, next_object_store, next_completion)
 }
 
-func workflow_advance_running(s: WorkflowServiceState, timer: timer_service.TimerServiceState, task: task_service.TaskServiceState, object_store: object_store_service.ObjectStoreServiceState, completion: completion_mailbox_service.CompletionMailboxServiceState) WorkflowAdvanceResult {
+func workflow_advance_running(s: WorkflowServiceState, timer: timer_service.TimerServiceState, task: task_service.TaskServiceState, object_store: object_store_service.ObjectStoreServiceState, completion: completion_mailbox_service.CompletionMailboxServiceState, connection: connection_service.ConnectionServiceState) WorkflowAdvanceResult {
     next_task: task_service.TaskServiceState = task
     next_object_store: object_store_service.ObjectStoreServiceState = object_store
     next_completion: completion_mailbox_service.CompletionMailboxServiceState = completion
     running := workflow_running_state(workflow_running_task_id(s))
 
+    if workflow_is_connection(s) && !workflow_connection_active(s, connection) {
+        cancelled_execution := workflow_connection_cancel_result(s, timer, task)
+        next_task = cancelled_execution.task
+        connection_cancelled_delivery := workflow_deliver_completion(s with { restart: WORKFLOW_RESTART_NONE }, next_completion, WORKFLOW_STATE_CONNECTION_CANCELLED)
+        return workflow_advance_result(connection_cancelled_delivery.workflow, cancelled_execution.timer, next_task, next_object_store, connection_cancelled_delivery.completion)
+    }
+
     complete := task_service.task_complete(task, running.task)
     next_task = complete.state
     if service_effect.effect_reply_status(complete.effect) == syscall.SyscallStatus.Ok {
-        done_delivery := workflow_deliver_completion(s, next_completion, WORKFLOW_STATE_DONE)
-        return workflow_advance_result(done_delivery.workflow, timer, next_task, next_object_store, done_delivery.completion)
+        if workflow_is_connection(s) {
+            connection_done_delivery := workflow_deliver_completion(s, next_completion, WORKFLOW_STATE_CONNECTION_EXECUTED)
+            return workflow_advance_result(connection_done_delivery.workflow, timer, next_task, next_object_store, connection_done_delivery.completion)
+        }
+        task_done_delivery := workflow_deliver_completion(s, next_completion, WORKFLOW_STATE_DONE)
+        return workflow_advance_result(task_done_delivery.workflow, timer, next_task, next_object_store, task_done_delivery.completion)
     }
 
     query := task_service.task_query(next_task, running.task)
@@ -552,16 +667,28 @@ func workflow_advance_running(s: WorkflowServiceState, timer: timer_service.Time
 
     query_payload := service_effect.effect_reply_payload(query.effect)
     if query_payload[0] == task_service.TASK_STATE_CANCELLED {
-        task_cancelled := workflow_deliver_completion(s, next_completion, WORKFLOW_STATE_CANCELLED)
-        return workflow_advance_result(task_cancelled.workflow, timer, next_task, next_object_store, task_cancelled.completion)
+        if workflow_is_connection(s) {
+            connection_task_cancelled := workflow_deliver_completion(s, next_completion, WORKFLOW_STATE_CONNECTION_CANCELLED)
+            return workflow_advance_result(connection_task_cancelled.workflow, timer, next_task, next_object_store, connection_task_cancelled.completion)
+        }
+        task_cancelled_delivery := workflow_deliver_completion(s, next_completion, WORKFLOW_STATE_CANCELLED)
+        return workflow_advance_result(task_cancelled_delivery.workflow, timer, next_task, next_object_store, task_cancelled_delivery.completion)
     }
     if query_payload[0] == task_service.TASK_STATE_DONE {
-        query_done := workflow_deliver_completion(s, next_completion, WORKFLOW_STATE_DONE)
-        return workflow_advance_result(query_done.workflow, timer, next_task, next_object_store, query_done.completion)
+        if workflow_is_connection(s) {
+            connection_query_done := workflow_deliver_completion(s, next_completion, WORKFLOW_STATE_CONNECTION_EXECUTED)
+            return workflow_advance_result(connection_query_done.workflow, timer, next_task, next_object_store, connection_query_done.completion)
+        }
+        task_query_done := workflow_deliver_completion(s, next_completion, WORKFLOW_STATE_DONE)
+        return workflow_advance_result(task_query_done.workflow, timer, next_task, next_object_store, task_query_done.completion)
     }
     if query_payload[0] == task_service.TASK_STATE_FAILED {
-        task_failed := workflow_deliver_completion(s, next_completion, WORKFLOW_STATE_FAILED)
-        return workflow_advance_result(task_failed.workflow, timer, next_task, next_object_store, task_failed.completion)
+        if workflow_is_connection(s) {
+            connection_task_failed := workflow_deliver_completion(s, next_completion, WORKFLOW_STATE_CONNECTION_CANCELLED)
+            return workflow_advance_result(connection_task_failed.workflow, timer, next_task, next_object_store, connection_task_failed.completion)
+        }
+        task_failed_delivery := workflow_deliver_completion(s, next_completion, WORKFLOW_STATE_FAILED)
+        return workflow_advance_result(task_failed_delivery.workflow, timer, next_task, next_object_store, task_failed_delivery.completion)
     }
 
     return workflow_advance_result(s, timer, next_task, next_object_store, next_completion)
@@ -573,13 +700,13 @@ func workflow_advance_delivering(s: WorkflowServiceState, timer: timer_service.T
     return workflow_advance_result(retry_delivery.workflow, timer, task, object_store, retry_delivery.completion)
 }
 
-func workflow_advance(s: WorkflowServiceState, timer: timer_service.TimerServiceState, task: task_service.TaskServiceState, object_store: object_store_service.ObjectStoreServiceState, completion: completion_mailbox_service.CompletionMailboxServiceState) WorkflowAdvanceResult {
+func workflow_advance(s: WorkflowServiceState, timer: timer_service.TimerServiceState, task: task_service.TaskServiceState, object_store: object_store_service.ObjectStoreServiceState, completion: completion_mailbox_service.CompletionMailboxServiceState, connection: connection_service.ConnectionServiceState) WorkflowAdvanceResult {
     if workflow_is_waiting(s) {
-        return workflow_advance_waiting(s, timer, task, object_store, completion)
+        return workflow_advance_waiting(s, timer, task, object_store, completion, connection)
     }
 
     if workflow_is_running(s) {
-        return workflow_advance_running(s, timer, task, object_store, completion)
+        return workflow_advance_running(s, timer, task, object_store, completion, connection)
     }
 
     if workflow_is_delivering(s) {
@@ -609,6 +736,22 @@ func workflow_step_schedule(workflow: WorkflowServiceState, timer: timer_service
     }
 
     create := timer_service.timer_create(timer, WORKFLOW_TIMER_ID, workflow_schedule_due_for_message(msg))
+    next_timer := create.state
+    if service_effect.effect_reply_status(create.effect) != syscall.SyscallStatus.Ok {
+        return workflow_step_with_synced_journal(workflow, next_timer, task, object_store, journal, completion, create.effect)
+    }
+
+    return workflow_step_with_synced_journal(scheduled.state, next_timer, task, object_store, journal, completion, scheduled.effect)
+}
+
+func workflow_step_schedule_connection(workflow: WorkflowServiceState, timer: timer_service.TimerServiceState, task: task_service.TaskServiceState, object_store: object_store_service.ObjectStoreServiceState, journal: journal_service.JournalServiceState, completion: completion_mailbox_service.CompletionMailboxServiceState, id: u8, slot: u8, opcode: u8, generation: u8) WorkflowStepResult {
+    prepared := workflow_prepare_schedule(workflow, generation)
+    scheduled := workflow_schedule_connection(prepared, id, slot, opcode)
+    if service_effect.effect_reply_status(scheduled.effect) != syscall.SyscallStatus.Ok {
+        return workflow_step_with_synced_journal(workflow, timer, task, object_store, journal, completion, scheduled.effect)
+    }
+
+    create := timer_service.timer_create(timer, WORKFLOW_TIMER_ID, 2)
     next_timer := create.state
     if service_effect.effect_reply_status(create.effect) != syscall.SyscallStatus.Ok {
         return workflow_step_with_synced_journal(workflow, next_timer, task, object_store, journal, completion, create.effect)
@@ -654,7 +797,7 @@ func workflow_lane_matches(s: WorkflowServiceState, lane: journal_service.Journa
     return true
 }
 
-func workflow_restart_reload(pid: u32, snap: WorkflowSnapshotRecord, lane: journal_service.JournalLane, generation: u8, keep: bool) WorkflowServiceState {
+func workflow_restart_reload(pid: u32, snap: WorkflowSnapshotRecord, lane: journal_service.JournalLane, generation: u8, keep: bool, connection: connection_service.ConnectionServiceState) WorkflowServiceState {
     current := workflow_state_from_snapshot(pid, snap)
     if !workflow_has_record(current) {
         return current
@@ -670,23 +813,35 @@ func workflow_restart_reload(pid: u32, snap: WorkflowSnapshotRecord, lane: journ
         return workflow_restate(current, workflow_payload_from_state(current), current.state, WORKFLOW_RESTART_NONE, current.generation)
     }
     if !keep || current.generation != generation || !workflow_lane_matches(current, lane) {
+        if workflow_is_connection(current) {
+            return workflow_restate(current, workflow_payload_delivery(WORKFLOW_STATE_CONNECTION_RESTART_CANCELLED, 0), WORKFLOW_STATE_DELIVERING, WORKFLOW_RESTART_CANCELLED, generation)
+        }
         if workflow_is_object_update(current) {
             return workflow_restate(current, workflow_payload_delivery(WORKFLOW_STATE_OBJECT_CANCELLED, 0), WORKFLOW_STATE_DELIVERING, WORKFLOW_RESTART_CANCELLED, generation)
         }
         return workflow_restate(current, workflow_payload_terminal(), WORKFLOW_STATE_CANCELLED, WORKFLOW_RESTART_CANCELLED, generation)
     }
+    if workflow_is_connection(current) && !workflow_connection_active(current, connection) {
+        return workflow_restate(current, workflow_payload_delivery(WORKFLOW_STATE_CONNECTION_RESTART_CANCELLED, 0), WORKFLOW_STATE_DELIVERING, WORKFLOW_RESTART_CANCELLED, generation)
+    }
     if workflow_is_running(current) {
+        if workflow_is_connection(current) {
+            return workflow_waiting_connection(current, workflow_connection_slot(current), WORKFLOW_RESTART_RESUMED, generation)
+        }
         return workflow_waiting_task(current, 0, WORKFLOW_RESTART_RESUMED, generation)
     }
     if workflow_is_object_update(current) {
         return workflow_waiting_object_update(current, WORKFLOW_RESTART_RESUMED, generation)
     }
+    if workflow_is_connection(current) {
+        return workflow_waiting_connection(current, workflow_connection_slot(current), WORKFLOW_RESTART_RESUMED, generation)
+    }
     return workflow_waiting_task(current, workflow_wait_due(current), WORKFLOW_RESTART_RESUMED, generation)
 }
 
-func step(s: WorkflowServiceState, timer: timer_service.TimerServiceState, task: task_service.TaskServiceState, object_store: object_store_service.ObjectStoreServiceState, journal: journal_service.JournalServiceState, completion: completion_mailbox_service.CompletionMailboxServiceState, msg: service_effect.Message, generation: u8) WorkflowStepResult {
+func step(s: WorkflowServiceState, timer: timer_service.TimerServiceState, task: task_service.TaskServiceState, object_store: object_store_service.ObjectStoreServiceState, journal: journal_service.JournalServiceState, completion: completion_mailbox_service.CompletionMailboxServiceState, connection: connection_service.ConnectionServiceState, msg: service_effect.Message, generation: u8) WorkflowStepResult {
     ticked_timer := timer_service.timer_tick(timer)
-    advanced := workflow_advance(s, ticked_timer, task, object_store, completion)
+    advanced := workflow_advance(s, ticked_timer, task, object_store, completion, connection)
     next_workflow := advanced.workflow
     next_timer := advanced.timer
     next_task := advanced.task

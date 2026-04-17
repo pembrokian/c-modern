@@ -4,6 +4,7 @@ import boot
 import scenario_authority
 import scenario_audit_coordination
 import scenario_completion_mailbox
+import scenario_connection_backed_workflow
 import scenario_connection_service
 import scenario_coordination
 import scenario_delegated_object_processing
@@ -92,6 +93,10 @@ func run(state: *boot.KernelBootState) i32 {
         return result
     }
     result = scenario_connection_service.run_connection_service_probe()
+    if result != 0 {
+        return result
+    }
+    result = scenario_connection_backed_workflow.run_connection_backed_workflow_probe()
     if result != 0 {
         return result
     }

@@ -143,6 +143,9 @@ This keeps entry behavior visible and target-specific without making it magical.
 
 Allocation remains a library feature, not a runtime requirement.
 
+Related guidance:
+- staged allocator and kernel-memory strategy guidance lives in `memory_architecture_note.txt`
+
 Rule:
 - The language does not require a default allocator to exist.
 

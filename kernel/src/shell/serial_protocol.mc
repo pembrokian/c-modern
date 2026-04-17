@@ -73,7 +73,7 @@ const TARGET_WORKFLOW: u8 = 79  // 'O'
 const TARGET_OBJECT_STORE: u8 = 78  // 'N'
 const TARGET_LEASE: u8 = 90     // 'Z'
 const TARGET_COMPLETION: u8 = 66  // 'B'
-const TARGET_CONNECTION: u8 = 72  // 'H'
+const TARGET_CONNECTION: u8 = 67  // 'C'
 
 const PARTICIPANT_NONE: u8 = 78  // 'N'
 const POLICY_CLEAR: u8 = 67      // 'C'
@@ -332,4 +332,8 @@ func encode_connection_send(slot: u8, value: u8) [4]u8 {
 
 func encode_connection_close(slot: u8, reason: u8) [4]u8 {
     return encode_two_args(CMD_H, CMD_C, slot, reason)
+}
+
+func encode_connection_execute(slot: u8) [4]u8 {
+    return encode_one_arg(CMD_H, CMD_X, slot)
 }

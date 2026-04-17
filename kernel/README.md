@@ -50,6 +50,16 @@ The following modules are deferred until the named phase boundary forces them:
 
 Recent service targets
 
+- Phase 239 (landed): connection-backed workflow execution. `connection_service.mc`,
+  `workflow_service.mc`, and `kernel_dispatch.mc` now admit one explicit
+  `connection execute` handoff that keeps connection lifetime truth owner-local
+  while routing one bounded ingress request shape into the retained workflow
+  substrate. The workflow path delivers explicit executed, cancelled, and
+  restart-cancelled outcomes through the existing completion mailbox without
+  widening the four-byte shell frame or the workflow journal lane. The focused
+  reset-lane fixture is
+  `tests/system/kernel_reset_lane_phase239_connection_backed_workflow`.
+
 - Phase 235 (landed): restart-safe named object update workflow. `workflow_service.mc`
   now admits one compact `OW<name><value>` path that waits on the existing
   restart-safe workflow substrate, applies one owner-local update through
