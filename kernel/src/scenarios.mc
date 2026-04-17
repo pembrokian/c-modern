@@ -10,6 +10,7 @@ import scenario_queue
 import scenario_retained_summary
 import scenario_restart
 import scenario_stall
+import scenario_218
 import scenario_steps
 import scenario_transfer
 import scenario_workset_identity
@@ -67,5 +68,9 @@ func run(state: *boot.KernelBootState) i32 {
         return result
     }
     stall_state := boot.kernel_init()
+    result = scenario_218.run_file_service_probe()
+    if result != 0 {
+        return result
+    }
     return scenario_stall.run_stall_probe(&stall_state)
 }

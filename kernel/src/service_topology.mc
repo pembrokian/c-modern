@@ -36,6 +36,7 @@ const ECHO_ENDPOINT_ID: u32 = 14
 const TRANSFER_ENDPOINT_ID: u32 = 15
 const QUEUE_ENDPOINT_ID: u32 = 16
 const TICKET_ENDPOINT_ID: u32 = 17
+const FILE_ENDPOINT_ID: u32 = 18
 
 // ServiceSlot records the static wiring for one boot service: which endpoint
 // it occupies and which pid owns it.  Both values are fixed at kernel_init
@@ -67,8 +68,9 @@ const ECHO_SLOT: ServiceSlot = { endpoint: ECHO_ENDPOINT_ID, pid: 5 }
 const TRANSFER_SLOT: ServiceSlot = { endpoint: TRANSFER_ENDPOINT_ID, pid: 6 }
 const QUEUE_SLOT: ServiceSlot = { endpoint: QUEUE_ENDPOINT_ID, pid: 7 }
 const TICKET_SLOT: ServiceSlot = { endpoint: TICKET_ENDPOINT_ID, pid: 8 }
+const FILE_SLOT: ServiceSlot = { endpoint: FILE_ENDPOINT_ID, pid: 9 }
 
-const SERVICE_SLOTS: [8]ServiceSlot = {
+const SERVICE_SLOTS: [9]ServiceSlot = {
     SERIAL_SLOT,
     SHELL_SLOT,
     LOG_SLOT,
@@ -76,10 +78,11 @@ const SERVICE_SLOTS: [8]ServiceSlot = {
     ECHO_SLOT,
     TRANSFER_SLOT,
     QUEUE_SLOT,
-    TICKET_SLOT
+    TICKET_SLOT,
+    FILE_SLOT
 }
 
-const SERVICE_RESTART_MODES: [8]ServiceRestartMode = {
+const SERVICE_RESTART_MODES: [9]ServiceRestartMode = {
     ServiceRestartMode.None,
     ServiceRestartMode.None,
     ServiceRestartMode.Reload,
@@ -87,15 +90,16 @@ const SERVICE_RESTART_MODES: [8]ServiceRestartMode = {
     ServiceRestartMode.Reset,
     ServiceRestartMode.Reset,
     ServiceRestartMode.Reload,
-    ServiceRestartMode.Reset
+    ServiceRestartMode.Reset,
+    ServiceRestartMode.Reload
 }
 
 // SERVICE_COUNT is the number of boot-wired services in the static topology.
 // Increment this when a new slot constant is added above.
-const SERVICE_COUNT: u32 = 8
+const SERVICE_COUNT: u32 = 9
 
 func service_count() usize {
-    return 8
+    return 9
 }
 
 func service_slot_at(index: usize) ServiceSlot {
@@ -160,6 +164,8 @@ func service_authority_class(endpoint: u32) ServiceAuthorityClass {
     case KV_ENDPOINT_ID:
         return ServiceAuthorityClass.RetainedOwner
     case QUEUE_ENDPOINT_ID:
+        return ServiceAuthorityClass.RetainedOwner
+    case FILE_ENDPOINT_ID:
         return ServiceAuthorityClass.RetainedOwner
     default:
         if endpoint_is_boot_wired(endpoint) {

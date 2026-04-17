@@ -5,6 +5,7 @@
 // Dispatch and routing logic lives in kernel_dispatch.mc.
 
 import echo_service
+import file_service
 import kv_service
 import log_service
 import queue_service
@@ -55,6 +56,8 @@ struct KernelBootState {
     transfer_restart_outcome: RestartOutcome
     ticket: ServiceCell<ticket_service.TicketServiceState>
     ticket_restart_outcome: RestartOutcome
+    file: ServiceCell<file_service.FileServiceState>
+    file_restart_outcome: RestartOutcome
     grants: transfer_grant.GrantTable
 }
 
@@ -67,6 +70,7 @@ func kernel_init() KernelBootState {
     echo_slot := service_topology.ECHO_SLOT
     transfer_slot := service_topology.TRANSFER_SLOT
     ticket_slot := service_topology.TICKET_SLOT
+    file_slot := service_topology.FILE_SLOT
 
     path_state := serial_shell_path.path_init(serial_service.serial_init(serial_slot.pid, 1), shell_service.shell_init(shell_slot.pid, 1), shell_slot.endpoint)
     log_cell := ServiceCell<log_service.LogServiceState>{ state: log_service.log_init(log_slot.pid, 1), generation: 1 }
@@ -75,6 +79,7 @@ func kernel_init() KernelBootState {
     echo_cell := ServiceCell<echo_service.EchoServiceState>{ state: echo_service.echo_init(echo_slot.pid, 1), generation: 1 }
     transfer_cell := ServiceCell<transfer_service.TransferServiceState>{ state: transfer_service.transfer_init(transfer_slot.pid, 1), generation: 1 }
     ticket_cell := ServiceCell<ticket_service.TicketServiceState>{ state: ticket_service.ticket_init(ticket_slot.pid, 1, 1), generation: 1 }
+    file_cell := ServiceCell<file_service.FileServiceState>{ state: file_service.file_init(file_slot.pid, 1), generation: 1 }
 
     return KernelBootState{
         path_state: path_state,
@@ -94,6 +99,8 @@ func kernel_init() KernelBootState {
         transfer_restart_outcome: RestartOutcome.None,
         ticket: ticket_cell,
         ticket_restart_outcome: RestartOutcome.None,
+        file: file_cell,
+        file_restart_outcome: RestartOutcome.None,
         grants: transfer_grant.grant_init()
     }
 }

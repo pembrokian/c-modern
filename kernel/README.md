@@ -39,4 +39,14 @@ The following modules are deferred until the named phase boundary forces them:
 
 Next target
 
-- Phase 154 identity and addressing audit: keep the newly restored serial-shell composition route explicit while making fixed service identity and restart-time addressing assumptions concrete.
+- Phase 218 (landed): narrow file-service shape probe. `file_service.mc` admitted
+  as the ninth boot-wired service (FILE_ENDPOINT_ID = 18, pid = 9). One compact
+  CMD_F protocol family (create, write, read, count) routes through shell dispatch.
+  Service is retained (Reload on restart); 1-byte-per-slot capacity is a probe
+  constraint, not a permanent design. `run_file_service_probe()` in
+  `scenario_218.mc` exercises the full create/write/read/count/error path.
+  SERVICE_COUNT is now 9.
+
+- Next open: decide whether to widen the file-service data model (requires 2D
+  array support or a redesigned state record), or advance another service-system
+  boundary identified in Phases 213–217.

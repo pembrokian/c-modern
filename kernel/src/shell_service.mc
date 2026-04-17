@@ -60,6 +60,8 @@ func lifecycle_target_endpoint(target: u8) u32 {
         return service_topology.TRANSFER_ENDPOINT_ID
     case serial_protocol.TARGET_TICKET:
         return service_topology.TICKET_ENDPOINT_ID
+    case serial_protocol.TARGET_FILE:
+        return service_topology.FILE_ENDPOINT_ID
     default:
         return 0
     }
@@ -109,6 +111,14 @@ func lifecycle_state_request(s: ShellServiceState, m: service_effect.Message) se
 }
 
 func lifecycle_state_effect(status: syscall.SyscallStatus, payload: [4]u8) service_effect.Effect {
+    return service_effect.effect_reply(status, 4, payload)
+}
+
+func lifecycle_durability_request(s: ShellServiceState, m: service_effect.Message) service_effect.Effect {
+    return service_effect.effect_send(s.pid, service_topology.SHELL_ENDPOINT_ID, m.payload_len, m.payload)
+}
+
+func lifecycle_durability_effect(status: syscall.SyscallStatus, payload: [4]u8) service_effect.Effect {
     return service_effect.effect_reply(status, 4, payload)
 }
 
@@ -205,6 +215,14 @@ func handle(s: ShellServiceState, m: service_effect.Message) service_effect.Effe
                 }
             }
             return lifecycle_state_request(s, m)
+        case serial_protocol.CMD_D:
+            if !identity_taxonomy.identity_target_is_lane(m.payload[2]) {
+                durability_endpoint: u32 = lifecycle_target_endpoint(m.payload[2])
+                if durability_endpoint == 0 {
+                    return invalid_effect(SHELL_INVALID_COMMAND)
+                }
+            }
+            return lifecycle_durability_request(s, m)
         case serial_protocol.CMD_Q:
             if identity_taxonomy.identity_target_is_lane(m.payload[2]) {
                 return lifecycle_effect(syscall.SyscallStatus.Ok, m.payload[2], serial_protocol.LIFECYCLE_RELOAD)
@@ -291,6 +309,36 @@ func handle(s: ShellServiceState, m: service_effect.Message) service_effect.Effe
             payload[0] = op
             payload[1] = serial_protocol.CMD_BANG
             return service_effect.effect_send(s.pid, service_topology.QUEUE_ENDPOINT_ID, 2, payload)
+        default:
+            return invalid_effect(SHELL_INVALID_COMMAND)
+        }
+
+    case serial_protocol.CMD_F:
+        switch op {
+        case serial_protocol.CMD_C:
+            if !bang3(m) {
+                return invalid_effect(SHELL_INVALID_SHAPE)
+            }
+            payload[0] = serial_protocol.CMD_C
+            payload[1] = m.payload[2]
+            return service_effect.effect_send(s.pid, service_topology.FILE_ENDPOINT_ID, 2, payload)
+        case serial_protocol.CMD_W:
+            payload[0] = serial_protocol.CMD_W
+            payload[1] = m.payload[2]
+            payload[2] = m.payload[3]
+            return service_effect.effect_send(s.pid, service_topology.FILE_ENDPOINT_ID, 3, payload)
+        case serial_protocol.CMD_R:
+            if !bang3(m) {
+                return invalid_effect(SHELL_INVALID_SHAPE)
+            }
+            payload[0] = serial_protocol.CMD_R
+            payload[1] = m.payload[2]
+            return service_effect.effect_send(s.pid, service_topology.FILE_ENDPOINT_ID, 2, payload)
+        case serial_protocol.CMD_L:
+            if !bang23(m) {
+                return invalid_effect(SHELL_INVALID_SHAPE)
+            }
+            return service_effect.effect_send(s.pid, service_topology.FILE_ENDPOINT_ID, 0, payload)
         default:
             return invalid_effect(SHELL_INVALID_COMMAND)
         }

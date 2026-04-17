@@ -82,7 +82,8 @@ Repository numbering note
   shell-plus-log-plus-key-value system: restart `log_service` while keeping
   `kv_service` state live, classify that result as a partial generalization,
   and keep compiler and framework surfaces closed.
-- The next speculative Canopus continuation therefore starts at Phase 153.
+- Phase 217 is occupied by the concrete retained-versus-durable boundary landing.
+- The next speculative Canopus continuation therefore starts at Phase 218.
 
 Repository status note
 ----------------------

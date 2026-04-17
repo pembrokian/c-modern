@@ -15,6 +15,7 @@
 //   Q P ! !         — queue peek
 //   X A <target> !  — authority inspection query
 //   X C <target> !  — compact service-state query
+//   X D <target> !  — retained-vs-durable boundary query
 //   X Q <target> !  — lifecycle query
 //   X P <target> !  — lifecycle policy query
 //   X S <target> !  — retained summary query
@@ -42,7 +43,8 @@ const CMD_P: u8 = 80   // 'P' — peek
 const CMD_U: u8 = 85   // 'U' — use
 const CMD_X: u8 = 88   // 'X' — lifecycle control family
 const CMD_BANG: u8 = 33  // '!' — end-of-argument sentinel
-const CMD_W: u8 = 87   // 'W' — stall-count query
+const CMD_W: u8 = 87   // 'W' — stall-count query; also write sub-op within CMD_F
+const CMD_F: u8 = 70   // 'F' — file command family
 
 const TARGET_SERIAL: u8 = 83    // 'S'
 const TARGET_SHELL: u8 = 72     // 'H'
@@ -54,6 +56,7 @@ const TARGET_WORKSET: u8 = 87   // 'W'
 const TARGET_ECHO: u8 = 69      // 'E'
 const TARGET_TRANSFER: u8 = 80  // 'P'
 const TARGET_TICKET: u8 = 84    // 'T'
+const TARGET_FILE: u8 = 70      // 'F'
 
 const PARTICIPANT_NONE: u8 = 78  // 'N'
 const POLICY_CLEAR: u8 = 67      // 'C'
@@ -112,6 +115,10 @@ func encode_lifecycle_state(target: u8) [4]u8 {
     return ipc.payload_byte(CMD_X, CMD_C, target, CMD_BANG)
 }
 
+func encode_lifecycle_durability(target: u8) [4]u8 {
+    return ipc.payload_byte(CMD_X, CMD_D, target, CMD_BANG)
+}
+
 func encode_lifecycle_identity(target: u8) [4]u8 {
     return ipc.payload_byte(CMD_X, CMD_I, target, CMD_BANG)
 }
@@ -154,4 +161,20 @@ func encode_ticket_issue() [4]u8 {
 
 func encode_ticket_use(epoch: u8, id: u8) [4]u8 {
     return ipc.payload_byte(CMD_T, CMD_U, epoch, id)
+}
+
+func encode_file_create(name: u8) [4]u8 {
+    return ipc.payload_byte(CMD_F, CMD_C, name, CMD_BANG)
+}
+
+func encode_file_write(name: u8, val: u8) [4]u8 {
+    return ipc.payload_byte(CMD_F, CMD_W, name, val)
+}
+
+func encode_file_read(name: u8) [4]u8 {
+    return ipc.payload_byte(CMD_F, CMD_R, name, CMD_BANG)
+}
+
+func encode_file_count() [4]u8 {
+    return ipc.payload_byte(CMD_F, CMD_L, CMD_BANG, CMD_BANG)
 }

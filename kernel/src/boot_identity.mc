@@ -111,6 +111,8 @@ func bootrestart_outcome_for_endpoint(s: KernelBootState, endpoint: u32) Restart
         return s.transfer_restart_outcome
     case service_topology.TICKET_ENDPOINT_ID:
         return s.ticket_restart_outcome
+    case service_topology.FILE_ENDPOINT_ID:
+        return s.file_restart_outcome
     default:
         return RestartOutcome.None
     }
@@ -148,6 +150,10 @@ func boot_ticket_mark(s: KernelBootState) service_identity.ServiceMark {
     return service_identity.service_mark(service_topology.TICKET_ENDPOINT_ID, s.ticket.state.pid, s.ticket.generation)
 }
 
+func boot_file_mark(s: KernelBootState) service_identity.ServiceMark {
+    return service_identity.service_mark(service_topology.FILE_ENDPOINT_ID, s.file.state.pid, s.file.generation)
+}
+
 func bootmark_for_endpoint(s: KernelBootState, endpoint: u32) service_identity.ServiceMark {
     switch endpoint {
     case service_topology.LOG_ENDPOINT_ID:
@@ -162,6 +168,8 @@ func bootmark_for_endpoint(s: KernelBootState, endpoint: u32) service_identity.S
         return boot_transfer_mark(s)
     case service_topology.TICKET_ENDPOINT_ID:
         return boot_ticket_mark(s)
+    case service_topology.FILE_ENDPOINT_ID:
+        return boot_file_mark(s)
     default:
         return service_identity.service_mark(endpoint, 0, 0)
     }

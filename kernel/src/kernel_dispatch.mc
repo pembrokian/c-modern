@@ -8,6 +8,7 @@
 
 import boot
 import echo_service
+import file_service
 import init
 import identity_taxonomy
 import event_codes
@@ -57,7 +58,7 @@ func lifecycle_is_lane_target(target: u8) bool {
 }
 
 func lifecycle_op_supported(op: u8) bool {
-    return op == serial_protocol.CMD_A || op == serial_protocol.CMD_C || op == serial_protocol.CMD_I || op == serial_protocol.CMD_P || op == serial_protocol.CMD_S || op == serial_protocol.CMD_R
+    return op == serial_protocol.CMD_A || op == serial_protocol.CMD_C || op == serial_protocol.CMD_D || op == serial_protocol.CMD_I || op == serial_protocol.CMD_P || op == serial_protocol.CMD_S || op == serial_protocol.CMD_R
 }
 
 func lifecycle_validate(msg: service_effect.Message) u8 {
@@ -118,6 +119,8 @@ func lifecycle_metadata(state: *boot.KernelBootState, target: u8) u8 {
         return u8(kv_service.kv_count(current.kv.state))
     case serial_protocol.TARGET_QUEUE:
         return u8(queue_service.queue_len(current.queue.state))
+    case serial_protocol.TARGET_FILE:
+        return u8(file_service.file_count(current.file.state))
     default:
         return 0
     }
@@ -201,6 +204,16 @@ func lifecycle_state_reply(state: *boot.KernelBootState, target: u8) service_eff
         lifecycle_metadata(state, target),
         lifecycle_generation_marker(state, target))
     return shell_service.lifecycle_state_effect(syscall.SyscallStatus.Ok, payload)
+}
+
+func lifecycle_durability_reply(state: *boot.KernelBootState, target: u8) service_effect.Effect {
+    if !lifecycle_is_lane_target(target) {
+        durability_endpoint: u32 = lifecycle_target_endpoint(target)
+        if durability_endpoint == 0 {
+            return shell_service.invalid_effect(shell_service.SHELL_INVALID_COMMAND)
+        }
+    }
+    return shell_service.lifecycle_durability_effect(syscall.SyscallStatus.Ok, service_state.state_durability_payload(target))
 }
 
 func lifecycle_identity_reply(state: *boot.KernelBootState, target: u8) service_effect.Effect {
@@ -293,6 +306,13 @@ func dispatch_ticket(state: *boot.KernelBootState, msg: service_effect.Message) 
     return ticket_result.effect
 }
 
+func dispatch_file(state: *boot.KernelBootState, msg: service_effect.Message) service_effect.Effect {
+    current: boot.KernelBootState = *state
+    file_result: file_service.FileResult = file_service.handle(current.file.state, msg)
+    *state = boot.bootwith_file(current, file_result.state)
+    return file_result.effect
+}
+
 func lifecycle_invalid_reply(state: *boot.KernelBootState, target: u8) service_effect.Effect {
     return shell_service.invalid_effect(shell_service.SHELL_INVALID_COMMAND)
 }
@@ -303,6 +323,8 @@ func lifecycle_route(op: u8) LifecycleRoute {
         return LifecycleRoute{ op: op, reply: lifecycle_authority_reply }
     case serial_protocol.CMD_C:
         return LifecycleRoute{ op: op, reply: lifecycle_state_reply }
+    case serial_protocol.CMD_D:
+        return LifecycleRoute{ op: op, reply: lifecycle_durability_reply }
     case serial_protocol.CMD_I:
         return LifecycleRoute{ op: op, reply: lifecycle_identity_reply }
     case serial_protocol.CMD_P:
@@ -336,6 +358,8 @@ func leaf_route(endpoint: u32) LeafRoute {
         return LeafRoute{ endpoint: endpoint, reply: dispatch_transfer }
     case service_topology.TICKET_ENDPOINT_ID:
         return LeafRoute{ endpoint: endpoint, reply: dispatch_ticket }
+    case service_topology.FILE_ENDPOINT_ID:
+        return LeafRoute{ endpoint: endpoint, reply: dispatch_file }
     default:
         return LeafRoute{ endpoint: endpoint, reply: dispatch_invalid_endpoint }
     }

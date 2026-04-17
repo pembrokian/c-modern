@@ -55,12 +55,16 @@ func smoke_slot_endpoints_match_constants() bool {
     if ticket_slot.endpoint != service_topology.TICKET_ENDPOINT_ID {
         return false
     }
+    file_slot: service_topology.ServiceSlot = service_topology.FILE_SLOT
+    if file_slot.endpoint != service_topology.FILE_ENDPOINT_ID {
+        return false
+    }
     return true
 }
 
-// B: SERVICE_COUNT must equal 8 — the number of boot-wired slots.
-func smoke_service_count_is_eight() bool {
-    if service_topology.SERVICE_COUNT != 8 {
+// B: SERVICE_COUNT must equal 9 — the number of boot-wired slots.
+func smoke_service_count_is_nine() bool {
+    if service_topology.SERVICE_COUNT != 9 {
         return false
     }
     return true
@@ -82,7 +86,7 @@ func main() i32 {
     if smoke_slot_endpoints_match_constants() == false {
         return 1
     }
-    if smoke_service_count_is_eight() == false {
+    if smoke_service_count_is_nine() == false {
         return 2
     }
     if smoke_init_and_round_trip() == false {

@@ -1,0 +1,189 @@
+Phase 218 -- Narrow File-Service Shape Probe
+===========================================
+
+Status
+------
+ACTIVE
+
+Purpose
+Test whether one small file-service-shaped owner can be admitted honestly on the
+
+Status
+It is not a framework phase and not a persistence-completion claim.
+It should add one narrow service shape over existing shell, dispatch, and
+Implementation notes
+--------------------
+- file_service.mc admitted as the bounded file-like owner; state is
+  FileServiceState { pid, slot, names: [4]u8, data: [4]u8, lens: [4]u8, count }
+- FILE_ENDPOINT_ID = 18, pid = 9; added to service_topology.mc as FILE_SLOT and
+  SERVICE_COUNT updated to 9
+- CMD_F (byte 'F') protocol family added to serial_protocol.mc with four
+  sub-commands: create (FC<name>!), write (FW<name><byte>), read (FR<name>!),
+  count (FL!!)
+- TARGET_FILE ('F') added to serial_protocol.mc for lifecycle target routing
+- shell_service.mc updated for TARGET_FILE lifecycle routing and full CMD_F
+  dispatch
+- kernel_dispatch.mc updated: dispatch_file(), lifecycle_metadata case for
+  TARGET_FILE, leaf_route case for FILE_ENDPOINT_ID
+- init.mc updated: restart_file(), restart_policy_for_target case, restart()
+  case — retained Reload semantics
+- boot.mc updated: file ServiceCell in KernelBootState, file_init in
+  kernel_init()
+- boot_update.mc: bootwith_file, bootwith_file_restart_outcome, bootrestart_file
+- boot_identity.mc: boot_file_mark, bootrestart_outcome_for_endpoint case,
+  bootmark_for_endpoint case
+- service_state.mc: TARGET_FILE → STATE_CLASS_RETAINED
+- service_topology.mc: FILE_ENDPOINT_ID in service_authority_class →
+  RetainedOwner
+- scenario_218.mc: run_file_service_probe() — 13 steps, fail codes 2180–2190
+- scenario_transport.mc: cmd_file_create, cmd_file_write, cmd_file_read,
+  cmd_file_count helpers
+- scenarios.mc: import scenario_218, call run_file_service_probe()
+- Design choice: 1 byte per file slot (lens[i]=0 or 1, data[i] is the byte) —
+  chosen because the language has no 2D fixed array syntax, and 1-byte capacity
+  is sufficient for a shape probe; see decision_log.txt and backlog.txt
+
+service ownership boundaries.
+
+Repository status note
+----------------------
+- The running-system slice already exposes an explicit retained-versus-durable
+  boundary query and keeps durable state unadmitted.
+- Current support wording still excludes filesystem frameworks, durable logs,
+  mountable namespaces, persistent object stores, and generalized recovery
+  machinery.
+- The next honest pressure step is to prototype one bounded file-like owner
+  surface and observe what semantics are truly needed.
+
+Problem being solved
+--------------------
+- The repository now has a clear retained-vs-durable philosophy but still lacks
+  concrete pressure on naming, identity, operation shape, and failure contracts
+  for file-like service behavior.
+- Without one bounded file-service probe, persistence discussion risks staying
+  abstract or jumping early into storage frameworks.
+- The missing truth is narrow: can a tiny file-like owner surface stay explicit
+  and deterministic under current boundaries.
+
+Core rule
+---------
+- Admit one bounded file-like owner before widening persistence mechanisms.
+- Keep state semantics explicit and classify retained versus durable behavior.
+- Keep naming and failure consequences owner-local and deterministic.
+- Do not imply durability guarantees, durable media, or general filesystem
+  architecture.
+
+Chosen slice for this phase
+---------------------------
+1. Add one bounded file-service owner with a tiny fixed operation family.
+2. Keep operation semantics compact and explicit, for example:
+   - create or open by compact name token
+   - append or write bounded payload
+   - read bounded payload or tail window
+   - list or stat in compact bounded form
+3. Keep state class explicit:
+   - retained behavior may be admitted if explicitly snapshot or reload-owned
+   - durable behavior remains unadmitted in this phase
+4. Keep identity and naming compact and fixed-target:
+   - no dynamic namespace tree
+   - no directory hierarchy framework
+   - no mount model
+5. Keep failure model explicit and minimal:
+   - missing object
+   - full or exhausted capacity
+   - malformed request
+   - stale or invalid handle only if a handle path is explicitly admitted
+6. Add one deterministic scenario plus one focused reset-lane fixture.
+7. Make no compiler, sema, MIR, backend, ABI, target, runtime, stdlib, or hal
+   expansion beyond the owner-local kernel service slice.
+
+Planned outcome
+---------------
+- The running system gains one concrete file-like service pressure point.
+- The repository gathers real evidence on file naming, identity, and mutation
+  semantics without prematurely choosing a durable substrate.
+- Later persistence phases can reopen only where this probe proves concrete
+  pressure.
+
+Preferred implementation shape
+------------------------------
+Owner path
+- Keep service semantics in one file-service owner module.
+- Keep shell command parsing and compact protocol routing in existing shell and
+  dispatch owners.
+
+State path
+- Keep file-like state bounded in memory by default.
+- If retained reload is admitted, make it explicit and init-owned, mirroring
+  existing retained-service patterns.
+- Keep durable class unadmitted and explicit.
+
+Inspection path
+- Reuse existing compact service-state and retained-versus-durable inspection
+  surfaces where possible.
+- Add at most one compact additive inspection field or query only if needed for
+  honesty.
+
+Identity and naming path
+- Keep names fixed-width or otherwise tightly bounded.
+- Keep file identity explicit and owner-local.
+- Avoid introducing a general directory graph or discovery registry.
+
+Suggested execution order
+-------------------------
+1. Define one compact command family and bounded reply shapes.
+2. Implement owner-local file-like state and operation semantics.
+3. Wire shell and dispatch routing for the new fixed target.
+4. Add one scenario that exercises normal flow plus one failure consequence.
+5. Add one reset-lane fixture proving retained-vs-durable boundary truth for the
+   file-like owner.
+6. Refresh support and planning surfaces only where active wording requires the
+   new admitted behavior.
+
+Deliverables
+------------
+- one bounded file-service owner with compact operation surface
+- one caller-visible failure contract for file-like operations
+- one deterministic scenario proof and one focused reset-lane fixture
+- bounded documentation updates reflecting what was admitted and what remains
+  deferred
+
+Validation expectations
+-----------------------
+- the tree must continue to build after the file-service probe lands
+- the focused Phase 218 reset-lane fixture must pass
+- grouped kernel reset-lane workflow coverage must remain green
+- existing retained-policy, service-state, authority, and retained-versus-
+  durable fixtures must remain green unless expected outputs intentionally widen
+
+Exit criteria
+-------------
+- one narrow file-like service is executable in the running-system slice
+- naming, identity, operation, and failure contracts are explicit and bounded
+- retained-versus-durable classification remains explicit and truthful
+- no filesystem framework, durable storage subsystem, or recovery framework is
+  introduced
+
+Non-goals
+---------
+- full filesystem implementation
+- durable logs, block storage, or object-store frameworks
+- mountable namespaces or path graph frameworks
+- dynamic service discovery or directory services
+- crash-recovery machinery beyond current retained-reload semantics
+- compiler-facing persistence features
+
+Why this is the narrowest honest landing
+---------------------------------------
+- The repository already has boundary language for retained versus durable
+  state, but still needs one concrete service pressure point.
+- A tiny file-like owner yields real design evidence without overcommitting to
+  durability substrate decisions.
+- This keeps the phase aligned with explicit owner-local growth rather than
+  framework-first expansion.
+
+Acceptance criteria for this document
+-------------------------------------
+- Phase 218 is explicitly framed as a bounded file-service shape probe.
+- The phase keeps durable semantics unadmitted and names that boundary clearly.
+- Scope, validation, and non-goals prevent implicit framework growth.

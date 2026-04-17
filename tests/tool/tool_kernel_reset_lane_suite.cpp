@@ -231,7 +231,7 @@ ResetLaneScenarioTiming RunKernelResetLaneScenario(const std::filesystem::path& 
     };
 }
 
-constexpr std::array<ResetLaneScenario, 41> kResetLaneScenarios = {{
+constexpr std::array<ResetLaneScenario, 42> kResetLaneScenarios = {{
     {"repo project", "", "", "kernel_reset_lane_repo_build", "kernel", "kernel_reset_lane_repo_build_output.txt", "kernel_reset_lane_repo_run_output.txt", "kernel reset lane repo project build", "kernel reset lane repo project run"},
     {"smoke", "tests/smoke/kernel_reset_lane_serial_round_trip", "kernel_reset_lane_smoke_project", "kernel_reset_lane_smoke_build", "app", "kernel_reset_lane_smoke_build_output.txt", "kernel_reset_lane_smoke_run_output.txt", "kernel reset lane smoke build", "kernel reset lane smoke run"},
     {"retained state", "tests/system/kernel_reset_lane_retained_log", "kernel_reset_lane_retained_state_project", "kernel_reset_lane_retained_state_build", "app", "kernel_reset_lane_retained_state_build_output.txt", "kernel_reset_lane_retained_state_run_output.txt", "kernel reset lane retained-state build", "kernel reset lane retained-state run"},
@@ -273,6 +273,7 @@ constexpr std::array<ResetLaneScenario, 41> kResetLaneScenarios = {{
     {"phase 214 service state", "tests/system/kernel_reset_lane_phase214_service_state", "kernel_reset_lane_phase214_service_state_project", "kernel_reset_lane_phase214_service_state_build", "app", "kernel_reset_lane_phase214_service_state_build_output.txt", "kernel_reset_lane_phase214_service_state_run_output.txt", "kernel reset lane phase 214 service state build", "kernel reset lane phase 214 service state run"},
     {"phase 215 queue pressure", "tests/system/kernel_reset_lane_phase215_queue_pressure", "kernel_reset_lane_phase215_queue_pressure_project", "kernel_reset_lane_phase215_queue_pressure_build", "app", "kernel_reset_lane_phase215_queue_pressure_build_output.txt", "kernel_reset_lane_phase215_queue_pressure_run_output.txt", "kernel reset lane phase 215 queue pressure build", "kernel reset lane phase 215 queue pressure run"},
     {"phase 216 stall consequence", "tests/system/kernel_reset_lane_phase216_stall_consequence", "kernel_reset_lane_phase216_stall_consequence_project", "kernel_reset_lane_phase216_stall_consequence_build", "app", "kernel_reset_lane_phase216_stall_consequence_build_output.txt", "kernel_reset_lane_phase216_stall_consequence_run_output.txt", "kernel reset lane phase 216 stall consequence build", "kernel reset lane phase 216 stall consequence run"},
+    {"phase 217 retained durable boundary", "tests/system/kernel_reset_lane_phase217_retained_durable_boundary", "kernel_reset_lane_phase217_retained_durable_boundary_project", "kernel_reset_lane_phase217_retained_durable_boundary_build", "app", "kernel_reset_lane_phase217_retained_durable_boundary_build_output.txt", "kernel_reset_lane_phase217_retained_durable_boundary_run_output.txt", "kernel reset lane phase 217 retained durable boundary build", "kernel reset lane phase 217 retained durable boundary run"},
 }};
 
 std::set<std::string> CollectCoveredResetLaneFixturePaths() {

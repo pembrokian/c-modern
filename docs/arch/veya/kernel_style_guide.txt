@@ -206,6 +206,22 @@ Incremental state from a copy
 5. Control flow
 ---------------
 
+Local binding form
+  Use `:=` for local mutable bindings when the type is clear from the
+  initializer.  Use the explicit `name: T = expr` form only when the
+  type needs to be stated for clarity or when the initializer alone is
+  not concrete enough for the reader.
+
+    // DO:
+    key := m.payload[0]
+    count := s.count
+
+    // ONLY when the type matters to the reader:
+    mask: u32 = 0xFF
+
+  `:=` is local-only.  It is not admitted for top-level declarations,
+  `var`, or `const` statements.
+
 Early return
   Return as early as possible.  Guard conditions come first; the happy path
   is last (or implicitly the fallthrough).
@@ -215,14 +231,14 @@ Early return
         if m.payload_len < 2 {
             return s
         }
-        key: u8 = m.payload[0]
+        key := m.payload[0]
         ...
     }
 
     // AVOID:
     func kvset(s: State, m: Message) State {
         if m.payload_len >= 2 {
-            key: u8 = m.payload[0]
+            key := m.payload[0]
             ...
         }
         return s
@@ -259,8 +275,8 @@ Intermediate variables
     return KvResult{ state: kvset(s, m), effect: effect_reply(Ok, 0, zero_payload()) }
 
     // AVOID:
-    new_state: KvServiceState = kvset(s, m)
-    result: KvResult = KvResult{ state: new_state, effect: ... }
+    new_state := kvset(s, m)
+    result := KvResult{ state: new_state, effect: ... }
     return result
 
 
@@ -380,6 +396,7 @@ Key patterns it demonstrates:
   f) KvResult (not KvHandleResult) as the return pair
   g) kv_count (not debug_kv_count) as the debug accessor
   h) No service_state() alias
+  i) Local bindings use := where the type is clear from the initializer
 
 The log_service.mc is the next module that should receive the same treatment
 when it is next touched.  Current pre-refactor patterns to clean up:
@@ -389,6 +406,7 @@ when it is next touched.  Current pre-refactor patterns to clean up:
   - log_on_tail's repeated if-chain → for i in 0..s.len loop
   - service_state() alias → remove
   - debug_retained_len → log_len
+  - explicit typed locals (name: T = expr) → := where type is clear
 
 The serial_service.mc is intentionally more complex (it carries reply staging
 state and has a forwarding buffer path).  Its long functions are justified by

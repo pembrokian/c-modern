@@ -51,6 +51,10 @@ func cmd_lifecycle_state(target: u8) syscall.ReceiveObservation {
     return serial_obs(DEFAULT_SERIAL_ROUTE.endpoint, DEFAULT_SERIAL_ROUTE.pid, serial_protocol.encode_lifecycle_state(target))
 }
 
+func cmd_lifecycle_durability(target: u8) syscall.ReceiveObservation {
+    return serial_obs(DEFAULT_SERIAL_ROUTE.endpoint, DEFAULT_SERIAL_ROUTE.pid, serial_protocol.encode_lifecycle_durability(target))
+}
+
 func cmd_lifecycle_identity(target: u8) syscall.ReceiveObservation {
     return serial_obs(DEFAULT_SERIAL_ROUTE.endpoint, DEFAULT_SERIAL_ROUTE.pid, serial_protocol.encode_lifecycle_identity(target))
 }
@@ -93,6 +97,22 @@ func cmd_ticket_issue() syscall.ReceiveObservation {
 
 func cmd_ticket_use(epoch: u8, id: u8) syscall.ReceiveObservation {
     return serial_obs(DEFAULT_SERIAL_ROUTE.endpoint, DEFAULT_SERIAL_ROUTE.pid, serial_protocol.encode_ticket_use(epoch, id))
+}
+
+func cmd_file_create(name: u8) syscall.ReceiveObservation {
+    return serial_obs(DEFAULT_SERIAL_ROUTE.endpoint, DEFAULT_SERIAL_ROUTE.pid, serial_protocol.encode_file_create(name))
+}
+
+func cmd_file_write(name: u8, val: u8) syscall.ReceiveObservation {
+    return serial_obs(DEFAULT_SERIAL_ROUTE.endpoint, DEFAULT_SERIAL_ROUTE.pid, serial_protocol.encode_file_write(name, val))
+}
+
+func cmd_file_read(name: u8) syscall.ReceiveObservation {
+    return serial_obs(DEFAULT_SERIAL_ROUTE.endpoint, DEFAULT_SERIAL_ROUTE.pid, serial_protocol.encode_file_read(name))
+}
+
+func cmd_file_count() syscall.ReceiveObservation {
+    return serial_obs(DEFAULT_SERIAL_ROUTE.endpoint, DEFAULT_SERIAL_ROUTE.pid, serial_protocol.encode_file_count())
 }
 
 func kv_count_obs(pid: u32) syscall.ReceiveObservation {

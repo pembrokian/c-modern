@@ -20,6 +20,15 @@ const STATE_POLICY_NONE: u8 = 0
 const STATE_POLICY_CLEAR: u8 = 1
 const STATE_POLICY_KEEP: u8 = 2
 
+const STATE_DURABILITY_NONE: u8 = 0
+const STATE_DURABILITY_RETAINED: u8 = 1
+const STATE_DURABILITY_DURABLE: u8 = 2
+
+const STATE_DURABLE_REQ_NONE: u8 = 0
+const STATE_DURABLE_REQ_PERSISTENCE: u8 = 1
+const STATE_DURABLE_REQ_NAMING: u8 = 2
+const STATE_DURABLE_REQ_RECOVERY: u8 = 4
+
 func state_class(target: u8) u8 {
     if identity_taxonomy.identity_target_is_lane(target) {
         return STATE_CLASS_LANE
@@ -30,6 +39,8 @@ func state_class(target: u8) u8 {
     case serial_protocol.TARGET_KV:
         return STATE_CLASS_RETAINED
     case serial_protocol.TARGET_QUEUE:
+        return STATE_CLASS_RETAINED
+    case serial_protocol.TARGET_FILE:
         return STATE_CLASS_RETAINED
     case serial_protocol.TARGET_ECHO:
         return STATE_CLASS_ORDINARY
@@ -74,6 +85,34 @@ func state_policy_code(policy: u8) u8 {
 
 func state_generation_marker(generation: u32) u8 {
     return u8(generation)
+}
+
+func state_durability(target: u8) u8 {
+    class: u8 = state_class(target)
+    if class == STATE_CLASS_RETAINED || class == STATE_CLASS_LANE {
+        return STATE_DURABILITY_RETAINED
+    }
+    return STATE_DURABILITY_NONE
+}
+
+func state_durable_level(target: u8) u8 {
+    return STATE_DURABILITY_NONE
+}
+
+func state_durable_requirements(target: u8) u8 {
+    if state_durability(target) == STATE_DURABILITY_RETAINED {
+        return STATE_DURABLE_REQ_PERSISTENCE + STATE_DURABLE_REQ_NAMING + STATE_DURABLE_REQ_RECOVERY
+    }
+    return STATE_DURABLE_REQ_NONE
+}
+
+func state_durability_payload(target: u8) [4]u8 {
+    payload: [4]u8
+    payload[0] = target
+    payload[1] = state_durability(target)
+    payload[2] = state_durable_level(target)
+    payload[3] = state_durable_requirements(target)
+    return payload
 }
 
 func state_payload(target: u8, class: u8, mode: u8, participation: u8, policy: u8, metadata: u8, generation: u8) [4]u8 {

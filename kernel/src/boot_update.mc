@@ -1,4 +1,5 @@
 import echo_service
+import file_service
 import kv_service
 import log_service
 import queue_service
@@ -110,4 +111,15 @@ func bootrestart_transfer(s: KernelBootState, transfer: transfer_service.Transfe
 
 func bootrestart_ticket(s: KernelBootState, ticket: ticket_service.TicketServiceState) KernelBootState {
     return s with { ticket.state: ticket, ticket.generation: s.ticket.generation + 1 }
+}
+func bootwith_file(s: KernelBootState, file: file_service.FileServiceState) KernelBootState {
+    return s with { file.state: file }
+}
+
+func bootwith_file_restart_outcome(s: KernelBootState, outcome: RestartOutcome) KernelBootState {
+    return s with { file_restart_outcome: outcome }
+}
+
+func bootrestart_file(s: KernelBootState, file: file_service.FileServiceState) KernelBootState {
+    return s with { file.state: file, file.generation: s.file.generation + 1 }
 }

@@ -15,6 +15,7 @@
 
 import boot
 import echo_service
+import file_service
 import kv_service
 import log_service
 import queue_service
@@ -56,6 +57,8 @@ func restart_policy_for_target(target: u8) RestartPolicyInfo {
         return restart_policy_single(target, serial_protocol.POLICY_CLEAR)
     case serial_protocol.TARGET_TICKET:
         return restart_policy_single(target, serial_protocol.POLICY_CLEAR)
+    case serial_protocol.TARGET_FILE:
+        return restart_policy_single(target, serial_protocol.POLICY_KEEP)
     default:
         return RestartPolicyInfo{ target: 0, owner0: serial_protocol.PARTICIPANT_NONE, owner1: serial_protocol.PARTICIPANT_NONE, policy: serial_protocol.PARTICIPANT_NONE }
     }
@@ -88,6 +91,8 @@ func restart(state: boot.KernelBootState, endpoint: u32) boot.KernelBootState {
         return restart_transfer(state)
     case service_topology.TICKET_ENDPOINT_ID:
         return restart_ticket(state)
+        case service_topology.FILE_ENDPOINT_ID:
+            return restart_file(state)
     default:
         return state
     }
@@ -158,4 +163,15 @@ func restart_ticket(state: boot.KernelBootState) boot.KernelBootState {
     ticket_slot := service_topology.TICKET_SLOT
     next := boot.bootrestart_ticket(state, ticket_service.ticket_init(ticket_slot.pid, 1, state.ticket.state.epoch + 1))
     return boot.bootwith_ticket_restart_outcome(next, boot.RestartOutcome.OrdinaryReplaced)
+}
+
+func restart_file(state: boot.KernelBootState) boot.KernelBootState {
+    file_slot := service_topology.FILE_SLOT
+    snap_names: [4]u8 = state.file.state.names
+    snap_data: [4]u8 = state.file.state.data
+    snap_lens: [4]u8 = state.file.state.lens
+    snap_count: usize = state.file.state.count
+    reloaded: file_service.FileServiceState = file_service.FileServiceState{ pid: file_slot.pid, slot: 1, names: snap_names, data: snap_data, lens: snap_lens, count: snap_count }
+    next := boot.bootrestart_file(state, reloaded)
+    return boot.bootwith_file_restart_outcome(next, boot.RestartOutcome.RetainedReloaded)
 }
