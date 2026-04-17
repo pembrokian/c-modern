@@ -159,7 +159,8 @@ void RunBuiltFixture(const std::filesystem::path& mc_path,
                      const std::filesystem::path& build_dir,
                      int expected_exit_code,
                      const std::vector<std::string>& run_args,
-                     bool dump_backend = false) {
+                     bool dump_backend = false,
+                     const std::optional<std::filesystem::path>& import_root = std::nullopt) {
     std::filesystem::remove_all(build_dir);
     std::filesystem::create_directories(build_dir);
 
@@ -172,6 +173,10 @@ void RunBuiltFixture(const std::filesystem::path& mc_path,
     };
     if (dump_backend) {
         build_command.push_back("--dump-backend");
+    }
+    if (import_root.has_value()) {
+        build_command.push_back("--import-root");
+        build_command.push_back(import_root->generic_string());
     }
 
     ExpectCommandSuccess(build_command, "mc build " + source_path.generic_string());
@@ -527,6 +532,14 @@ void RunCodegenExecutableCoreSuite(const std::filesystem::path& source_root,
                     work_root / "procedure_dispatch_table",
                     45,
                     {});
+
+    RunBuiltFixture(mc_path,
+                    source_root / "tests/compiler/codegen/procedure_dispatch_table_import/main.mc",
+                    work_root / "procedure_dispatch_table_import",
+                    45,
+                    {},
+                    false,
+                    source_root / "tests/compiler/codegen/procedure_dispatch_table_import");
 
     const std::filesystem::path global_source = work_root / "global_counter.mc";
     WriteFile(global_source,

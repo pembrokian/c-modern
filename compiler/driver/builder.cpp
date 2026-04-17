@@ -2051,6 +2051,7 @@ std::optional<std::vector<BuildUnit>> CompileModuleGraph(CompileGraph& graph,
         auto mir_result = mc::mir::LowerSourceFile(*node.parse_result.source_file,
                                                    *sema_result.module,
                                                    node.source_path,
+                                                   &imported_data->modules,
                                                    diagnostics);
         if (emit_objects && mir_result.ok && !imported_data->modules.empty()) {
             AddImportedExternDeclarations(*mir_result.module, imported_data->modules);

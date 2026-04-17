@@ -6,6 +6,7 @@
 #include <memory>
 #include <optional>
 #include <string>
+#include <unordered_map>
 #include <vector>
 
 #include "compiler/ast/ast.h"
@@ -181,6 +182,12 @@ struct LowerResult {
     std::unique_ptr<Module> module;
     bool ok = false;
 };
+
+LowerResult LowerSourceFile(const ast::SourceFile& source_file,
+                            const sema::Module& sema_module,
+                            const std::filesystem::path& file_path,
+                            const std::unordered_map<std::string, sema::Module>* imported_modules,
+                            support::DiagnosticSink& diagnostics);
 
 LowerResult LowerSourceFile(const ast::SourceFile& source_file,
                             const sema::Module& sema_module,

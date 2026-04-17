@@ -20,10 +20,13 @@ struct ShellServiceState {
     slot: u32
 }
 
-struct FamilyRoute {
-    endpoint: u32
-    send_len: usize
+struct OpHandler {
+    op: u8
+    check: func(service_effect.Message) bool
+    run: func(ShellServiceState, service_effect.Message) service_effect.Effect
 }
+
+const ROUTE_SENTINEL_OP: u8 = 0
 
 func shell_init(pid: u32, slot: u32) ShellServiceState {
     return ShellServiceState{ pid: pid, slot: slot }
@@ -75,6 +78,20 @@ func bang3(m: service_effect.Message) bool {
 
 func bang23(m: service_effect.Message) bool {
     return m.payload[2] == serial_protocol.CMD_BANG && m.payload[3] == serial_protocol.CMD_BANG
+}
+
+func anymsg(m: service_effect.Message) bool {
+    return true
+}
+
+func invalid_route(s: ShellServiceState, m: service_effect.Message) service_effect.Effect {
+    return invalid_effect(SHELL_INVALID_COMMAND)
+}
+
+const UNUSED_ROUTE: OpHandler = OpHandler{
+    op: ROUTE_SENTINEL_OP,
+    check: anymsg,
+    run: invalid_route
 }
 
 func lifecycle_op_supported(op: u8) bool {
@@ -155,7 +172,7 @@ func lifecycle_effect(status: syscall.SyscallStatus, target: u8, mode: u8) servi
     return service_effect.effect_reply(status, 2, payload)
 }
 
-func lifecycle_identity_request(s: ShellServiceState, m: service_effect.Message) service_effect.Effect {
+func lifecycle_forward(s: ShellServiceState, m: service_effect.Message) service_effect.Effect {
     return service_effect.effect_send(s.pid, service_topology.SHELL_ENDPOINT_ID, m.payload_len, m.payload)
 }
 
@@ -163,28 +180,12 @@ func lifecycle_identity_effect(status: syscall.SyscallStatus, generation_payload
     return service_effect.effect_reply(status, 4, generation_payload)
 }
 
-func lifecycle_policy_request(s: ShellServiceState, m: service_effect.Message) service_effect.Effect {
-    return service_effect.effect_send(s.pid, service_topology.SHELL_ENDPOINT_ID, m.payload_len, m.payload)
-}
-
-func lifecycle_authority_request(s: ShellServiceState, m: service_effect.Message) service_effect.Effect {
-    return service_effect.effect_send(s.pid, service_topology.SHELL_ENDPOINT_ID, m.payload_len, m.payload)
-}
-
 func lifecycle_authority_effect(status: syscall.SyscallStatus, payload: [4]u8) service_effect.Effect {
     return service_effect.effect_reply(status, 4, payload)
 }
 
-func lifecycle_state_request(s: ShellServiceState, m: service_effect.Message) service_effect.Effect {
-    return service_effect.effect_send(s.pid, service_topology.SHELL_ENDPOINT_ID, m.payload_len, m.payload)
-}
-
 func lifecycle_state_effect(status: syscall.SyscallStatus, payload: [4]u8) service_effect.Effect {
     return service_effect.effect_reply(status, 4, payload)
-}
-
-func lifecycle_durability_request(s: ShellServiceState, m: service_effect.Message) service_effect.Effect {
-    return service_effect.effect_send(s.pid, service_topology.SHELL_ENDPOINT_ID, m.payload_len, m.payload)
 }
 
 func lifecycle_durability_effect(status: syscall.SyscallStatus, payload: [4]u8) service_effect.Effect {
@@ -195,237 +196,324 @@ func lifecycle_policy_effect(status: syscall.SyscallStatus, payload: [4]u8) serv
     return service_effect.effect_reply(status, 4, payload)
 }
 
-func lifecycle_summary_request(s: ShellServiceState, m: service_effect.Message) service_effect.Effect {
-    return service_effect.effect_send(s.pid, service_topology.SHELL_ENDPOINT_ID, m.payload_len, m.payload)
-}
-
-func lifecycle_compare_request(s: ShellServiceState, m: service_effect.Message) service_effect.Effect {
-    return service_effect.effect_send(s.pid, service_topology.SHELL_ENDPOINT_ID, m.payload_len, m.payload)
-}
-
 func lifecycle_summary_effect(status: syscall.SyscallStatus, payload: [4]u8) service_effect.Effect {
     return service_effect.effect_reply(status, 4, payload)
 }
 
-func lifecycle_request(s: ShellServiceState, m: service_effect.Message) service_effect.Effect {
-    return service_effect.effect_send(s.pid, service_topology.SHELL_ENDPOINT_ID, m.payload_len, m.payload)
+func dispatch(routes: [5]OpHandler, s: ShellServiceState, m: service_effect.Message, op: u8) service_effect.Effect {
+    for i in 0..5 {
+        if routes[i].op == ROUTE_SENTINEL_OP {
+            return invalid_effect(SHELL_INVALID_COMMAND)
+        }
+        if routes[i].op == op {
+            if !routes[i].check(m) {
+                return invalid_effect(SHELL_INVALID_SHAPE)
+            }
+            return routes[i].run(s, m)
+        }
+    }
+    return invalid_effect(SHELL_INVALID_COMMAND)
+}
+
+func lifecycle_validate_target(target: u8, require_restart: bool) bool {
+    if identity_taxonomy.identity_target_is_lane(target) {
+        return true
+    }
+
+    endpoint: u32 = lifecycle_target_endpoint(target)
+    if endpoint == 0 {
+        return false
+    }
+
+    if require_restart && !service_topology.service_can_restart(endpoint) {
+        return false
+    }
+
+    return true
+}
+
+func route_lifecycle(s: ShellServiceState, m: service_effect.Message, op: u8) service_effect.Effect {
+    if !bang3(m) {
+        return invalid_effect(SHELL_INVALID_SHAPE)
+    }
+
+    switch op {
+    case serial_protocol.CMD_A:
+        if !lifecycle_validate_target(m.payload[2], false) {
+            return invalid_effect(SHELL_INVALID_COMMAND)
+        }
+        return lifecycle_forward(s, m)
+    case serial_protocol.CMD_C:
+        if !lifecycle_validate_target(m.payload[2], false) {
+            return invalid_effect(SHELL_INVALID_COMMAND)
+        }
+        return lifecycle_forward(s, m)
+    case serial_protocol.CMD_D:
+        if !lifecycle_validate_target(m.payload[2], false) {
+            return invalid_effect(SHELL_INVALID_COMMAND)
+        }
+        return lifecycle_forward(s, m)
+    case serial_protocol.CMD_Q:
+        if identity_taxonomy.identity_target_is_lane(m.payload[2]) {
+            return lifecycle_effect(syscall.SyscallStatus.Ok, m.payload[2], serial_protocol.LIFECYCLE_RELOAD)
+        }
+        query_endpoint: u32 = lifecycle_target_endpoint(m.payload[2])
+        if query_endpoint == 0 {
+            return invalid_effect(SHELL_INVALID_COMMAND)
+        }
+        return lifecycle_effect(syscall.SyscallStatus.Ok, m.payload[2], lifecycle_mode(query_endpoint))
+    case serial_protocol.CMD_I:
+        if !identity_taxonomy.identity_target_has_generation_query(m.payload[2]) {
+            return invalid_effect(SHELL_INVALID_COMMAND)
+        }
+        if !identity_taxonomy.identity_target_has_direct_generation(m.payload[2]) {
+            return lifecycle_forward(s, m)
+        }
+        if m.payload[2] != serial_protocol.TARGET_WORKSET {
+            identity_endpoint: u32 = lifecycle_target_endpoint(m.payload[2])
+            if identity_endpoint == 0 {
+                return invalid_effect(SHELL_INVALID_COMMAND)
+            }
+        }
+        return lifecycle_forward(s, m)
+    case serial_protocol.CMD_P:
+        if !lifecycle_validate_target(m.payload[2], true) {
+            return invalid_effect(SHELL_INVALID_COMMAND)
+        }
+        return lifecycle_forward(s, m)
+    case serial_protocol.CMD_S:
+        if !lifecycle_validate_target(m.payload[2], true) {
+            return invalid_effect(SHELL_INVALID_COMMAND)
+        }
+        return lifecycle_forward(s, m)
+    case serial_protocol.CMD_M:
+        if !lifecycle_validate_target(m.payload[2], true) {
+            return invalid_effect(SHELL_INVALID_COMMAND)
+        }
+        return lifecycle_forward(s, m)
+    case serial_protocol.CMD_R:
+        if !lifecycle_validate_target(m.payload[2], false) {
+            return invalid_effect(SHELL_INVALID_COMMAND)
+        }
+        return lifecycle_forward(s, m)
+    default:
+        return invalid_effect(SHELL_INVALID_COMMAND)
+    }
+}
+
+func route_echo(s: ShellServiceState, m: service_effect.Message, op: u8) service_effect.Effect {
+    if op != serial_protocol.CMD_C {
+        return invalid_effect(SHELL_INVALID_COMMAND)
+    }
+    return forward_two(s, service_topology.ECHO_ENDPOINT_ID, m.payload[2], m.payload[3])
+}
+
+func log_append(s: ShellServiceState, m: service_effect.Message) service_effect.Effect {
+    return forward_one(s, service_topology.LOG_ENDPOINT_ID, m.payload[2])
+}
+
+func log_tail(s: ShellServiceState, m: service_effect.Message) service_effect.Effect {
+    return forward_empty(s, service_topology.LOG_ENDPOINT_ID)
+}
+
+const LOG_ROUTES: [5]OpHandler = [5]OpHandler{
+    OpHandler{ op: serial_protocol.CMD_A, check: bang3, run: log_append },
+    OpHandler{ op: serial_protocol.CMD_T, check: bang23, run: log_tail },
+    UNUSED_ROUTE,
+    UNUSED_ROUTE,
+    UNUSED_ROUTE
 }
 
 func route_log(s: ShellServiceState, m: service_effect.Message, op: u8) service_effect.Effect {
-    switch op {
-    case serial_protocol.CMD_A:
-        if !bang3(m) {
-            return invalid_effect(SHELL_INVALID_SHAPE)
-        }
-        return forward_one(s, service_topology.LOG_ENDPOINT_ID, m.payload[2])
-    case serial_protocol.CMD_T:
-        if !bang23(m) {
-            return invalid_effect(SHELL_INVALID_SHAPE)
-        }
-        return forward_empty(s, service_topology.LOG_ENDPOINT_ID)
-    default:
-        return invalid_effect(SHELL_INVALID_COMMAND)
-    }
+    return dispatch(LOG_ROUTES, s, m, op)
+}
+
+func kv_set(s: ShellServiceState, m: service_effect.Message) service_effect.Effect {
+    return forward_two(s, service_topology.KV_ENDPOINT_ID, m.payload[2], m.payload[3])
+}
+
+func kv_get(s: ShellServiceState, m: service_effect.Message) service_effect.Effect {
+    return forward_one(s, service_topology.KV_ENDPOINT_ID, m.payload[2])
+}
+
+func kv_count(s: ShellServiceState, m: service_effect.Message) service_effect.Effect {
+    return forward_empty(s, service_topology.KV_ENDPOINT_ID)
+}
+
+const KV_ROUTES: [5]OpHandler = [5]OpHandler{
+    OpHandler{ op: serial_protocol.CMD_S, check: anymsg, run: kv_set },
+    OpHandler{ op: serial_protocol.CMD_G, check: bang3, run: kv_get },
+    OpHandler{ op: serial_protocol.CMD_C, check: bang23, run: kv_count },
+    UNUSED_ROUTE,
+    UNUSED_ROUTE
 }
 
 func route_kv(s: ShellServiceState, m: service_effect.Message, op: u8) service_effect.Effect {
-    switch op {
-    case serial_protocol.CMD_S:
-        return forward_two(s, service_topology.KV_ENDPOINT_ID, m.payload[2], m.payload[3])
-    case serial_protocol.CMD_G:
-        if !bang3(m) {
-            return invalid_effect(SHELL_INVALID_SHAPE)
-        }
-        return forward_one(s, service_topology.KV_ENDPOINT_ID, m.payload[2])
-    case serial_protocol.CMD_C:
-        if !bang23(m) {
-            return invalid_effect(SHELL_INVALID_SHAPE)
-        }
-        return forward_empty(s, service_topology.KV_ENDPOINT_ID)
-    default:
-        return invalid_effect(SHELL_INVALID_COMMAND)
-    }
+    return dispatch(KV_ROUTES, s, m, op)
 }
 
-func queue_route(op: u8) FamilyRoute {
-    switch op {
-    case serial_protocol.CMD_A:
-        return FamilyRoute{ endpoint: service_topology.QUEUE_ENDPOINT_ID, send_len: 1 }
-    case serial_protocol.CMD_D:
-        return FamilyRoute{ endpoint: service_topology.QUEUE_ENDPOINT_ID, send_len: 0 }
-    case serial_protocol.CMD_C:
-        return FamilyRoute{ endpoint: service_topology.QUEUE_ENDPOINT_ID, send_len: 2 }
-    case serial_protocol.CMD_P:
-        return FamilyRoute{ endpoint: service_topology.QUEUE_ENDPOINT_ID, send_len: 2 }
-    case serial_protocol.CMD_W:
-        return FamilyRoute{ endpoint: service_topology.QUEUE_ENDPOINT_ID, send_len: 2 }
-    default:
-        return FamilyRoute{ endpoint: 0, send_len: 0 }
-    }
+func queue_push(s: ShellServiceState, m: service_effect.Message) service_effect.Effect {
+    return forward_one(s, service_topology.QUEUE_ENDPOINT_ID, m.payload[2])
+}
+
+func queue_dequeue(s: ShellServiceState, m: service_effect.Message) service_effect.Effect {
+    return forward_empty(s, service_topology.QUEUE_ENDPOINT_ID)
+}
+
+func queue_count(s: ShellServiceState, m: service_effect.Message) service_effect.Effect {
+    return forward_two(s, service_topology.QUEUE_ENDPOINT_ID, serial_protocol.CMD_C, serial_protocol.CMD_BANG)
+}
+
+func queue_peek(s: ShellServiceState, m: service_effect.Message) service_effect.Effect {
+    return forward_two(s, service_topology.QUEUE_ENDPOINT_ID, serial_protocol.CMD_P, serial_protocol.CMD_BANG)
+}
+
+func queue_wait(s: ShellServiceState, m: service_effect.Message) service_effect.Effect {
+    return forward_two(s, service_topology.QUEUE_ENDPOINT_ID, serial_protocol.CMD_W, serial_protocol.CMD_BANG)
+}
+
+const QUEUE_ROUTES: [5]OpHandler = [5]OpHandler{
+    OpHandler{ op: serial_protocol.CMD_A, check: bang3, run: queue_push },
+    OpHandler{ op: serial_protocol.CMD_D, check: bang23, run: queue_dequeue },
+    OpHandler{ op: serial_protocol.CMD_C, check: bang23, run: queue_count },
+    OpHandler{ op: serial_protocol.CMD_P, check: bang23, run: queue_peek },
+    OpHandler{ op: serial_protocol.CMD_W, check: bang23, run: queue_wait }
 }
 
 func route_queue(s: ShellServiceState, m: service_effect.Message, op: u8) service_effect.Effect {
-    route := queue_route(op)
-    if route.endpoint == 0 {
-        return invalid_effect(SHELL_INVALID_COMMAND)
-    }
-    if op == serial_protocol.CMD_A {
-        if !bang3(m) {
-            return invalid_effect(SHELL_INVALID_SHAPE)
-        }
-        return forward_one(s, route.endpoint, m.payload[2])
-    }
-    if op == serial_protocol.CMD_D {
-        if !bang23(m) {
-            return invalid_effect(SHELL_INVALID_SHAPE)
-        }
-        return forward_empty(s, route.endpoint)
-    }
-    if !bang23(m) {
-        return invalid_effect(SHELL_INVALID_SHAPE)
-    }
-    return forward_two(s, route.endpoint, op, serial_protocol.CMD_BANG)
+    return dispatch(QUEUE_ROUTES, s, m, op)
 }
 
-func file_route(op: u8) FamilyRoute {
-    switch op {
-    case serial_protocol.CMD_C:
-        return FamilyRoute{ endpoint: service_topology.FILE_ENDPOINT_ID, send_len: 2 }
-    case serial_protocol.CMD_W:
-        return FamilyRoute{ endpoint: service_topology.FILE_ENDPOINT_ID, send_len: 3 }
-    case serial_protocol.CMD_R:
-        return FamilyRoute{ endpoint: service_topology.FILE_ENDPOINT_ID, send_len: 2 }
-    case serial_protocol.CMD_L:
-        return FamilyRoute{ endpoint: service_topology.FILE_ENDPOINT_ID, send_len: 0 }
-    default:
-        return FamilyRoute{ endpoint: 0, send_len: 0 }
-    }
+func file_create(s: ShellServiceState, m: service_effect.Message) service_effect.Effect {
+    return forward_two(s, service_topology.FILE_ENDPOINT_ID, serial_protocol.CMD_C, m.payload[2])
+}
+
+func file_write(s: ShellServiceState, m: service_effect.Message) service_effect.Effect {
+    return forward_three(s, service_topology.FILE_ENDPOINT_ID, serial_protocol.CMD_W, m.payload[2], m.payload[3])
+}
+
+func file_read(s: ShellServiceState, m: service_effect.Message) service_effect.Effect {
+    return forward_two(s, service_topology.FILE_ENDPOINT_ID, serial_protocol.CMD_R, m.payload[2])
+}
+
+func file_list(s: ShellServiceState, m: service_effect.Message) service_effect.Effect {
+    return forward_empty(s, service_topology.FILE_ENDPOINT_ID)
+}
+
+const FILE_ROUTES: [5]OpHandler = [5]OpHandler{
+    OpHandler{ op: serial_protocol.CMD_C, check: bang3, run: file_create },
+    OpHandler{ op: serial_protocol.CMD_W, check: anymsg, run: file_write },
+    OpHandler{ op: serial_protocol.CMD_R, check: bang3, run: file_read },
+    OpHandler{ op: serial_protocol.CMD_L, check: bang23, run: file_list },
+    UNUSED_ROUTE
 }
 
 func route_file(s: ShellServiceState, m: service_effect.Message, op: u8) service_effect.Effect {
-    route := file_route(op)
-    if route.endpoint == 0 {
-        return invalid_effect(SHELL_INVALID_COMMAND)
-    }
-    switch op {
-    case serial_protocol.CMD_C:
-        if !bang3(m) {
-            return invalid_effect(SHELL_INVALID_SHAPE)
-        }
-        return forward_two(s, route.endpoint, serial_protocol.CMD_C, m.payload[2])
-    case serial_protocol.CMD_W:
-        return forward_three(s, route.endpoint, serial_protocol.CMD_W, m.payload[2], m.payload[3])
-    case serial_protocol.CMD_R:
-        if !bang3(m) {
-            return invalid_effect(SHELL_INVALID_SHAPE)
-        }
-        return forward_two(s, route.endpoint, serial_protocol.CMD_R, m.payload[2])
-    case serial_protocol.CMD_L:
-        if !bang23(m) {
-            return invalid_effect(SHELL_INVALID_SHAPE)
-        }
-        return forward_empty(s, route.endpoint)
-    default:
-        return invalid_effect(SHELL_INVALID_COMMAND)
-    }
+    return dispatch(FILE_ROUTES, s, m, op)
 }
 
-func timer_route(op: u8) FamilyRoute {
-    switch op {
-    case serial_protocol.CMD_C:
-        return FamilyRoute{ endpoint: service_topology.TIMER_ENDPOINT_ID, send_len: 3 }
-    case serial_protocol.CMD_X:
-        return FamilyRoute{ endpoint: service_topology.TIMER_ENDPOINT_ID, send_len: 2 }
-    case serial_protocol.CMD_Q:
-        return FamilyRoute{ endpoint: service_topology.TIMER_ENDPOINT_ID, send_len: 2 }
-    case serial_protocol.CMD_E:
-        return FamilyRoute{ endpoint: service_topology.TIMER_ENDPOINT_ID, send_len: 2 }
-    default:
-        return FamilyRoute{ endpoint: 0, send_len: 0 }
-    }
+func timer_create(s: ShellServiceState, m: service_effect.Message) service_effect.Effect {
+    return forward_three(s, service_topology.TIMER_ENDPOINT_ID, serial_protocol.CMD_C, m.payload[2], m.payload[3])
+}
+
+func timer_cancel(s: ShellServiceState, m: service_effect.Message) service_effect.Effect {
+    return forward_two(s, service_topology.TIMER_ENDPOINT_ID, serial_protocol.CMD_X, m.payload[2])
+}
+
+func timer_query(s: ShellServiceState, m: service_effect.Message) service_effect.Effect {
+    return forward_two(s, service_topology.TIMER_ENDPOINT_ID, serial_protocol.CMD_Q, m.payload[2])
+}
+
+func timer_expired(s: ShellServiceState, m: service_effect.Message) service_effect.Effect {
+    return forward_two(s, service_topology.TIMER_ENDPOINT_ID, serial_protocol.CMD_E, m.payload[2])
+}
+
+const TIMER_ROUTES: [5]OpHandler = [5]OpHandler{
+    OpHandler{ op: serial_protocol.CMD_C, check: anymsg, run: timer_create },
+    OpHandler{ op: serial_protocol.CMD_X, check: bang3, run: timer_cancel },
+    OpHandler{ op: serial_protocol.CMD_Q, check: bang3, run: timer_query },
+    OpHandler{ op: serial_protocol.CMD_E, check: bang3, run: timer_expired },
+    UNUSED_ROUTE
 }
 
 func route_timer(s: ShellServiceState, m: service_effect.Message, op: u8) service_effect.Effect {
-    route := timer_route(op)
-    if route.endpoint == 0 {
-        return invalid_effect(SHELL_INVALID_COMMAND)
-    }
-    if op == serial_protocol.CMD_C {
-        return forward_three(s, route.endpoint, serial_protocol.CMD_C, m.payload[2], m.payload[3])
-    }
-    if !bang3(m) {
-        return invalid_effect(SHELL_INVALID_SHAPE)
-    }
-    return forward_two(s, route.endpoint, op, m.payload[2])
+    return dispatch(TIMER_ROUTES, s, m, op)
 }
 
-func journal_route(op: u8) FamilyRoute {
-    switch op {
-    case serial_protocol.CMD_A:
-        return FamilyRoute{ endpoint: service_topology.JOURNAL_ENDPOINT_ID, send_len: 3 }
-    case serial_protocol.CMD_R:
-        return FamilyRoute{ endpoint: service_topology.JOURNAL_ENDPOINT_ID, send_len: 2 }
-    case serial_protocol.CMD_C:
-        return FamilyRoute{ endpoint: service_topology.JOURNAL_ENDPOINT_ID, send_len: 2 }
-    default:
-        return FamilyRoute{ endpoint: 0, send_len: 0 }
-    }
+func journal_append(s: ShellServiceState, m: service_effect.Message) service_effect.Effect {
+    return forward_three(s, service_topology.JOURNAL_ENDPOINT_ID, serial_protocol.CMD_A, m.payload[2], m.payload[3])
+}
+
+func journal_read(s: ShellServiceState, m: service_effect.Message) service_effect.Effect {
+    return forward_two(s, service_topology.JOURNAL_ENDPOINT_ID, serial_protocol.CMD_R, m.payload[2])
+}
+
+func journal_clear(s: ShellServiceState, m: service_effect.Message) service_effect.Effect {
+    return forward_two(s, service_topology.JOURNAL_ENDPOINT_ID, serial_protocol.CMD_C, m.payload[2])
+}
+
+const JOURNAL_ROUTES: [5]OpHandler = [5]OpHandler{
+    OpHandler{ op: serial_protocol.CMD_A, check: anymsg, run: journal_append },
+    OpHandler{ op: serial_protocol.CMD_R, check: bang3, run: journal_read },
+    OpHandler{ op: serial_protocol.CMD_C, check: bang3, run: journal_clear },
+    UNUSED_ROUTE,
+    UNUSED_ROUTE
 }
 
 func route_journal(s: ShellServiceState, m: service_effect.Message, op: u8) service_effect.Effect {
-    route := journal_route(op)
-    if route.endpoint == 0 {
-        return invalid_effect(SHELL_INVALID_COMMAND)
-    }
-    if op == serial_protocol.CMD_A {
-        return forward_three(s, route.endpoint, serial_protocol.CMD_A, m.payload[2], m.payload[3])
-    }
-    if !bang3(m) {
-        return invalid_effect(SHELL_INVALID_SHAPE)
-    }
-    return forward_two(s, route.endpoint, op, m.payload[2])
+    return dispatch(JOURNAL_ROUTES, s, m, op)
 }
 
-func task_route(op: u8) FamilyRoute {
-    switch op {
-    case serial_protocol.CMD_S:
-        return FamilyRoute{ endpoint: service_topology.TASK_ENDPOINT_ID, send_len: 2 }
-    case serial_protocol.CMD_Q:
-        return FamilyRoute{ endpoint: service_topology.TASK_ENDPOINT_ID, send_len: 2 }
-    case serial_protocol.CMD_C:
-        return FamilyRoute{ endpoint: service_topology.TASK_ENDPOINT_ID, send_len: 2 }
-    case serial_protocol.CMD_D:
-        return FamilyRoute{ endpoint: service_topology.TASK_ENDPOINT_ID, send_len: 2 }
-    case serial_protocol.CMD_L:
-        return FamilyRoute{ endpoint: service_topology.TASK_ENDPOINT_ID, send_len: 2 }
-    default:
-        return FamilyRoute{ endpoint: 0, send_len: 0 }
-    }
+func task_submit(s: ShellServiceState, m: service_effect.Message) service_effect.Effect {
+    return forward_two(s, service_topology.TASK_ENDPOINT_ID, serial_protocol.CMD_S, m.payload[2])
+}
+
+func task_query(s: ShellServiceState, m: service_effect.Message) service_effect.Effect {
+    return forward_two(s, service_topology.TASK_ENDPOINT_ID, serial_protocol.CMD_Q, m.payload[2])
+}
+
+func task_cancel(s: ShellServiceState, m: service_effect.Message) service_effect.Effect {
+    return forward_two(s, service_topology.TASK_ENDPOINT_ID, serial_protocol.CMD_C, m.payload[2])
+}
+
+func task_done(s: ShellServiceState, m: service_effect.Message) service_effect.Effect {
+    return forward_two(s, service_topology.TASK_ENDPOINT_ID, serial_protocol.CMD_D, m.payload[2])
+}
+
+func task_list(s: ShellServiceState, m: service_effect.Message) service_effect.Effect {
+    return forward_two(s, service_topology.TASK_ENDPOINT_ID, serial_protocol.CMD_L, m.payload[2])
+}
+
+const TASK_ROUTES: [5]OpHandler = [5]OpHandler{
+    OpHandler{ op: serial_protocol.CMD_S, check: bang3, run: task_submit },
+    OpHandler{ op: serial_protocol.CMD_Q, check: bang3, run: task_query },
+    OpHandler{ op: serial_protocol.CMD_C, check: bang3, run: task_cancel },
+    OpHandler{ op: serial_protocol.CMD_D, check: bang3, run: task_done },
+    OpHandler{ op: serial_protocol.CMD_L, check: bang3, run: task_list }
 }
 
 func route_task(s: ShellServiceState, m: service_effect.Message, op: u8) service_effect.Effect {
-    route := task_route(op)
-    if route.endpoint == 0 {
-        return invalid_effect(SHELL_INVALID_COMMAND)
-    }
-    if !bang3(m) {
-        return invalid_effect(SHELL_INVALID_SHAPE)
-    }
-    return forward_two(s, route.endpoint, op, m.payload[2])
+    return dispatch(TASK_ROUTES, s, m, op)
+}
+
+func ticket_issue(s: ShellServiceState, m: service_effect.Message) service_effect.Effect {
+    return forward_empty(s, service_topology.TICKET_ENDPOINT_ID)
+}
+
+func ticket_use(s: ShellServiceState, m: service_effect.Message) service_effect.Effect {
+    return forward_two(s, service_topology.TICKET_ENDPOINT_ID, m.payload[2], m.payload[3])
+}
+
+const TICKET_ROUTES: [5]OpHandler = [5]OpHandler{
+    OpHandler{ op: serial_protocol.CMD_I, check: bang23, run: ticket_issue },
+    OpHandler{ op: serial_protocol.CMD_U, check: anymsg, run: ticket_use },
+    UNUSED_ROUTE,
+    UNUSED_ROUTE,
+    UNUSED_ROUTE
 }
 
 func route_ticket(s: ShellServiceState, m: service_effect.Message, op: u8) service_effect.Effect {
-    switch op {
-    case serial_protocol.CMD_I:
-        if !bang23(m) {
-            return invalid_effect(SHELL_INVALID_SHAPE)
-        }
-        return forward_empty(s, service_topology.TICKET_ENDPOINT_ID)
-    case serial_protocol.CMD_U:
-        return forward_two(s, service_topology.TICKET_ENDPOINT_ID, m.payload[2], m.payload[3])
-    default:
-        return invalid_effect(SHELL_INVALID_COMMAND)
-    }
+    return dispatch(TICKET_ROUTES, s, m, op)
 }
 
 func handle(s: ShellServiceState, m: service_effect.Message) service_effect.Effect {
@@ -438,10 +526,7 @@ func handle(s: ShellServiceState, m: service_effect.Message) service_effect.Effe
 
     switch cmd {
     case serial_protocol.CMD_E:
-        if op != serial_protocol.CMD_C {
-            return invalid_effect(SHELL_INVALID_COMMAND)
-        }
-        return forward_two(s, service_topology.ECHO_ENDPOINT_ID, m.payload[2], m.payload[3])
+        return route_echo(s, m, op)
 
     case serial_protocol.CMD_L:
         return route_log(s, m, op)
@@ -450,93 +535,7 @@ func handle(s: ShellServiceState, m: service_effect.Message) service_effect.Effe
         return route_kv(s, m, op)
 
     case serial_protocol.CMD_X:
-        if !bang3(m) {
-            return invalid_effect(SHELL_INVALID_SHAPE)
-        }
-        switch op {
-        case serial_protocol.CMD_A:
-            if !identity_taxonomy.identity_target_is_lane(m.payload[2]) {
-                authority_endpoint: u32 = lifecycle_target_endpoint(m.payload[2])
-                if authority_endpoint == 0 {
-                    return invalid_effect(SHELL_INVALID_COMMAND)
-                }
-            }
-            return lifecycle_authority_request(s, m)
-        case serial_protocol.CMD_C:
-            if !identity_taxonomy.identity_target_is_lane(m.payload[2]) {
-                state_endpoint: u32 = lifecycle_target_endpoint(m.payload[2])
-                if state_endpoint == 0 {
-                    return invalid_effect(SHELL_INVALID_COMMAND)
-                }
-            }
-            return lifecycle_state_request(s, m)
-        case serial_protocol.CMD_D:
-            if !identity_taxonomy.identity_target_is_lane(m.payload[2]) {
-                durability_endpoint: u32 = lifecycle_target_endpoint(m.payload[2])
-                if durability_endpoint == 0 {
-                    return invalid_effect(SHELL_INVALID_COMMAND)
-                }
-            }
-            return lifecycle_durability_request(s, m)
-        case serial_protocol.CMD_Q:
-            if identity_taxonomy.identity_target_is_lane(m.payload[2]) {
-                return lifecycle_effect(syscall.SyscallStatus.Ok, m.payload[2], serial_protocol.LIFECYCLE_RELOAD)
-            }
-            query_endpoint: u32 = lifecycle_target_endpoint(m.payload[2])
-            if query_endpoint == 0 {
-                return invalid_effect(SHELL_INVALID_COMMAND)
-            }
-            return lifecycle_effect(syscall.SyscallStatus.Ok, m.payload[2], lifecycle_mode(query_endpoint))
-        case serial_protocol.CMD_I:
-            if !identity_taxonomy.identity_target_has_generation_query(m.payload[2]) {
-                return invalid_effect(SHELL_INVALID_COMMAND)
-            }
-            if !identity_taxonomy.identity_target_has_direct_generation(m.payload[2]) {
-                return lifecycle_identity_request(s, m)
-            }
-            if m.payload[2] != serial_protocol.TARGET_WORKSET {
-                identity_endpoint: u32 = lifecycle_target_endpoint(m.payload[2])
-                if identity_endpoint == 0 {
-                    return invalid_effect(SHELL_INVALID_COMMAND)
-                }
-            }
-            return lifecycle_identity_request(s, m)
-        case serial_protocol.CMD_P:
-            if !identity_taxonomy.identity_target_is_lane(m.payload[2]) {
-                policy_endpoint: u32 = lifecycle_target_endpoint(m.payload[2])
-                if policy_endpoint == 0 || !service_topology.service_can_restart(policy_endpoint) {
-                    return invalid_effect(SHELL_INVALID_COMMAND)
-                }
-            }
-            return lifecycle_policy_request(s, m)
-        case serial_protocol.CMD_S:
-            if !identity_taxonomy.identity_target_is_lane(m.payload[2]) {
-                summary_endpoint: u32 = lifecycle_target_endpoint(m.payload[2])
-                if summary_endpoint == 0 || !service_topology.service_can_restart(summary_endpoint) {
-                    return invalid_effect(SHELL_INVALID_COMMAND)
-                }
-            }
-            return lifecycle_summary_request(s, m)
-        case serial_protocol.CMD_M:
-            if !identity_taxonomy.identity_target_is_lane(m.payload[2]) {
-                compare_endpoint: u32 = lifecycle_target_endpoint(m.payload[2])
-                if compare_endpoint == 0 || !service_topology.service_can_restart(compare_endpoint) {
-                    return invalid_effect(SHELL_INVALID_COMMAND)
-                }
-            }
-            return lifecycle_compare_request(s, m)
-        case serial_protocol.CMD_R:
-            if identity_taxonomy.identity_target_is_lane(m.payload[2]) {
-                return lifecycle_request(s, m)
-            }
-            restart_endpoint: u32 = lifecycle_target_endpoint(m.payload[2])
-            if restart_endpoint == 0 {
-                return invalid_effect(SHELL_INVALID_COMMAND)
-            }
-            return lifecycle_request(s, m)
-        default:
-            return invalid_effect(SHELL_INVALID_COMMAND)
-        }
+        return route_lifecycle(s, m, op)
 
     case serial_protocol.CMD_Q:
         return route_queue(s, m, op)
@@ -558,13 +557,4 @@ func handle(s: ShellServiceState, m: service_effect.Message) service_effect.Effe
     default:
         return invalid_effect(SHELL_INVALID_COMMAND)
     }
-
-    return invalid_effect(SHELL_INVALID_COMMAND)
-}
-
-func debug_request(s: ShellServiceState, len: usize) u32 {
-    if !shell_ready(s) || len == 0 {
-        return 0
-    }
-    return 1
 }

@@ -45,6 +45,11 @@ struct ResetLaneScenarioTiming {
     std::chrono::milliseconds run_duration {};
 };
 
+struct InFlightScenario {
+    std::size_t index = 0;
+    std::future<ResetLaneScenarioTiming> future;
+};
+
 enum class ResetLaneMode {
     fast,
     full,
@@ -109,6 +114,20 @@ std::string TimingFlagsForScenario(const ResetLaneScenario& scenario,
         stream << flags[i];
     }
     return stream.str();
+}
+
+bool CollectCompletedResetLaneScenario(std::vector<ResetLaneScenarioTiming>* timings,
+                                      std::vector<struct InFlightScenario>* in_flight) {
+    for (std::size_t index = 0; index < in_flight->size(); ++index) {
+        auto& current = (*in_flight)[index];
+        if (current.future.wait_for(std::chrono::milliseconds(0)) != std::future_status::ready) {
+            continue;
+        }
+        (*timings)[current.index] = current.future.get();
+        in_flight->erase(in_flight->begin() + static_cast<std::ptrdiff_t>(index));
+        return true;
+    }
+    return false;
 }
 
 int ResetLaneWallWarnMs(ResetLaneMode mode) {
@@ -432,20 +451,18 @@ void RunWorkflowKernelResetLaneSuiteImpl(const std::filesystem::path& source_roo
     int slow_build_count = 0;
     int slow_run_count = 0;
 
-    struct InFlightScenario {
-        std::size_t index = 0;
-        std::future<ResetLaneScenarioTiming> future;
-    };
-
     std::vector<InFlightScenario> in_flight;
     in_flight.reserve(jobs);
 
     for (std::size_t index = 0; index < selected.size(); ++index) {
         const ResetLaneScenario scenario = *selected[index];
         if (in_flight.size() >= jobs) {
-            InFlightScenario current = std::move(in_flight.front());
-            timings[current.index] = current.future.get();
-            in_flight.erase(in_flight.begin());
+            while (!CollectCompletedResetLaneScenario(&timings, &in_flight)) {
+                InFlightScenario current = std::move(in_flight.front());
+                current.future.wait();
+                timings[current.index] = current.future.get();
+                in_flight.erase(in_flight.begin());
+            }
         }
         in_flight.push_back(InFlightScenario{
             .index = index,
@@ -456,8 +473,14 @@ void RunWorkflowKernelResetLaneSuiteImpl(const std::filesystem::path& source_roo
         });
     }
 
-    for (auto& current : in_flight) {
+    while (!in_flight.empty()) {
+        if (CollectCompletedResetLaneScenario(&timings, &in_flight)) {
+            continue;
+        }
+        InFlightScenario current = std::move(in_flight.front());
+        current.future.wait();
         timings[current.index] = current.future.get();
+        in_flight.erase(in_flight.begin());
     }
 
     for (std::size_t index = 0; index < selected.size(); ++index) {

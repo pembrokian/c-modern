@@ -41,8 +41,14 @@ class FunctionLowerer {
                     const Module& module,
                     const std::filesystem::path& file_path,
                     const sema::Module& sema_module,
+                                        const std::unordered_map<std::string, sema::Module>* imported_modules,
                     support::DiagnosticSink& diagnostics)
-        : decl_(decl), module_(module), file_path_(file_path), sema_module_(sema_module), diagnostics_(diagnostics) {
+                : decl_(decl),
+                    file_path_(file_path),
+                    sema_module_(sema_module),
+                    module_(module),
+                    imported_modules_(imported_modules),
+                    diagnostics_(diagnostics) {
         function_.name = decl.name;
         function_.type_params = decl.type_params;
         // Prefer sema-computed return types over re-deriving from AST TypeExprs.
@@ -205,6 +211,13 @@ class FunctionLowerer {
                 if (const auto* global = sema::FindGlobalSummary(sema_module_, expr.text); global != nullptr) {
                     if (const auto field_type = FindMirFieldType(module_, global->type, expr.secondary_text); field_type.has_value()) {
                         return *field_type;
+                    }
+                }
+                if (IsImportedModuleName(expr.text)) {
+                    if (const auto* imported_module = FindImportedModule(expr.text); imported_module != nullptr) {
+                        if (const auto* global = sema::FindGlobalSummary(*imported_module, expr.secondary_text); global != nullptr) {
+                            return global->type;
+                        }
                     }
                 }
                 if (const auto* type_decl = FindMirTypeDecl(module_, CombineQualifiedName(expr)); type_decl != nullptr) {
@@ -425,6 +438,17 @@ class FunctionLowerer {
 
     bool IsImportedModuleName(std::string_view name) const {
         return std::find(sema_module_.imports.begin(), sema_module_.imports.end(), name) != sema_module_.imports.end();
+    }
+
+    const sema::Module* FindImportedModule(std::string_view name) const {
+        if (imported_modules_ == nullptr) {
+            return nullptr;
+        }
+        const auto found = imported_modules_->find(std::string(name));
+        if (found == imported_modules_->end()) {
+            return nullptr;
+        }
+        return &found->second;
     }
 
     Instruction::TargetKind InferTargetKindForExpr(const Expr& expr) const {
@@ -2010,6 +2034,7 @@ class FunctionLowerer {
     std::filesystem::path file_path_;
     const sema::Module& sema_module_;
     const Module& module_;
+    const std::unordered_map<std::string, sema::Module>* imported_modules_ = nullptr;
     support::DiagnosticSink& diagnostics_;
     Function function_;
     std::unordered_map<std::string, sema::Type> local_types_;
@@ -2058,6 +2083,7 @@ TypeDecl LowerTypeDeclSummary(const sema::TypeDeclSummary& summary) {
 LowerResult LowerSourceFile(const ast::SourceFile& source_file,
                             const sema::Module& sema_module,
                             const std::filesystem::path& file_path,
+                            const std::unordered_map<std::string, sema::Module>* imported_modules,
                             support::DiagnosticSink& diagnostics) {
     auto module = std::make_unique<Module>();
 
@@ -2138,7 +2164,7 @@ LowerResult LowerSourceFile(const ast::SourceFile& source_file,
         }
 
         if (decl.kind == Decl::Kind::kFunc) {
-            module->functions.push_back(FunctionLowerer(decl, *module, file_path, sema_module, diagnostics).Run());
+            module->functions.push_back(FunctionLowerer(decl, *module, file_path, sema_module, imported_modules, diagnostics).Run());
         }
     }
 
@@ -2148,12 +2174,19 @@ LowerResult LowerSourceFile(const ast::SourceFile& source_file,
     };
 }
 
+LowerResult LowerSourceFile(const ast::SourceFile& source_file,
+                            const sema::Module& sema_module,
+                            const std::filesystem::path& file_path,
+                            support::DiagnosticSink& diagnostics) {
+    return LowerSourceFile(source_file, sema_module, file_path, nullptr, diagnostics);
+}
+
 Function LowerFunctionDecl(const ast::Decl& decl,
                             const Module& module,
                             const std::filesystem::path& file_path,
                             const sema::Module& sema_module,
                             support::DiagnosticSink& diagnostics) {
-    return FunctionLowerer(decl, module, file_path, sema_module, diagnostics).Run();
+    return FunctionLowerer(decl, module, file_path, sema_module, nullptr, diagnostics).Run();
 }
 
 }  // namespace mc::mir

@@ -21,7 +21,8 @@ Admitted surface
 4. top-level `const` values, local values, struct fields, and fixed-array
   elements may use procedure values under the same explicit typing rules
 5. imported constant aggregates containing procedure values remain valid across
-  module-surface export, import rewriting, and build-unit namespacing
+  module-surface export, import rewriting, MIR lowering, build-unit
+  namespacing, and executable emission
 6. calling through a procedure value loaded from such a table uses the
   ordinary call rules already admitted for callable values
 
@@ -99,3 +100,10 @@ The admitted surface is intentionally limited to named procedures with exact
 signatures stored in explicit typed aggregates. It does not imply procedure
 equality, ordering, closures, erased callbacks, or a broader callback
 framework.
+
+Imported-module note
+--------------------
+The admitted cross-module surface includes both fixed arrays and struct-shaped
+constant aggregates containing procedure values. Imported struct constants may
+be copied into local constants, projected through fields, and called through
+those projected procedure values under the same exact-signature rules.
