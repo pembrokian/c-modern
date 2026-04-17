@@ -1,0 +1,149 @@
+Veya Restartable-Service Identity Taxonomy
+==========================================
+
+Status
+------
+ACTIVE
+
+Purpose
+-------
+Publish one compact repository-owned identity taxonomy for the admitted
+restartable-service running-system slice and map the current identity-bearing
+surfaces onto that taxonomy in one maintained place.
+
+This note is intentionally narrow.
+It does not introduce discovery, dynamic object ids, durable naming,
+registries, or compiler-owned identity machinery.
+It names the current identity truth that already exists in the landed kernel,
+shell-visible control path, and active phase notes.
+
+Relationship to companion notes
+-------------------------------
+This note is meant to stay aligned with:
+
+- `docs/plan/active/phase182_restart_identity_continuity_probe.txt`
+- `docs/plan/active/phase183_endpoint_ownership_and_authority_audit.txt`
+- `docs/plan/active/phase193_bounded_shell_service_identity_query_follow_through.txt`
+- `docs/plan/active/phase197_bounded_cross_service_retained_restart_coordination_probe.txt`
+- `docs/plan/active/phase200_bounded_coordinated_retained_workset_identity_query_follow_through.txt`
+- `docs/plan/active/phase201_bounded_second_coordinated_retained_audit_lane_probe.txt`
+- `docs/plan/active/phase206_retained_service_summary_and_restart_outcome_inspection.txt`
+- `docs/plan/active/phase208_explicit_retained_coordination_comparison_and_policy_probe.txt`
+- `docs/plan/active/phase213_unified_identity_taxonomy_for_restartable_services.txt`
+- `docs/arch/veya/veya_authority_vocabulary_and_ownership_table_v0.txt`
+- `docs/arch/veya/veya_service_shape_phase146_v0.txt`
+
+Taxonomy
+--------
+Use these terms consistently when describing identity in the current
+repository-owned running-system slice.
+
+Stable public identity
+  The boot-wired public name that stays routable across restart.
+  In the current slice this is `ServiceRef.endpoint_id` and the fixed target's
+  corresponding endpoint id in `service_topology.mc`.
+
+Restart generation identity
+  The per-service instance marker that changes when an explicit restart
+  replaces a service instance while stable routing stays the same.
+  In the current slice this is `ServiceMark.generation` and the boot-owned
+  per-service generation field in `KernelBootState`.
+
+Coordinated lane identity
+  The explicit generation marker for one fixed retained coordination target
+  whose meaning spans more than one owner.
+  In the current slice this is the boot-owned `workset_generation` and
+  `audit_generation` markers.
+
+Continuity outcome identity
+  The classification that answers what kind of continuity the last explicit
+  restart preserved or replaced.
+  In the current slice this is `boot.RestartOutcome` for restartable services
+  and coordinated retained lanes.
+
+Derived inspection identity
+  A compact inspection payload that projects already-owned identity truth
+  rather than creating a new independent identity source.
+  In the current slice this includes the fixed-width retained-summary payload
+  returned by `XS<target>!`.
+
+Core rules
+----------
+- Stable public identity and restart generation identity are distinct.
+- Coordinated lane identity is explicit and boot-owned; it is not inferred by
+  composing per-service generations after the fact.
+- Continuity outcome identity classifies what survived a restart; it does not
+  replace stable public identity or restart generation identity.
+- Derived inspection identity must remain a bounded projection of already-owned
+  truth rather than becoming a new registry or metadata framework.
+- The runtime helper `kernel/src/identity_taxonomy.mc` owns the shell-visible
+  lane-target classification so the code path and the docs reuse the same
+  identity split.
+
+Identity map
+------------
+Surface: boot-wired service reference
+Identity class: stable public identity
+Owner: `service_identity.mc` plus `service_topology.mc`
+Carrier: `ServiceRef.endpoint_id`
+Public surface: boot-published refs and fixed shell targets that route to the
+same endpoint ids indirectly
+Notes: restart preserves this identity class even when instance generation
+changes
+
+Surface: per-service restart marker
+Identity class: restart generation identity
+Owner: `boot.mc` plus `service_identity.mc`
+Carrier: `ServiceMark.generation` and per-service `ServiceCell<T>.generation`
+Public surface: `XI<target>!` for restartable single-owner services
+Notes: restart replaces instance identity while preserving stable public
+identity and the boot-wired pid
+
+Surface: coordinated workset marker
+Identity class: coordinated lane identity
+Owner: `boot.mc`; mutated only through `init.restart_retained_workset(...)`
+Carrier: `workset_generation`
+Public surface: `XIW!`, `XSW!`, `XPW!`, and `XAW!`
+Notes: this is a real identity source, not a derived bundle summary
+
+Surface: coordinated audit-lane marker
+Identity class: coordinated lane identity
+Owner: `boot.mc`; mutated only through `init.restart_retained_audit_lane(...)`
+Carrier: `audit_generation`
+Public surface: `XSA!`, `XPA!`, and `XAA!`
+Notes: the audit lane currently has no direct `XI` generation query; its lane
+identity is intentionally exposed through derived inspection and control
+surfaces rather than as a second direct generation verb
+
+Surface: last restart outcome for restartable services and lanes
+Identity class: continuity outcome identity
+Owner: `boot.mc` with enactment owned by `init.mc`
+Carrier: `RestartOutcome`
+Public surface: header classification bits in `XS<target>!`
+Notes: this class answers whether the last restart was ordinary replacement,
+retained reload, or coordinated retained reload
+
+Surface: retained summary projection
+Identity class: derived inspection identity
+Owner: `boot_identity.mc`
+Carrier: `summary_payload(...)`
+Public surface: `XS<target>!`
+Notes: this is a bounded projection over retained participation, continuity
+outcome, and generation marker; it is not a new independent identity store
+
+Interpretation rule for later phases
+------------------------------------
+When a future phase touches identity in the running-system slice, answer these
+questions first:
+
+1. is the proposal about stable public identity, restart generation identity,
+   coordinated lane identity, continuity outcome identity, or only a derived
+   inspection projection
+2. which owner currently mutates that identity class
+3. which shell-visible query or restart path currently exposes it
+4. whether the change is naming existing truth more clearly or actually
+   widening the identity model
+
+If the proposal cannot be described with those questions, it is either
+changing the identity model and must say so explicitly, or it is trying to
+introduce a broader framework than the current slice justifies.

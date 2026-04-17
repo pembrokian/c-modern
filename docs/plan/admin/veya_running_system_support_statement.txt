@@ -9,10 +9,10 @@ Purpose
 -------
 Record the current admitted Veya running-system slice separately from the
 broader position note so the repository can state exactly what the work
-through Phase 206 does and does not support.
+through Phase 213 does and does not support.
 
 This is the current refreshed running-system statement.  It supersedes the
-earlier Phase 120 through Phase 121 statement and reflects the post-Phase-188
+earlier Phase 120 through Phase 121 statement and reflects the post-Phase-213
 landing.
 
 This note is intentionally narrower than the current-position assessment.
@@ -130,13 +130,22 @@ Repository status note
   retained participation, generation marker, and last restart outcome for the
   admitted retained owners and coordinated retained lanes without widening
   into a bundle registry or framework.
+- Phase 208 adds one compact shell-visible retained-policy query on the same
+  fixed targets.
+- Phase 209 publishes one reusable authority vocabulary and ownership table
+  for the admitted running-system slice.
+- Phase 212 adds one compact shell-visible authority inspection query over the
+  same fixed targets.
+- Phase 213 publishes one reusable restartable-service identity taxonomy and
+  one runtime-owned target-classification helper so identity naming stops
+  drifting across shell-visible lifecycle, identity, summary, and policy
+  surfaces.
 
 Core rule
 ---------
 - Keep this running-system support statement separate from the broader
   position note.
-- State only the admitted Phase 109 through Phase 201 running-system slice,
-- State only the admitted Phase 109 through Phase 206 running-system slice,
+- State only the admitted Phase 109 through Phase 213 running-system slice,
   not a larger platform ambition.
 - Keep service policy init-owned and explicit.
 - Reopen broader running-system claims only when a later kernel proof lands
@@ -196,6 +205,12 @@ Frozen support matrix
   `queue`) and audit lane (`kv` plus `log`), and the boot-owned workset plus
   audit generation markers and last-restart outcomes visible through the
   shell identity and retained-summary path
+- admitted identity boundary: `service_identity.mc` owns stable public
+  `ServiceRef` and per-service `ServiceMark`; `boot.mc` owns per-service and
+  coordinated-lane generation truth plus continuity outcomes; `boot_identity.mc`
+  owns the fixed-width retained-summary projection; `identity_taxonomy.mc`
+  owns the shell-visible lane-target classification for the shared Phase 213
+  restartable-service identity taxonomy
 - admitted proof set: Phase 109 first-running-kernel slice, Phase 110
   ownership split, Phase 111 scheduler and lifecycle clarification, Phase
   112 syscall boundary, Phase 113 interrupt-entry and generic-dispatch, Phase
@@ -239,8 +254,11 @@ Frozen support matrix
   coordination probe, Phase 198 multi-handle transfer follow-through under
   explicit authority, Phase 200 bounded coordinated retained workset identity
   query follow-through, Phase 201 bounded second coordinated retained
-  audit-lane probe, and Phase 206 retained service summary and restart
-  outcome inspection
+  audit-lane probe, Phase 206 retained service summary and restart outcome
+  inspection, Phase 208 retained-policy inspection, Phase 209 authority
+  vocabulary and ownership-table audit, Phase 212 authority inspection
+  follow-through, and Phase 213 unified identity taxonomy for restartable
+  services
 - unsupported today: dynamic discovery, a general namespace model, dynamic
   loading, a service manager, broader init policy, public freestanding `mc
   run` or `mc test`, broader target-family admission, multicore claims,

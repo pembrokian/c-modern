@@ -23,6 +23,9 @@ Repository status note
   lifecycle query, service identity query, retained summary, coordinated
   retained policy, and the authority vocabulary plus any Phase 212 runtime
   authority inspection follow-through.
+- Phase 213 now gives those identity-bearing inspection surfaces one shared
+  restartable-service identity taxonomy instead of separate local identity
+  wording.
 - Those surfaces are individually honest but collectively fragmented.
 - The system now has enough inspection truth that the next leverage point is
   composition rather than more one-off queries.

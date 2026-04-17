@@ -1,4 +1,5 @@
 import primitives
+import identity_taxonomy
 import serial_protocol
 import service_effect
 import service_topology
@@ -180,7 +181,7 @@ func handle(s: ShellServiceState, m: service_effect.Message) service_effect.Effe
         }
         switch op {
         case serial_protocol.CMD_A:
-            if m.payload[2] != serial_protocol.TARGET_WORKSET && m.payload[2] != serial_protocol.TARGET_AUDIT {
+            if !identity_taxonomy.identity_target_is_lane(m.payload[2]) {
                 authority_endpoint: u32 = lifecycle_target_endpoint(m.payload[2])
                 if authority_endpoint == 0 {
                     return invalid_effect(SHELL_INVALID_COMMAND)
@@ -188,7 +189,7 @@ func handle(s: ShellServiceState, m: service_effect.Message) service_effect.Effe
             }
             return lifecycle_authority_request(s, m)
         case serial_protocol.CMD_Q:
-            if m.payload[2] == serial_protocol.TARGET_WORKSET || m.payload[2] == serial_protocol.TARGET_AUDIT {
+            if identity_taxonomy.identity_target_is_lane(m.payload[2]) {
                 return lifecycle_effect(syscall.SyscallStatus.Ok, m.payload[2], serial_protocol.LIFECYCLE_RELOAD)
             }
             query_endpoint: u32 = lifecycle_target_endpoint(m.payload[2])
@@ -197,6 +198,12 @@ func handle(s: ShellServiceState, m: service_effect.Message) service_effect.Effe
             }
             return lifecycle_effect(syscall.SyscallStatus.Ok, m.payload[2], lifecycle_mode(query_endpoint))
         case serial_protocol.CMD_I:
+            if !identity_taxonomy.identity_target_has_generation_query(m.payload[2]) {
+                return invalid_effect(SHELL_INVALID_COMMAND)
+            }
+            if !identity_taxonomy.identity_target_has_direct_generation(m.payload[2]) {
+                return lifecycle_identity_request(s, m)
+            }
             if m.payload[2] != serial_protocol.TARGET_WORKSET {
                 identity_endpoint: u32 = lifecycle_target_endpoint(m.payload[2])
                 if identity_endpoint == 0 {
@@ -205,7 +212,7 @@ func handle(s: ShellServiceState, m: service_effect.Message) service_effect.Effe
             }
             return lifecycle_identity_request(s, m)
         case serial_protocol.CMD_P:
-            if m.payload[2] != serial_protocol.TARGET_WORKSET && m.payload[2] != serial_protocol.TARGET_AUDIT {
+            if !identity_taxonomy.identity_target_is_lane(m.payload[2]) {
                 policy_endpoint: u32 = lifecycle_target_endpoint(m.payload[2])
                 if policy_endpoint == 0 || !service_topology.service_can_restart(policy_endpoint) {
                     return invalid_effect(SHELL_INVALID_COMMAND)
@@ -213,7 +220,7 @@ func handle(s: ShellServiceState, m: service_effect.Message) service_effect.Effe
             }
             return lifecycle_policy_request(s, m)
         case serial_protocol.CMD_S:
-            if m.payload[2] != serial_protocol.TARGET_WORKSET && m.payload[2] != serial_protocol.TARGET_AUDIT {
+            if !identity_taxonomy.identity_target_is_lane(m.payload[2]) {
                 summary_endpoint: u32 = lifecycle_target_endpoint(m.payload[2])
                 if summary_endpoint == 0 || !service_topology.service_can_restart(summary_endpoint) {
                     return invalid_effect(SHELL_INVALID_COMMAND)
@@ -221,7 +228,7 @@ func handle(s: ShellServiceState, m: service_effect.Message) service_effect.Effe
             }
             return lifecycle_summary_request(s, m)
         case serial_protocol.CMD_R:
-            if m.payload[2] == serial_protocol.TARGET_WORKSET || m.payload[2] == serial_protocol.TARGET_AUDIT {
+            if identity_taxonomy.identity_target_is_lane(m.payload[2]) {
                 return lifecycle_request(s, m)
             }
             restart_endpoint: u32 = lifecycle_target_endpoint(m.payload[2])

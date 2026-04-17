@@ -9,6 +9,7 @@
 import boot
 import echo_service
 import init
+import identity_taxonomy
 import event_codes
 import kv_service
 import log_service
@@ -51,7 +52,7 @@ func effect_to_message(effect: service_effect.Effect) service_effect.Message {
 }
 
 func lifecycle_is_lane_target(target: u8) bool {
-    return target == serial_protocol.TARGET_WORKSET || target == serial_protocol.TARGET_AUDIT
+    return identity_taxonomy.identity_target_is_lane(target)
 }
 
 func lifecycle_op_supported(op: u8) bool {
@@ -140,6 +141,9 @@ func lifecycle_authority_reply(state: *boot.KernelBootState, target: u8) service
 }
 
 func lifecycle_identity_reply(state: *boot.KernelBootState, target: u8) service_effect.Effect {
+    if !identity_taxonomy.identity_target_has_generation_query(target) {
+        return shell_service.invalid_effect(shell_service.SHELL_INVALID_COMMAND)
+    }
     if target == serial_protocol.TARGET_WORKSET {
         return shell_service.lifecycle_identity_effect(syscall.SyscallStatus.Ok, boot.boot_workset_generation_payload(*state))
     }

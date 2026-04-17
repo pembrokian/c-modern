@@ -3,7 +3,54 @@ Phase 213 -- Unified Identity Taxonomy For Restartable Services
 
 Status
 ------
-PROPOSED
+COMPLETED
+
+Outcome
+-------
+Phase 213 completed the identity-shaping step it was intended to land.
+
+The repository now has one reusable restartable-service identity taxonomy and
+one small runtime-owned helper that keeps the shell-visible identity-target
+split explicit in code.
+
+Implemented outcome
+-------------------
+- `docs/arch/veya/veya_restartable_service_identity_taxonomy_v0.txt` now
+  publishes the maintained identity taxonomy for the admitted running-system
+  slice:
+  - stable public identity
+  - restart generation identity
+  - coordinated lane identity
+  - continuity outcome identity
+  - derived inspection identity
+- `kernel/src/identity_taxonomy.mc` now owns the shell-visible coordinated-
+  lane target classification so `shell_service.mc`, `kernel_dispatch.mc`, and
+  `boot_identity.mc` do not each restate the workset-versus-audit split.
+- This Phase 213 note now records the closeout and points later work at the
+  shared taxonomy instead of re-explaining restartable-service identity per
+  phase.
+- `docs/plan/admin/veya_running_system_support_statement.txt` and
+  `docs/plan/admin/modern_c_veya_readiness_position.txt` now state that the
+  running-system slice includes one explicit restartable-service identity
+  taxonomy rather than only separate identity phase truths.
+- `docs/plan/decision_log.txt` now records the deliberate decision to keep
+  this landing on the current kernel-plus-docs boundary without reopening any
+  compiler surface.
+- `docs/plan/backlog.txt` now carries the forward rule that later identity
+  work should extend the Phase 213 taxonomy rather than introducing parallel
+  identity vocabularies.
+- Executable honesty is reused from the current reset-lane workflow slice
+  rather than duplicated in a new harness:
+  - Phase 182 proves stable public routing plus replaced instance generation
+  - Phase 193 proves shell-visible per-service generation queries
+  - Phases 200 and 201 prove explicit coordinated lane identity
+  - Phase 206 proves derived retained-summary identity and continuity outcome
+  - Phase 208 proves coordinated retained policy on the same fixed targets
+
+Validation
+----------
+- the CMake debug build succeeded after the runtime helper landed
+- `mc_tool_workflow_kernel_reset_lane_unit` passed
 
 Purpose
 -------
@@ -88,6 +135,18 @@ Identity-class path
     of the above rather than a new independent identity source
 - Do not add speculative future classes such as filesystem object ids, session
   ids, or package-distribution identities.
+
+Implemented shape
+-----------------
+- The shared taxonomy lives in one repository-owned architecture note,
+  `docs/arch/veya/veya_restartable_service_identity_taxonomy_v0.txt`.
+- The runtime-owned target split lives in `kernel/src/identity_taxonomy.mc` so
+  the shell-visible workset-versus-audit classification stays explicit in one
+  code owner.
+- Existing reset-lane identity, summary, and retained-policy coverage remains
+  the executable honesty check.
+- Planning and support surfaces were refreshed so later phases reuse the
+  taxonomy instead of restating identity locally.
 
 Executable honesty path
 - Reuse existing retained summary, retained policy, and service identity proof

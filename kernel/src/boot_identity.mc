@@ -1,3 +1,4 @@
+import identity_taxonomy
 import service_identity
 import serial_protocol
 import service_topology
@@ -125,15 +126,14 @@ func bootsummary_payload_for_endpoint(s: KernelBootState, endpoint: u32) [4]u8 {
 }
 
 func bootsummary_payload_for_target(s: KernelBootState, target: u8) [4]u8 {
-    switch target {
-    case serial_protocol.TARGET_WORKSET:
-        return summary_payload(RetainedSummaryParticipation.Lane, s.workset_restart_outcome, s.workset_generation)
-    case serial_protocol.TARGET_AUDIT:
+    if identity_taxonomy.identity_target_is_lane(target) {
+        if target == serial_protocol.TARGET_WORKSET {
+            return summary_payload(RetainedSummaryParticipation.Lane, s.workset_restart_outcome, s.workset_generation)
+        }
         return summary_payload(RetainedSummaryParticipation.Lane, s.audit_restart_outcome, s.audit_generation)
-    default:
-        endpoint: u32 = shell_service.lifecycle_target_endpoint(target)
-        return bootsummary_payload_for_endpoint(s, endpoint)
     }
+    endpoint: u32 = shell_service.lifecycle_target_endpoint(target)
+    return bootsummary_payload_for_endpoint(s, endpoint)
 }
 
 func boot_echo_mark(s: KernelBootState) service_identity.ServiceMark {
