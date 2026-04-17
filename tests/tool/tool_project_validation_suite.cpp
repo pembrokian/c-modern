@@ -267,6 +267,40 @@ void TestDuplicateTargetRootsFailEarly(const std::filesystem::path& binary_root,
                          "duplicate target roots should produce a deterministic graph diagnostic");
 }
 
+void TestTargetValidationUsesTargetStanzaSpan(const std::filesystem::path& binary_root,
+                                              const std::filesystem::path& mc_path) {
+    const std::filesystem::path project_root = binary_root / "target_span_project";
+    std::filesystem::remove_all(project_root);
+    WriteFile(project_root / "build.toml",
+              "schema = 1\n"
+              "project = \"phase229-target-span\"\n"
+              "default = \"app\"\n"
+              "\n"
+              "[targets.app]\n"
+              "kind = \"exe\"\n"
+              "package = \"phase229-target-span\"\n"
+              "root = \"src/main.mc\"\n"
+              "mode = \"broken\"\n"
+              "env = \"hosted\"\n"
+              "\n"
+              "[targets.app.search_paths]\n"
+              "modules = [\"src\"]\n"
+              "\n"
+              "[targets.app.runtime]\n"
+              "startup = \"default\"\n");
+    WriteFile(project_root / "src/main.mc", "func main() i32 { return 0 }\n");
+
+    const std::string output = BuildProjectTargetAndExpectFailure(mc_path,
+                                                                  project_root / "build.toml",
+                                                                  binary_root / "target_span_build",
+                                                                  "app",
+                                                                  "target_span_output.txt",
+                                                                  "target stanza span build");
+    ExpectOutputContains(output,
+                         "build.toml:5:1: error: target 'app' uses unsupported build mode: broken",
+                         "target validation should point at the target stanza line");
+}
+
 void TestExecutableTargetRejectsNonStaticLibraryLink(const std::filesystem::path& binary_root,
                                                      const std::filesystem::path& mc_path) {
     const std::filesystem::path project_root = binary_root / "invalid_staticlib_link_project";
@@ -452,6 +486,7 @@ void RunWorkflowProjectValidationSuite(const std::filesystem::path& source_root,
     TestProjectAmbiguousImportFails(source_root, binary_root, mc_path);
     TestDuplicateModuleRootFailsEarly(binary_root, mc_path);
     TestDuplicateTargetRootsFailEarly(binary_root, mc_path);
+    TestTargetValidationUsesTargetStanzaSpan(binary_root, mc_path);
     TestExecutableTargetRejectsNonStaticLibraryLink(binary_root, mc_path);
     TestUnsupportedFreestandingBootstrapTargetEmitsNotes(binary_root, mc_path);
     TestMissingFreestandingBootstrapTargetEmitsNotes(binary_root, mc_path);

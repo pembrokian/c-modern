@@ -602,6 +602,7 @@ std::optional<ProjectFile> LoadProjectFile(const std::filesystem::path& path,
     const std::vector<SourceLine> lines = ReadLogicalProjectLines(input, project.path, diagnostics);
 
     std::vector<std::string> section;
+    std::size_t section_line = 0;
     for (const auto& source_line : lines) {
         const std::size_t line_number = source_line.number;
         const std::string& line = source_line.text;
@@ -616,6 +617,7 @@ std::optional<ProjectFile> LoadProjectFile(const std::filesystem::path& path,
                 continue;
             }
             section = std::move(*parsed_section);
+            section_line = line_number;
             continue;
         }
 
@@ -679,6 +681,9 @@ std::optional<ProjectFile> LoadProjectFile(const std::filesystem::path& path,
         ProjectTarget* target = LookupTarget(project, section[1], project.path, line_number, diagnostics);
         if (target == nullptr) {
             continue;
+        }
+        if (target->decl_line == 0) {
+            target->decl_line = section_line;
         }
 
         if (section.size() == 2) {
@@ -870,10 +875,11 @@ std::optional<ProjectFile> LoadProjectFile(const std::filesystem::path& path,
     }
 
     for (auto& [name, target] : project.targets) {
+        const auto target_span = MakeLineSpan(target.decl_line == 0 ? 1 : target.decl_line);
         if (!IsSupportedBootstrapTargetKind(target.kind)) {
             diagnostics.Report({
                 .file_path = project.path,
-                .span = mc::support::kDefaultSourceSpan,
+                .span = target_span,
                 .severity = DiagnosticSeverity::kError,
                 .message = "target '" + name + "' uses unsupported bootstrap target kind: " + target.kind,
             });
@@ -881,7 +887,7 @@ std::optional<ProjectFile> LoadProjectFile(const std::filesystem::path& path,
         if (target.root.empty()) {
             diagnostics.Report({
                 .file_path = project.path,
-                .span = mc::support::kDefaultSourceSpan,
+                .span = target_span,
                 .severity = DiagnosticSeverity::kError,
                 .message = "target '" + name + "' is missing required key: root",
             });
@@ -894,7 +900,7 @@ std::optional<ProjectFile> LoadProjectFile(const std::filesystem::path& path,
         if (!IsSupportedMode(target.mode)) {
             diagnostics.Report({
                 .file_path = project.path,
-                .span = mc::support::kDefaultSourceSpan,
+                .span = target_span,
                 .severity = DiagnosticSeverity::kError,
                 .message = "target '" + name + "' uses unsupported build mode: " + target.mode,
             });
@@ -902,7 +908,7 @@ std::optional<ProjectFile> LoadProjectFile(const std::filesystem::path& path,
         if (!IsSupportedBootstrapEnv(target.env)) {
             diagnostics.Report({
                 .file_path = project.path,
-                .span = mc::support::kDefaultSourceSpan,
+                .span = target_span,
                 .severity = DiagnosticSeverity::kError,
                 .message = "target '" + name + "' uses unsupported bootstrap environment: " + target.env,
             });
@@ -911,7 +917,7 @@ std::optional<ProjectFile> LoadProjectFile(const std::filesystem::path& path,
             if (target.runtime_startup != "default") {
                 diagnostics.Report({
                     .file_path = project.path,
-                    .span = mc::support::kDefaultSourceSpan,
+                    .span = target_span,
                     .severity = DiagnosticSeverity::kError,
                     .message = "target '" + name + "' uses unsupported hosted runtime startup: " + target.runtime_startup,
                 });
@@ -920,7 +926,7 @@ std::optional<ProjectFile> LoadProjectFile(const std::filesystem::path& path,
             if (target.target.empty()) {
                 diagnostics.Report({
                     .file_path = project.path,
-                    .span = mc::support::kDefaultSourceSpan,
+                    .span = target_span,
                     .severity = DiagnosticSeverity::kError,
                     .message = "target '" + name + "' must declare an explicit freestanding target",
                 });
@@ -929,14 +935,14 @@ std::optional<ProjectFile> LoadProjectFile(const std::filesystem::path& path,
             if (target.runtime_startup == "default") {
                 diagnostics.Report({
                     .file_path = project.path,
-                    .span = mc::support::kDefaultSourceSpan,
+                    .span = target_span,
                     .severity = DiagnosticSeverity::kError,
                     .message = "target '" + name + "' must declare an explicit freestanding runtime startup",
                 });
             } else if (!IsPlainStartupName(target.runtime_startup)) {
                 diagnostics.Report({
                     .file_path = project.path,
-                    .span = mc::support::kDefaultSourceSpan,
+                    .span = target_span,
                     .severity = DiagnosticSeverity::kError,
                     .message = "target '" + name + "' uses invalid freestanding runtime startup name: " + target.runtime_startup,
                 });
@@ -945,7 +951,7 @@ std::optional<ProjectFile> LoadProjectFile(const std::filesystem::path& path,
         if (!target.link_inputs.empty() && !IsExecutableTargetKind(target.kind)) {
             diagnostics.Report({
                 .file_path = project.path,
-                .span = mc::support::kDefaultSourceSpan,
+                .span = target_span,
                 .severity = DiagnosticSeverity::kError,
                 .message = "target '" + name + "' may only declare link.inputs on executable targets",
             });
@@ -960,7 +966,7 @@ std::optional<ProjectFile> LoadProjectFile(const std::filesystem::path& path,
             if (package_name.empty()) {
                 diagnostics.Report({
                     .file_path = project.path,
-                    .span = mc::support::kDefaultSourceSpan,
+                    .span = target_span,
                     .severity = DiagnosticSeverity::kError,
                     .message = "target '" + name + "' declares an empty package identity",
                 });
@@ -991,7 +997,7 @@ std::optional<ProjectFile> LoadProjectFile(const std::filesystem::path& path,
             if (module_name == "internal") {
                 diagnostics.Report({
                     .file_path = project.path,
-                    .span = mc::support::kDefaultSourceSpan,
+                    .span = target_span,
                     .severity = DiagnosticSeverity::kError,
                     .message = "target '" + name + "' may not declare multi-file module set 'internal'; multi-file internal modules remain deferred",
                 });
@@ -999,7 +1005,7 @@ std::optional<ProjectFile> LoadProjectFile(const std::filesystem::path& path,
             if (module_set.files.empty()) {
                 diagnostics.Report({
                     .file_path = project.path,
-                    .span = mc::support::kDefaultSourceSpan,
+                    .span = target_span,
                     .severity = DiagnosticSeverity::kError,
                     .message = "target '" + name + "' declares module set '" + module_name + "' with no files",
                 });
@@ -1010,7 +1016,7 @@ std::optional<ProjectFile> LoadProjectFile(const std::filesystem::path& path,
                 if (mc::support::IsInternalModulePath(file)) {
                     diagnostics.Report({
                         .file_path = project.path,
-                        .span = mc::support::kDefaultSourceSpan,
+                        .span = target_span,
                         .severity = DiagnosticSeverity::kError,
                         .message = "target '" + name + "' module set '" + module_name +
                                    "' includes internal module source '" + file.generic_string() +
@@ -1040,7 +1046,7 @@ std::optional<ProjectFile> LoadProjectFile(const std::filesystem::path& path,
                 if (!inserted && it->second != package_name) {
                     diagnostics.Report({
                         .file_path = project.path,
-                        .span = mc::support::kDefaultSourceSpan,
+                        .span = target_span,
                         .severity = DiagnosticSeverity::kError,
                         .message = "target '" + name + "' assigns source root '" + normalized_root +
                                    "' to multiple package identities: '" + it->second + "' and '" + package_name + "'",
@@ -1088,7 +1094,7 @@ std::optional<ProjectFile> LoadProjectFile(const std::filesystem::path& path,
             if (!root_owned_by_entry_module) {
                 diagnostics.Report({
                     .file_path = project.path,
-                    .span = mc::support::kDefaultSourceSpan,
+                    .span = target_span,
                     .severity = DiagnosticSeverity::kError,
                     .message = "target '" + name + "' declares entry module set '" + entry_module_name +
                                "' but does not include root source '" + root_key + "'",
@@ -1099,7 +1105,7 @@ std::optional<ProjectFile> LoadProjectFile(const std::filesystem::path& path,
         if (root_owner != owned_module_set_files.end() && root_owner->second.module_name != entry_module_name) {
             diagnostics.Report({
                 .file_path = project.path,
-                .span = mc::support::kDefaultSourceSpan,
+                .span = target_span,
                 .severity = DiagnosticSeverity::kError,
                 .message = "target '" + name + "' root source '" + target.root.generic_string() +
                            "' belongs to module set '" + root_owner->second.module_name +
@@ -1109,7 +1115,7 @@ std::optional<ProjectFile> LoadProjectFile(const std::filesystem::path& path,
         if (!IsSupportedMode(target.tests.mode)) {
             diagnostics.Report({
                 .file_path = project.path,
-                .span = mc::support::kDefaultSourceSpan,
+                .span = target_span,
                 .severity = DiagnosticSeverity::kError,
                 .message = "target '" + name + "' tests use unsupported build mode: " + target.tests.mode,
             });

@@ -27,6 +27,7 @@ struct ProjectModuleSet {
 
 struct ProjectTarget {
     std::string name;
+    std::size_t decl_line = 0;
     std::string kind = "exe";
     std::string package_name;
     std::filesystem::path root;

@@ -3,11 +3,11 @@ Phase 229 -- Compiler Surface Truth Cleanup
 
 Status
 ------
-PLANNED
+COMPLETED (2026-04-17)
 
 Purpose
 -------
-Continue the compiler-facing cleanup after Phase 211 by removing the last
+Completed the compiler-facing cleanup after Phase 211 by removing the last
 bootstrap-era wording and tightening one narrow diagnostic truth path where
 the current owner-local error surface can be more accurate.
 
@@ -20,6 +20,11 @@ Repository status note
 - The compiler and driver path already has several small truth-repair wins on
   project validation and manifest parsing, so the next cleanup should stay
   equally local.
+
+Landing note
+------------
+- Project-target validation now reports target-owned errors against the target
+  stanza line instead of the manifest root span.
 
 Problem being solved
 --------------------
