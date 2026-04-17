@@ -431,6 +431,13 @@ func handle(s: ShellServiceState, m: service_effect.Message) service_effect.Effe
             payload[0] = serial_protocol.CMD_C
             payload[1] = m.payload[2]
             return service_effect.effect_send(s.pid, service_topology.TASK_ENDPOINT_ID, 2, payload)
+        case serial_protocol.CMD_D:
+            if !bang3(m) {
+                return invalid_effect(SHELL_INVALID_SHAPE)
+            }
+            payload[0] = serial_protocol.CMD_D
+            payload[1] = m.payload[2]
+            return service_effect.effect_send(s.pid, service_topology.TASK_ENDPOINT_ID, 2, payload)
         case serial_protocol.CMD_L:
             if !bang3(m) {
                 return invalid_effect(SHELL_INVALID_SHAPE)

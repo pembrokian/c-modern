@@ -7,6 +7,7 @@ const TASK_CAPACITY: usize = 4
 const TASK_OP_SUBMIT: u8 = 83  // 'S'
 const TASK_OP_QUERY: u8 = 81   // 'Q'
 const TASK_OP_CANCEL: u8 = 67  // 'C'
+const TASK_OP_DONE: u8 = 68    // 'D'
 const TASK_OP_LIST: u8 = 76    // 'L'
 
 const TASK_STATE_NONE: u8 = 78       // 'N'
@@ -125,6 +126,19 @@ func task_cancel(s: TaskServiceState, id: u8) TaskResult {
     return TaskResult{ state: taskwith(s, s.ids, s.op, next_state, s.len, s.next), effect: task_reply_status(syscall.SyscallStatus.Ok, 0) }
 }
 
+func task_complete(s: TaskServiceState, id: u8) TaskResult {
+    idx := task_find(s, id)
+    if idx >= TASK_CAPACITY {
+        return TaskResult{ state: s, effect: task_reply_status(syscall.SyscallStatus.InvalidArgument, 0) }
+    }
+    if s.state[idx] != TASK_STATE_ACTIVE {
+        return TaskResult{ state: s, effect: task_reply_status(syscall.SyscallStatus.InvalidArgument, s.state[idx]) }
+    }
+    next_state: [TASK_CAPACITY]u8 = s.state
+    next_state[idx] = TASK_STATE_DONE
+    return TaskResult{ state: taskwith(s, s.ids, s.op, next_state, s.len, s.next), effect: task_reply_status(syscall.SyscallStatus.Ok, 0) }
+}
+
 func task_list_active(s: TaskServiceState, window: u8) TaskResult {
     payload: [4]u8 = primitives.zero_payload()
     limit: usize = usize(window)
@@ -169,6 +183,11 @@ func handle(s: TaskServiceState, m: service_effect.Message) TaskResult {
             return TaskResult{ state: s, effect: task_reply_status(syscall.SyscallStatus.InvalidArgument, 0) }
         }
         return task_cancel(s, m.payload[1])
+    case TASK_OP_DONE:
+        if m.payload_len != 2 {
+            return TaskResult{ state: s, effect: task_reply_status(syscall.SyscallStatus.InvalidArgument, 0) }
+        }
+        return task_complete(s, m.payload[1])
     case TASK_OP_LIST:
         if m.payload_len != 2 {
             return TaskResult{ state: s, effect: task_reply_status(syscall.SyscallStatus.InvalidArgument, 0) }

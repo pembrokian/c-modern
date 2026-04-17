@@ -211,6 +211,10 @@ func encode_task_cancel(id: u8) [4]u8 {
     return ipc.payload_byte(CMD_J, CMD_C, id, CMD_BANG)
 }
 
+func encode_task_complete(id: u8) [4]u8 {
+    return ipc.payload_byte(CMD_J, CMD_D, id, CMD_BANG)
+}
+
 func encode_task_list(window: u8) [4]u8 {
     return ipc.payload_byte(CMD_J, CMD_L, window, CMD_BANG)
 }

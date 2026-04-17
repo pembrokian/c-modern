@@ -48,19 +48,26 @@ The following modules are deferred until the named phase boundary forces them:
 - `lifecycle/init` — Phase 153 or when Phase 149 restart needs spawn/exit; one struct + two handlers, not a `LifecycleAudit`
 - `mmu` — probably never in this tree; hosted execution makes MMU stubs meaningless
 
-Next target
+Recent service targets
 
 - Phase 218 (landed): narrow file-service shape probe. `file_service.mc` admitted
   as the ninth boot-wired service (FILE_ENDPOINT_ID = 18, pid = 9). One compact
   CMD_F protocol family (create, write, read, count) routes through shell dispatch.
-  Service is retained (Reload on restart); 1-byte-per-slot capacity is a probe
-  constraint, not a permanent design. `run_file_service_probe()` in
+  Service is retained (Reload on restart); the original one-byte-per-slot cap was
+  a probe constraint, not a permanent design. `run_file_service_probe()` in
   `scenario_file_service.mc` exercises the full create/write/read/count/error path.
   SERVICE_COUNT is now 9.
 
-- Next open: decide whether to widen the file-service data model (requires 2D
-  array support or a redesigned state record), or advance another service-system
-  boundary identified in Phases 213–217.
+- Phase 225 (landed): bounded task completion follow-through. `task_service.mc`
+  now exposes a real `DONE` path through `JD<id>!` without widening into process,
+  session, or worker-pool policy.
+
+- Phase 226 (landed): bounded file-service payload growth. `file_service.mc`
+  now appends one byte at a time up to four retained bytes per file and returns
+  the retained prefix on read. This used the already-landed explicit `FileSlot`
+  shape and did not require 2D arrays, compiler work, or filesystem-framework
+  growth. The focused reset-lane fixture is
+  `tests/system/kernel_reset_lane_phase226_file_growth`.
 
 - Phase 220 (landed): bounded timer and task service follow-through. Added
   `timer_service.mc` and `task_service.mc` as the tenth and eleventh
@@ -72,5 +79,6 @@ Next target
   focused reset-lane fixture is
   `tests/system/kernel_reset_lane_phase220_timer_task_service`.
 
-- Next open: pressure a richer owner-local temporal model only if a real
-  admitted consumer cannot stay inside the bounded timer/task contracts.
+- Next open: choose the next owner-local pressure only when one remaining
+  caller-visible gap becomes clearly stronger than the others without forcing
+  durability, namespace, or framework drift.

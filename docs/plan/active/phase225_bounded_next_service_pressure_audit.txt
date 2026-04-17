@@ -3,16 +3,14 @@ Phase 225 -- Bounded Next Service Pressure Audit
 
 Status
 ------
-ACTIVE
+COMPLETED (2026-04-17)
 
 Purpose
 -------
 Choose exactly one next owner-local running-system pressure step after the
-Phase 220 timer or task admission, the Phase 221 file-service state reshape,
-and the Phase 224 dispatch ownership cleanup.
-
-This phase is an evidence-gathering and selection phase for the next service
-owner. It is not permission to widen multiple kernel fronts at once.
+Phase 220 timer/task admission, the Phase 221 file-service state reshape, and
+the Phase 224 dispatch ownership cleanup, then land that step as a real
+implementation.
 
 Repository status note
 ----------------------
@@ -32,8 +30,12 @@ Problem being solved
   the repository should pick only one.
 - Without a selection phase, "next kernel work" can blur into multiple small
   widenings across queue, timer, task, ticket, or retained-state owners.
-- The project needs one evidence-backed choice for the next owner-local service
-  slice and explicit deferral wording for the others.
+- The project needed one evidence-backed choice for the next owner-local
+  service slice and explicit deferral wording for the others.
+- `task_service` already defined `TASK_STATE_DONE`, but no shell-visible or
+  service-local operation could ever produce it. The admitted task owner could
+  submit active work, cancel it, fail it immediately, or clear it on restart,
+  but it could not represent successful completion at all.
 
 Core rule
 ---------
@@ -42,6 +44,13 @@ Core rule
 - Keep the landing compact: one owner, one small command family addition or
   one bounded state consequence, one scenario, one focused reset-lane fixture.
 - Defer all other candidate owners explicitly.
+
+Decision summary
+----------------
+1. Chosen branch: Branch C -- task follow-through.
+2. Landed owner-local addition: `JD<id>!` transitions one active task to
+   `TASK_STATE_DONE`.
+3. Queue, timer, ticket, and file follow-through remain explicitly deferred.
 
 Candidate owner families to re-audit
 ------------------------------------
@@ -103,6 +112,52 @@ Branch E -- explicit deferral
 - Required follow-through: sharpen backlog wording so the next owner is chosen
   only when a real admitted consumer makes it obvious.
 
+Chosen branch
+-------------
+Branch C -- task follow-through
+- `task_service` had the strongest current caller-visible gap because its own
+  state vocabulary exposed `DONE` while no executable command path could ever
+  reach that state.
+- The narrowest honest repair was one owner-local successful-completion
+  consequence, not a process model, worker pool, scheduler, or framework.
+- The landing stays inside the current task owner, compact shell protocol, and
+  reset-lane workflow surface.
+
+Implementation summary
+----------------------
+- Added `TASK_OP_DONE = 'D'` and `task_complete(...)` in
+  `kernel/src/services/task_service.mc`.
+- Added compact shell/protocol routing for `JD<id>!` through:
+  - `kernel/src/shell/serial_protocol.mc`
+  - `kernel/src/shell/shell_service.mc`
+  - `kernel/src/scenarios/scenario_transport.mc`
+- Extended `kernel/src/scenarios/scenario_timer_task_service.mc` to prove:
+  - active task submission remains visible in `JL<window>!`
+  - `JD<id>!` transitions an active task to `DONE`
+  - completed tasks no longer appear in active-list queries
+  - cancelled and failed task paths still behave as before
+  - task restart still clears task state explicitly
+- Added a focused reset-lane fixture entry:
+  - `tests/system/kernel_reset_lane_phase225_task_completion`
+  - registered in `tests/tool/tool_kernel_reset_lane_suite.cpp`
+
+Why task won over the other candidates
+--------------------------------------
+- Queue follow-through deferred: queue already has caller-visible count, peek,
+  pressure, and stall classification.
+- Timer follow-through deferred: timer already has caller-visible create,
+  cancel, query, expired-window behavior, and retained restart semantics.
+- Ticket follow-through deferred: ticket already has explicit restart-visible
+  stale and invalid outcomes.
+- File follow-through deferred: file just received its Phase 221 owner-local
+  state reshape; no stronger gap beat missing task completion.
+
+Compiler and toolchain boundary
+-------------------------------
+- No compiler, sema, MIR, backend, ABI, target, runtime, stdlib, or `hal`
+  widening was required for Phase 225.
+- No new language limitation was encountered while landing this slice.
+
 Selection criteria
 ------------------
 The selected branch must satisfy all of the following:
@@ -139,14 +194,62 @@ Validation expectations
   focused reset-lane fixture
 - the audit must not recommend framework growth based on aesthetics alone
 
+Validation summary
+------------------
+- `Build debug`
+- focused reset-lane workflow coverage for the task-service landing
+- full reset-lane workflow coverage (`mc_tool_workflow_kernel_reset_lane_full_unit`)
+
+Post-land re-audit
+------------------
+- After the Phase 225 landing and full reset-lane validation, queue, timer,
+  ticket, and file were re-audited again.
+- The strongest next gap is now file-service bounded payload growth.
+- Queue, timer, and ticket are all internally coherent on their current compact
+  contracts:
+  - queue already covers count, peek, pressure, stall, and retained restart
+  - timer already covers create, cancel, query, expired-window, and retained
+    restart
+  - ticket already covers issue, consume, stale, invalid, and restart-visible
+    epoch change
+- File remains the thinnest current owner: its slot shape already carries
+  `len` plus `data0..data3`, but the admitted behavior still stops at one-byte
+  write-once storage. That is a real caller-visible limitation, not just a
+  missing audit.
+- The narrowest honest next move is one file-owned bounded payload growth step:
+  let `FW<name><byte>` append one byte up to a fixed per-file limit of four
+  bytes and let `FR<name>!` return the retained byte prefix with length `1..4`.
+- This stays owner-local, uses the already-landed slot-in-state shape from
+  Phase 221, does not widen into durability or a filesystem framework, and does
+  not require compiler, sema, MIR, backend, runtime, stdlib, or `hal` work.
+
 Exit criteria
 -------------
-- the repository has one chosen next service-pressure owner or one explicit
-  deferral outcome
+- the repository has one chosen next service-pressure owner and one real
+  owner-local landing
 - the non-selected candidate owners are explicitly deferred rather than left as
   vague co-equal possibilities
-- the chosen next move, if any, is small enough to stay owner-local and
-  executable
+- the chosen next move is small enough to stay owner-local and executable
+
+Chosen next gap after Phase 225
+-------------------------------
+- Best next gap: file-service bounded payload growth inside the retained-only
+  file owner.
+- Outcome: landed in Phase 226 as bounded append-until-full plus retained
+  prefix read, still inside the retained-only file owner.
+- Recommended next slice:
+  - keep `FILE_CAPACITY = 4` file slots unchanged
+  - grow per-file retained payload from one byte to up to four bytes
+  - reinterpret `FW<name><byte>` as append-one-byte-until-full instead of
+    single-write-only
+  - keep `FR<name>!` as the full retained read, now returning `payload_len`
+    from `0..4` and bytes `data0..data3`
+  - keep retained restart behavior explicit and unchanged
+- Non-goals for that next slice:
+  - no path graph or namespace framework
+  - no durable storage
+  - no seek, truncate, delete, or directory semantics
+  - no compiler or protocol-width expansion
 
 Non-goals for this phase
 ------------------------
@@ -166,3 +269,5 @@ Why this is the narrowest honest next move
   adjacent small kernel ideas from landing as one unfocused wave.
 - The next honest service step should be chosen by real caller-visible pressure
   rather than by taste or by which owner is easiest to edit.
+- `task_service` exposed exactly that kind of honest gap: it already named a
+  successful terminal state, but the running system had no way to reach it.

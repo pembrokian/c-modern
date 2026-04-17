@@ -18,13 +18,16 @@ const FAIL_TIMER_RESTART: i32 = 2205
 const FAIL_TIMER_RETAINED: i32 = 2206
 
 const FAIL_TASK_SUBMIT: i32 = 2210
-const FAIL_TASK_LIST: i32 = 2211
-const FAIL_TASK_CANCEL: i32 = 2212
-const FAIL_TASK_CANCELLED_QUERY: i32 = 2213
-const FAIL_TASK_FAILED_CLASS: i32 = 2214
-const FAIL_TASK_RESTART: i32 = 2215
-const FAIL_TASK_RESET_QUERY: i32 = 2216
-const FAIL_TASK_RESET_LIST: i32 = 2217
+const FAIL_TASK_ACTIVE_LIST: i32 = 2211
+const FAIL_TASK_COMPLETE: i32 = 2212
+const FAIL_TASK_DONE_QUERY: i32 = 2213
+const FAIL_TASK_DONE_LIST: i32 = 2214
+const FAIL_TASK_CANCEL: i32 = 2215
+const FAIL_TASK_CANCELLED_QUERY: i32 = 2216
+const FAIL_TASK_FAILED_CLASS: i32 = 2217
+const FAIL_TASK_RESTART: i32 = 2218
+const FAIL_TASK_RESET_QUERY: i32 = 2219
+const FAIL_TASK_RESET_LIST: i32 = 2220
 
 func expect_status(effect: service_effect.Effect, status: syscall.SyscallStatus) bool {
     return service_effect.effect_reply_status(effect) == status
@@ -112,15 +115,36 @@ func run_timer_task_probe() i32 {
 
     effect = kernel_dispatch.kernel_dispatch_step(&state, scenario_transport.cmd_task_list(4))
     if !list_first_is(effect, task_id) {
-        return FAIL_TASK_LIST
+        return FAIL_TASK_ACTIVE_LIST
     }
 
-    effect = kernel_dispatch.kernel_dispatch_step(&state, scenario_transport.cmd_task_cancel(task_id))
+    effect = kernel_dispatch.kernel_dispatch_step(&state, scenario_transport.cmd_task_complete(task_id))
+    if !expect_status(effect, syscall.SyscallStatus.Ok) {
+        return FAIL_TASK_COMPLETE
+    }
+
+    effect = kernel_dispatch.kernel_dispatch_step(&state, scenario_transport.cmd_task_query(task_id))
+    if !query_state_is(effect, task_service.TASK_STATE_DONE) {
+        return FAIL_TASK_DONE_QUERY
+    }
+
+    effect = kernel_dispatch.kernel_dispatch_step(&state, scenario_transport.cmd_task_list(4))
+    if service_effect.effect_reply_payload_len(effect) != 0 {
+        return FAIL_TASK_DONE_LIST
+    }
+
+    effect = kernel_dispatch.kernel_dispatch_step(&state, scenario_transport.cmd_task_submit(56))
+    if !expect_status(effect, syscall.SyscallStatus.Ok) {
+        return FAIL_TASK_SUBMIT
+    }
+    cancel_id: u8 = service_effect.effect_reply_payload(effect)[0]
+
+    effect = kernel_dispatch.kernel_dispatch_step(&state, scenario_transport.cmd_task_cancel(cancel_id))
     if !expect_status(effect, syscall.SyscallStatus.Ok) {
         return FAIL_TASK_CANCEL
     }
 
-    effect = kernel_dispatch.kernel_dispatch_step(&state, scenario_transport.cmd_task_query(task_id))
+    effect = kernel_dispatch.kernel_dispatch_step(&state, scenario_transport.cmd_task_query(cancel_id))
     if !query_state_is(effect, task_service.TASK_STATE_CANCELLED) {
         return FAIL_TASK_CANCELLED_QUERY
     }
@@ -135,7 +159,7 @@ func run_timer_task_probe() i32 {
         return FAIL_TASK_RESTART
     }
 
-    effect = kernel_dispatch.kernel_dispatch_step(&state, scenario_transport.cmd_task_query(task_id))
+    effect = kernel_dispatch.kernel_dispatch_step(&state, scenario_transport.cmd_task_query(cancel_id))
     if !expect_status(effect, syscall.SyscallStatus.InvalidArgument) {
         return FAIL_TASK_RESET_QUERY
     }

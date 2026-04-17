@@ -1,0 +1,76 @@
+Phase 226 -- Bounded File-Service Payload Growth
+===============================================
+
+Status
+------
+COMPLETED
+
+Date
+----
+2026-04-17
+
+Purpose
+-------
+Land the next chosen owner-local gap after Phase 225 by widening the admitted
+file owner from one-byte write-once storage to bounded retained append and
+bounded retained read, without widening durability, namespace, or compiler
+surfaces.
+
+Why this phase exists
+---------------------
+- Phase 225 re-audited queue, timer, ticket, and file and chose file-service
+  payload growth as the strongest remaining caller-visible deficit.
+- `file_service.mc` already carried the needed owner-local shape:
+  `FileSlot { name, used, len, data0, data1, data2, data3 }`.
+- The deficit was behavioral rather than structural: callers still saw only
+  one-byte write-once storage even though the owner already had room for four
+  retained bytes.
+
+Chosen slice
+------------
+1. Keep `FILE_CAPACITY = 4` file slots unchanged.
+2. Reinterpret `FW<name><byte>` as append-one-byte-until-full.
+3. Keep `FR<name>!` as the bounded retained read, now returning the retained
+   byte prefix with `payload_len` from `0..4`.
+4. Keep restart behavior unchanged: retained reload remains explicit and
+   init-owned.
+5. Make no compiler, sema, MIR, backend, runtime, stdlib, durability,
+   namespace, delete, seek, or truncate expansion.
+
+Implementation summary
+----------------------
+- `kernel/src/services/file_service.mc`
+  - `file_write(...)` now appends into `data0..data3` while `len < 4`
+  - `file_read(...)` now returns the retained byte prefix across all four data
+    fields
+- `kernel/src/scenarios/scenario_file_service.mc`
+  - widened the live owner-local proof from one-byte write/read to append up to
+    four bytes, reject the fifth append with `Exhausted`, and verify the full
+    retained prefix on read
+- `tests/system/kernel_reset_lane_phase226_file_growth`
+  - adds one focused reset-lane fixture for the landed growth slice
+- `tests/tool/tool_kernel_reset_lane_suite.cpp`
+  - registers the focused Phase 226 fixture in the grouped reset-lane workflow
+    suite
+
+Validation
+----------
+- `Build debug`
+- focused grouped reset-lane workflow coverage including the new Phase 226
+  fixture
+
+Non-goals
+---------
+- no durable storage
+- no path graph or namespace framework
+- no delete, truncate, seek, or directory semantics
+- no protocol-width expansion
+- no compiler or language widening
+
+Outcome
+-------
+- The admitted file owner now has a real bounded payload model instead of a
+  historical one-byte probe cap.
+- The old Phase 218 one-byte limit is now historical context, not current
+  repository truth.
+- The landing stays within the existing owner-local kernel service boundary.

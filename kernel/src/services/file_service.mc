@@ -116,10 +116,21 @@ func file_write(s: FileServiceState, name: u8, val: u8) FileResult {
         return FileResult{ state: s, effect: service_effect.effect_reply(syscall.SyscallStatus.InvalidArgument, 0, primitives.zero_payload()) }
     }
     slot := file_slot_at(s, idx)
-    if slot.len >= 1 {
+    if slot.len >= 4 {
         return FileResult{ state: s, effect: service_effect.effect_reply(syscall.SyscallStatus.Exhausted, 0, primitives.zero_payload()) }
     }
-    written := slot with { len: 1, data0: val }
+    next_len := slot.len + 1
+    written := slot
+    switch slot.len {
+    case 0:
+        written = slot with { len: next_len, data0: val }
+    case 1:
+        written = slot with { len: next_len, data1: val }
+    case 2:
+        written = slot with { len: next_len, data2: val }
+    default:
+        written = slot with { len: next_len, data3: val }
+    }
     return FileResult{ state: file_with_slot(s, idx, written), effect: service_effect.effect_reply(syscall.SyscallStatus.Ok, 0, primitives.zero_payload()) }
 }
 
@@ -131,6 +142,9 @@ func file_read(s: FileServiceState, name: u8) FileResult {
     slot := file_slot_at(s, idx)
     reply: [4]u8 = primitives.zero_payload()
     reply[0] = slot.data0
+    reply[1] = slot.data1
+    reply[2] = slot.data2
+    reply[3] = slot.data3
     return FileResult{ state: s, effect: service_effect.effect_reply(syscall.SyscallStatus.Ok, usize(slot.len), reply) }
 }
 
