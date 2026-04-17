@@ -1,0 +1,135 @@
+Phase 235 -- Restart-Safe Named Object Update Workflow
+======================================================
+
+Status
+------
+PROPOSED
+
+Purpose
+-------
+Admit one bounded update workflow that applies delayed or restart-safe mutation
+to durable named objects, so the workflow system graduates from recoverable
+control flow to recoverable durable mutation.
+
+This phase exists now because Phase 234 would make durable named objects real,
+and the next honest pressure is to mutate them through the already-admitted
+workflow path rather than through direct owner-local commands alone.
+
+Repository status note
+----------------------
+- Phase 231 already binds timer, task, and restart truth into one bounded
+  `workflow_service`.
+- Phase 232 already forces completion delivery under backpressure.
+- Phase 233 already proves bounded delegated access to one real service chain.
+- Phase 234 is expected to admit durable named objects as the first durable
+  named-data capability.
+- What is still missing is one end-to-end update workflow over durable data.
+
+Problem being solved
+--------------------
+- The repository can durably store named objects and it can run restart-safe
+  workflows, but it still cannot prove one recoverable durable update path.
+- Without this phase, object mutation would stay synchronous and local, which
+  underuses the restart-safe workflow substrate and leaves recovery semantics
+  under real mutation pressure untested.
+- That would make the new durable object owner feel like a static store rather
+  than a capability that participates in system work.
+
+Non-goals
+---------
+- no scheduler framework
+- no process or session model
+- no general transaction system
+- no package or image installer semantics
+- no generic dependency graph
+- no multi-object atomic update surface
+
+Invariants
+----------
+- `workflow_service` remains a bounded owner-local workflow system, not a
+  general scheduler.
+- `object_store_service` remains the owner of durable object truth.
+- Completion delivery remains bounded through `completion_mailbox_service`.
+- The four-byte shell frame stays fixed.
+- Restart continuity stays explicit through journal-backed workflow state and
+  owner-local durable reload; no hidden orchestration framework is introduced.
+
+Required surface changes
+------------------------
+1. Extend `workflow_service` with one admitted workflow kind that targets a
+   named durable object update.
+2. Add one bounded update operation in `object_store_service` that the workflow
+   may invoke as its durable mutation step.
+3. Add explicit completion outcomes for successful update, rejected update, and
+   restart-cancelled update.
+4. Add one deterministic scenario proving delayed durable update plus restart
+   recovery.
+5. Add one focused reset-lane fixture covering the durable update workflow.
+
+Forbidden changes
+-----------------
+- do not turn `workflow_service` into a general job graph
+- do not move durable object mutation truth into workflow code
+- do not widen transport width to carry richer update payloads
+- do not add multi-object transactions or rollback frameworks
+- do not bypass completion-mailbox delivery by inventing a second terminal
+  result surface
+
+Phase role in the larger sequence
+---------------------------------
+- This phase consumes the durable named-object surface from Phase 234.
+- It prepares the next two phases by making completion and delegation matter on
+  a real durable mutation path.
+- It is the first phase in this track that should create restart-visible data
+  consequences rather than only restart-visible control consequences.
+
+Relevant backlog items this phase intentionally brings under pressure
+--------------------------------------------------------------------
+- timer-service growth bounded to compact timeout/cancellation
+- task-service follow-through bounded to explicit work-state consequences
+- completion delivery bounded to one retained completion mailbox owner
+- restart identity as a split contract rather than a framework
+- retained-state reload explicit and init-owned
+
+Questions this phase must answer
+--------------------------------
+1. Can one durable object update workflow stay honest without a transaction or
+   dependency framework?
+2. Which update states must survive restart, and which must cancel explicitly?
+3. Is one-object mutation enough to expose the real recovery pressure?
+4. Does completion delivery remain sufficient once workflow outcomes represent
+   durable data change rather than only control-flow completion?
+
+Preferred implementation shape
+------------------------------
+- Keep workflow composition in `workflow_service` and durable mutation in
+  `object_store_service`.
+- Reuse the existing journal-backed workflow restart substrate.
+- Keep update payload shape fixed and small so the pressure stays on durable
+  mutation semantics rather than protocol-width or parser work.
+- Reuse the current completion mailbox for terminal update outcomes.
+
+Test obligations
+----------------
+- `Build debug`
+- one focused scenario proving delayed durable update, restart during the
+  waiting path, and explicit terminal outcome delivery
+- one focused reset-lane fixture for the named-object update workflow
+- `mc_tool_workflow_kernel_reset_lane_unit`
+
+Acceptance criteria
+-------------------
+- one bounded workflow can mutate one durable named object and survive restart
+  honestly
+- terminal outcomes are delivered through the existing completion mailbox
+- no scheduler, transaction, or dependency framework is introduced
+- durable mutation truth remains owned by the object store
+
+Future follow-up
+----------------
+- The likely next pressure is delegated mutation of durable objects rather than
+  owner-local workflow-only mutation.
+- Later phases may need version or conflict truth if delegation exposes stale
+  object-update races.
+- Reopen multi-object semantics only if a real admitted consumer cannot stay
+  honest with one-object update workflows.

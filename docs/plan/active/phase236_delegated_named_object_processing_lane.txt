@@ -1,0 +1,135 @@
+Phase 236 -- Delegated Named Object Processing Lane
+===================================================
+
+Status
+------
+PROPOSED
+
+Purpose
+-------
+Admit one bounded delegated durable-object processing path so temporary
+authority, workflow execution, and durable mutation are forced together in one
+real system capability.
+
+This phase exists now because Phases 234 and 235 would make durable object
+mutation real, and the next honest pressure is to let one non-owner service act
+through bounded delegated authority rather than keeping all mutation owner-
+local.
+
+Repository status note
+----------------------
+- Phase 233 landed `lease_service` as a bounded temporary-authority owner.
+- Phase 235 is expected to let workflows apply durable named-object updates.
+- The authority model has already been pressure-tested for completion retrieval
+  but not yet for durable data mutation.
+- The repository still lacks one real delegated mutation workload.
+
+Problem being solved
+--------------------
+- The current authority model has only been proven on a narrow completion path.
+- Without delegated object mutation, it remains unclear whether the current
+  generation-based stale rejection and bounded lease model are sufficient when
+  authority governs real durable data change.
+- This is now a real gap because the system can already perform recoverable
+  mutation; it just cannot yet authorize that mutation across one service
+  boundary honestly.
+
+Non-goals
+---------
+- no session model
+- no authentication system
+- no ACL or rights algebra
+- no generic capability framework
+- no dynamic endpoint assignment
+- no multi-hop delegation chain beyond one admitted handoff
+
+Invariants
+----------
+- `lease_service` remains a bounded temporary-authority owner.
+- Endpoint ids remain stable public routing names unless this phase proves a
+  concrete contradiction.
+- `object_store_service` remains the owner of durable object truth.
+- `workflow_service` remains the owner of workflow state and restart behavior.
+- The four-byte shell frame stays fixed.
+
+Required surface changes
+------------------------
+1. Extend `lease_service` with one admitted lease shape for one durable named
+   object or one named-object update workflow.
+2. Add one explicit delegated consume path that allows a non-owner service to
+   trigger one durable object processing step.
+3. Add explicit stale, invalid, and already-consumed failure outcomes for the
+   delegated object path.
+4. Add one deterministic scenario proving valid delegated mutation and stale-
+   after-restart rejection.
+5. Add one focused reset-lane fixture for delegated named-object processing.
+
+Forbidden changes
+-----------------
+- do not widen `lease_service` into a generic session or capability system
+- do not add ordinary handle-bearing traffic outside the current narrow
+  transfer and lease boundaries
+- do not move authority truth into dispatch or shell merely to simplify routing
+- do not add generic version negotiation or rights metadata channels
+
+Phase role in the larger sequence
+---------------------------------
+- This phase consumes the durable update workflow admitted in Phase 235.
+- It prepares the final phase in this milestone by making completion and
+  recovery outcomes meaningful under delegated mutation.
+- If it lands honestly, the repository will have a stronger claim that its
+  authority model can govern real durable work rather than just bounded
+  inspection or retrieval.
+
+Relevant backlog items this phase intentionally brings under pressure
+--------------------------------------------------------------------
+- restart-visible user-issued state local to `ticket_service`
+- restart identity as a split contract rather than a framework
+- transferred-handle runtime path bounded to one monotonic grant table
+- future authority changes framed through the Phase 209 ownership vocabulary
+- completion delivery bounded to one retained completion mailbox owner
+
+Questions this phase must answer
+--------------------------------
+1. Is one bounded delegated durable-mutation path enough to validate the
+   current authority model under real write pressure?
+2. Is generation-based stale rejection still sufficient once the delegated
+   action changes durable state?
+3. Which authority truth belongs in `lease_service` versus the object store and
+   workflow owners?
+4. Does delegated mutation expose a need for object-local version truth, or can
+  that remain deferred?
+
+Preferred implementation shape
+------------------------------
+- Keep temporary authority in `lease_service`.
+- Keep durable object mutation in `object_store_service`.
+- Keep durable update sequencing in `workflow_service` when the delegated path
+  needs delayed or restart-safe execution.
+- Reuse completion-mailbox outcomes rather than inventing a second delegated
+  terminal-reporting surface.
+
+Test obligations
+----------------
+- `Build debug`
+- one focused scenario proving delegated durable mutation, one stale-after-
+  restart rejection, and one already-consumed rejection
+- one focused reset-lane fixture for the delegated named-object path
+- `mc_tool_workflow_kernel_reset_lane_unit`
+
+Acceptance criteria
+-------------------
+- one bounded delegated path can authorize one durable named-object processing
+  step
+- stale or restarted authority is rejected deterministically
+- completion and workflow surfaces remain bounded and reused
+- no session, ACL, or capability framework is introduced
+
+Future follow-up
+----------------
+- The likely immediate next pressure is outcome and recovery handling when
+  delegated durable work collides with backlog pressure or restart timing.
+- If delegated mutation exposes object-version ambiguity, record that as a
+  bounded later phase rather than widening this phase.
+- Reopen broader authority machinery only if one real delegated durable-work
+  consumer cannot stay honest inside the current lease model.

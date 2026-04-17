@@ -8,6 +8,7 @@ This file is a fast orientation map for agents working in this repository.
 - `Makefile`: convenience wrapper around the CMake workflow
 - `README.md`: current repository summary and common commands
 - `kernel/`: repository-owned Veya kernel bring-up tree; currently at the Phase 233 bounded delegation lease slice over the hosted reset-lane workflow surface
+- `docs/agent/prompts/plan_spec.txt`: normative spec for the required structure of new per-phase plan documents
 - `docs/plan/admin/canopus_repo_layout_and_test_policy.txt`: current repository policy for Veya source, build, and test placement
 - `docs/plan/plan.txt`: authoritative multi-phase implementation plan
 - `docs/plan/backlog.txt`: implementation backlog and recurring follow-up themes

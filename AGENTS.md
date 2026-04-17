@@ -15,12 +15,14 @@ See these files first:
 - `docs/plan/admin/bootstrap_plan.txt`
 - `docs/plan/archive/phase3_bootstrap_finish.txt`
 - `docs/agent/prompts/repo_map.md`
+- `docs/agent/prompts/plan_spec.txt` for the normative structure required by new phase plan documents
 - `docs/arch/veya/kernel_style_guide.txt` for kernel/src/ service shape, naming, and main.mc limits
 
 Documentation routing:
 
 - `docs/arch/open_decisions.txt`: unresolved language, architecture, or packaging questions only
 - `docs/arch/key_decisions.txt`: settled design choices with short rationale
+- `docs/agent/prompts/plan_spec.txt`: normative specification for the structure and required sections of new per-phase plan documents
 - `docs/plan/backlog.txt`: implementation themes, deferred tasks, and recurring follow-up work
 - `docs/plan/decision_log.txt`: intentional limited solutions, blockers, and deferred fuller fixes
 - `docs/plan/*phase*.txt`: phase-scoped milestones, summaries, and closeouts

@@ -1,0 +1,130 @@
+Phase 240 -- External Ingress Completion And Backpressure
+=========================================================
+
+Status
+------
+PROPOSED
+
+Purpose
+-------
+Admit one bounded pressure phase that forces externally-driven workflow results
+through completion delivery under backlog, full-queue, and stall conditions.
+
+This phase exists now because Phase 239 would make external ingress drive real
+workflow execution, and the next honest move is to make completion pressure
+matter on that external path rather than only on internal durable work.
+
+Repository status note
+----------------------
+- Phase 232 already made completion delivery and queue-style backpressure real.
+- Phase 239 is expected to make connection ingress feed the workflow system.
+- The repository still lacks one phase where external request results compete
+  with backlog and stall behavior as part of the primary contract.
+
+Problem being solved
+--------------------
+- External ingress without completion-pressure testing would leave the second
+  milestone under-stressed in the same way earlier phases risked remaining too
+  internal.
+- The system can already express `Exhausted` and `WouldBlock`, but it has not
+  yet proven that those consequences stay honest when the producer is external
+  ingress rather than internal workflow steps alone.
+- This is now a real gap because external work would create sustained terminal
+  outcomes.
+
+Non-goals
+---------
+- no generic broker or message bus
+- no fairness framework
+- no blocking receive redesign
+- no stream transport or second IPC layer
+- no operator dashboard or telemetry framework
+- no supervisor framework in this phase
+
+Invariants
+----------
+- Completion delivery remains bounded through `completion_mailbox_service`.
+- Queue pressure truth remains owner-local and explicit.
+- Stall classification remains deterministic and additive.
+- `connection_service` remains the owner of ingress lifetime truth.
+- The four-byte shell frame stays fixed.
+
+Required surface changes
+------------------------
+1. Add one explicit external-request terminal path that can remain pending in
+   delivery under mailbox-full conditions.
+2. Add one bounded scenario where repeated ingress drives `Exhausted` then
+   `WouldBlock` or equivalent bounded full-path consequences.
+3. Add one caller-visible outcome for deferred, retried, or abandoned external
+   completion if the current model requires it.
+4. Add one deterministic scenario covering external success, backlog pressure,
+   and one stalled-delivery case.
+5. Add one focused reset-lane fixture for external ingress completion pressure.
+
+Forbidden changes
+-----------------
+- do not generalize the completion mailbox into a broker or queue framework
+- do not move queue pressure truth out of the completion owner
+- do not add blocking semantics or implicit waiting loops
+- do not widen connection ingress into a generic streaming framework
+
+Phase role in the larger sequence
+---------------------------------
+- This phase consumes the connection-backed workflow path from Phase 239.
+- It prepares the final ingress milestone phase by making delegated external
+  handling meaningful under backlog pressure.
+- It should leave the repository with one genuinely stressed external
+  completion path before authority is layered on top.
+
+Relevant backlog items this phase intentionally brings under pressure
+--------------------------------------------------------------------
+- completion delivery bounded to one retained completion mailbox owner plus
+  workflow-local retry state
+- queue-pressure policy owner-local to queue_service
+- stall-consequence classification owner-local to queue_service
+- kernel observability must remain effect-backed
+
+Questions this phase must answer
+--------------------------------
+1. Is the current completion-mailbox model still honest when the producer is
+   sustained external ingress?
+2. What is the narrowest caller-visible truth when external request outcomes
+   cannot be delivered immediately?
+3. Does external pressure expose a real fairness problem, or does the bounded
+   current model remain honest?
+4. Can backpressure stay explicit without reopening blocking receive or broker
+   designs?
+
+Preferred implementation shape
+------------------------------
+- Reuse the current completion owner and queue-style consequence language.
+- Keep any new deferred-delivery state local to the workflow or completion
+  owner.
+- Keep external request lifetime truth in `connection_service`.
+- Reuse scenario and reset-lane coverage rather than inventing a second
+  external test harness.
+
+Test obligations
+----------------
+- `Build debug`
+- one focused scenario proving external request completion under ordinary and
+  mailbox-full conditions
+- one focused reset-lane fixture for external ingress completion pressure
+- `mc_tool_workflow_kernel_reset_lane_unit`
+- `mc_tool_workflow_kernel_reset_lane_full_unit`
+
+Acceptance criteria
+-------------------
+- external ingress outcomes remain explicit and deterministic under backlog
+  pressure
+- the system exposes bounded full and stalled delivery truth on an external
+  request path
+- no broker, fairness, or blocking framework is introduced
+- the repository has one genuinely stressed external completion lane
+
+Future follow-up
+----------------
+- The likely immediate next pressure is delegated handling of external requests
+  under restart and stale authority.
+- Record any fairness or delivery-policy pressure in `docs/plan/backlog.txt`
+  rather than widening this phase.

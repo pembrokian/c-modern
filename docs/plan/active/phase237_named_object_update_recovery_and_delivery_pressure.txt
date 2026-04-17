@@ -1,0 +1,136 @@
+Phase 237 -- Named Object Update Recovery And Delivery Pressure
+===============================================================
+
+Status
+------
+PROPOSED
+
+Purpose
+-------
+Admit one bounded pressure phase that forces durable object updates, delegated
+work, completion delivery, and restart recovery to interact under backlog and
+restart timing rather than as mostly independent success paths.
+
+This phase exists now because Phases 234 through 236 would create the first
+real recoverable named-object processing lane, and the next honest move is to
+stress outcome delivery and recovery on that lane before changing domains.
+
+Repository status note
+----------------------
+- Phase 232 already made completion delivery and queue-style backpressure real.
+- Phase 235 is expected to produce durable object update outcomes.
+- Phase 236 is expected to produce delegated durable mutation outcomes.
+- The repository still lacks one phase whose primary job is to make those
+  outcomes contend with backlog, stall, and restart timing on a durable-data
+  path.
+
+Problem being solved
+--------------------
+- The current recoverable work pipeline can succeed under bounded nominal
+  cases, but it has not yet proven that named-object updates stay honest when
+  delivery is full, stalled, or interrupted by restart.
+- Without this pressure, the milestone would end with a set of individually
+  coherent services but no strong evidence that they compose honestly under
+  load-like conditions.
+- That would leave the durable named-data milestone under-stressed.
+
+Non-goals
+---------
+- no fairness framework
+- no generic broker or queue generalization
+- no supervisor or retry framework
+- no second completion consumer model
+- no cross-owner telemetry or dashboard system
+- no broader filesystem or package workflow admission yet
+
+Invariants
+----------
+- Completion delivery remains bounded through `completion_mailbox_service`.
+- Queue pressure truth remains owner-local and explicit.
+- Stall classification remains additive and deterministic rather than becoming
+  blocking semantics.
+- Durable object truth remains owner-local.
+- The four-byte shell frame stays fixed.
+
+Required surface changes
+------------------------
+1. Add one explicit named-object update outcome path that can remain pending in
+   delivery under mailbox-full pressure.
+2. Add one bounded scenario where delegated durable work collides with backlog
+   or restart timing.
+3. Add one caller-visible outcome for abandoned, retried, or explicitly
+   deferred delivery if the current mailbox semantics require it.
+4. Add one deterministic scenario covering success, backlog pressure, and
+   restart-interrupted delivery.
+5. Add one focused reset-lane fixture for the composed named-object processing
+   lane.
+
+Forbidden changes
+-----------------
+- do not widen completion delivery into a generic broker or fairness framework
+- do not move backlog truth out of `completion_mailbox_service`
+- do not add hidden retry loops in boot, init, or dispatch
+- do not solve pressure by dropping durable update outcomes silently
+
+Phase role in the larger sequence
+---------------------------------
+- This phase closes the durable named-data and update-workflow milestone.
+- It consumes the object-store, workflow, delegation, and completion surfaces
+  admitted in Phases 234 through 236.
+- It should leave the repository with one genuinely stressed recoverable named-
+  object processing lane before the next milestone shifts to external ingress.
+
+Relevant backlog items this phase intentionally brings under pressure
+--------------------------------------------------------------------
+- completion delivery bounded to one retained completion mailbox owner plus
+  workflow-local retry state
+- queue-pressure policy owner-local to queue_service
+- stall-consequence classification owner-local to queue_service
+- restart identity as a split contract rather than a framework
+
+Questions this phase must answer
+--------------------------------
+1. Is the current completion-mailbox plus workflow-local retry split still
+   honest when outcomes represent durable delegated mutation?
+2. What is the narrowest caller-visible truth when durable update outcomes
+   cannot be delivered immediately?
+3. Does restart during deferred delivery require a new bounded outcome class,
+   or can the current model stay honest as-is?
+4. Has the named-object milestone created real pressure without forcing a
+   fairness or supervisor framework?
+
+Preferred implementation shape
+------------------------------
+- Reuse the existing completion-mailbox owner and its queue-style consequence
+  language.
+- Keep any new retry or deferred-delivery state local to `workflow_service` or
+  the completion owner rather than inventing a third coordination layer.
+- Keep durable object update truth in `object_store_service` and authority
+  truth in `lease_service`.
+
+Test obligations
+----------------
+- `Build debug`
+- one focused scenario proving durable update success, mailbox-full pressure,
+  and restart-interrupted or restart-resumed delivery
+- one focused reset-lane fixture for the composed named-object processing lane
+- `mc_tool_workflow_kernel_reset_lane_unit`
+- `mc_tool_workflow_kernel_reset_lane_full_unit`
+
+Acceptance criteria
+-------------------
+- the repository has one composed durable named-object processing lane that
+  remains honest under backlog and restart timing
+- caller-visible delivery outcomes remain explicit and deterministic
+- no fairness, broker, or supervisor framework is introduced
+- the milestone ends with real composition pressure rather than only successful
+  happy-path behavior
+
+Future follow-up
+----------------
+- The next immediate milestone should shift from internal recoverable work to
+  external ingress and connection handling.
+- If this phase exposes deeper delivery-policy pressure, record it in
+  `docs/plan/backlog.txt` rather than widening this milestone after the fact.
+- Reopen fairness or supervisor work only if external ingress later proves the
+  current bounded model dishonest.

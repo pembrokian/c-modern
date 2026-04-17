@@ -1,0 +1,133 @@
+Phase 238 -- Connection Service Narrow Ingress Admission
+========================================================
+
+Status
+------
+PROPOSED
+
+Purpose
+-------
+Admit one bounded connection-facing ingress owner so the repository can move
+from entirely internal recoverable work to one persistent external-style input
+surface with explicit open, receive, send, and close behavior.
+
+This phase exists now because the durable named-object milestone would finish
+the internal recoverable-work lane. The next honest pressure is to introduce a
+real ingress surface rather than more internal orchestration refinement.
+
+Repository status note
+----------------------
+- Phases 230 through 237 establish durable work, durable named-object mutation,
+  bounded completion delivery, and bounded delegation.
+- The kernel already has serial ingress and shell routing, but not one general
+  long-lived connection owner that creates sustained external workload.
+- The backlog already defers broader pipe, poller, blocking, and IPC widening
+  until a real consumer demands more than the current bounded slice.
+
+Problem being solved
+--------------------
+- Current pressure is still largely driven by internal commands and reset-lane
+  probes rather than by one persistent ingress owner with connection lifetime.
+- Without a connection-facing owner, the next milestone risks remaining too
+  internal and under-stressing backlog, timeouts, and lifecycle behavior under
+  ongoing input.
+- This is now the strongest next gap because the system has enough recoverable
+  work machinery to do useful work once ingress exists.
+
+Non-goals
+---------
+- no networking stack framework
+- no stream socket abstraction layer
+- no service discovery registry
+- no generic blocking receive or mailbox framework
+- no subprocess or shell session model
+- no capability or ACL framework widening in this phase
+
+Invariants
+----------
+- `kernel_dispatch.mc` remains a routing and gating boundary only.
+- The four-byte shell frame stays fixed.
+- Connection lifetime truth remains owner-local to the new service.
+- Existing queue, workflow, and completion owners keep their current bounded
+  responsibilities.
+- Any new observability remains effect-backed rather than replay-based.
+
+Required surface changes
+------------------------
+1. Add one `connection_service` owner under `kernel/src/services/`.
+2. Admit one bounded command family for:
+   - open one connection slot
+   - receive one bounded ingress unit
+   - send one bounded reply unit
+   - close one connection slot
+3. Add explicit connection states and failure outcomes such as invalid,
+   disconnected, or timed-out.
+4. Add one deterministic scenario proving open, receive, send, and close.
+5. Add one focused reset-lane fixture for the new connection owner.
+
+Forbidden changes
+-----------------
+- do not widen transport width
+- do not add a general network protocol stack
+- do not move connection state truth into shell, boot, or dispatch
+- do not solve ingress by inventing a generic queue, broker, or process layer
+
+Phase role in the larger sequence
+---------------------------------
+- This phase starts the external ingress and connection-handling milestone.
+- It consumes the recoverable work substrate from the previous milestone by
+  giving it a persistent external-style workload source.
+- It prepares later phases that should route ingress into workflow, completion,
+  and delegated handling paths.
+
+Relevant backlog items this phase intentionally brings under pressure
+--------------------------------------------------------------------
+- timer-service growth bounded to compact timeout/cancellation
+- queue-pressure policy owner-local to queue_service
+- stall-consequence classification owner-local to queue_service
+- admitted `io.pipe()` and `io.poller_*` composition slice remains narrow until
+  a real consumer needs more
+- kernel observability must remain effect-backed
+
+Questions this phase must answer
+--------------------------------
+1. What is the narrowest honest connection contract for this repository: slot,
+   ingress unit, reply unit, and close?
+2. Can one persistent ingress owner stay honest without reopening blocking or
+   scheduler frameworks?
+3. Which timeout and lifecycle truths belong in the new owner versus timer or
+   workflow owners?
+4. Does one connection owner create enough external pressure to justify the
+   later workflow and delegation phases?
+
+Preferred implementation shape
+------------------------------
+- Keep the new owner in `kernel/src/services/connection_service.mc`.
+- Keep lifetime, slot, and ingress truth owner-local.
+- Reuse existing timer semantics only if the owner needs bounded timeout
+  consequences.
+- Reuse the current shell, topology, and scenario surfaces rather than adding
+  a second orchestration layer.
+
+Test obligations
+----------------
+- `Build debug`
+- one focused scenario proving bounded connection open, ingress, reply, and
+  close
+- one focused reset-lane fixture for the connection owner
+- `mc_tool_workflow_kernel_reset_lane_unit`
+
+Acceptance criteria
+-------------------
+- one bounded connection owner exists with explicit lifetime and failure truth
+- the system can accept one ingress unit and produce one reply unit through the
+  admitted owner
+- no generic networking, blocking, or process framework is introduced
+- ingress pressure is now external-style rather than purely internal
+
+Future follow-up
+----------------
+- The likely immediate next pressure is to route ingress into restart-safe
+  workflows rather than handling it only owner-locally.
+- Reopen broader network abstractions only if one real admitted consumer cannot
+  stay honest with fixed-capacity connection slots and bounded ingress units.

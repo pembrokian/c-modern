@@ -1,0 +1,133 @@
+Phase 241 -- Delegated External Request Handling
+================================================
+
+Status
+------
+PROPOSED
+
+Purpose
+-------
+Admit one bounded delegated handling path for external requests so ingress,
+workflow execution, completion delivery, and temporary authority all interact
+under one real external service chain.
+
+This phase exists now because the prior three ingress phases would establish a
+persistent external workload, workflow-backed execution, and backpressure. The
+next honest move is to pressure the authority model on that external path
+rather than declaring the milestone complete after owner-local handling alone.
+
+Repository status note
+----------------------
+- Phase 233 already proved bounded delegation on an internal completion path.
+- Phase 239 is expected to make external ingress drive workflow work.
+- Phase 240 is expected to stress completion delivery under external backlog.
+- The repository still lacks one external request path that uses bounded
+  delegated authority and restart-visible stale rejection.
+
+Problem being solved
+--------------------
+- The authority model has been tested on internal durable work and completion,
+  but not yet on a sustained external request path.
+- Without this phase, the external ingress milestone would still leave a key
+  question unresolved: whether bounded delegation remains honest when requests,
+  backlog, restart, and completion all interact.
+- This is now a real gap because the ingress milestone would otherwise stop
+  short of the hardest external composition pressure.
+
+Non-goals
+---------
+- no session model
+- no authentication or login system
+- no ACL or generic rights algebra
+- no dynamic endpoint assignment
+- no generic proxy or service mesh framework
+- no supervisor framework in this phase
+
+Invariants
+----------
+- Temporary authority remains bounded and owner-local to `lease_service`.
+- `connection_service` remains the owner of external request lifetime truth.
+- `workflow_service` remains the owner of queued work and restart continuity.
+- Completion delivery remains bounded through `completion_mailbox_service`.
+- The four-byte shell frame stays fixed.
+
+Required surface changes
+------------------------
+1. Extend `lease_service` with one admitted lease or delegation shape for one
+   external request handling step.
+2. Add one explicit handoff path where a non-owner service handles one bounded
+   external request through delegated authority.
+3. Add explicit stale, invalid, and already-consumed failures on the external
+   delegated path.
+4. Add one deterministic scenario proving valid delegated external handling and
+   stale-after-restart rejection.
+5. Add one focused reset-lane fixture for delegated external request handling.
+
+Forbidden changes
+-----------------
+- do not widen `lease_service` into sessions or ACL machinery
+- do not introduce ordinary handle-bearing traffic outside the current narrow
+  transfer and lease boundaries
+- do not move authority truth into dispatch, shell, or the connection owner
+- do not add generic request routing or mesh-style forwarding frameworks
+
+Phase role in the larger sequence
+---------------------------------
+- This phase closes the external ingress and connection-handling milestone.
+- It consumes the ingress, workflow, and completion paths from Phases 238
+  through 240.
+- If it lands honestly, the repository will have one real externally-driven
+  service chain that pressures temporary authority under restart and backlog.
+
+Relevant backlog items this phase intentionally brings under pressure
+--------------------------------------------------------------------
+- restart-visible user-issued state local to `ticket_service`
+- restart identity as a split contract rather than a framework
+- transferred-handle runtime path bounded to one monotonic grant table
+- future authority changes framed through the Phase 209 ownership vocabulary
+- completion delivery bounded to one retained completion mailbox owner
+
+Questions this phase must answer
+--------------------------------
+1. Is one bounded delegated external-request path enough to validate the
+   current authority model under ingress pressure?
+2. Does generation-based stale rejection remain sufficient once requests are
+   externally driven and backlog-sensitive?
+3. Which authority facts belong in `lease_service` versus connection,
+   workflow, and completion owners?
+4. Does this phase expose a real need for broader session or routing policy,
+   or can those remain honestly deferred?
+
+Preferred implementation shape
+------------------------------
+- Keep temporary authority in `lease_service`.
+- Keep external request lifetime and ingress truth in `connection_service`.
+- Keep queued execution in `workflow_service` when the delegated path needs
+  restart-safe work.
+- Reuse completion-mailbox outcomes for the delegated external request path.
+
+Test obligations
+----------------
+- `Build debug`
+- one focused scenario proving delegated external handling, one stale-after-
+  restart rejection, and one already-consumed rejection
+- one focused reset-lane fixture for delegated external request handling
+- `mc_tool_workflow_kernel_reset_lane_unit`
+- `mc_tool_workflow_kernel_reset_lane_full_unit`
+
+Acceptance criteria
+-------------------
+- one bounded delegated external-request path works across the admitted service
+  chain
+- stale or restarted authority is rejected deterministically and visibly
+- ingress, workflow, completion, and authority truths remain in their bounded
+  owners
+- no session, authentication, or routing framework is introduced
+
+Future follow-up
+----------------
+- The likely next milestone after this is a more product-shaped workflow such
+  as update or package handling over real ingress.
+- If this phase exposes broader routing, fairness, or authority pressure,
+  record that in `docs/plan/backlog.txt` rather than widening this milestone
+  after the fact.

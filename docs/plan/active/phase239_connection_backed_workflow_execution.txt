@@ -1,0 +1,126 @@
+Phase 239 -- Connection-Backed Workflow Execution
+=================================================
+
+Status
+------
+PROPOSED
+
+Purpose
+-------
+Admit one bounded path that turns connection ingress into restart-safe
+workflow-driven work, so external requests become a real sustained pressure on
+the recoverable work substrate.
+
+This phase exists now because Phase 238 would create a persistent ingress
+surface, and the next honest move is to route that ingress into existing
+workflow machinery rather than handling all requests synchronously inside the
+connection owner.
+
+Repository status note
+----------------------
+- Phase 231 already binds timer, task, and restart truth into one bounded
+  workflow system.
+- Phase 238 is expected to create a persistent connection owner with bounded
+  ingress and reply behavior.
+- The repository still lacks one external request path that can survive restart
+  or fail honestly through the workflow substrate.
+
+Problem being solved
+--------------------
+- External-style ingress without workflow execution would underuse the durable
+  and restart-safe work system and keep connection handling too synchronous.
+- That would make ingress pressure shallow and would fail to test whether the
+  existing workflow substrate can handle sustained external work honestly.
+- This gap is real once a connection owner exists, because requests now have a
+  natural path into durable work.
+
+Non-goals
+---------
+- no general scheduler framework
+- no process or session model
+- no request graph or fan-out framework
+- no dynamic service discovery
+- no general RPC framework
+- no fairness framework in this phase
+
+Invariants
+----------
+- `workflow_service` remains a bounded owner-local workflow system.
+- `connection_service` remains the owner of connection lifetime truth.
+- Completion delivery remains bounded through `completion_mailbox_service`.
+- The four-byte shell frame stays fixed.
+- Restart behavior remains explicit and testable.
+
+Required surface changes
+------------------------
+1. Add one admitted connection-backed workflow kind in `workflow_service`.
+2. Add one explicit handoff path from `connection_service` to
+   `workflow_service` for one bounded ingress request shape.
+3. Add explicit terminal outcomes for executed, cancelled, and restart-
+   cancelled connection-backed work.
+4. Add one deterministic scenario proving request ingress, workflow execution,
+   and restart behavior.
+5. Add one focused reset-lane fixture for connection-backed workflow execution.
+
+Forbidden changes
+-----------------
+- do not turn `connection_service` into a workflow or scheduler owner
+- do not widen the request shape into a generic RPC payload model
+- do not move connection lifetime truth into workflow code
+- do not add a general dependency graph or fan-out runtime
+
+Phase role in the larger sequence
+---------------------------------
+- This phase consumes the ingress surface admitted in Phase 238.
+- It prepares later phases by making completion delivery and backpressure
+  matter on real external requests.
+- It is the first phase in this milestone that should create restart-visible
+  consequences on external ingress.
+
+Relevant backlog items this phase intentionally brings under pressure
+--------------------------------------------------------------------
+- timer-service growth bounded to compact timeout/cancellation
+- task-service follow-through bounded to explicit work-state consequences
+- completion delivery bounded to one retained completion mailbox owner
+- restart identity as a split contract rather than a framework
+
+Questions this phase must answer
+--------------------------------
+1. Can one connection-backed workflow path stay honest without a general RPC or
+   scheduler framework?
+2. Which request states must survive restart, and which must cancel explicitly?
+3. Does the current completion-mailbox model remain sufficient for external
+   request outcomes?
+4. What is the narrowest ingress request shape that still creates meaningful
+   external workflow pressure?
+
+Preferred implementation shape
+------------------------------
+- Keep connection lifetime and ingress buffering in `connection_service`.
+- Keep queued work and restart continuity in `workflow_service`.
+- Reuse the current journal-backed workflow restart substrate.
+- Reuse the completion mailbox for terminal request outcomes rather than
+  inventing a second reply-completion layer.
+
+Test obligations
+----------------
+- `Build debug`
+- one focused scenario proving ingress-to-workflow handoff, execution, and one
+  restart outcome
+- one focused reset-lane fixture for connection-backed workflow execution
+- `mc_tool_workflow_kernel_reset_lane_unit`
+
+Acceptance criteria
+-------------------
+- one bounded ingress request can enter the workflow system and complete or
+  cancel honestly across restart
+- connection and workflow truths stay in their existing owners
+- no scheduler, session, or RPC framework is introduced
+- external ingress now drives recoverable work directly
+
+Future follow-up
+----------------
+- The likely immediate next pressure is completion delivery and backpressure on
+  externally-driven work.
+- Reopen richer request composition only if a real admitted ingress consumer
+  cannot stay honest with one bounded request shape.

@@ -1,0 +1,145 @@
+Phase 234 -- Durable Named Object Store First Slice
+===================================================
+
+Status
+------
+PROPOSED
+
+Purpose
+-------
+Admit one bounded durable named-object owner so the repository can move from a
+durable journal substrate to durable named state with explicit create, read,
+and replace behavior.
+
+This phase exists now because Phases 230 through 233 proved recoverable work,
+completion, and delegation, but they still operate over thin durable data
+semantics. The next honest move is to make durable named data itself real
+before widening to broader filesystem or packaging claims.
+
+Repository status note
+----------------------
+- Phase 230 landed `journal_service` as the first durable owner with bounded
+  append, replay, and clear semantics.
+- Phase 231 landed `workflow_service` and already consumes durable journal
+  state for restart-safe work.
+- Phase 232 landed `completion_mailbox_service` and made backpressure on
+  completion delivery executable.
+- Phase 233 landed `lease_service` and proved bounded temporary authority over
+  one real service chain.
+- The repository still lacks one durable owner whose primary contract is named
+  data rather than replay records.
+
+Problem being solved
+--------------------
+- The repository can durably record workflow and recovery facts, but it still
+  cannot expose one bounded durable named-data capability.
+- Without a durable named-object owner, later update workflows would either
+  smuggle state into journal records or widen the existing retained file owner
+  dishonestly.
+- This gap is now real because the recoverable work pipeline exists and needs a
+  meaningful durable object to operate on.
+
+Non-goals
+---------
+- no filesystem framework
+- no path graph or directories
+- no delete, truncate, seek, or rename surface
+- no durable multi-owner registry
+- no package or installer workflow in this phase
+- no compiler, sema, MIR, runtime, or stdlib widening unless one concrete
+  implementation blocker makes a narrowly-scoped follow-up unavoidable
+
+Invariants
+----------
+- `kernel_dispatch.mc` remains a routing and gating boundary only.
+- The four-byte shell frame stays fixed.
+- Durable replay and artifact interpretation remain owner-local or boot/init-
+  local; they do not become a generic persistence layer.
+- Existing retained owners keep their current restart truths; this phase does
+  not silently convert retained owners into durable owners.
+- Reset-lane workflow coverage remains the primary maintained proof surface for
+  the running-system slice.
+
+Required surface changes
+------------------------
+1. Add one durable `object_store_service` owner under `kernel/src/services/`.
+2. Admit one bounded command family for:
+   - create one named object slot
+   - read one named object slot
+   - replace one named object slot atomically within the owner
+3. Add explicit durable serialization and reload for the object store through
+   the existing boot/init durable path.
+4. Add one deterministic scenario proving create, read, replace, and restart
+   reload.
+5. Add one focused reset-lane fixture for the object-store owner.
+
+Forbidden changes
+-----------------
+- do not widen shell transport width
+- do not repurpose `journal_service` into a generic durable object registry
+- do not move object-store truth into boot or dispatch merely to simplify code
+- do not add generic namespaces, dashboards, or discovery registries
+- do not solve named-data pressure by widening the retained `file_service`
+  beyond its current admitted boundary
+
+Phase role in the larger sequence
+---------------------------------
+- This phase consumes the durable substrate admitted in Phase 230.
+- It prepares the next three phases by giving workflow, completion, and
+  delegation a real durable object to mutate or transport truth about.
+- Later update-workflow phases should operate on this owner rather than on raw
+  journal lanes.
+
+Relevant backlog items this phase intentionally brings under pressure
+--------------------------------------------------------------------
+- retained-versus-durable state classification
+- durable replay and recovery bounded to `journal_service`
+- file-like service growth bounded to one owner-local probe
+- file-service payload semantics bounded to retained append/read
+- retained-state reload explicit and init-owned
+
+Questions this phase must answer
+--------------------------------
+1. What is the narrowest durable named-object contract that is stronger than a
+   journal lane but weaker than a filesystem?
+2. Can one durable object owner stay honest without paths, directories, or
+   delete semantics?
+3. Which durable truth belongs in `object_store_service` versus boot/init
+   reload helpers?
+4. Does durable named data expose a second coordination need, or can recovery
+   still stay explicit and flat?
+
+Preferred implementation shape
+------------------------------
+- Keep the new owner in `kernel/src/services/object_store_service.mc`.
+- Reuse the existing journal-backed durable boot/init pattern rather than
+  inventing a second persistence framework.
+- Keep object naming fixed-capacity and owner-local.
+- Keep replace semantics owner-local and explicit rather than layering a
+  transaction abstraction over the owner.
+- Reuse existing shell, topology, boot identity, and reset-lane surfaces.
+
+Test obligations
+----------------
+- `Build debug`
+- one focused scenario proving durable create, read, replace, and reload after
+  restart
+- one focused reset-lane fixture for the new durable object owner
+- `mc_tool_workflow_kernel_reset_lane_unit`
+
+Acceptance criteria
+-------------------
+- one bounded durable named-object owner exists and survives restart
+- callers can create, read, and replace one named object through the admitted
+  shell surface
+- the phase does not widen into filesystem or namespace semantics
+- durable reload remains explicit and deterministic
+
+Future follow-up
+----------------
+- The likely immediate next pressure is a workflow that mutates durable named
+  objects rather than merely recording workflow state.
+- Delegated object mutation and completion reporting should build on this owner
+  rather than on journal lanes directly.
+- Reopen filesystem-scale naming only if a real admitted consumer cannot stay
+  honest inside fixed-capacity named object slots.
