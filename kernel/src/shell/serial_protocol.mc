@@ -47,6 +47,7 @@ const CMD_BANG: u8 = 33  // '!' — end-of-argument sentinel
 const CMD_W: u8 = 87   // 'W' — stall-count query; also write sub-op within CMD_F
 const CMD_F: u8 = 70   // 'F' — file command family
 const CMD_M: u8 = 77   // 'M' — timer command family
+const CMD_N: u8 = 78   // 'N' — object store command family
 const CMD_J: u8 = 74   // 'J' — task command family
 const CMD_Y: u8 = 89   // 'Y' — journal command family
 const CMD_O: u8 = 79   // 'O' — workflow command family
@@ -68,6 +69,7 @@ const TARGET_TIMER: u8 = 77     // 'M'
 const TARGET_TASK: u8 = 74      // 'J'
 const TARGET_JOURNAL: u8 = 85   // 'U'
 const TARGET_WORKFLOW: u8 = 79  // 'O'
+const TARGET_OBJECT_STORE: u8 = 78  // 'N'
 const TARGET_LEASE: u8 = 90     // 'Z'
 const TARGET_COMPLETION: u8 = 66  // 'B'
 
@@ -208,6 +210,18 @@ func encode_file_read(name: u8) [4]u8 {
 
 func encode_file_count() [4]u8 {
     return encode_no_args(CMD_F, CMD_L)
+}
+
+func encode_object_create(name: u8, value: u8) [4]u8 {
+    return encode_two_args(CMD_N, CMD_C, name, value)
+}
+
+func encode_object_read(name: u8) [4]u8 {
+    return encode_one_arg(CMD_N, CMD_R, name)
+}
+
+func encode_object_replace(name: u8, value: u8) [4]u8 {
+    return encode_two_args(CMD_N, CMD_W, name, value)
 }
 
 func encode_timer_create(id: u8, due: u8) [4]u8 {

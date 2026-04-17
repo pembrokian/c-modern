@@ -43,6 +43,7 @@ const JOURNAL_ENDPOINT_ID: u32 = 21
 const WORKFLOW_ENDPOINT_ID: u32 = 22
 const LEASE_ENDPOINT_ID: u32 = 23
 const COMPLETION_MAILBOX_ENDPOINT_ID: u32 = 24
+const OBJECT_STORE_ENDPOINT_ID: u32 = 25
 
 // ServiceSlot records the static wiring for one boot service: which endpoint
 // it occupies and which pid owns it.  Both values are fixed at kernel_init
@@ -82,8 +83,9 @@ const JOURNAL_SLOT: ServiceSlot = { endpoint: JOURNAL_ENDPOINT_ID, pid: 12 }
 const WORKFLOW_SLOT: ServiceSlot = { endpoint: WORKFLOW_ENDPOINT_ID, pid: 13 }
 const LEASE_SLOT: ServiceSlot = { endpoint: LEASE_ENDPOINT_ID, pid: 14 }
 const COMPLETION_MAILBOX_SLOT: ServiceSlot = { endpoint: COMPLETION_MAILBOX_ENDPOINT_ID, pid: 15 }
+const OBJECT_STORE_SLOT: ServiceSlot = { endpoint: OBJECT_STORE_ENDPOINT_ID, pid: 16 }
 
-const SERVICE_SLOTS: [15]ServiceSlot = {
+const SERVICE_SLOTS: [16]ServiceSlot = {
     SERIAL_SLOT,
     SHELL_SLOT,
     LOG_SLOT,
@@ -98,10 +100,11 @@ const SERVICE_SLOTS: [15]ServiceSlot = {
     JOURNAL_SLOT,
     WORKFLOW_SLOT,
     LEASE_SLOT,
-    COMPLETION_MAILBOX_SLOT
+    COMPLETION_MAILBOX_SLOT,
+    OBJECT_STORE_SLOT
 }
 
-const SERVICE_RESTART_MODES: [15]ServiceRestartMode = {
+const SERVICE_RESTART_MODES: [16]ServiceRestartMode = {
     ServiceRestartMode.None,
     ServiceRestartMode.None,
     ServiceRestartMode.Reload,
@@ -116,15 +119,16 @@ const SERVICE_RESTART_MODES: [15]ServiceRestartMode = {
     ServiceRestartMode.Reload,
     ServiceRestartMode.Reload,
     ServiceRestartMode.Reset,
+    ServiceRestartMode.Reload,
     ServiceRestartMode.Reload
 }
 
 // SERVICE_COUNT is the number of boot-wired services in the static topology.
 // Increment this when a new slot constant is added above.
-const SERVICE_COUNT: u32 = 15
+const SERVICE_COUNT: u32 = 16
 
 func service_count() usize {
-    return 15
+    return 16
 }
 
 func service_slot_at(index: usize) ServiceSlot {
@@ -202,6 +206,8 @@ func service_authority_class(endpoint: u32) ServiceAuthorityClass {
         return ServiceAuthorityClass.RetainedOwner
     case COMPLETION_MAILBOX_ENDPOINT_ID:
         return ServiceAuthorityClass.RetainedOwner
+    case OBJECT_STORE_ENDPOINT_ID:
+        return ServiceAuthorityClass.DurableOwner
     default:
         if endpoint_is_boot_wired(endpoint) {
             return ServiceAuthorityClass.PublicEndpoint

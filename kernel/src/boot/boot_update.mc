@@ -5,6 +5,7 @@ import journal_service
 import kv_service
 import lease_service
 import log_service
+import object_store_service
 import queue_service
 import serial_shell_path
 import service_identity
@@ -187,6 +188,14 @@ func bootwith_completion_restart_outcome(s: KernelBootState, outcome: RestartOut
     return s with { completion_restart_outcome: outcome }
 }
 
+func bootwith_object_store(s: KernelBootState, object_store: object_store_service.ObjectStoreServiceState) KernelBootState {
+    return s with { object_store.state: object_store }
+}
+
+func bootwith_object_store_restart_outcome(s: KernelBootState, outcome: RestartOutcome) KernelBootState {
+    return s with { object_store_restart_outcome: outcome }
+}
+
 func bootrestart_workflow(s: KernelBootState, workflow: workflow_service.WorkflowServiceState) KernelBootState {
     return s with { workflow.state: workflow, workflow.generation: s.workflow.generation + 1 }
 }
@@ -197,4 +206,8 @@ func bootrestart_lease(s: KernelBootState, lease: lease_service.LeaseServiceStat
 
 func bootrestart_completion(s: KernelBootState, completion: completion_mailbox_service.CompletionMailboxServiceState) KernelBootState {
     return s with { completion.state: completion, completion.generation: s.completion.generation + 1 }
+}
+
+func bootrestart_object_store(s: KernelBootState, object_store: object_store_service.ObjectStoreServiceState) KernelBootState {
+    return s with { object_store.state: object_store, object_store.generation: s.object_store.generation + 1 }
 }

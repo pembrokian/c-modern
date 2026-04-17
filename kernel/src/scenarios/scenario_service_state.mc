@@ -2,17 +2,20 @@
 
 import boot
 import kernel_dispatch
+import object_store_service
 import scenario_assert
 import scenario_transport
 import serial_protocol
 import service_effect
 import service_state
+import service_topology
 import syscall
 
 const FAIL_STATE_SERIAL: i32 = 311
 const FAIL_STATE_ECHO: i32 = 312
 const FAIL_STATE_QUEUE: i32 = 313
 const FAIL_STATE_WORKSET: i32 = 314
+const FAIL_STATE_OBJECT_STORE: i32 = 315
 
 func run_service_state_probe() i32 {
     fixed: boot.KernelBootState = boot.kernel_init()
@@ -61,6 +64,27 @@ func run_service_state_probe() i32 {
     effect = kernel_dispatch.kernel_dispatch_step(&lane, scenario_transport.cmd_lifecycle_state(serial_protocol.TARGET_WORKSET))
     if !scenario_assert.expect_service_state(effect, syscall.SyscallStatus.Ok, serial_protocol.TARGET_WORKSET, service_state.STATE_CLASS_LANE, service_state.STATE_MODE_RELOAD, service_state.STATE_PARTICIPATION_LANE, service_state.STATE_POLICY_KEEP, 0, 2) {
         return FAIL_STATE_WORKSET
+    }
+
+    if !object_store_service.object_store_persist(object_store_service.object_store_init(service_topology.OBJECT_STORE_SLOT.pid, 1)) {
+        return FAIL_STATE_OBJECT_STORE
+    }
+    durable: boot.KernelBootState = boot.kernel_init()
+    effect = kernel_dispatch.kernel_dispatch_step(&durable, scenario_transport.cmd_object_create(9, 77))
+    if service_effect.effect_reply_status(effect) != syscall.SyscallStatus.Ok {
+        return FAIL_STATE_OBJECT_STORE
+    }
+    effect = kernel_dispatch.kernel_dispatch_step(&durable, scenario_transport.cmd_lifecycle_state(serial_protocol.TARGET_OBJECT_STORE))
+    if !scenario_assert.expect_service_state(effect, syscall.SyscallStatus.Ok, serial_protocol.TARGET_OBJECT_STORE, service_state.STATE_CLASS_DURABLE, service_state.STATE_MODE_RELOAD, service_state.STATE_PARTICIPATION_SERVICE, service_state.STATE_POLICY_KEEP, 1, 1) {
+        return FAIL_STATE_OBJECT_STORE
+    }
+    effect = kernel_dispatch.kernel_dispatch_step(&durable, scenario_transport.cmd_lifecycle_restart(serial_protocol.TARGET_OBJECT_STORE))
+    if !scenario_assert.expect_lifecycle(effect, syscall.SyscallStatus.Ok, serial_protocol.TARGET_OBJECT_STORE, serial_protocol.LIFECYCLE_RELOAD) {
+        return FAIL_STATE_OBJECT_STORE
+    }
+    effect = kernel_dispatch.kernel_dispatch_step(&durable, scenario_transport.cmd_lifecycle_state(serial_protocol.TARGET_OBJECT_STORE))
+    if !scenario_assert.expect_service_state(effect, syscall.SyscallStatus.Ok, serial_protocol.TARGET_OBJECT_STORE, service_state.STATE_CLASS_DURABLE, service_state.STATE_MODE_RELOAD, service_state.STATE_PARTICIPATION_SERVICE, service_state.STATE_POLICY_KEEP, 1, 2) {
+        return FAIL_STATE_OBJECT_STORE
     }
 
     return 0

@@ -1,0 +1,51 @@
+You are acting as a senior compiler and systems engineer working on a small, pragmatic systems language and microkernel-oriented runtime.
+
+Your task is to implement Phase 234.
+
+Before making changes:
+
+1. Read:
+   - the phase document
+   - agents.md
+   - repo_map.txt
+   - kernel_style_guide
+   - any module contracts relevant to the affected files
+
+2. Identify:
+   - which files should change
+   - which files must not change
+   - which ownership boundaries matter for this phase
+   - any invariants or forbidden changes from the phase spec
+
+Implementation requirements:
+
+3. Implement the phase fully, not just tests, validation, or scaffolding.
+4. Prefer small, direct, Ken Thompson style programs and data structures.
+5. Do not introduce large frameworks, generic infrastructure, registries, or speculative abstractions unless the phase explicitly requires them.
+6. Respect existing ownership boundaries and module contracts.
+7. Keep dispatch, boot, topology, parser, checker, and codegen responsibilities narrow.
+8. Avoid turning central files into new centers of gravity.
+
+After implementation:
+
+9. Update any affected docs, such as:
+   - roadmap
+   - backlog
+   - decision_log
+   - repo_map.txt
+   - architecture docs
+
+10. Record:
+   - major implementation decisions (docs/plan/decision_log.txt)
+   - important non-decisions
+   - places where the compiler or language was intentionally kept simple
+   - deferred work
+   - newly discovered language limitations
+
+11. If implementation reveals missing language features, add them to backlog under:
+   - Potential Language Features
+
+12. End by reviewing the implementation against the phase spec:
+   - what invariants were preserved
+   - whether any ownership boundaries weakened
+   - whether any accidental abstractions or centers of gravity emerged

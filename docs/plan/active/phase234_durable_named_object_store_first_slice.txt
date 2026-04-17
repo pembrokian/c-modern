@@ -3,7 +3,7 @@ Phase 234 -- Durable Named Object Store First Slice
 
 Status
 ------
-PROPOSED
+IMPLEMENTED
 
 Purpose
 -------

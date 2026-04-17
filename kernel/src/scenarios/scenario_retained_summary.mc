@@ -2,10 +2,12 @@
 
 import boot
 import kernel_dispatch
+import object_store_service
 import scenario_assert
 import scenario_transport
 import serial_protocol
 import service_effect
+import service_topology
 import syscall
 
 const FAIL_SUMMARY_FRESH_LOG: i32 = 207
@@ -20,10 +22,30 @@ const FAIL_SUMMARY_KV_AFTER_WORKSET: i32 = 215
 const FAIL_SUMMARY_AUDIT_STATUS: i32 = 216
 const FAIL_SUMMARY_AUDIT_AFTER: i32 = 217
 const FAIL_SUMMARY_LOG_AFTER_AUDIT: i32 = 218
+const FAIL_SUMMARY_OBJECT_STORE_STATUS: i32 = 219
+const FAIL_SUMMARY_OBJECT_STORE_AFTER: i32 = 220
 
 func run_retained_summary_probe() i32 {
+    if !object_store_service.object_store_persist(object_store_service.object_store_init(service_topology.OBJECT_STORE_SLOT.pid, 1)) {
+        return FAIL_SUMMARY_OBJECT_STORE_STATUS
+    }
+
+    durable: boot.KernelBootState = boot.kernel_init()
+    effect: service_effect.Effect = kernel_dispatch.kernel_dispatch_step(&durable, scenario_transport.cmd_object_create(1, 55))
+    if service_effect.effect_reply_status(effect) != syscall.SyscallStatus.Ok {
+        return FAIL_SUMMARY_OBJECT_STORE_STATUS
+    }
+    effect = kernel_dispatch.kernel_dispatch_step(&durable, scenario_transport.cmd_lifecycle_restart(serial_protocol.TARGET_OBJECT_STORE))
+    if !scenario_assert.expect_lifecycle(effect, syscall.SyscallStatus.Ok, serial_protocol.TARGET_OBJECT_STORE, serial_protocol.LIFECYCLE_RELOAD) {
+        return FAIL_SUMMARY_OBJECT_STORE_STATUS
+    }
+    effect = kernel_dispatch.kernel_dispatch_step(&durable, scenario_transport.cmd_lifecycle_summary(serial_protocol.TARGET_OBJECT_STORE))
+    if !scenario_assert.expect_summary(effect, syscall.SyscallStatus.Ok, boot.RetainedSummaryParticipation.Service, boot.RestartOutcome.DurableReloaded, 2) {
+        return FAIL_SUMMARY_OBJECT_STORE_AFTER
+    }
+
     fresh: boot.KernelBootState = boot.kernel_init()
-    effect: service_effect.Effect = kernel_dispatch.kernel_dispatch_step(&fresh, scenario_transport.cmd_lifecycle_summary(serial_protocol.TARGET_LOG))
+    effect = kernel_dispatch.kernel_dispatch_step(&fresh, scenario_transport.cmd_lifecycle_summary(serial_protocol.TARGET_LOG))
     if !scenario_assert.expect_summary(effect, syscall.SyscallStatus.Ok, boot.RetainedSummaryParticipation.Service, boot.RestartOutcome.None, 1) {
         return FAIL_SUMMARY_FRESH_LOG
     }

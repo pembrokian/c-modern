@@ -11,6 +11,7 @@ import journal_service
 import kv_service
 import lease_service
 import log_service
+import object_store_service
 import queue_service
 import serial_service
 import serial_shell_path
@@ -74,8 +75,10 @@ struct KernelBootState {
     workflow: ServiceCell<workflow_service.WorkflowServiceState>
     lease: ServiceCell<lease_service.LeaseServiceState>
     completion: ServiceCell<completion_mailbox_service.CompletionMailboxServiceState>
+    object_store: ServiceCell<object_store_service.ObjectStoreServiceState>
     lease_restart_outcome: RestartOutcome
     completion_restart_outcome: RestartOutcome
+    object_store_restart_outcome: RestartOutcome
     grants: transfer_grant.GrantTable
 }
 
@@ -95,6 +98,7 @@ func kernel_init() KernelBootState {
     workflow_slot := service_topology.WORKFLOW_SLOT
     lease_slot := service_topology.LEASE_SLOT
     completion_slot := service_topology.COMPLETION_MAILBOX_SLOT
+    object_store_slot := service_topology.OBJECT_STORE_SLOT
 
     path_state := serial_shell_path.path_init(serial_service.serial_init(serial_slot.pid, 1), shell_service.shell_init(shell_slot.pid, 1), shell_slot.endpoint)
     log_cell := ServiceCell<log_service.LogServiceState>{ state: log_service.log_init(log_slot.pid, 1), generation: 1 }
@@ -110,6 +114,7 @@ func kernel_init() KernelBootState {
     workflow_cell := ServiceCell<workflow_service.WorkflowServiceState>{ state: workflow_service.workflow_init(workflow_slot.pid), generation: 1 }
     lease_cell := ServiceCell<lease_service.LeaseServiceState>{ state: lease_service.lease_init(lease_slot.pid, 1), generation: 1 }
     completion_cell := ServiceCell<completion_mailbox_service.CompletionMailboxServiceState>{ state: completion_mailbox_service.completion_mailbox_init(completion_slot.pid, 1), generation: 1 }
+    object_store_cell := ServiceCell<object_store_service.ObjectStoreServiceState>{ state: object_store_service.object_store_load(object_store_slot.pid, 1), generation: 1 }
 
     return KernelBootState{
         path_state: path_state,
@@ -140,8 +145,10 @@ func kernel_init() KernelBootState {
         workflow: workflow_cell,
         lease: lease_cell,
         completion: completion_cell,
+        object_store: object_store_cell,
         lease_restart_outcome: RestartOutcome.None,
         completion_restart_outcome: RestartOutcome.None,
+        object_store_restart_outcome: RestartOutcome.None,
         grants: transfer_grant.grant_init()
     }
 }

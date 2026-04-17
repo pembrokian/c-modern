@@ -154,6 +154,8 @@ func lifecycle_target_endpoint(target: u8) u32 {
         return service_topology.LEASE_ENDPOINT_ID
     case serial_protocol.TARGET_COMPLETION:
         return service_topology.COMPLETION_MAILBOX_ENDPOINT_ID
+    case serial_protocol.TARGET_OBJECT_STORE:
+        return service_topology.OBJECT_STORE_ENDPOINT_ID
     default:
         return 0
     }
@@ -418,6 +420,30 @@ func route_file(s: ShellServiceState, m: service_effect.Message, op: u8) service
     return dispatch(FILE_ROUTES, s, m, op)
 }
 
+func object_create(s: ShellServiceState, m: service_effect.Message) service_effect.Effect {
+    return forward_three(s, service_topology.OBJECT_STORE_ENDPOINT_ID, serial_protocol.CMD_C, m.payload[2], m.payload[3])
+}
+
+func object_read(s: ShellServiceState, m: service_effect.Message) service_effect.Effect {
+    return forward_two(s, service_topology.OBJECT_STORE_ENDPOINT_ID, serial_protocol.CMD_R, m.payload[2])
+}
+
+func object_replace(s: ShellServiceState, m: service_effect.Message) service_effect.Effect {
+    return forward_three(s, service_topology.OBJECT_STORE_ENDPOINT_ID, serial_protocol.CMD_W, m.payload[2], m.payload[3])
+}
+
+const OBJECT_ROUTES: [5]OpHandler = [5]OpHandler{
+    OpHandler{ op: serial_protocol.CMD_C, check: anymsg, run: object_create },
+    OpHandler{ op: serial_protocol.CMD_R, check: bang3, run: object_read },
+    OpHandler{ op: serial_protocol.CMD_W, check: anymsg, run: object_replace },
+    UNUSED_ROUTE,
+    UNUSED_ROUTE
+}
+
+func route_object_store(s: ShellServiceState, m: service_effect.Message, op: u8) service_effect.Effect {
+    return dispatch(OBJECT_ROUTES, s, m, op)
+}
+
 func timer_create(s: ShellServiceState, m: service_effect.Message) service_effect.Effect {
     return forward_three(s, service_topology.TIMER_ENDPOINT_ID, serial_protocol.CMD_C, m.payload[2], m.payload[3])
 }
@@ -620,6 +646,9 @@ func handle(s: ShellServiceState, m: service_effect.Message) service_effect.Effe
 
     case serial_protocol.CMD_F:
         return route_file(s, m, op)
+
+    case serial_protocol.CMD_N:
+        return route_object_store(s, m, op)
 
     case serial_protocol.CMD_M:
         return route_timer(s, m, op)

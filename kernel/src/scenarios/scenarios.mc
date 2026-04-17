@@ -9,6 +9,7 @@ import scenario_durability
 import scenario_journal_service
 import scenario_lease_service
 import scenario_lifecycle
+import scenario_object_store_service
 import scenario_retained_policy
 import scenario_queue
 import scenario_retained_summary
@@ -87,6 +88,10 @@ func run(state: *boot.KernelBootState) i32 {
         return result
     }
     result = scenario_journal_service.run_journal_service_probe()
+    if result != 0 {
+        return result
+    }
+    result = scenario_object_store_service.run_object_store_service_probe()
     if result != 0 {
         return result
     }

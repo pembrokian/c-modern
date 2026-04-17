@@ -17,6 +17,7 @@ import event_codes
 import kv_service
 import lease_service
 import log_service
+import object_store_service
 import primitives
 import queue_service
 import serial_protocol
@@ -306,6 +307,18 @@ func dispatch_journal(state: *boot.KernelBootState, msg: service_effect.Message)
     return journal_result.effect
 }
 
+func dispatch_object_store(state: *boot.KernelBootState, msg: service_effect.Message) service_effect.Effect {
+    current: boot.KernelBootState = *state
+    result := object_store_service.handle(current.object_store.state, msg)
+    if object_store_service.object_store_changed(current.object_store.state, result.state) {
+        if !object_store_service.object_store_persist(result.state) {
+            return service_effect.effect_reply(syscall.SyscallStatus.Closed, 0, primitives.zero_payload())
+        }
+    }
+    *state = boot.bootwith_object_store(current, result.state)
+    return result.effect
+}
+
 func dispatch_completion_mailbox(state: *boot.KernelBootState, msg: service_effect.Message) service_effect.Effect {
     current: boot.KernelBootState = *state
     result: completion_mailbox_service.CompletionMailboxResult = completion_mailbox_service.handle(current.completion.state, msg)
@@ -406,6 +419,8 @@ func leaf_route(endpoint: u32) LeafRoute {
         return LeafRoute{ endpoint: endpoint, reply: dispatch_lease }
     case service_topology.COMPLETION_MAILBOX_ENDPOINT_ID:
         return LeafRoute{ endpoint: endpoint, reply: dispatch_completion_mailbox }
+    case service_topology.OBJECT_STORE_ENDPOINT_ID:
+        return LeafRoute{ endpoint: endpoint, reply: dispatch_object_store }
     default:
         return LeafRoute{ endpoint: endpoint, reply: dispatch_invalid_endpoint }
     }

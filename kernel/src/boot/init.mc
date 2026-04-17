@@ -21,6 +21,7 @@ import journal_service
 import kv_service
 import lease_service
 import log_service
+import object_store_service
 import queue_service
 import serial_protocol
 import service_topology
@@ -77,6 +78,8 @@ func restart_policy_for_target(target: u8) RestartPolicyInfo {
         return restart_policy_single(target, serial_protocol.POLICY_CLEAR)
     case serial_protocol.TARGET_COMPLETION:
         return restart_policy_single(target, serial_protocol.POLICY_KEEP)
+    case serial_protocol.TARGET_OBJECT_STORE:
+        return restart_policy_single(target, serial_protocol.POLICY_KEEP)
     default:
         return RestartPolicyInfo{ target: 0, owner0: serial_protocol.PARTICIPANT_NONE, owner1: serial_protocol.PARTICIPANT_NONE, policy: serial_protocol.PARTICIPANT_NONE }
     }
@@ -123,6 +126,8 @@ func restart(state: boot.KernelBootState, endpoint: u32) boot.KernelBootState {
         return restart_lease(state)
     case service_topology.COMPLETION_MAILBOX_ENDPOINT_ID:
         return restart_completion_mailbox(state)
+    case service_topology.OBJECT_STORE_ENDPOINT_ID:
+        return restart_object_store(state)
     default:
         return state
     }
@@ -264,4 +269,10 @@ func restart_completion_mailbox(state: boot.KernelBootState) boot.KernelBootStat
     snap := completion_mailbox_service.completion_mailbox_snapshot(state.completion.state)
     next := boot.bootrestart_completion(state, completion_mailbox_service.completion_mailbox_reload(slot.pid, 1, snap))
     return boot.bootwith_completion_restart_outcome(next, boot.RestartOutcome.RetainedReloaded)
+}
+
+func restart_object_store(state: boot.KernelBootState) boot.KernelBootState {
+    slot := service_topology.OBJECT_STORE_SLOT
+    next := boot.bootrestart_object_store(state, object_store_service.object_store_load(slot.pid, 1))
+    return boot.bootwith_object_store_restart_outcome(next, boot.RestartOutcome.DurableReloaded)
 }
