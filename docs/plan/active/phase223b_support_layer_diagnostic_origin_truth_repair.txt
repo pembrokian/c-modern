@@ -3,7 +3,7 @@ Phase 223B -- Support-Layer Diagnostic Origin Truth Repair
 
 Status
 ------
-ACTIVE
+COMPLETE
 
 Purpose
 -------
@@ -124,3 +124,24 @@ Why this is still a plausible next move
   while the repository is focused on compiler diagnostics.
 - This stays inside the compiler-owned surface and remains narrower than any
   non-compiler error expansion.
+
+Closeout
+--------
+- Chosen defect: duplicate project `module_sets.<name>.files` ownership
+  diagnostics in `compiler/driver/project.cpp` reported the right conflict but
+  anchored it to `build.toml:1:1` instead of the later conflicting
+  `module_sets.<name>.files` entry.
+- Repair shape: keep the change owner-local to project loading and validation.
+  `ProjectModuleSet` now retains the declaration line for its `files` entry,
+  and the duplicate-ownership validation reports the conflict at the later
+  conflicting declaration line instead of the manifest root.
+- Validation owner: `tests/tool/tool_multifile_module_suite.cpp` now asserts
+  the repaired `build.toml:19:1` origin for the duplicate module-set file
+  ownership workflow.
+- Why this stayed narrow: the repair reused existing manifest line ownership,
+  changed only span truth for one admitted compiler-owned failure path, and did
+  not widen `Diagnostic`, support-layer provenance, AST identity, or any
+  broader diagnostic framework.
+- Validation performed:
+  - `Build debug`
+  - `mc_tool_workflow_multifile_module_unit`

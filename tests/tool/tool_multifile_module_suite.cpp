@@ -138,6 +138,9 @@ void TestDuplicateModuleSetFileOwnershipFails(const std::filesystem::path& binar
                                                                   "multifile_duplicate_ownership_output.txt",
                                                                   "duplicate module-set ownership build");
     ExpectOutputContains(output,
+                         "build.toml:19:1: error:",
+                         "duplicate module-set file ownership should point at the later module-set files entry");
+    ExpectOutputContains(output,
                          "assigns source file",
                          "duplicate module-set file ownership should be rejected");
     ExpectOutputContains(output,

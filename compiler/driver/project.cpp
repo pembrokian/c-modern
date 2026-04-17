@@ -777,6 +777,7 @@ std::optional<ProjectFile> LoadProjectFile(const std::filesystem::path& path,
             }
             auto* module_set = LookupTargetModuleSet(*target, section[3]);
             module_set->files.clear();
+            module_set->files_line = line_number;
             for (const auto& entry : parsed_value->string_array_value) {
                 module_set->files.push_back(entry);
             }
@@ -1047,18 +1048,30 @@ std::optional<ProjectFile> LoadProjectFile(const std::filesystem::path& path,
                 }
             }
         }
-        std::unordered_map<std::string, std::string> owned_module_set_files;
+        struct ModuleSetFileOwner {
+            std::string module_name;
+            std::size_t files_line = 0;
+        };
+        std::unordered_map<std::string, ModuleSetFileOwner> owned_module_set_files;
         for (const auto& [module_name, module_set] : target.module_sets) {
             for (const auto& file : module_set.files) {
                 const std::string normalized_file = file.lexically_normal().generic_string();
-                const auto [it, inserted] = owned_module_set_files.emplace(normalized_file, module_name);
-                if (!inserted && it->second != module_name) {
+                const auto [it, inserted] = owned_module_set_files.emplace(normalized_file,
+                                                                           ModuleSetFileOwner {
+                                                                               .module_name = module_name,
+                                                                               .files_line = module_set.files_line,
+                                                                           });
+                if (!inserted && it->second.module_name != module_name) {
+                    const bool current_is_later = module_set.files_line >= it->second.files_line;
+                    const std::string& first_owner = current_is_later ? it->second.module_name : module_name;
+                    const std::string& second_owner = current_is_later ? module_name : it->second.module_name;
+                    const std::size_t second_owner_line = current_is_later ? module_set.files_line : it->second.files_line;
                     diagnostics.Report({
                         .file_path = project.path,
-                        .span = mc::support::kDefaultSourceSpan,
+                        .span = MakeLineSpan(second_owner_line == 0 ? 1 : second_owner_line),
                         .severity = DiagnosticSeverity::kError,
                         .message = "target '" + name + "' assigns source file '" + normalized_file +
-                                   "' to multiple module sets: '" + it->second + "' and '" + module_name + "'",
+                                   "' to multiple module sets: '" + first_owner + "' and '" + second_owner + "'",
                     });
                 }
             }
@@ -1083,13 +1096,13 @@ std::optional<ProjectFile> LoadProjectFile(const std::filesystem::path& path,
             }
         }
         const auto root_owner = owned_module_set_files.find(target.root.lexically_normal().generic_string());
-        if (root_owner != owned_module_set_files.end() && root_owner->second != entry_module_name) {
+        if (root_owner != owned_module_set_files.end() && root_owner->second.module_name != entry_module_name) {
             diagnostics.Report({
                 .file_path = project.path,
                 .span = mc::support::kDefaultSourceSpan,
                 .severity = DiagnosticSeverity::kError,
                 .message = "target '" + name + "' root source '" + target.root.generic_string() +
-                           "' belongs to module set '" + root_owner->second +
+                           "' belongs to module set '" + root_owner->second.module_name +
                            "'; the root source may only participate in entry module set '" + entry_module_name + "'",
             });
         }

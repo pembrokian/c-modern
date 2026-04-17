@@ -22,6 +22,7 @@ struct ProjectTargetTests {
 struct ProjectModuleSet {
     std::string module_name;
     std::vector<std::filesystem::path> files;
+    std::size_t files_line = 0;
 };
 
 struct ProjectTarget {
