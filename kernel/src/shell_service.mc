@@ -3,6 +3,7 @@ import identity_taxonomy
 import serial_protocol
 import service_effect
 import service_topology
+import service_state
 import syscall
 
 const SHELL_INVALID_REPLY: u8 = 63  // '?'
@@ -103,6 +104,14 @@ func lifecycle_authority_effect(status: syscall.SyscallStatus, payload: [4]u8) s
     return service_effect.effect_reply(status, 4, payload)
 }
 
+func lifecycle_state_request(s: ShellServiceState, m: service_effect.Message) service_effect.Effect {
+    return service_effect.effect_send(s.pid, service_topology.SHELL_ENDPOINT_ID, m.payload_len, m.payload)
+}
+
+func lifecycle_state_effect(status: syscall.SyscallStatus, payload: [4]u8) service_effect.Effect {
+    return service_effect.effect_reply(status, 4, payload)
+}
+
 func lifecycle_policy_effect(status: syscall.SyscallStatus, payload: [4]u8) service_effect.Effect {
     return service_effect.effect_reply(status, 4, payload)
 }
@@ -188,6 +197,14 @@ func handle(s: ShellServiceState, m: service_effect.Message) service_effect.Effe
                 }
             }
             return lifecycle_authority_request(s, m)
+        case serial_protocol.CMD_C:
+            if !identity_taxonomy.identity_target_is_lane(m.payload[2]) {
+                state_endpoint: u32 = lifecycle_target_endpoint(m.payload[2])
+                if state_endpoint == 0 {
+                    return invalid_effect(SHELL_INVALID_COMMAND)
+                }
+            }
+            return lifecycle_state_request(s, m)
         case serial_protocol.CMD_Q:
             if identity_taxonomy.identity_target_is_lane(m.payload[2]) {
                 return lifecycle_effect(syscall.SyscallStatus.Ok, m.payload[2], serial_protocol.LIFECYCLE_RELOAD)

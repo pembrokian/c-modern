@@ -14,6 +14,7 @@
 //   Q C ! !         — queue count (returns count as reply_payload_len)
 //   Q P ! !         — queue peek
 //   X A <target> !  — authority inspection query
+//   X C <target> !  — compact service-state query
 //   X Q <target> !  — lifecycle query
 //   X P <target> !  — lifecycle policy query
 //   X S <target> !  — retained summary query
@@ -104,6 +105,10 @@ func encode_lifecycle_query(target: u8) [4]u8 {
 
 func encode_lifecycle_authority(target: u8) [4]u8 {
     return ipc.payload_byte(CMD_X, CMD_A, target, CMD_BANG)
+}
+
+func encode_lifecycle_state(target: u8) [4]u8 {
+    return ipc.payload_byte(CMD_X, CMD_C, target, CMD_BANG)
 }
 
 func encode_lifecycle_identity(target: u8) [4]u8 {

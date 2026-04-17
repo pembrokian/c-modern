@@ -9,10 +9,10 @@ Purpose
 -------
 Record the current admitted Veya running-system slice separately from the
 broader position note so the repository can state exactly what the work
-through Phase 213 does and does not support.
+through Phase 214 does and does not support.
 
 This is the current refreshed running-system statement.  It supersedes the
-earlier Phase 120 through Phase 121 statement and reflects the post-Phase-213
+earlier Phase 120 through Phase 121 statement and reflects the post-Phase-214
 landing.
 
 This note is intentionally narrower than the current-position assessment.
@@ -140,12 +140,16 @@ Repository status note
   one runtime-owned target-classification helper so identity naming stops
   drifting across shell-visible lifecycle, identity, summary, and policy
   surfaces.
+- Phase 214 adds one compact shell-visible service-state query over the same
+  fixed targets, composing lifecycle class, restart mode, retained
+  participation, retained policy, bounded generation marker, and already-
+  admitted local count metadata.
 
 Core rule
 ---------
 - Keep this running-system support statement separate from the broader
   position note.
-- State only the admitted Phase 109 through Phase 213 running-system slice,
+- State only the admitted Phase 109 through Phase 214 running-system slice,
   not a larger platform ambition.
 - Keep service policy init-owned and explicit.
 - Reopen broader running-system claims only when a later kernel proof lands
@@ -181,8 +185,8 @@ Frozen support matrix
   shell_service as a stateless
   command-routing owner with compact hostile-user invalid classification
   (`?C` unknown command, `?S` malformed admitted shape) plus bounded
-  lifecycle query, restart, identity, and retained-summary routing on fixed
-  public targets;
+  lifecycle query, restart, identity, retained-summary, retained-policy, and
+  compact service-state routing on fixed public targets;
   serial_service as serial ingress and reply staging owner; handle-bearing
   observations remain outside ordinary named messaging and are rejected at
   the dispatch gateway with `InvalidCapability` unless they target the
@@ -210,7 +214,8 @@ Frozen support matrix
   coordinated-lane generation truth plus continuity outcomes; `boot_identity.mc`
   owns the fixed-width retained-summary projection; `identity_taxonomy.mc`
   owns the shell-visible lane-target classification for the shared Phase 213
-  restartable-service identity taxonomy
+  restartable-service identity taxonomy; `service_state.mc` owns the compact
+  Phase 214 service-state reply contract
 - admitted proof set: Phase 109 first-running-kernel slice, Phase 110
   ownership split, Phase 111 scheduler and lifecycle clarification, Phase
   112 syscall boundary, Phase 113 interrupt-entry and generic-dispatch, Phase
@@ -257,8 +262,8 @@ Frozen support matrix
   audit-lane probe, Phase 206 retained service summary and restart outcome
   inspection, Phase 208 retained-policy inspection, Phase 209 authority
   vocabulary and ownership-table audit, Phase 212 authority inspection
-  follow-through, and Phase 213 unified identity taxonomy for restartable
-  services
+  follow-through, Phase 213 unified identity taxonomy for restartable
+  services, and Phase 214 system introspection surface for service state
 - unsupported today: dynamic discovery, a general namespace model, dynamic
   loading, a service manager, broader init policy, public freestanding `mc
   run` or `mc test`, broader target-family admission, multicore claims,

@@ -3,6 +3,7 @@
 import service_effect
 import service_identity
 import boot
+import service_state
 import syscall
 
 func expect_restart_identity(before: service_identity.ServiceMark, after: service_identity.ServiceMark, base: i32) i32 {
@@ -103,6 +104,30 @@ func expect_authority(effect: service_effect.Effect, status: syscall.SyscallStat
         return false
     }
     if payload[3] != scope {
+        return false
+    }
+    return true
+}
+
+func expect_service_state(effect: service_effect.Effect, status: syscall.SyscallStatus, target: u8, class: u8, mode: u8, participation: u8, policy: u8, metadata: u8, generation: u8) bool {
+    if service_effect.effect_reply_status(effect) != status {
+        return false
+    }
+    if service_effect.effect_reply_payload_len(effect) != 4 {
+        return false
+    }
+    payload: [4]u8 = service_effect.effect_reply_payload(effect)
+    expected: [4]u8 = service_state.state_payload(target, class, mode, participation, policy, metadata, generation)
+    if payload[0] != expected[0] {
+        return false
+    }
+    if payload[1] != expected[1] {
+        return false
+    }
+    if payload[2] != expected[2] {
+        return false
+    }
+    if payload[3] != expected[3] {
         return false
     }
     return true

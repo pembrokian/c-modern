@@ -19,6 +19,7 @@ import serial_protocol
 import serial_shell_path
 import service_effect
 import service_identity
+import service_state
 import service_topology
 import shell_service
 import syscall
@@ -56,7 +57,7 @@ func lifecycle_is_lane_target(target: u8) bool {
 }
 
 func lifecycle_op_supported(op: u8) bool {
-    return op == serial_protocol.CMD_A || op == serial_protocol.CMD_I || op == serial_protocol.CMD_P || op == serial_protocol.CMD_S || op == serial_protocol.CMD_R
+    return op == serial_protocol.CMD_A || op == serial_protocol.CMD_C || op == serial_protocol.CMD_I || op == serial_protocol.CMD_P || op == serial_protocol.CMD_S || op == serial_protocol.CMD_R
 }
 
 func lifecycle_validate(msg: service_effect.Message) u8 {
@@ -103,6 +104,42 @@ func authority_payload(target: u8, class: u8, transfer: u8, scope: u8) [4]u8 {
     return payload
 }
 
+func lifecycle_policy_code(target: u8) u8 {
+    info: init.RestartPolicyInfo = init.restart_policy_for_target(target)
+    return service_state.state_policy_code(info.policy)
+}
+
+func lifecycle_metadata(state: *boot.KernelBootState, target: u8) u8 {
+    current: boot.KernelBootState = *state
+    switch target {
+    case serial_protocol.TARGET_LOG:
+        return u8(log_service.log_len(current.log.state))
+    case serial_protocol.TARGET_KV:
+        return u8(kv_service.kv_count(current.kv.state))
+    case serial_protocol.TARGET_QUEUE:
+        return u8(queue_service.queue_len(current.queue.state))
+    default:
+        return 0
+    }
+}
+
+func lifecycle_generation_marker(state: *boot.KernelBootState, target: u8) u8 {
+    if target == serial_protocol.TARGET_WORKSET {
+        return service_state.state_generation_marker(boot.boot_workset_generation(*state))
+    }
+    if target == serial_protocol.TARGET_AUDIT {
+        return service_state.state_generation_marker(boot.boot_audit_generation(*state))
+    }
+
+    endpoint: u32 = lifecycle_target_endpoint(target)
+    if endpoint == 0 || !service_topology.service_can_restart(endpoint) {
+        return 0
+    }
+
+    mark: service_identity.ServiceMark = boot.bootmark_for_endpoint(*state, endpoint)
+    return service_state.state_generation_marker(service_identity.mark_generation(mark))
+}
+
 func lifecycle_authority_reply(state: *boot.KernelBootState, target: u8) service_effect.Effect {
     if lifecycle_is_lane_target(target) {
         return shell_service.lifecycle_authority_effect(
@@ -138,6 +175,32 @@ func lifecycle_authority_reply(state: *boot.KernelBootState, target: u8) service
     return shell_service.lifecycle_authority_effect(
         syscall.SyscallStatus.Ok,
         authority_payload(target, class_code, transfer, scope))
+}
+
+func lifecycle_state_reply(state: *boot.KernelBootState, target: u8) service_effect.Effect {
+    if !lifecycle_is_lane_target(target) {
+        state_endpoint: u32 = lifecycle_target_endpoint(target)
+        if state_endpoint == 0 {
+            return shell_service.invalid_effect(shell_service.SHELL_INVALID_COMMAND)
+        }
+    }
+
+    mode: u8 = serial_protocol.LIFECYCLE_NONE
+    if lifecycle_is_lane_target(target) {
+        mode = serial_protocol.LIFECYCLE_RELOAD
+    } else {
+        mode = shell_service.lifecycle_mode(lifecycle_target_endpoint(target))
+    }
+
+    payload: [4]u8 = service_state.state_payload(
+        target,
+        service_state.state_class(target),
+        service_state.state_mode_code(mode),
+        service_state.state_participation(target),
+        lifecycle_policy_code(target),
+        lifecycle_metadata(state, target),
+        lifecycle_generation_marker(state, target))
+    return shell_service.lifecycle_state_effect(syscall.SyscallStatus.Ok, payload)
 }
 
 func lifecycle_identity_reply(state: *boot.KernelBootState, target: u8) service_effect.Effect {
@@ -238,6 +301,8 @@ func lifecycle_route(op: u8) LifecycleRoute {
     switch op {
     case serial_protocol.CMD_A:
         return LifecycleRoute{ op: op, reply: lifecycle_authority_reply }
+    case serial_protocol.CMD_C:
+        return LifecycleRoute{ op: op, reply: lifecycle_state_reply }
     case serial_protocol.CMD_I:
         return LifecycleRoute{ op: op, reply: lifecycle_identity_reply }
     case serial_protocol.CMD_P:

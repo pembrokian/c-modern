@@ -3,7 +3,41 @@ Phase 214 -- System Introspection Surface For Service State
 
 Status
 ------
-PROPOSED
+COMPLETED
+
+Outcome
+-------
+Phase 214 completed the service-state consolidation step it was intended to
+land.
+
+The running system now exposes one compact fixed-target `XC<target>!`
+service-state query that composes already-admitted lifecycle, retained,
+identity, policy, and bounded service-local metadata truth without opening a
+registry, dashboard, or compiler wave.
+
+Implemented outcome
+-------------------
+- `kernel/src/serial_protocol.mc` now defines one additive `XC<target>!`
+  shell-visible service-state query on the existing `X` control family.
+- `kernel/src/service_state.mc` now owns the compact four-byte reply contract:
+  target, packed lifecycle class plus restart mode, packed retained
+  participation plus retained policy plus metadata, and one bounded low-byte
+  generation marker.
+- `kernel/src/kernel_dispatch.mc` now composes service-state replies from the
+  existing truthful owners instead of rebuilding semantics in the shell.
+- `kernel/src/scenario_service_state.mc` now provides one deterministic probe
+  over representative fixed, ordinary-restart, retained-reload, and
+  coordinated-retained targets.
+- `tests/system/kernel_reset_lane_phase214_service_state/` now provides one
+  focused reset-lane fixture and `tests/tool/tool_kernel_reset_lane_suite.cpp`
+  now keeps that fixture in the live grouped workflow suite.
+- `docs/plan/decision_log.txt` and `docs/plan/backlog.txt` now record the
+  deliberate compactness and non-expansion boundary for this surface.
+
+Validation
+----------
+- the CMake debug build succeeded after the runtime wiring landed
+- `mc_tool_workflow_kernel_reset_lane_unit` passed
 
 Purpose
 -------
@@ -26,9 +60,9 @@ Repository status note
 - Phase 213 now gives those identity-bearing inspection surfaces one shared
   restartable-service identity taxonomy instead of separate local identity
   wording.
-- Those surfaces are individually honest but collectively fragmented.
-- The system now has enough inspection truth that the next leverage point is
-  composition rather than more one-off queries.
+- Those surfaces were individually honest but collectively fragmented.
+- Phase 214 turns that fragmentation into one additive compact state view
+  without changing the underlying owner split.
 
 Problem being solved
 --------------------
@@ -60,8 +94,8 @@ Chosen slice for this phase
    - retained participation
    - relevant identity generation marker
    - retained policy class where already admitted
-   - bounded service-local metadata such as queue count only where a service
-     already owns and exposes that truth honestly
+   - bounded service-local metadata such as retained count or queue count only
+     where a service already owns and exposes that truth honestly
 3. keep each piece of introspected truth owned by its current module rather
    than rebuilding semantics in the shell
 4. add one deterministic scenario and one focused reset-lane fixture proving
@@ -69,8 +103,8 @@ Chosen slice for this phase
 5. make no compiler, sema, MIR, backend, ABI, target, runtime, stdlib, or
    `hal` expansion beyond the inspection surface itself
 
-Planned outcome
----------------
+Resulting outcome
+-----------------
 - the running system gains one coherent service-state inspection surface
 - the repo starts to expose a more legible operating-system personality rather
   than only a collection of separate narrow inspection verbs
