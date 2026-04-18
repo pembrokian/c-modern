@@ -1,0 +1,259 @@
+Patterns Cookbook
+=================
+
+Purpose
+-------
+Use this document to shorten planning and search time for common repository-
+owned change shapes.
+
+This is a touch-set guide, not a substitute for `AGENTS.md`,
+`docs/agent/prompts/repo_map.md`, `docs/agent/prompts/plan_spec.txt`, the
+active phase document, or owner-local contracts.
+
+It only covers patterns that repeat cleanly across recent compiler phases and
+reset-lane kernel phases.
+
+Do not apply it mechanically to delegated authority, restart choreography,
+imported-module plumbing, or broad architecture work.
+
+Core Rules
+----------
+1. Start from the controlling owner.
+   Syntax lives in `compiler/parse`.
+   Meaning lives in `compiler/sema`.
+   Typed lowering lives in `compiler/mir`.
+   Tool behavior lives in `compiler/driver` or `tests/tool`.
+   Kernel runtime ownership lives in the owning `kernel/src/...` module.
+2. Keep the phase boundary honest.
+   Do not repair parser or sema gaps in MIR, driver, or tests.
+3. Update the narrowest owning tests first.
+4. Spend the feature in one repository-owned caller when the phase expects a
+   real source improvement.
+5. If the active phase document conflicts with this cookbook, the phase doc
+   wins.
+
+Pattern 1 -- Add A New AST Node
+-------------------------------
+Use when:
+- parser must preserve a new source shape structurally
+
+Usually edit:
+- `compiler/ast`
+- `compiler/parse`
+- AST dump paths if parser fixtures compare `.ast.txt`
+- `compiler/sema` only if the new shape carries distinct meaning
+- `compiler/mir` only if current lowering cannot reuse an existing typed form
+
+Validate:
+- parser fixtures first
+- sema or MIR tests only if those owners changed
+
+Beware:
+- do not create a new node when one bounded field on an existing node is enough
+- do not move semantic meaning into the AST layer
+
+Pattern 2 -- Add A Parser Keyword Or Syntax Form
+------------------------------------------------
+Use when:
+- language admits a new token or grammar-owned spelling
+
+Usually edit:
+- `compiler/lex` if the token is new
+- `compiler/parse`
+- `compiler/ast` if the syntax needs a stored shape
+- parser diagnostics for malformed local syntax
+- parser fixtures and `.errors.txt` cases
+- sema only if the syntax is context-sensitive or meaning-bearing
+
+Validate:
+- parser fixtures first
+- sema or MIR follow-through only if ownership extends there
+
+Beware:
+- do not rewrite callers to hide a parser defect
+- check current parser code before trusting an old phase note about a parser gap
+
+Recent shape:
+- Phase 247: trailing commas and chained `||`
+
+Pattern 3 -- Add A Service State Field
+--------------------------------------
+Use when:
+- a kernel service needs one more owner-local fact
+
+Usually edit:
+- owning file in `kernel/src/services/`
+- init and `...with(...)` helpers
+- persistence or reload helpers if the field is restart-visible
+- owning scenario in `kernel/src/scenarios/`
+- reset-lane fixture in `tests/system/` if the behavior is phase-sized
+- `tests/tool/tool_kernel_reset_lane_suite.cpp` if fixture registration is required
+
+Validate:
+- `Build debug`
+- owning reset-lane workflow test target
+
+Beware:
+- no audit counters or observation-only live state
+- do not move service-owned truth into boot, dispatch, or workflow code
+
+Recent shape:
+- Phase 242: `kernel/src/services/update_store_service.mc`
+
+Pattern 4 -- Add A Diagnostic
+-----------------------------
+Use when:
+- one owner must reject invalid source or tool state
+
+Usually edit:
+- the first layer that can state the problem honestly
+- `.errors.txt` fixtures for compiler diagnostics
+- grouped tool expectations in `tests/tool` for CLI behavior
+
+Validate:
+- the owning parser, sema, MIR, or tool test target
+
+Beware:
+- do not delay the error to a later layer
+- fixture convention is one expected substring per line, not full formatted lines
+
+Pattern 5 -- Add A Test File
+----------------------------
+Use when:
+- the touched owner already has a stable fixture family
+
+Common families:
+- parser: `.mc` plus `.ast.txt` or `.errors.txt`
+- sema: `.mc` plus `.sema.txt` or `.errors.txt`
+- MIR: `.mc` plus `.mir.txt`
+- tool: grouped case under `tests/tool/`
+- reset-lane kernel: `tests/system/<fixture>/build.toml` plus `src/main.mc`
+
+Validate:
+- the owning test target, not the whole suite first
+
+Beware:
+- prefer the active grouped owner instead of creating a parallel legacy surface
+- for reset-lane fixtures, check whether the scenario table also needs a row
+
+Pattern 6 -- Add A Compiler Phase
+---------------------------------
+Use when:
+- the task is a bounded repository-owned language or compiler slice
+
+Usually edit:
+- `docs/plan/active/`
+- `docs/agent/prompts/plan_spec.txt` as the shape contract
+- only the owning compiler layer and its tests
+
+Validate:
+- the build or test targets named by the phase doc
+
+Beware:
+- phase docs must name non-goals, invariants, required surfaces, forbidden
+  changes, and test obligations
+- do not claim a broader milestone is complete when only a follow-through slice
+  landed
+
+Pattern 7 -- Add A Builtin Function
+-----------------------------------
+Use when:
+- one compiler-known callable surface is needed
+
+Usually edit:
+- parser only if the spelling is reserved or keyword-like
+- sema for recognition, signature, and call legality
+- MIR or backend only if ordinary call lowering is not honest enough
+- examples or tests that spend the builtin
+
+Validate:
+- sema tests first
+- MIR or executable tests if lowering or codegen changed
+
+Beware:
+- many builtin-like features are sema-owned, not parser-owned
+- do not add backend magic before checking current lowering
+
+Pattern 8 -- Add A Tagged Union Case
+------------------------------------
+Use when:
+- an existing variant or enum-like sum type gains one case
+
+Usually edit:
+- owning type definition
+- printers or dumpers
+- parser only if source can spell the case distinctly
+- sema checks for classification, exhaustiveness, or field access
+- MIR only if representation or control flow changes
+
+Validate:
+- the narrowest parser, sema, or MIR tests for that variant family
+
+Beware:
+- do not forget dump paths that act as public truth in fixtures
+- do not widen one case into a general variant redesign
+
+Pattern 9 -- Add A New Runtime Service
+--------------------------------------
+Use when:
+- kernel needs one new bounded reset-lane owner
+
+Usually edit:
+- `kernel/src/services/<name>.mc`
+- topology and dispatch wiring
+- `kernel/src/scenarios/scenario_<name>.mc`
+- reset-lane fixture under `tests/system/`
+- `tests/tool/tool_kernel_reset_lane_suite.cpp`
+
+Validate:
+- `Build debug`
+- owning reset-lane workflow suite target
+
+Beware:
+- follow the kernel four-section standard
+- do not put service-owned truth in `main.mc`
+- do not use the new service to smuggle in a framework
+
+Recent shape:
+- Phase 242 is the cleanest recent example
+
+Pattern 10 -- Parser + Sema + MIR Follow-Through
+------------------------------------------------
+Use when:
+- syntax is parser-owned but only becomes meaningful through sema or lowering
+
+Usually edit:
+- parser for the source surface
+- sema for legality, expected-type rules, or meaning
+- MIR only if the typed representation truly changes
+- parser, sema, and MIR tests only where each layer changed
+- one spend site if the feature reduces real source noise
+
+Validate:
+- the narrowest changed-layer tests in order: parser, then sema, then MIR or
+  executable
+
+Beware:
+- not every syntax change needs a MIR node
+- do not skip sema when meaning depends on context or destination type
+
+Recent shapes:
+- Phase 246: parser plus sema, MIR adjusted only for deterministic distinct locals
+- Phase 248: sema-centered extent normalization with MIR imported-module follow-through
+- Phase 249: parser-owned `[]`, sema-owned admissibility, MIR reuse of existing aggregate lowering
+
+Quick Check Before Editing
+--------------------------
+1. Which layer owns the first honest definition of this behavior?
+2. Which layers only need follow-through?
+3. What is the narrowest existing test family?
+4. Is a spend site required?
+5. What adjacent expansion must stay out of scope?
+
+Quick Check Before Finishing
+----------------------------
+1. Did the change stay in the owning layer?
+2. Did the narrowest relevant tests pass?
+3. Did fixture truth files need updating?
+4. Did the change accidentally add a framework, registry, or new center of gravity?
+5. If this was phase work, does the landing still match the active phase doc?

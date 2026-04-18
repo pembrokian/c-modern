@@ -1,0 +1,1444 @@
+==== kernel/src/services/completion_mailbox_service.mc ====
+STRUCT_DECL: CompletionMailboxServiceState
+STRUCT_DECL: CompletionMailboxSnapshot
+STRUCT_DECL: CompletionMailboxResult
+FUNCTION_DECL: completion_mailbox_init
+   Return: CompletionMailboxServiceState
+   Param: u32 pid
+   Param: u32 slot
+FUNCTION_DECL: mailboxwith
+   Return: CompletionMailboxServiceState
+   Param: CompletionMailboxServiceState s
+   Param: [MAILBOX_CAPACITY]u8 ids
+   Param: [MAILBOX_CAPACITY]u8 states
+   Param: [MAILBOX_CAPACITY]u8 restarts
+   Param: [MAILBOX_CAPACITY]u8 gens
+   Param: usize len
+   Param: usize stall_count
+FUNCTION_DECL: completion_mailbox_snapshot
+   Return: CompletionMailboxSnapshot
+   Param: CompletionMailboxServiceState s
+FUNCTION_DECL: completion_mailbox_reload
+   Return: CompletionMailboxServiceState
+   Param: u32 pid
+   Param: u32 slot
+   Param: CompletionMailboxSnapshot snap
+FUNCTION_DECL: completion_mailbox_enqueue
+   Return: CompletionMailboxResult
+   Param: CompletionMailboxServiceState s
+   Param: u8 id
+   Param: u8 state
+   Param: u8 restart
+   Param: u8 generation
+FUNCTION_DECL: completion_mailbox_fetch
+   Return: CompletionMailboxResult
+   Param: CompletionMailboxServiceState s
+FUNCTION_DECL: completion_mailbox_take
+   Return: CompletionMailboxResult
+   Param: CompletionMailboxServiceState s
+   Param: u8 id
+FUNCTION_DECL: completion_mailbox_ack
+   Return: CompletionMailboxResult
+   Param: CompletionMailboxServiceState s
+FUNCTION_DECL: completion_mailbox_count
+   Return: CompletionMailboxResult
+   Param: CompletionMailboxServiceState s
+FUNCTION_DECL: handle
+   Return: CompletionMailboxResult
+   Param: CompletionMailboxServiceState s
+   Param: service_effect.Message m
+FUNCTION_DECL: completion_backlog_count
+   Return: usize
+   Param: CompletionMailboxServiceState s
+FUNCTION_DECL: completion_stall_count
+   Return: usize
+   Param: CompletionMailboxServiceState s
+
+==== kernel/src/services/connection_service.mc ====
+STRUCT_DECL: ConnectionServiceState
+STRUCT_DECL: ConnectionResult
+STRUCT_DECL: ConnectionExecuteResult
+FUNCTION_DECL: connection_init
+   Return: ConnectionServiceState
+   Param: u32 pid
+   Param: u32 slot
+FUNCTION_DECL: connectionwith
+   Return: ConnectionServiceState
+   Param: ConnectionServiceState s
+   Param: [CONNECTION_CAPACITY]u8 ids
+   Param: [CONNECTION_CAPACITY]u8 state
+   Param: [CONNECTION_CAPACITY]u8 ingress
+   Param: [CONNECTION_CAPACITY]u8 reply
+   Param: [CONNECTION_CAPACITY]u8 work
+   Param: [CONNECTION_CAPACITY]u8 idle
+   Param: u8 next
+FUNCTION_DECL: connection_reply
+   Return: service_effect.Effect
+   Param: syscall.SyscallStatus status
+   Param: usize len
+   Param: u8 payload0
+   Param: u8 payload1
+   Param: u8 payload2
+   Param: u8 payload3
+FUNCTION_DECL: connection_find
+   Return: usize
+   Param: u8 slot
+FUNCTION_DECL: connection_slot_valid
+   Return: bool
+   Param: usize idx
+FUNCTION_DECL: connection_mark_timed_out
+   Return: ConnectionServiceState
+   Param: ConnectionServiceState s
+   Param: usize idx
+FUNCTION_DECL: connection_active_state
+   Return: bool
+   Param: u8 state
+FUNCTION_DECL: connection_validate
+   Return: ConnectionResult
+   Param: ConnectionServiceState s
+   Param: usize idx
+FUNCTION_DECL: connection_open
+   Return: ConnectionResult
+   Param: ConnectionServiceState s
+   Param: u8 slot
+   Param: u8 budget
+FUNCTION_DECL: connection_receive
+   Return: ConnectionResult
+   Param: ConnectionServiceState s
+   Param: u8 slot
+   Param: u8 value
+FUNCTION_DECL: connection_send
+   Return: ConnectionResult
+   Param: ConnectionServiceState s
+   Param: u8 slot
+   Param: u8 value
+FUNCTION_DECL: connection_close
+   Return: ConnectionResult
+   Param: ConnectionServiceState s
+   Param: u8 slot
+   Param: u8 reason
+FUNCTION_DECL: connection_next_request_id
+   Return: u8
+   Param: u8 next
+FUNCTION_DECL: connection_execute_prepare
+   Return: ConnectionExecuteResult
+   Param: ConnectionServiceState s
+   Param: u8 slot
+FUNCTION_DECL: connection_request_active
+   Return: bool
+   Param: ConnectionServiceState s
+   Param: u8 slot
+   Param: u8 request
+FUNCTION_DECL: connection_request_finish
+   Return: ConnectionServiceState
+   Param: ConnectionServiceState s
+   Param: u8 slot
+   Param: u8 request
+FUNCTION_DECL: handle
+   Return: ConnectionResult
+   Param: ConnectionServiceState s
+   Param: service_effect.Message m
+FUNCTION_DECL: connection_active_count
+   Return: usize
+   Param: ConnectionServiceState s
+FUNCTION_DECL: connection_state_code
+   Return: u8
+   Param: ConnectionServiceState s
+   Param: u8 slot
+
+==== kernel/src/services/echo_service.mc ====
+STRUCT_DECL: EchoServiceState
+STRUCT_DECL: EchoResult
+FUNCTION_DECL: echo_init
+   Return: EchoServiceState
+   Param: u32 pid
+   Param: u32 slot
+FUNCTION_DECL: echowith
+   Return: EchoServiceState
+   Param: EchoServiceState s
+   Param: usize count
+FUNCTION_DECL: echoreply
+   Return: service_effect.Effect
+   Param: service_effect.Message m
+FUNCTION_DECL: handle
+   Return: EchoResult
+   Param: EchoServiceState s
+   Param: service_effect.Message m
+FUNCTION_DECL: echo_count
+   Return: usize
+   Param: EchoServiceState s
+
+==== kernel/src/services/file_service.mc ====
+STRUCT_DECL: FileSlot
+STRUCT_DECL: FileServiceState
+STRUCT_DECL: FileResult
+FUNCTION_DECL: empty_file_slot
+   Return: FileSlot
+FUNCTION_DECL: file_init
+   Return: FileServiceState
+   Param: u32 pid
+   Param: u32 slot
+FUNCTION_DECL: filewith
+   Return: FileServiceState
+   Param: FileServiceState s
+   Param: FileSlot slot0
+   Param: FileSlot slot1
+   Param: FileSlot slot2
+   Param: FileSlot slot3
+   Param: usize count
+FUNCTION_DECL: file_slot_at
+   Return: FileSlot
+   Param: FileServiceState s
+   Param: usize idx
+FUNCTION_DECL: file_with_slot
+   Return: FileServiceState
+   Param: FileServiceState s
+   Param: usize idx
+   Param: FileSlot slot
+FUNCTION_DECL: file_append_slot
+   Return: FileServiceState
+   Param: FileServiceState s
+   Param: FileSlot slot
+FUNCTION_DECL: file_find
+   Return: usize
+   Param: FileServiceState s
+   Param: u8 name
+FUNCTION_DECL: file_create
+   Return: FileResult
+   Param: FileServiceState s
+   Param: u8 name
+FUNCTION_DECL: file_write
+   Return: FileResult
+   Param: FileServiceState s
+   Param: u8 name
+   Param: u8 val
+FUNCTION_DECL: file_read
+   Return: FileResult
+   Param: FileServiceState s
+   Param: u8 name
+FUNCTION_DECL: handle
+   Return: FileResult
+   Param: FileServiceState s
+   Param: service_effect.Message m
+FUNCTION_DECL: filerecv
+   Return: FileResult
+   Param: FileServiceState s
+   Param: syscall.ReceiveObservation obs
+FUNCTION_DECL: file_count
+   Return: usize
+   Param: FileServiceState s
+
+==== kernel/src/services/journal_service.mc ====
+STRUCT_DECL: JournalLane
+STRUCT_DECL: JournalServiceState
+STRUCT_DECL: JournalResult
+FUNCTION_DECL: lane_init
+   Return: JournalLane
+   Param: u8 name
+FUNCTION_DECL: journal_init
+   Return: JournalServiceState
+   Param: u32 pid
+   Param: u32 slot
+FUNCTION_DECL: journalwith
+   Return: JournalServiceState
+   Param: JournalServiceState s
+   Param: JournalLane lane0
+   Param: JournalLane lane1
+FUNCTION_DECL: lane_valid
+   Return: bool
+   Param: u8 name
+FUNCTION_DECL: lane_at
+   Return: JournalLane
+   Param: JournalServiceState s
+   Param: u8 name
+FUNCTION_DECL: journal_with_lane
+   Return: JournalServiceState
+   Param: JournalServiceState s
+   Param: u8 name
+   Param: JournalLane lane
+FUNCTION_DECL: lane_equal
+   Return: bool
+   Param: JournalLane left
+   Param: JournalLane right
+FUNCTION_DECL: journal_changed
+   Return: bool
+   Param: JournalServiceState before
+   Param: JournalServiceState after
+FUNCTION_DECL: journal_count
+   Return: usize
+   Param: JournalServiceState s
+FUNCTION_DECL: journal_artifact_bytes
+   Return: [JOURNAL_ARTIFACT_SIZE]u8
+   Param: JournalServiceState s
+FUNCTION_DECL: journal_persist
+   Return: bool
+   Param: JournalServiceState s
+FUNCTION_DECL: journal_load
+   Return: JournalServiceState
+   Param: u32 pid
+   Param: u32 slot
+FUNCTION_DECL: journal_append
+   Return: JournalResult
+   Param: JournalServiceState s
+   Param: u8 name
+   Param: u8 value
+FUNCTION_DECL: journal_replay
+   Return: JournalResult
+   Param: JournalServiceState s
+   Param: u8 name
+FUNCTION_DECL: journal_clear
+   Return: JournalResult
+   Param: JournalServiceState s
+   Param: u8 name
+FUNCTION_DECL: handle
+   Return: JournalResult
+   Param: JournalServiceState s
+   Param: service_effect.Message m
+
+==== kernel/src/services/kv_service.mc ====
+STRUCT_DECL: KvServiceState
+STRUCT_DECL: KvSnapshot
+STRUCT_DECL: KvResult
+FUNCTION_DECL: kv_init
+   Return: KvServiceState
+   Param: u32 pid
+   Param: u32 slot
+FUNCTION_DECL: kvwith
+   Return: KvServiceState
+   Param: KvServiceState s
+   Param: [KV_CAPACITY]u8 keys
+   Param: [KV_CAPACITY]u8 vals
+   Param: usize count
+FUNCTION_DECL: kv_snapshot
+   Return: KvSnapshot
+   Param: KvServiceState s
+FUNCTION_DECL: kv_reload
+   Return: KvServiceState
+   Param: u32 pid
+   Param: u32 slot
+   Param: KvSnapshot snap
+FUNCTION_DECL: kvset
+   Return: KvServiceState
+   Param: KvServiceState s
+   Param: service_effect.Message m
+FUNCTION_DECL: kvget
+   Return: service_effect.Effect
+   Param: KvServiceState s
+   Param: service_effect.Message m
+FUNCTION_DECL: handle
+   Return: KvResult
+   Param: KvServiceState s
+   Param: service_effect.Message m
+FUNCTION_DECL: kvrecv
+   Return: KvResult
+   Param: KvServiceState s
+   Param: syscall.ReceiveObservation obs
+FUNCTION_DECL: kv_count
+   Return: usize
+   Param: KvServiceState s
+
+==== kernel/src/services/lease_service.mc ====
+STRUCT_DECL: LeaseServiceState
+STRUCT_DECL: LeaseResult
+FUNCTION_DECL: lease_init
+   Return: LeaseServiceState
+   Param: u32 pid
+   Param: u32 slot
+FUNCTION_DECL: leasewith
+   Return: LeaseServiceState
+   Param: LeaseServiceState s
+   Param: u8 next
+   Param: [LEASE_CAPACITY]u8 ids
+   Param: [LEASE_CAPACITY]u8 kinds
+   Param: [LEASE_CAPACITY]u8 firsts
+   Param: [LEASE_CAPACITY]u8 seconds
+   Param: [LEASE_CAPACITY]u8 gens
+   Param: usize len
+FUNCTION_DECL: lease_reply
+   Return: service_effect.Effect
+   Param: syscall.SyscallStatus status
+   Param: usize len
+   Param: [4]u8 payload
+FUNCTION_DECL: lease_failure
+   Return: service_effect.Effect
+   Param: u8 code
+FUNCTION_DECL: lease_issue
+   Return: LeaseResult
+   Param: LeaseServiceState s
+   Param: u8 kind
+   Param: u8 first
+   Param: u8 second
+   Param: u8 generation
+FUNCTION_DECL: lease_issue_completion
+   Return: LeaseResult
+   Param: LeaseServiceState s
+   Param: u8 workflow
+   Param: u8 generation
+FUNCTION_DECL: lease_issue_installer_apply
+   Return: LeaseResult
+   Param: LeaseServiceState s
+   Param: u8 generation
+FUNCTION_DECL: lease_issue_object_update
+   Return: LeaseResult
+   Param: LeaseServiceState s
+   Param: u8 name
+   Param: u8 value
+   Param: u8 generation
+FUNCTION_DECL: lease_issue_external_ticket
+   Return: LeaseResult
+   Param: LeaseServiceState s
+   Param: u8 epoch
+   Param: u8 id
+   Param: u8 generation
+FUNCTION_DECL: lease_remove_at
+   Return: LeaseServiceState
+   Param: LeaseServiceState s
+   Param: usize idx
+FUNCTION_DECL: lease_consume_completion
+   Return: LeaseResult
+   Param: LeaseServiceState s
+   Param: u8 id
+   Param: u8 workflow
+   Param: u8 generation
+FUNCTION_DECL: lease_missing_installer_apply_code
+   Return: u8
+   Param: LeaseServiceState s
+   Param: u8 id
+FUNCTION_DECL: lease_consume_installer_apply
+   Return: LeaseResult
+   Param: LeaseServiceState s
+   Param: u8 id
+   Param: u8 generation
+FUNCTION_DECL: lease_consume_object_update
+   Return: LeaseResult
+   Param: LeaseServiceState s
+   Param: u8 id
+   Param: u8 generation
+FUNCTION_DECL: lease_consume_external_ticket
+   Return: LeaseResult
+   Param: LeaseServiceState s
+   Param: u8 id
+   Param: u8 generation
+FUNCTION_DECL: handle
+   Return: LeaseResult
+   Param: LeaseServiceState s
+   Param: service_effect.Message m
+   Param: u8 completion_generation
+   Param: u8 workset_generation
+   Param: u8 ticket_generation
+FUNCTION_DECL: lease_count
+   Return: usize
+   Param: LeaseServiceState s
+
+==== kernel/src/services/log_service.mc ====
+STRUCT_DECL: LogServiceState
+STRUCT_DECL: LogSnapshot
+STRUCT_DECL: LogResult
+FUNCTION_DECL: log_init
+   Return: LogServiceState
+   Param: u32 pid
+   Param: u32 slot
+FUNCTION_DECL: logwith
+   Return: LogServiceState
+   Param: LogServiceState s
+   Param: [LOG_BUFFER_CAPACITY]u8 retained
+   Param: usize len
+FUNCTION_DECL: log_snapshot
+   Return: LogSnapshot
+   Param: LogServiceState s
+FUNCTION_DECL: log_reload
+   Return: LogServiceState
+   Param: u32 pid
+   Param: u32 slot
+   Param: LogSnapshot snap
+FUNCTION_DECL: log_append
+   Return: LogServiceState
+   Param: LogServiceState s
+   Param: syscall.ReceiveObservation obs
+FUNCTION_DECL: log_tail
+   Return: service_effect.Effect
+   Param: LogServiceState s
+FUNCTION_DECL: handle
+   Return: LogResult
+   Param: LogServiceState s
+   Param: service_effect.Message m
+FUNCTION_DECL: log_len
+   Return: usize
+   Param: LogServiceState s
+
+==== kernel/src/services/object_store_service.mc ====
+STRUCT_DECL: ObjectSlot
+STRUCT_DECL: ObjectStoreServiceState
+STRUCT_DECL: ObjectStoreResult
+FUNCTION_DECL: empty_object_slot
+   Return: ObjectSlot
+FUNCTION_DECL: object_store_init
+   Return: ObjectStoreServiceState
+   Param: u32 pid
+   Param: u32 slot
+FUNCTION_DECL: object_storewith
+   Return: ObjectStoreServiceState
+   Param: ObjectStoreServiceState s
+   Param: ObjectSlot slot0
+   Param: ObjectSlot slot1
+   Param: ObjectSlot slot2
+   Param: ObjectSlot slot3
+   Param: usize count
+FUNCTION_DECL: object_slot_at
+   Return: ObjectSlot
+   Param: ObjectStoreServiceState s
+   Param: usize idx
+FUNCTION_DECL: object_with_slot
+   Return: ObjectStoreServiceState
+   Param: ObjectStoreServiceState s
+   Param: usize idx
+   Param: ObjectSlot slot
+FUNCTION_DECL: object_append_slot
+   Return: ObjectStoreServiceState
+   Param: ObjectStoreServiceState s
+   Param: ObjectSlot slot
+FUNCTION_DECL: object_find
+   Return: usize
+   Param: ObjectStoreServiceState s
+   Param: u8 name
+FUNCTION_DECL: object_count
+   Return: usize
+   Param: ObjectStoreServiceState s
+FUNCTION_DECL: object_slot_equal
+   Return: bool
+   Param: ObjectSlot left
+   Param: ObjectSlot right
+FUNCTION_DECL: object_store_changed
+   Return: bool
+   Param: ObjectStoreServiceState before
+   Param: ObjectStoreServiceState after
+FUNCTION_DECL: object_store_artifact_bytes
+   Return: [OBJECT_STORE_ARTIFACT_SIZE]u8
+   Param: ObjectStoreServiceState s
+FUNCTION_DECL: object_store_persist
+   Return: bool
+   Param: ObjectStoreServiceState s
+FUNCTION_DECL: object_store_load
+   Return: ObjectStoreServiceState
+   Param: u32 pid
+   Param: u32 slot
+FUNCTION_DECL: object_create
+   Return: ObjectStoreResult
+   Param: ObjectStoreServiceState s
+   Param: u8 name
+   Param: u8 value
+FUNCTION_DECL: object_read
+   Return: ObjectStoreResult
+   Param: ObjectStoreServiceState s
+   Param: u8 name
+FUNCTION_DECL: object_replace
+   Return: ObjectStoreResult
+   Param: ObjectStoreServiceState s
+   Param: u8 name
+   Param: u8 value
+FUNCTION_DECL: object_update
+   Return: ObjectStoreResult
+   Param: ObjectStoreServiceState s
+   Param: u8 name
+   Param: u8 value
+FUNCTION_DECL: handle
+   Return: ObjectStoreResult
+   Param: ObjectStoreServiceState s
+   Param: service_effect.Message m
+
+==== kernel/src/services/queue_service.mc ====
+STRUCT_DECL: QueueServiceState
+STRUCT_DECL: QueueSnapshot
+STRUCT_DECL: QueueResult
+FUNCTION_DECL: queue_init
+   Return: QueueServiceState
+   Param: u32 pid
+   Param: u32 slot
+FUNCTION_DECL: queuewith
+   Return: QueueServiceState
+   Param: QueueServiceState s
+   Param: [QUEUE_CAPACITY]u8 items
+   Param: usize len
+   Param: usize stall_count
+FUNCTION_DECL: queue_snapshot
+   Return: QueueSnapshot
+   Param: QueueServiceState s
+FUNCTION_DECL: queue_reload
+   Return: QueueServiceState
+   Param: u32 pid
+   Param: u32 slot
+   Param: QueueSnapshot snap
+FUNCTION_DECL: queue_push
+   Return: QueueServiceState
+   Param: QueueServiceState s
+   Param: u8 value
+FUNCTION_DECL: queue_pop
+   Return: QueueResult
+   Param: QueueServiceState s
+FUNCTION_DECL: queue_count
+   Return: QueueResult
+   Param: QueueServiceState s
+FUNCTION_DECL: queue_peek
+   Return: QueueResult
+   Param: QueueServiceState s
+FUNCTION_DECL: handle
+   Return: QueueResult
+   Param: QueueServiceState s
+   Param: service_effect.Message m
+FUNCTION_DECL: queue_len
+   Return: usize
+   Param: QueueServiceState s
+FUNCTION_DECL: queue_stall_count
+   Return: usize
+   Param: QueueServiceState s
+
+==== kernel/src/services/task_service.mc ====
+STRUCT_DECL: TaskServiceState
+STRUCT_DECL: TaskResult
+FUNCTION_DECL: task_init
+   Return: TaskServiceState
+   Param: u32 pid
+   Param: u32 slot
+FUNCTION_DECL: taskwith
+   Return: TaskServiceState
+   Param: TaskServiceState s
+   Param: [TASK_CAPACITY]u8 ids
+   Param: [TASK_CAPACITY]u8 op
+   Param: [TASK_CAPACITY]u8 state
+   Param: usize len
+   Param: u8 next
+FUNCTION_DECL: task_find
+   Return: usize
+   Param: TaskServiceState s
+   Param: u8 id
+FUNCTION_DECL: task_find_free
+   Return: usize
+   Param: TaskServiceState s
+FUNCTION_DECL: task_reply_status
+   Return: service_effect.Effect
+   Param: syscall.SyscallStatus status
+   Param: u8 code
+FUNCTION_DECL: task_submit
+   Return: TaskResult
+   Param: TaskServiceState s
+   Param: u8 opcode
+FUNCTION_DECL: task_query
+   Return: TaskResult
+   Param: TaskServiceState s
+   Param: u8 id
+FUNCTION_DECL: task_cancel
+   Return: TaskResult
+   Param: TaskServiceState s
+   Param: u8 id
+FUNCTION_DECL: task_complete
+   Return: TaskResult
+   Param: TaskServiceState s
+   Param: u8 id
+FUNCTION_DECL: task_list_active
+   Return: TaskResult
+   Param: TaskServiceState s
+   Param: u8 window
+FUNCTION_DECL: handle
+   Return: TaskResult
+   Param: TaskServiceState s
+   Param: service_effect.Message m
+FUNCTION_DECL: task_active_count
+   Return: usize
+   Param: TaskServiceState s
+
+==== kernel/src/services/ticket_service.mc ====
+STRUCT_DECL: TicketServiceState
+STRUCT_DECL: TicketResult
+FUNCTION_DECL: ticket_init
+   Return: TicketServiceState
+   Param: u32 pid
+   Param: u32 slot
+   Param: u8 epoch
+FUNCTION_DECL: ticketwith
+   Return: TicketServiceState
+   Param: TicketServiceState s
+   Param: u8 next
+   Param: [TICKET_CAPACITY]u8 ids
+   Param: usize len
+FUNCTION_DECL: ticket_failure
+   Return: service_effect.Effect
+   Param: syscall.SyscallStatus status
+   Param: u8 code
+FUNCTION_DECL: ticket_issue
+   Return: TicketResult
+   Param: TicketServiceState s
+FUNCTION_DECL: ticket_use
+   Return: TicketResult
+   Param: TicketServiceState s
+   Param: u8 epoch
+   Param: u8 id
+FUNCTION_DECL: handle
+   Return: TicketResult
+   Param: TicketServiceState s
+   Param: service_effect.Message m
+FUNCTION_DECL: ticket_len
+   Return: usize
+   Param: TicketServiceState s
+
+==== kernel/src/services/timer_service.mc ====
+STRUCT_DECL: TimerServiceState
+STRUCT_DECL: TimerSnapshot
+STRUCT_DECL: TimerResult
+FUNCTION_DECL: timer_init
+   Return: TimerServiceState
+   Param: u32 pid
+   Param: u32 slot
+FUNCTION_DECL: timerwith
+   Return: TimerServiceState
+   Param: TimerServiceState s
+   Param: [TIMER_CAPACITY]u8 ids
+   Param: [TIMER_CAPACITY]u8 due
+   Param: [TIMER_CAPACITY]u8 state
+   Param: usize len
+   Param: u8 tick
+FUNCTION_DECL: timer_snapshot
+   Return: TimerSnapshot
+   Param: TimerServiceState s
+FUNCTION_DECL: timer_reload
+   Return: TimerServiceState
+   Param: u32 pid
+   Param: u32 slot
+   Param: TimerSnapshot snap
+FUNCTION_DECL: timer_find
+   Return: usize
+   Param: TimerServiceState s
+   Param: u8 id
+FUNCTION_DECL: timer_tick
+   Return: TimerServiceState
+   Param: TimerServiceState s
+FUNCTION_DECL: timer_reply_status
+   Return: service_effect.Effect
+   Param: syscall.SyscallStatus status
+   Param: u8 code
+FUNCTION_DECL: timer_create
+   Return: TimerResult
+   Param: TimerServiceState s
+   Param: u8 id
+   Param: u8 due_tick
+FUNCTION_DECL: timer_cancel
+   Return: TimerResult
+   Param: TimerServiceState s
+   Param: u8 id
+FUNCTION_DECL: timer_query
+   Return: TimerResult
+   Param: TimerServiceState s
+   Param: u8 id
+FUNCTION_DECL: timer_expired
+   Return: TimerResult
+   Param: TimerServiceState s
+   Param: u8 window
+FUNCTION_DECL: handle
+   Return: TimerResult
+   Param: TimerServiceState s
+   Param: service_effect.Message m
+FUNCTION_DECL: timer_active_count
+   Return: usize
+   Param: TimerServiceState s
+
+==== kernel/src/services/transfer_grant.mc ====
+STRUCT_DECL: GrantTable
+STRUCT_DECL: GrantIssue
+STRUCT_DECL: GrantConsume
+FUNCTION_DECL: grant_init
+   Return: GrantTable
+FUNCTION_DECL: grantwith
+   Return: GrantTable
+   Param: GrantTable t
+   Param: [GRANT_CAPACITY]u32 owners
+   Param: [GRANT_CAPACITY]u32 endpoints
+   Param: [GRANT_CAPACITY]u32 ids
+   Param: u32 next
+FUNCTION_DECL: grant_issue
+   Return: GrantIssue
+   Param: GrantTable t
+   Param: u32 pid
+   Param: u32 endpoint
+FUNCTION_DECL: grant_consume
+   Return: GrantConsume
+   Param: GrantTable t
+   Param: u32 pid
+   Param: u32 slot
+   Param: usize count
+FUNCTION_DECL: grant_consume_one
+   Return: GrantConsume
+   Param: GrantTable t
+   Param: u32 pid
+   Param: u32 slot
+FUNCTION_DECL: grant_consume_two
+   Return: GrantConsume
+   Param: GrantTable t
+   Param: u32 pid
+   Param: u32 slot
+FUNCTION_DECL: grant_consume_index
+   Return: GrantConsume
+   Param: GrantTable t
+   Param: u32 pid
+   Param: usize index
+FUNCTION_DECL: grant_consume_pair_index
+   Return: GrantConsume
+   Param: GrantTable t
+   Param: u32 pid
+   Param: usize first
+   Param: usize second
+
+==== kernel/src/services/transfer_service.mc ====
+STRUCT_DECL: TransferServiceState
+STRUCT_DECL: TransferResult
+FUNCTION_DECL: transfer_init
+   Return: TransferServiceState
+   Param: u32 pid
+   Param: u32 slot
+FUNCTION_DECL: transferwith
+   Return: TransferServiceState
+   Param: TransferServiceState s
+   Param: u32 left
+   Param: u32 right
+FUNCTION_DECL: transfer_ok
+   Return: TransferResult
+   Param: TransferServiceState s
+FUNCTION_DECL: transfer_invalid
+   Return: TransferResult
+   Param: TransferServiceState s
+FUNCTION_DECL: transfer_badarg
+   Return: TransferResult
+   Param: TransferServiceState s
+FUNCTION_DECL: transfer_endpoint_ok
+   Return: bool
+   Param: u32 endpoint
+FUNCTION_DECL: transfer_has
+   Return: bool
+   Param: TransferServiceState s
+   Param: u32 endpoint
+FUNCTION_DECL: transfer_pair_ok
+   Return: bool
+   Param: u32 left
+   Param: u32 right
+FUNCTION_DECL: transfer_bind
+   Return: TransferResult
+   Param: TransferServiceState s
+   Param: service_effect.Message m
+FUNCTION_DECL: onebyte
+   Return: [4]u8
+   Param: u8 value
+FUNCTION_DECL: transfer_direct
+   Return: TransferResult
+   Param: TransferServiceState s
+   Param: service_effect.Message m
+FUNCTION_DECL: transfer_log
+   Return: TransferResult
+   Param: TransferServiceState s
+   Param: service_effect.Message m
+FUNCTION_DECL: transfer_kv
+   Return: TransferResult
+   Param: TransferServiceState s
+   Param: service_effect.Message m
+FUNCTION_DECL: handle
+   Return: TransferResult
+   Param: TransferServiceState s
+   Param: service_effect.Message m
+
+==== kernel/src/services/update_store_service.mc ====
+STRUCT_DECL: UpdateManifest
+STRUCT_DECL: AppliedUpdateTarget
+STRUCT_DECL: UpdateStoreServiceState
+STRUCT_DECL: UpdateStoreResult
+FUNCTION_DECL: update_manifest_init
+   Return: UpdateManifest
+FUNCTION_DECL: update_applied_init
+   Return: AppliedUpdateTarget
+FUNCTION_DECL: update_store_init
+   Return: UpdateStoreServiceState
+   Param: u32 pid
+   Param: u32 slot
+FUNCTION_DECL: update_storewith
+   Return: UpdateStoreServiceState
+   Param: UpdateStoreServiceState s
+   Param: usize len
+   Param: [UPDATE_ARTIFACT_CAPACITY]u8 data
+   Param: UpdateManifest manifest
+   Param: AppliedUpdateTarget applied
+FUNCTION_DECL: update_manifest_equal
+   Return: bool
+   Param: UpdateManifest left
+   Param: UpdateManifest right
+FUNCTION_DECL: update_applied_equal
+   Return: bool
+   Param: AppliedUpdateTarget left
+   Param: AppliedUpdateTarget right
+FUNCTION_DECL: update_store_changed
+   Return: bool
+   Param: UpdateStoreServiceState before
+   Param: UpdateStoreServiceState after
+FUNCTION_DECL: update_applied_present
+   Return: bool
+   Param: UpdateStoreServiceState s
+FUNCTION_DECL: update_applied_version
+   Return: u8
+   Param: UpdateStoreServiceState s
+FUNCTION_DECL: update_applied_len
+   Return: usize
+   Param: UpdateStoreServiceState s
+FUNCTION_DECL: update_applied_byte
+   Return: u8
+   Param: UpdateStoreServiceState s
+   Param: usize idx
+FUNCTION_DECL: update_manifest_classification
+   Return: u8
+   Param: UpdateStoreServiceState s
+FUNCTION_DECL: update_artifact_len
+   Return: usize
+   Param: UpdateStoreServiceState s
+FUNCTION_DECL: update_store_artifact_bytes
+   Return: [UPDATE_STORE_ARTIFACT_SIZE]u8
+   Param: UpdateStoreServiceState s
+FUNCTION_DECL: update_store_persist
+   Return: bool
+   Param: UpdateStoreServiceState s
+FUNCTION_DECL: update_store_load
+   Return: UpdateStoreServiceState
+   Param: u32 pid
+   Param: u32 slot
+FUNCTION_DECL: update_stage
+   Return: UpdateStoreResult
+   Param: UpdateStoreServiceState s
+   Param: u8 value
+FUNCTION_DECL: update_record_manifest
+   Return: UpdateStoreResult
+   Param: UpdateStoreServiceState s
+   Param: u8 version
+   Param: u8 expected_len
+FUNCTION_DECL: update_apply
+   Return: UpdateStoreResult
+   Param: UpdateStoreServiceState s
+FUNCTION_DECL: update_query
+   Return: UpdateStoreResult
+   Param: UpdateStoreServiceState s
+FUNCTION_DECL: update_clear
+   Return: UpdateStoreResult
+   Param: UpdateStoreServiceState s
+FUNCTION_DECL: handle
+   Return: UpdateStoreResult
+   Param: UpdateStoreServiceState s
+   Param: service_effect.Message m
+
+==== kernel/src/services/workflow_advance.mc ====
+FUNCTION_DECL: workflow_execute_connection_ticket
+   Return: workflow_core.WorkflowDelegatedConnectionResult
+   Param: workflow_core.WorkflowServiceState s
+   Param: lease_service.LeaseServiceState lease
+   Param: ticket_service.TicketServiceState ticket
+   Param: completion_mailbox_service.CompletionMailboxServiceState completion
+   Param: u8 ticket_generation
+FUNCTION_DECL: workflow_execute_update_apply_with_lease
+   Return: workflow_core.WorkflowDelegatedUpdateApplyResult
+   Param: workflow_core.WorkflowServiceState s
+   Param: lease_service.LeaseServiceState lease
+   Param: update_store_service.UpdateStoreServiceState update_store
+   Param: completion_mailbox_service.CompletionMailboxServiceState completion
+   Param: u8 workset_generation
+FUNCTION_DECL: workflow_advance_waiting
+   Return: workflow_core.WorkflowAdvanceResult
+   Param: workflow_core.WorkflowServiceState s
+   Param: timer_service.TimerServiceState timer
+   Param: task_service.TaskServiceState task
+   Param: object_store_service.ObjectStoreServiceState object_store
+   Param: update_store_service.UpdateStoreServiceState update_store
+   Param: lease_service.LeaseServiceState lease
+   Param: ticket_service.TicketServiceState ticket
+   Param: completion_mailbox_service.CompletionMailboxServiceState completion
+   Param: connection_service.ConnectionServiceState connection
+   Param: u8 workset_generation
+   Param: u8 ticket_generation
+FUNCTION_DECL: workflow_advance_running
+   Return: workflow_core.WorkflowAdvanceResult
+   Param: workflow_core.WorkflowServiceState s
+   Param: timer_service.TimerServiceState timer
+   Param: task_service.TaskServiceState task
+   Param: object_store_service.ObjectStoreServiceState object_store
+   Param: update_store_service.UpdateStoreServiceState update_store
+   Param: lease_service.LeaseServiceState lease
+   Param: ticket_service.TicketServiceState ticket
+   Param: completion_mailbox_service.CompletionMailboxServiceState completion
+   Param: connection_service.ConnectionServiceState connection
+FUNCTION_DECL: workflow_advance_delivering
+   Return: workflow_core.WorkflowAdvanceResult
+   Param: workflow_core.WorkflowServiceState s
+   Param: timer_service.TimerServiceState timer
+   Param: task_service.TaskServiceState task
+   Param: object_store_service.ObjectStoreServiceState object_store
+   Param: update_store_service.UpdateStoreServiceState update_store
+   Param: lease_service.LeaseServiceState lease
+   Param: ticket_service.TicketServiceState ticket
+   Param: completion_mailbox_service.CompletionMailboxServiceState completion
+FUNCTION_DECL: workflow_advance
+   Return: workflow_core.WorkflowAdvanceResult
+   Param: workflow_core.WorkflowServiceState s
+   Param: timer_service.TimerServiceState timer
+   Param: task_service.TaskServiceState task
+   Param: object_store_service.ObjectStoreServiceState object_store
+   Param: update_store_service.UpdateStoreServiceState update_store
+   Param: lease_service.LeaseServiceState lease
+   Param: ticket_service.TicketServiceState ticket
+   Param: completion_mailbox_service.CompletionMailboxServiceState completion
+   Param: connection_service.ConnectionServiceState connection
+   Param: u8 workset_generation
+   Param: u8 ticket_generation
+
+==== kernel/src/services/workflow_core.mc ====
+STRUCT_DECL: WorkflowServiceState
+STRUCT_DECL: WorkflowSnapshotRecord
+STRUCT_DECL: WorkflowResult
+STRUCT_DECL: WorkflowAdvanceResult
+STRUCT_DECL: WorkflowStepResult
+STRUCT_DECL: WorkflowDeliveryResult
+STRUCT_DECL: WorkflowPayload
+STRUCT_DECL: WorkflowWaitingState
+STRUCT_DECL: WorkflowRunningState
+STRUCT_DECL: WorkflowDeliveryState
+STRUCT_DECL: WorkflowScheduleSpec
+STRUCT_DECL: WorkflowCancelExecution
+STRUCT_DECL: WorkflowDelegatedConnectionResult
+STRUCT_DECL: WorkflowDelegatedUpdateApplyResult
+FUNCTION_DECL: workflow_advance_result
+   Return: WorkflowAdvanceResult
+   Param: WorkflowServiceState workflow
+   Param: timer_service.TimerServiceState timer
+   Param: task_service.TaskServiceState task
+   Param: object_store_service.ObjectStoreServiceState object_store
+   Param: update_store_service.UpdateStoreServiceState update_store
+   Param: lease_service.LeaseServiceState lease
+   Param: ticket_service.TicketServiceState ticket
+   Param: completion_mailbox_service.CompletionMailboxServiceState completion
+FUNCTION_DECL: workflow_step_result
+   Return: WorkflowStepResult
+   Param: WorkflowServiceState workflow
+   Param: timer_service.TimerServiceState timer
+   Param: task_service.TaskServiceState task
+   Param: object_store_service.ObjectStoreServiceState object_store
+   Param: update_store_service.UpdateStoreServiceState update_store
+   Param: journal_service.JournalServiceState journal
+   Param: lease_service.LeaseServiceState lease
+   Param: ticket_service.TicketServiceState ticket
+   Param: completion_mailbox_service.CompletionMailboxServiceState completion
+   Param: service_effect.Effect effect
+FUNCTION_DECL: workflow_delegated_connection_result
+   Return: WorkflowDelegatedConnectionResult
+   Param: WorkflowServiceState workflow
+   Param: lease_service.LeaseServiceState lease
+   Param: ticket_service.TicketServiceState ticket
+   Param: completion_mailbox_service.CompletionMailboxServiceState completion
+FUNCTION_DECL: workflow_delegated_update_apply_result
+   Return: WorkflowDelegatedUpdateApplyResult
+   Param: WorkflowServiceState workflow
+   Param: lease_service.LeaseServiceState lease
+   Param: update_store_service.UpdateStoreServiceState update_store
+   Param: completion_mailbox_service.CompletionMailboxServiceState completion
+FUNCTION_DECL: workflow_state_init
+   Return: WorkflowServiceState
+   Param: u32 pid
+FUNCTION_DECL: workflow_state_raw
+   Return: WorkflowServiceState
+   Param: WorkflowServiceState s
+   Param: u8 kind
+   Param: u8 id
+   Param: u8 due
+   Param: u8 opcode
+   Param: u8 task
+   Param: u8 state
+   Param: u8 restart
+   Param: u8 generation
+FUNCTION_DECL: workflow_payload
+   Return: WorkflowPayload
+   Param: u8 due
+   Param: u8 task
+FUNCTION_DECL: workflow_waiting_state
+   Return: WorkflowWaitingState
+   Param: u8 due
+FUNCTION_DECL: workflow_running_state
+   Return: WorkflowRunningState
+   Param: u8 task
+FUNCTION_DECL: workflow_delivery_state
+   Return: WorkflowDeliveryState
+   Param: u8 outcome
+   Param: u8 status
+FUNCTION_DECL: workflow_payload_wait
+   Return: WorkflowPayload
+   Param: u8 due
+FUNCTION_DECL: workflow_payload_object_update
+   Return: WorkflowPayload
+   Param: u8 value
+FUNCTION_DECL: workflow_payload_running
+   Return: WorkflowPayload
+   Param: u8 task
+FUNCTION_DECL: workflow_payload_delivery
+   Return: WorkflowPayload
+   Param: u8 outcome
+   Param: u8 status
+FUNCTION_DECL: workflow_payload_terminal
+   Return: WorkflowPayload
+FUNCTION_DECL: workflow_payload_from_state
+   Return: WorkflowPayload
+   Param: WorkflowServiceState s
+FUNCTION_DECL: workflow_record
+   Return: WorkflowServiceState
+   Param: WorkflowServiceState s
+   Param: u8 kind
+   Param: u8 id
+   Param: u8 opcode
+   Param: WorkflowPayload payload
+   Param: u8 state
+   Param: u8 restart
+   Param: u8 generation
+FUNCTION_DECL: workflow_schedule_spec
+   Return: WorkflowScheduleSpec
+   Param: u8 id
+   Param: u8 opcode
+   Param: WorkflowPayload payload
+FUNCTION_DECL: workflow_schedule_task_spec
+   Return: WorkflowScheduleSpec
+   Param: u8 id
+   Param: u8 due
+FUNCTION_DECL: workflow_schedule_object_update_spec
+   Return: WorkflowScheduleSpec
+   Param: u8 name
+   Param: u8 value
+FUNCTION_DECL: workflow_schedule_update_apply_spec
+   Return: WorkflowScheduleSpec
+FUNCTION_DECL: workflow_schedule_update_apply_with_lease_spec
+   Return: WorkflowScheduleSpec
+   Param: u8 id
+FUNCTION_DECL: workflow_schedule_connection_spec
+   Return: WorkflowScheduleSpec
+   Param: u8 id
+   Param: u8 slot
+   Param: u8 opcode
+FUNCTION_DECL: workflow_restate
+   Return: WorkflowServiceState
+   Param: WorkflowServiceState s
+   Param: WorkflowPayload payload
+   Param: u8 state
+   Param: u8 restart
+   Param: u8 generation
+FUNCTION_DECL: workflow_snapshot_record
+   Return: WorkflowSnapshotRecord
+   Param: WorkflowServiceState s
+FUNCTION_DECL: workflow_state_from_snapshot
+   Return: WorkflowServiceState
+   Param: u32 pid
+   Param: WorkflowSnapshotRecord snap
+FUNCTION_DECL: workflow_lane_bytes
+   Return: [4]u8
+   Param: WorkflowServiceState s
+FUNCTION_DECL: workflow_reply_invalid
+   Return: service_effect.Effect
+FUNCTION_DECL: workflow_schedule_effect
+   Return: service_effect.Effect
+   Param: u8 id
+   Param: u8 state
+FUNCTION_DECL: workflow_query_effect
+   Return: service_effect.Effect
+   Param: WorkflowServiceState s
+FUNCTION_DECL: workflow_is_idle
+   Return: bool
+   Param: WorkflowServiceState s
+FUNCTION_DECL: workflow_is_waiting
+   Return: bool
+   Param: WorkflowServiceState s
+FUNCTION_DECL: workflow_is_running
+   Return: bool
+   Param: WorkflowServiceState s
+FUNCTION_DECL: workflow_is_delivering
+   Return: bool
+   Param: WorkflowServiceState s
+FUNCTION_DECL: workflow_matches
+   Return: bool
+   Param: WorkflowServiceState s
+   Param: u8 id
+FUNCTION_DECL: workflow_is_active
+   Return: bool
+   Param: WorkflowServiceState s
+FUNCTION_DECL: workflow_is_task
+   Return: bool
+   Param: WorkflowServiceState s
+FUNCTION_DECL: workflow_is_object_update
+   Return: bool
+   Param: WorkflowServiceState s
+FUNCTION_DECL: workflow_is_connection
+   Return: bool
+   Param: WorkflowServiceState s
+FUNCTION_DECL: workflow_is_update_apply
+   Return: bool
+   Param: WorkflowServiceState s
+FUNCTION_DECL: workflow_has_record
+   Return: bool
+   Param: WorkflowServiceState s
+FUNCTION_DECL: workflow_object_workflow_id
+   Return: u8
+   Param: u8 name
+FUNCTION_DECL: workflow_connection_slot
+   Return: u8
+   Param: WorkflowServiceState s
+FUNCTION_DECL: workflow_connection_uses_ticket_lease
+   Return: bool
+   Param: WorkflowServiceState s
+FUNCTION_DECL: workflow_connection_ticket_lease_id
+   Return: u8
+   Param: WorkflowServiceState s
+FUNCTION_DECL: workflow_object_name
+   Return: u8
+   Param: WorkflowServiceState s
+FUNCTION_DECL: workflow_wait_due
+   Return: u8
+   Param: WorkflowServiceState s
+FUNCTION_DECL: workflow_object_value
+   Return: u8
+   Param: WorkflowServiceState s
+FUNCTION_DECL: workflow_running_task_id
+   Return: u8
+   Param: WorkflowServiceState s
+FUNCTION_DECL: workflow_delivery_outcome
+   Return: u8
+   Param: WorkflowServiceState s
+FUNCTION_DECL: workflow_delivery_status
+   Return: u8
+   Param: WorkflowServiceState s
+FUNCTION_DECL: workflow_query_value
+   Return: u8
+   Param: WorkflowServiceState s
+FUNCTION_DECL: workflow_prepare_schedule
+   Return: WorkflowServiceState
+   Param: WorkflowServiceState s
+   Param: u8 generation
+FUNCTION_DECL: workflow_can_schedule
+   Return: bool
+   Param: WorkflowServiceState s
+FUNCTION_DECL: workflow_schedule_with_spec
+   Return: WorkflowResult
+   Param: WorkflowServiceState s
+   Param: WorkflowScheduleSpec spec
+FUNCTION_DECL: workflow_schedule
+   Return: WorkflowResult
+   Param: WorkflowServiceState s
+   Param: u8 id
+   Param: u8 due
+FUNCTION_DECL: workflow_schedule_object_update
+   Return: WorkflowResult
+   Param: WorkflowServiceState s
+   Param: u8 name
+   Param: u8 value
+FUNCTION_DECL: workflow_schedule_connection
+   Return: WorkflowResult
+   Param: WorkflowServiceState s
+   Param: u8 id
+   Param: u8 slot
+   Param: u8 opcode
+FUNCTION_DECL: workflow_schedule_update_apply
+   Return: WorkflowResult
+   Param: WorkflowServiceState s
+FUNCTION_DECL: workflow_schedule_update_apply_with_lease
+   Return: WorkflowResult
+   Param: WorkflowServiceState s
+   Param: u8 lease
+FUNCTION_DECL: workflow_can_cancel
+   Return: bool
+   Param: WorkflowServiceState s
+   Param: u8 id
+FUNCTION_DECL: workflow_cancel
+   Return: WorkflowResult
+   Param: WorkflowServiceState s
+   Param: u8 id
+FUNCTION_DECL: workflow_query
+   Return: WorkflowResult
+   Param: WorkflowServiceState s
+   Param: u8 id
+FUNCTION_DECL: workflow_waiting_task
+   Return: WorkflowServiceState
+   Param: WorkflowServiceState s
+   Param: u8 due
+   Param: u8 restart
+   Param: u8 generation
+FUNCTION_DECL: workflow_waiting_object_update
+   Return: WorkflowServiceState
+   Param: WorkflowServiceState s
+   Param: u8 restart
+   Param: u8 generation
+FUNCTION_DECL: workflow_waiting_update_apply
+   Return: WorkflowServiceState
+   Param: WorkflowServiceState s
+   Param: u8 restart
+   Param: u8 generation
+FUNCTION_DECL: workflow_update_apply_lease_id
+   Return: u8
+   Param: WorkflowServiceState s
+FUNCTION_DECL: workflow_waiting_connection
+   Return: WorkflowServiceState
+   Param: WorkflowServiceState s
+   Param: u8 slot
+   Param: u8 restart
+   Param: u8 generation
+FUNCTION_DECL: workflow_running_task
+   Return: WorkflowServiceState
+   Param: WorkflowServiceState s
+   Param: u8 task
+FUNCTION_DECL: workflow_running_connection
+   Return: WorkflowServiceState
+   Param: WorkflowServiceState s
+   Param: u8 slot
+   Param: u8 task
+FUNCTION_DECL: workflow_pending_delivery
+   Return: WorkflowServiceState
+   Param: WorkflowServiceState s
+   Param: u8 outcome
+   Param: u8 status
+FUNCTION_DECL: workflow_terminal
+   Return: WorkflowServiceState
+   Param: WorkflowServiceState s
+   Param: u8 state
+FUNCTION_DECL: workflow_delivery_status_code
+   Return: u8
+   Param: syscall.SyscallStatus status
+FUNCTION_DECL: workflow_connection_active
+   Return: bool
+   Param: WorkflowServiceState s
+   Param: connection_service.ConnectionServiceState connection
+FUNCTION_DECL: workflow_connection_cancel_result
+   Return: WorkflowCancelExecution
+   Param: WorkflowServiceState s
+   Param: timer_service.TimerServiceState timer
+   Param: task_service.TaskServiceState task
+FUNCTION_DECL: workflow_connection_cancelled_state
+   Return: u8
+   Param: WorkflowServiceState s
+FUNCTION_DECL: workflow_schedule_due_for_message
+   Return: u8
+   Param: service_effect.Message m
+FUNCTION_DECL: workflow_restart_timer_due
+   Return: u8
+   Param: WorkflowServiceState s
+FUNCTION_DECL: workflow_query_status
+   Return: syscall.SyscallStatus
+   Param: WorkflowServiceState s
+FUNCTION_DECL: workflow_cancelled_outcome
+   Return: u8
+   Param: WorkflowServiceState s
+FUNCTION_DECL: workflow_object_update_outcome
+   Return: u8
+   Param: service_effect.Effect effect
+FUNCTION_DECL: workflow_deliver_completion
+   Return: WorkflowDeliveryResult
+   Param: WorkflowServiceState s
+   Param: completion_mailbox_service.CompletionMailboxServiceState completion
+   Param: u8 outcome
+FUNCTION_DECL: workflow_connection_ticket_outcome
+   Return: u8
+   Param: service_effect.Effect effect
+FUNCTION_DECL: workflow_update_apply_lease_outcome
+   Return: u8
+   Param: service_effect.Effect effect
+FUNCTION_DECL: workflow_active_count
+   Return: usize
+   Param: WorkflowServiceState s
+
+==== kernel/src/services/workflow_protocol.mc ====
+FUNCTION_DECL: handle
+   Return: workflow_core.WorkflowResult
+   Param: workflow_core.WorkflowServiceState s
+   Param: service_effect.Message m
+FUNCTION_DECL: workflow_step_schedule
+   Return: workflow_core.WorkflowStepResult
+   Param: workflow_core.WorkflowServiceState workflow
+   Param: timer_service.TimerServiceState timer
+   Param: task_service.TaskServiceState task
+   Param: object_store_service.ObjectStoreServiceState object_store
+   Param: update_store_service.UpdateStoreServiceState update_store
+   Param: journal_service.JournalServiceState journal
+   Param: lease_service.LeaseServiceState lease
+   Param: ticket_service.TicketServiceState ticket
+   Param: completion_mailbox_service.CompletionMailboxServiceState completion
+   Param: service_effect.Message msg
+   Param: u8 generation
+FUNCTION_DECL: workflow_step_schedule_connection
+   Return: workflow_core.WorkflowStepResult
+   Param: workflow_core.WorkflowServiceState workflow
+   Param: timer_service.TimerServiceState timer
+   Param: task_service.TaskServiceState task
+   Param: object_store_service.ObjectStoreServiceState object_store
+   Param: update_store_service.UpdateStoreServiceState update_store
+   Param: journal_service.JournalServiceState journal
+   Param: lease_service.LeaseServiceState lease
+   Param: ticket_service.TicketServiceState ticket
+   Param: completion_mailbox_service.CompletionMailboxServiceState completion
+   Param: u8 id
+   Param: u8 slot
+   Param: u8 opcode
+   Param: u8 generation
+FUNCTION_DECL: workflow_execute_cancel
+   Return: workflow_core.WorkflowCancelExecution
+   Param: workflow_core.WorkflowServiceState workflow
+   Param: timer_service.TimerServiceState timer
+   Param: task_service.TaskServiceState task
+FUNCTION_DECL: workflow_step_cancel
+   Return: workflow_core.WorkflowStepResult
+   Param: workflow_core.WorkflowServiceState workflow
+   Param: timer_service.TimerServiceState timer
+   Param: task_service.TaskServiceState task
+   Param: object_store_service.ObjectStoreServiceState object_store
+   Param: update_store_service.UpdateStoreServiceState update_store
+   Param: journal_service.JournalServiceState journal
+   Param: lease_service.LeaseServiceState lease
+   Param: ticket_service.TicketServiceState ticket
+   Param: completion_mailbox_service.CompletionMailboxServiceState completion
+   Param: service_effect.Message msg
+FUNCTION_DECL: step
+   Return: workflow_core.WorkflowStepResult
+   Param: workflow_core.WorkflowServiceState s
+   Param: timer_service.TimerServiceState timer
+   Param: task_service.TaskServiceState task
+   Param: object_store_service.ObjectStoreServiceState object_store
+   Param: update_store_service.UpdateStoreServiceState update_store
+   Param: journal_service.JournalServiceState journal
+   Param: lease_service.LeaseServiceState lease
+   Param: ticket_service.TicketServiceState ticket
+   Param: completion_mailbox_service.CompletionMailboxServiceState completion
+   Param: connection_service.ConnectionServiceState connection
+   Param: service_effect.Message msg
+   Param: u8 generation
+   Param: u8 ticket_generation
+
+==== kernel/src/services/workflow_restart.mc ====
+FUNCTION_DECL: workflow_sync_journal
+   Return: journal_service.JournalServiceState
+   Param: journal_service.JournalServiceState journal
+   Param: workflow_core.WorkflowServiceState s
+FUNCTION_DECL: workflow_step_with_synced_journal
+   Return: workflow_core.WorkflowStepResult
+   Param: workflow_core.WorkflowServiceState workflow
+   Param: timer_service.TimerServiceState timer
+   Param: task_service.TaskServiceState task
+   Param: object_store_service.ObjectStoreServiceState object_store
+   Param: update_store_service.UpdateStoreServiceState update_store
+   Param: journal_service.JournalServiceState journal
+   Param: lease_service.LeaseServiceState lease
+   Param: ticket_service.TicketServiceState ticket
+   Param: completion_mailbox_service.CompletionMailboxServiceState completion
+   Param: service_effect.Effect effect
+FUNCTION_DECL: workflow_lane_matches
+   Return: bool
+   Param: workflow_core.WorkflowServiceState s
+   Param: journal_service.JournalLane lane
+FUNCTION_DECL: workflow_restart_reload
+   Return: workflow_core.WorkflowServiceState
+   Param: u32 pid
+   Param: workflow_core.WorkflowSnapshotRecord snap
+   Param: journal_service.JournalLane lane
+   Param: u8 generation
+   Param: bool keep
+   Param: connection_service.ConnectionServiceState connection
+
+==== kernel/src/services/workflow_service.mc ====
+

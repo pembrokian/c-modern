@@ -1,0 +1,110 @@
+==== kernel/src/transport/ipc.mc ====
+FUNCTION_DECL: zero_payload
+   Return: [4]u8
+FUNCTION_DECL: payload_byte
+   Return: [4]u8
+   Param: u8 b0
+   Param: u8 b1
+   Param: u8 b2
+   Param: u8 b3
+
+==== kernel/src/transport/primitives.mc ====
+FUNCTION_DECL: zero_payload
+   Return: [4]u8
+
+==== kernel/src/transport/service_effect.mc ====
+STRUCT_DECL: Message
+STRUCT_DECL: Effect
+FUNCTION_DECL: message
+   Return: Message
+   Param: u32 source_pid
+   Param: u32 endpoint_id
+   Param: usize payload_len
+   Param: [4]u8 payload
+FUNCTION_DECL: message_with_handle
+   Return: Message
+   Param: u32 source_pid
+   Param: u32 endpoint_id
+   Param: usize payload_len
+   Param: [4]u8 payload
+   Param: u32 received_handle_slot
+   Param: usize received_handle_count
+   Param: u32 received_endpoint_id
+   Param: u32 received_endpoint_id_1
+FUNCTION_DECL: effect_none
+   Return: Effect
+FUNCTION_DECL: effect_reply
+   Return: Effect
+   Param: syscall.SyscallStatus status
+   Param: usize payload_len
+   Param: [4]u8 payload
+FUNCTION_DECL: effect_send
+   Return: Effect
+   Param: u32 source_pid
+   Param: u32 endpoint_id
+   Param: usize payload_len
+   Param: [4]u8 payload
+FUNCTION_DECL: effect_has_reply
+   Return: u32
+   Param: Effect effect
+FUNCTION_DECL: effect_has_send
+   Return: u32
+   Param: Effect effect
+FUNCTION_DECL: effect_reply_status
+   Return: syscall.SyscallStatus
+   Param: Effect effect
+FUNCTION_DECL: effect_reply_payload_len
+   Return: usize
+   Param: Effect effect
+FUNCTION_DECL: effect_reply_payload
+   Return: [4]u8
+   Param: Effect effect
+FUNCTION_DECL: effect_send_endpoint_id
+   Return: u32
+   Param: Effect effect
+FUNCTION_DECL: effect_send_source_pid
+   Return: u32
+   Param: Effect effect
+FUNCTION_DECL: effect_send_payload_len
+   Return: usize
+   Param: Effect effect
+FUNCTION_DECL: effect_send_payload
+   Return: [4]u8
+   Param: Effect effect
+FUNCTION_DECL: effect_event_count
+   Return: usize
+   Param: Effect effect
+FUNCTION_DECL: effect_event
+   Return: u32
+   Param: Effect effect
+   Param: usize i
+FUNCTION_DECL: effectwith_events
+   Return: Effect
+   Param: Effect e
+   Param: usize count
+   Param: u32 e0
+   Param: u32 e1
+   Param: u32 e2
+   Param: u32 e3
+FUNCTION_DECL: effect_with_event
+   Return: Effect
+   Param: Effect effect
+   Param: u32 event_code
+FUNCTION_DECL: effect_mark_send_dropped
+   Return: Effect
+   Param: Effect e
+FUNCTION_DECL: effect_send_dropped
+   Return: u32
+   Param: Effect e
+FUNCTION_DECL: from_receive_observation
+   Return: Message
+   Param: syscall.ReceiveObservation obs
+
+==== kernel/src/transport/syscall.mc ====
+STRUCT_DECL: ReceiveObservation
+FUNCTION_DECL: empty_receive_observation
+   Return: ReceiveObservation
+FUNCTION_DECL: observation_has_received_handle
+   Return: bool
+   Param: ReceiveObservation obs
+

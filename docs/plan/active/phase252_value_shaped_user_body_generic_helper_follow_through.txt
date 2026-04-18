@@ -1,0 +1,197 @@
+Phase 252 -- Value-Shaped User-Body Generic Helper Follow-Through
+=================================================================
+
+Status
+------
+PROPOSED
+
+Purpose
+-------
+Admit one bounded executable generic-support slice so user-body generic helper
+functions that return or manipulate value-shaped instantiated records can work
+through the real compiler path when a real repository-owned caller needs them.
+
+This phase exists now because the repository already exhausted the erased-ABI
+generic family in Phase 171, and the post-Phase-182 `ServiceCell<T>` cleanup
+named a specific blocked helper shape that remains compiler-owned rather than
+kernel-owned. The next honest move is a narrow executable follow-through, not
+general generic monomorphization.
+
+Repository status note
+----------------------
+- Phase 171 explicitly deferred broader generic monomorphization after
+  confirming the then-admitted erased-ABI pointer-shaped family was enough.
+- The backlog now records a more specific blocked shape: executable support
+  for value-shaped user-body generic helper functions.
+- The boot-state follow-through after Phase 182 already tried to use generic
+  `ServiceCell<T>` helper functions such as `service_cell_with_state<T>(...)`
+  and `service_cell_restart<T>(...)`, but the bootstrap compiler still rejected
+  those value-returning helpers.
+- The repository still lacks one bounded compiler phase whose primary purpose
+  is to admit exactly that value-shaped helper family without widening into a
+  general generic framework.
+
+Problem being solved
+--------------------
+- The current compiler accepts erased-ABI pointer-shaped generic functions but
+  still rejects user-body generic helpers whose executable ABI depends on the
+  concrete instantiated value shape.
+- That gap blocks cleaner repository-owned helper code even when the desired
+  helper is simple, local, and already justified by active owner code.
+- Leaving the gap unresolved keeps real source stuck on repetitive explicit
+  wrappers and makes the compiler boundary look broader than the actual real
+  admitted pressure.
+
+Non-goals
+---------
+- no general generic-function framework
+- no inference-driven specialization
+- no generic closures, lambdas, or callback registries
+- no broad imported-generic redesign unless this exact slice proves it is
+  necessary
+- no sema-owned reinterpretation of generic meaning
+- no backend-only silent cloning without explicit MIR ownership
+
+Invariants
+----------
+- Generic source legality and type meaning remain sema-owned.
+- Any admitted specialization or monomorphization lives in MIR and/or backend,
+  not in parser or sema.
+- The erased-ABI generic family admitted before this phase must remain correct.
+- Artifact naming and emitted output must remain deterministic.
+- Unsupported generic bodies outside the admitted slice must continue to fail
+  explicitly rather than being accepted accidentally.
+
+Required surface changes
+------------------------
+1. Admit one bounded executable support path for user-body generic helper
+   functions whose instantiated ABI depends on a value-shaped generic record or
+   other value-shaped generic result.
+2. Keep the admitted slice tied to one real repository-owned consumer, such as
+   `ServiceCell<T>` helper functions or an equivalently narrow checked-in
+   helper family.
+3. Preserve explicit rejection for broader unsupported generic bodies outside
+   the admitted slice.
+4. Add focused MIR and executable regressions for the admitted helper shape.
+5. Spend the feature in one repository-owned caller so the phase lands as a
+   real source improvement rather than as synthetic compiler capability only.
+
+Forbidden changes
+-----------------
+- do not widen into whole-program generic monomorphization by convenience
+- do not move specialization policy into sema or the driver
+- do not accept unsupported generic bodies silently just because one narrow
+  helper family now works
+- do not bundle closures, callback values, or generic procedure constants into
+  the same phase
+- do not treat one real helper family as evidence that every value-shaped
+  generic body must now be supported
+
+Phase role in the larger sequence
+---------------------------------
+- This phase consumes the explicit deferral boundary from Phase 171 and the
+  later boot-state follow-through that named a real blocked helper shape.
+- It prepares later compiler and kernel cleanup by making one already-known
+  helper family executable instead of leaving wrapper repetition as permanent
+  source cost.
+- It should still leave broader generic capability work explicit and deferred.
+
+Relevant backlog items this phase intentionally brings under pressure
+--------------------------------------------------------------------
+- keep broader generic-function monomorphization explicit after the Phase 171
+  deferral audit
+- consider executable support for value-shaped user-body generic helper
+  functions
+
+Questions this phase must answer
+--------------------------------
+1. What is the narrowest real value-shaped generic helper family the compiler
+   should admit now?
+2. Which layer should own specialization for that helper family: MIR, backend,
+   or a small explicit combination of both?
+3. Can the admitted slice stay same-module and repository-owned, or does the
+   first honest implementation require imported generic follow-through too?
+4. How can unsupported generic bodies remain explicitly rejected after the new
+   helper family lands?
+
+Preferred implementation shape
+------------------------------
+- Keep parser and sema surfaces stable unless one narrow explicit diagnostic or
+  query hook is required.
+- Start from MIR ownership for instantiated executable generic bodies if a
+  distinct specialized function or callable representation is needed.
+- Keep the backend responsible only for lowering the already-admitted MIR
+  truth, not for inventing generic semantics ad hoc.
+- Tie the feature to one real checked-in consumer and keep any broader generic
+  family explicitly deferred.
+- Reuse the existing erased-ABI support path where possible instead of
+  replacing it.
+
+Implementation accelerators
+---------------------------
+Main files and navigations
+- Primary controlling owners: `compiler/mir/mir_lower.cpp` for generic-body
+  executable follow-through and `compiler/codegen_llvm/backend.cpp` plus the
+  split executable lowering owners only where the admitted instantiated MIR
+  needs backend support.
+- First-hop adjacent files: `compiler/mir/mir.h`,
+  `compiler/mir/mir_validate.cpp`, `compiler/codegen_llvm/backend_internal.h`,
+  and `compiler/sema/check.cpp` only if a narrow explicit rejection or query
+  boundary needs adjustment.
+- Nearby accelerator docs: `docs/plan/archive/phase171_generic_monomorphization_first_slice.txt`,
+  `docs/agent/prompts/compiler_file_invariants.txt`, and the boot-state note in
+  `docs/plan/decision_log.txt` that recorded the blocked `ServiceCell<T>`
+  helper attempt.
+- Expected first validation target when the owner changes: a focused MIR
+  regression first, then the narrowest executable codegen regression covering
+  the admitted helper family.
+
+Relevant cookbook patterns
+- Pattern 6 -- Add A Compiler Phase applies because this is a bounded compiler
+  capability slice with one explicit deferred pressure and one real consumer.
+- No exact existing cookbook pattern fits perfectly because the phase is not a
+  syntax change and not a generic framework admission; that is why the plan
+  must keep MIR/backend ownership explicit instead of leaning on a parser or
+  sema follow-through pattern.
+
+Relevant file-local invariants
+- `compiler/mir/mir_lower.cpp` must continue to consume sema truth rather than
+  recomputing generic legality there; if a helper is admitted, lowering should
+  reuse existing checked type facts.
+- `compiler/mir/mir_validate.cpp` must stay strict; it should validate the new
+  admitted instantiated shape instead of weakening MIR contracts broadly.
+- `compiler/codegen_llvm/backend.cpp` remains orchestration only after Phase
+  250; detailed call or aggregate emission should stay in the split backend
+  family files.
+- Narrow validation should run MIR first, then executable codegen, before any
+  broader workflow build.
+
+Test obligations
+----------------
+- `Build debug`
+- one focused MIR regression for the admitted value-shaped user-body generic
+  helper family
+- one focused executable regression for the same helper family
+- one repository-owned spend site proving the blocked helper shape now works
+  through the full compiler path
+- the narrowest owning MIR and executable codegen test targets named by the
+  implementation
+
+Acceptance criteria
+-------------------
+- at least one real repository-owned value-shaped user-body generic helper
+  function now executes through the full compiler path
+- unsupported broader generic bodies remain explicitly rejected
+- the erased-ABI generic family remains correct and unchanged in behavior
+- the landing stays a narrow generic capability slice rather than becoming a
+  general monomorphization framework
+
+Future follow-up
+----------------
+- If the admitted helper family still leaves imported or cross-module generic
+  bodies blocked, record that separately in `docs/plan/backlog.txt` rather than
+  widening this phase after the fact.
+- If this phase exposes a cleaner owner boundary for instantiated generic-body
+  naming or artifact identity, record it in `docs/plan/decision_log.txt`.
+- Broader callable or generic capability work should remain separate from this
+  narrow helper-focused landing.

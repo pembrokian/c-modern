@@ -8,22 +8,6 @@ FUNCTION_DECL: debug_boot_routed
    Param: service_effect.Effect effect
 
 ==== kernel/src/boot/boot_identity.mc ====
-FUNCTION_DECL: boot_serial_ref
-   Return: service_identity.ServiceRef
-FUNCTION_DECL: boot_shell_ref
-   Return: service_identity.ServiceRef
-FUNCTION_DECL: boot_log_ref
-   Return: service_identity.ServiceRef
-FUNCTION_DECL: boot_kv_ref
-   Return: service_identity.ServiceRef
-FUNCTION_DECL: boot_echo_ref
-   Return: service_identity.ServiceRef
-FUNCTION_DECL: boot_queue_ref
-   Return: service_identity.ServiceRef
-FUNCTION_DECL: boot_transfer_ref
-   Return: service_identity.ServiceRef
-FUNCTION_DECL: boot_ticket_ref
-   Return: service_identity.ServiceRef
 FUNCTION_DECL: boot_log_mark
    Return: service_identity.ServiceMark
    Param: KernelBootState s

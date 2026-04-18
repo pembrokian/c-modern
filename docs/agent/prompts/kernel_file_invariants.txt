@@ -1,0 +1,810 @@
+Kernel File Invariants
+======================
+
+Purpose
+-------
+This file is a planning-time accelerator for work under `kernel/`.
+
+It is not a full kernel architecture spec. It is a local invariant map for the
+major kernel files that agents are most likely to touch.
+
+Use it to answer:
+
+- which file owns this runtime behavior
+- which nearby kernel files usually move with it
+- what must not be pushed into or out of that file
+- what the narrowest reset-lane validation usually is
+
+Global Kernel Rules
+-------------------
+1. Preserve the reset-lane owner split.
+   `boot` owns static construction, retained state assembly, restart outcomes,
+   and service references.
+   `kernel_dispatch` owns routing and effect chasing.
+   `shell` owns serial framing, shell command decoding, and the serial-shell
+   path.
+   each `services/*` file owns one bounded state machine.
+   `scenarios` owns scripted integration probes.
+2. Keep the four-section service standard intact.
+   Imports, constants, structs, then functions.
+   Use init, small pure helpers, handlers, public `handle`, then debug helpers.
+3. Do not move service-owned truth into `boot`, `kernel_dispatch`, or
+   `scenarios`.
+   If one service needs one more field, command, or reply shape, start in that
+   service.
+4. Do not solve current reset-lane work by introducing framework layers,
+   registries, or audit-only structures.
+5. Prefer explicit state transformation.
+   Services remain small value-state machines with bounded arrays and explicit
+   reply or send effects.
+6. Validate with the narrowest reset-lane owner first.
+   Usually `Build debug`, then the owning system fixture or the grouped reset-
+   lane tool suite that exercises it.
+
+Major File Selection Policy
+---------------------------
+This document focuses on the major files in:
+
+- `kernel/src/boot`
+- `kernel/src/identity`
+- `kernel/src/shell`
+- `kernel/src/kernel_dispatch.mc`
+- the larger behavior-owning files in `kernel/src/services`
+- `kernel/src/scenarios/scenarios.mc`
+- `kernel/src/main.mc`
+
+It intentionally leaves off smaller or more mechanical files such as:
+
+- thin wrappers with little owner-local behavior
+- protocol or constant tables that do not decide behavior beyond naming
+- very small single-owner services that mostly follow the standard service
+  shape without extra coordination logic
+- most individual `scenario_*.mc` files, which are test spend sites rather
+  than reusable runtime owners
+- transport primitives in `kernel/src/transport`, unless a task is explicitly
+  about effect or syscall wire shapes
+
+Boot
+----
+
+File: `kernel/src/boot/boot.mc`
+Owns:
+- the assembled `KernelBootState`
+- boot-time construction of every boot-wired service cell
+- retained generation counters and restart-outcome fields
+- the service-cell wrapper contract used across the kernel
+
+Local invariants:
+- this is the single owner of the full boot-state shape
+- service references and generations are explicit fields, not hidden maps
+- static boot wiring reads endpoint and pid truth from `service_topology.mc`
+- dispatch logic does not live here; this file builds state, it does not route
+
+Do not move into this file:
+- runtime dispatch branching
+- shell command decoding
+- service-local handler logic
+- workflow coordination logic that belongs in workflow owners
+
+Safe editing rules:
+- when adding a new boot-wired service, add the field here, initialize it here,
+  and wire topology separately in `service_topology.mc`
+- keep restart-outcome and generation truth explicit; do not compress them into
+  generic metadata bags
+- if a change only affects how a service handles a message, leave this file
+  alone unless boot-state shape really changed
+
+Usual validation:
+- `Build debug`
+- the owning reset-lane system fixture or grouped kernel workflow suite
+
+Cross-file contract:
+- `service_topology.mc` names the stable endpoint and pid constants
+- `kernel_dispatch.mc` consumes this state and mutates it through explicit
+  `bootwith_*` helpers from `boot_update.mc`
+
+File: `kernel/src/boot/boot_update.mc`
+Owns:
+- structured boot-state update helpers such as `bootwith_*` and `bootrestart_*`
+
+Local invariants:
+- boot-state field replacement is centralized here rather than duplicated in
+  dispatch or scenarios
+- restart follow-through keeps one explicit helper per owner-local field or
+  restart outcome
+
+Do not move into this file:
+- the policy for when restarts happen
+- per-service business logic
+
+Safe editing rules:
+- if a `KernelBootState` field is added, add the paired updater here in the
+  same change
+- keep helpers mechanical and explicit; do not turn this into a policy layer
+
+Usual validation:
+- `Build debug`
+- owning reset-lane workflow coverage if restart or retention behavior changed
+
+File: `kernel/src/boot/boot_identity.mc`
+Owns:
+- boot-state to lifecycle payload projection: marks, generations, summary and
+  comparison payloads
+
+Local invariants:
+- lifecycle identity and summary payload bytes derived from boot state are
+  centralized here
+- generation and restart-outcome projection stays explicit and deterministic
+
+Do not move into this file:
+- restart execution
+- shell command validation
+- topology endpoint definitions
+
+Safe editing rules:
+- if lifecycle reply bytes change because boot-state truth changed, update this
+  file with the owning field change
+- keep payload encoding deterministic and bounded to fixed four-byte shapes
+
+Usual validation:
+- owning lifecycle or retained-state fixture
+
+File: `kernel/src/boot/init.mc`
+Owns:
+- restart policy classification
+- restart execution across the boot state
+- lane-level retained restart owners such as workset and audit generation
+
+Local invariants:
+- restart policy truth is centralized here, not scattered through dispatch or
+  individual services
+- this file enacts restart; it does not define shell protocol or lifecycle
+  reply formatting
+- retained vs reset vs reload semantics stay explicit here
+
+Do not move into this file:
+- endpoint id naming
+- shell lifecycle request parsing
+- service-local persistence formats
+
+Safe editing rules:
+- when changing restart semantics for a boot-wired owner, update both the
+  restart policy logic and the actual restart path here
+- keep restart behavior honest to the owning service shape; do not fake reloads
+  in boot when the service does not persist that state
+
+Usual validation:
+- `Build debug`
+- lifecycle, retained-state, or restart fixtures for the changed owner
+
+Identity
+--------
+
+File: `kernel/src/identity/service_topology.mc`
+Owns:
+- stable boot-wired endpoint ids
+- static `ServiceSlot` pid plus endpoint wiring
+- service restart-mode classification
+- public routing classification such as `endpoint_is_boot_wired()`
+
+Local invariants:
+- this is the sole definer of boot-wired endpoint id constants
+- public endpoint naming and restart-mode classification stay centralized here
+- no service imports are allowed; this file must remain dependency-light so
+  boot and shell can both import it safely
+
+Do not move into this file:
+- service construction
+- dispatch routing bodies
+- lifecycle payload formatting
+
+Safe editing rules:
+- new boot-wired services start here with endpoint id, slot constant, restart
+  mode, and `SERVICE_COUNT` update
+- preserve the stable-name contract; endpoint ids are public names, not ad hoc
+  capability tokens
+
+Usual validation:
+- `Build debug`
+- lifecycle, dispatch, or owning workflow fixtures that address the service
+
+File: `kernel/src/identity/service_identity.mc`
+Owns:
+- service mark and ref value types plus equality and payload helpers
+
+Local invariants:
+- service identity comparisons and payload extraction stay centralized here
+- mark shape is simple and explicit: endpoint, pid, generation
+
+Do not move into this file:
+- restart policy
+- lifecycle command handling
+
+Safe editing rules:
+- if service identity shape changes, audit all lifecycle and retained-summary
+  consumers because they treat these values as canonical
+
+Usual validation:
+- identity, lifecycle, and retained-summary fixtures
+
+File: `kernel/src/identity/service_state.mc`
+Owns:
+- encoded lifecycle state and durability payload helpers
+
+Local invariants:
+- lifecycle state bytes are constructed here from already-decided owner truths
+- this file formats state payloads; it does not decide restart policy or query
+  routing
+
+Do not move into this file:
+- restart execution
+- lifecycle request validation
+
+Safe editing rules:
+- if a lifecycle payload byte layout changes, update all paired reply owners
+  that call these helpers
+
+Usual validation:
+- lifecycle and durability fixtures
+
+Shell And Dispatch
+------------------
+
+File: `kernel/src/kernel_dispatch.mc`
+Owns:
+- runtime dispatch from observations or effects into service handlers
+- the effect-chasing loop and depth guard
+- lifecycle routing replies and shell-to-service dispatch bridging
+- how boot state is mutated after each service result
+
+Local invariants:
+- this is the only owner of runtime routing and effect chasing
+- `boot.mc` constructs state, but this file decides how incoming work flows
+- service handlers return `service_effect.Effect`; this file executes the send
+  or reply choreography
+- routing by endpoint id and lifecycle target stays centralized here
+
+Do not move into this file:
+- service-local state machines
+- service persistence formats
+- boot-state layout definitions
+- broad policy that belongs in workflow or restart owners
+
+Safe editing rules:
+- if the change is about where a message goes or which state cell gets updated,
+  start here
+- when adding a new boot-wired service, wire one focused dispatch path here and
+  keep service logic inside the owning service file
+- preserve the bounded effect-chain contract; do not hide loops by increasing
+  complexity elsewhere first
+
+Usual validation:
+- `Build debug`
+- owning reset-lane system fixture and the grouped kernel workflow suite
+
+File: `kernel/src/shell/serial_protocol.mc`
+Owns:
+- shell command and target byte vocabulary for the serial protocol
+
+Local invariants:
+- shell byte naming is centralized here
+- this file names the protocol surface; it does not perform validation or
+  routing
+
+Do not move into this file:
+- dispatch branches
+- shell behavior decisions
+
+Safe editing rules:
+- add new command or target constants here before teaching shell or scenarios
+  about them
+- keep the file a naming table, not a second routing layer
+
+Usual validation:
+- owning scenario fixture that spends the new command family
+
+File: `kernel/src/shell/serial_service.mc`
+Owns:
+- serial ingress and reply buffering at the serial endpoint
+- buffered forward request extraction and reply-slot management
+
+Local invariants:
+- serial framing state lives here, not in `serial_shell_path.mc`
+- reply buffering and forwarded-request extraction remain owner-local and
+  explicit
+
+Do not move into this file:
+- shell command decoding
+- service endpoint routing
+
+Safe editing rules:
+- serial path bugs about pending reply state or forwarded request bytes start
+  here
+- keep the serial service a bounded buffer owner, not a dispatch layer
+
+Usual validation:
+- serial-path or steps scenario coverage
+
+File: `kernel/src/shell/shell_service.mc`
+Owns:
+- shell command decoding and validation
+- mapping shell protocol target bytes to topology endpoints
+- construction of shell-local invalid replies and forward effects
+
+Local invariants:
+- shell syntax and command-family validation are owned here
+- this file knows both serial protocol bytes and stable topology names without
+  introducing a circular dependency
+- it forwards valid work; it does not execute service-local behavior itself
+
+Do not move into this file:
+- boot-state mutation
+- actual service handler logic
+- lifecycle reply payload construction from boot state
+
+Safe editing rules:
+- new shell command families start here unless they are pure protocol naming
+  additions in `serial_protocol.mc`
+- keep invalid-shape vs invalid-command distinctions local and explicit
+- if a shell change only remaps bytes to an existing service owner, do not edit
+  that service until the forwarded message shape truly changes
+
+Usual validation:
+- owning scenario fixture for the shell command family
+
+File: `kernel/src/shell/serial_shell_path.mc`
+Owns:
+- composition of serial ingress with shell decoding and reply commit
+- the one-step serial-to-shell path state machine
+
+Local invariants:
+- this file composes `serial_service` and `shell_service`; it owns neither
+  service's inner logic
+- path step is explicit: receive serial input, maybe forward to shell, maybe
+  commit reply
+
+Do not move into this file:
+- shell command-family branching
+- serial buffering internals
+- kernel-wide dispatch
+
+Safe editing rules:
+- changes about serial-shell composition start here
+- keep this as a narrow seam; do not let it become a hidden dispatcher for the
+  rest of the kernel
+
+Usual validation:
+- serial-path, steps, or shell-driven scenario coverage
+
+File: `kernel/src/main.mc`
+Owns:
+- the thin kernel entrypoint: boot init plus scenario loop handoff
+
+Local invariants:
+- this file stays minimal and does not accumulate runtime policy
+
+Do not move into this file:
+- boot construction details
+- scenario sequencing logic
+- dispatch or shell code
+
+Safe editing rules:
+- only touch this file when the entry contract itself changes
+
+Usual validation:
+- `Build debug`
+
+Services
+--------
+
+File: `kernel/src/services/log_service.mc`
+Owns:
+- one bounded retained log buffer and its append or tail handlers
+
+Local invariants:
+- retained bytes and current length are owner-local state here
+- backpressure on full buffer is visible here as reply status, not hidden in
+  dispatch
+- service stays a compact pure state machine under the four-section standard
+
+Do not move into this file:
+- shell command parsing
+- boot restart policy
+
+Safe editing rules:
+- append or tail behavior changes start here
+- preserve bounded fixed-size behavior; do not smuggle in dynamic storage
+
+Usual validation:
+- owning log scenario or shell path scenario
+
+File: `kernel/src/services/kv_service.mc`
+Owns:
+- bounded key or value retained state and set or get handlers
+
+Local invariants:
+- kv ownership is entirely local to the service state
+- any logging or follow-through caused by kv writes belongs in dispatch or the
+  owning caller seam, not as hidden side effects here unless the service is
+  deliberately widened
+
+Do not move into this file:
+- shell route parsing
+- global observability policy
+
+Safe editing rules:
+- ordinary kv behavior changes start here
+- keep it a compact retained state machine rather than a coordination owner
+
+Usual validation:
+- kv or shell scenario coverage
+
+File: `kernel/src/services/transfer_grant.mc`
+Owns:
+- transfer-grant table issuance and consumption for transferred handle paths
+
+Local invariants:
+- grant ownership and consume or issue bookkeeping stay here
+- this is the narrow authority table, separate from ordinary named routing
+
+Do not move into this file:
+- transfer service message handling
+- boot topology or shell routing
+
+Safe editing rules:
+- transferred-handle bugs about grant issuance or consumption start here
+- preserve explicit bounded table behavior
+
+Usual validation:
+- transfer scenario coverage
+
+File: `kernel/src/services/transfer_service.mc`
+Owns:
+- narrow transferred-handle message routing and reply behavior
+
+Local invariants:
+- transfer-specific routing stays separated from ordinary service traffic
+- this file uses grant truth, but the grant table itself is owned by
+  `transfer_grant.mc`
+
+Do not move into this file:
+- generic dispatch routing
+- grant-table policy that belongs in `transfer_grant.mc`
+
+Safe editing rules:
+- if the change is about transferred-handle message behavior, start here and
+  only follow into grants if the authority table contract changes
+
+Usual validation:
+- transfer scenario fixture
+
+File: `kernel/src/services/completion_mailbox_service.mc`
+Owns:
+- bounded completion backlog state, fetch or ack protocol, and stall counters
+
+Local invariants:
+- completion queue shape and backpressure semantics are owned here
+- first-full and repeated-full behavior stay explicit and deterministic here
+- reload clears stall count but preserves retained queue contents
+
+Do not move into this file:
+- workflow outcome policy
+- dispatch retry logic outside the mailbox contract
+
+Safe editing rules:
+- backlog or stall semantics start here
+- preserve fixed entry ordering and explicit reply payload shape
+
+Usual validation:
+- completion mailbox fixture or any workflow pressure scenario that exercises it
+
+File: `kernel/src/services/connection_service.mc`
+Owns:
+- bounded connection-slot state, ingress buffering, request execution
+  preparation, and connection-local reply shapes
+
+Local invariants:
+- connection slot occupancy and request-lifetime truth are owner-local here
+- external ingress pressure behavior depends on this service staying the source
+  of slot state
+- this file owns connection execution prep, not workflow completion delivery
+
+Do not move into this file:
+- workflow scheduling policy
+- completion mailbox backlog ownership
+
+Safe editing rules:
+- connection slot lifetime or execute-preparation issues start here
+- if a bug is about request state surviving delivery pressure, check this file
+  before widening workflow logic
+
+Usual validation:
+- connection service, connection-backed workflow, or external ingress pressure
+  fixtures
+
+File: `kernel/src/services/journal_service.mc`
+Owns:
+- bounded durable journal lanes, artifact bytes, persist or load, and journal
+  append or replay behavior
+
+Local invariants:
+- durable journal truth is owned here
+- persistence bytes and equality checks are owner-local
+- workflow synchronization uses this service but does not own journal format
+
+Do not move into this file:
+- workflow state transitions
+- boot restart policy beyond calling load or persist
+
+Safe editing rules:
+- durable journal behavior or byte format changes start here
+- if persistence format changes, audit reload paths and the owning scenario
+
+Usual validation:
+- journal scenario and any workflow restart coverage that consumes the journal
+
+File: `kernel/src/services/object_store_service.mc`
+Owns:
+- bounded durable named-object state, persistence format, and object create or
+  read or replace or update behavior
+
+Local invariants:
+- object-slot truth and durable artifact bytes are centralized here
+- workflow object-update paths consume this service, but object ownership stays
+  here
+
+Do not move into this file:
+- workflow scheduling or completion behavior
+
+Safe editing rules:
+- named-object behavior changes start here
+- keep the durable state format explicit and bounded
+
+Usual validation:
+- object store or named object workflow fixtures
+
+File: `kernel/src/services/update_store_service.mc`
+Owns:
+- bounded staged artifact storage
+- manifest truth and classification
+- applied-target durable state and on-disk artifact bytes
+
+Local invariants:
+- update staging, manifest, and applied-target truth are owner-local here
+- this service owns the durable file format for update store state
+- it does not own broader workflow policy or installation choreography
+
+Do not move into this file:
+- delegated workflow sequencing
+- mailbox delivery policy
+- package-distribution framework behavior
+
+Safe editing rules:
+- update-store bugs start here when the problem is staged bytes, manifest
+  classification, or durable applied-target truth
+- keep the service bounded to one staged artifact plus one manifest and one
+  applied target unless an explicit phase changes that boundary
+
+Usual validation:
+- update store scenario, update apply workflow, or update recovery pressure
+  coverage
+
+File: `kernel/src/services/lease_service.mc`
+Owns:
+- bounded delegated lease issuance and consumption for workflow follow-through
+
+Local invariants:
+- lease ids, kinds, payload fields, and generation coupling are owner-local
+  here
+- workflow consumes lease truth but does not redefine the lease table shape
+
+Do not move into this file:
+- workflow outcome policy
+- ticket-service inner rules
+
+Safe editing rules:
+- delegated lease bugs start here if the wrong lease is issued, consumed, or
+  classified
+- preserve bounded table and explicit generation-aware behavior
+
+Usual validation:
+- lease, delegated installer, delegated object, or delegated external request
+  fixtures
+
+File: `kernel/src/services/workflow_core.mc`
+Owns:
+- the canonical workflow state model
+- workflow constants, state encodings, record helpers, snapshot and lane bytes
+- schedule, query, cancel, and core state-transition helpers
+
+Local invariants:
+- workflow semantic truth lives here, not in `workflow_protocol.mc` or
+  `workflow_advance.mc`
+- snapshot and restart-visible workflow representation stay explicit here
+- workflow state and restart code bytes are canonical and reused across the
+  workflow family
+
+Do not move into this file:
+- timer ticking orchestration
+- mailbox delivery retry loops
+- dispatch or shell message routing
+
+Safe editing rules:
+- if the change is about workflow state meaning, ids, encoding, or state
+  transitions, start here
+- keep state helpers explicit and data-oriented; do not hide workflow truth in
+  framework wrappers
+- if snapshot shape or lane bytes change, audit restart and journal consumers
+
+Usual validation:
+- workflow service, connection-backed workflow, object-update workflow, update-
+  apply workflow, and pressure fixtures as applicable
+
+File: `kernel/src/services/workflow_protocol.mc`
+Owns:
+- message-level workflow command handling
+- orchestration of schedule, cancel, and step flow across workflow, timer,
+  task, journal, lease, ticket, completion, and connection owners
+
+Local invariants:
+- this file is the protocol and orchestration seam for workflow messages
+- it consumes workflow-core truth instead of redefining it
+- it owns the order in which workflow stepping touches other services
+
+Do not move into this file:
+- canonical workflow state encoding from `workflow_core.mc`
+- low-level advance helpers that belong in `workflow_advance.mc`
+- restart synchronization that belongs in `workflow_restart.mc`
+
+Safe editing rules:
+- if the bug is about how a workflow message is executed through the service
+  family, start here
+- keep orchestration explicit; do not smear protocol handling across dispatch
+  or scenario code
+
+Usual validation:
+- owning workflow fixture for the message family being changed
+
+File: `kernel/src/services/workflow_advance.mc`
+Owns:
+- automatic workflow progression from waiting or running or delivering states
+- delegated connection and delegated update-apply execution helpers
+
+Local invariants:
+- progression on timer or task or delegated execution boundaries is owned here
+- this file advances workflow state using other services, but workflow state
+  meaning still comes from `workflow_core.mc`
+
+Do not move into this file:
+- shell command parsing
+- mailbox queue implementation
+- workflow snapshot encoding
+
+Safe editing rules:
+- delayed progression, delegated execution, or delivery retry follow-through
+  bugs start here
+- if delivery semantics changed but mailbox ownership did not, check here
+  before widening completion service behavior
+
+Usual validation:
+- connection-backed workflow, delegated request, update apply, or recovery
+  pressure fixtures
+
+File: `kernel/src/services/workflow_restart.mc`
+Owns:
+- workflow restart synchronization with the journal lane
+- workflow reload and restart-resume helpers
+
+Local invariants:
+- workflow restart and journal-lane coupling are explicit here
+- journal synchronization is kept separate from ordinary workflow protocol
+  handling
+
+Do not move into this file:
+- general workflow command handling
+- journal persistence mechanics
+
+Safe editing rules:
+- restart-resume or journal-sync bugs start here when core state shape is
+  already correct
+- preserve the explicit restart seam rather than spreading restart logic across
+  `workflow_protocol.mc` and `workflow_advance.mc`
+
+Usual validation:
+- restart, retained-summary, delegated workflow, or update recovery fixtures
+
+Scenarios
+---------
+
+File: `kernel/src/scenarios/scenarios.mc`
+Owns:
+- repo-owned scenario sequencing for the kernel image entry
+
+Local invariants:
+- this file is the ordered integration harness over scenario probes
+- each `scenario_*.mc` spends owner behavior; this file decides sequence and
+  isolated boot-state resets between probes
+
+Do not move into this file:
+- runtime service behavior
+- shell routing logic
+- service-local validation helpers that belong in the owning scenario file
+
+Safe editing rules:
+- when adding a new repo-owned scenario, register it here in the right order
+  and use a fresh `kernel_init()` when isolation matters
+- keep it an orchestration file, not a second test utility library
+
+Usual validation:
+- `Build debug`
+- grouped reset-lane workflow or full kernel suite coverage
+
+Representative individual scenario owners:
+- `scenario_steps.mc`: scripted serial transport and base path probe owner
+- `scenario_lifecycle.mc`: lifecycle command spend site
+- `scenario_connection_backed_workflow.mc`: connection-backed workflow spend
+  site
+- `scenario_update_apply_workflow.mc` and
+  `scenario_update_recovery_completion_pressure.mc`: update workflow and
+  backlog-pressure spend sites
+
+Omitted Or Smaller Surfaces
+---------------------------
+
+Directory: `kernel/src/transport`
+Status:
+- low-level effect, syscall, and IPC vocabulary
+
+Editing rule:
+- only start here when the task is explicitly about wire-shape or syscall
+  primitives; ordinary service changes should not widen transport types first
+
+File group: small bounded services such as `echo_service.mc`, `queue_service.mc`,
+`file_service.mc`, `ticket_service.mc`, `timer_service.mc`, `task_service.mc`
+Status:
+- live owners, but mechanically simpler than the major coordinated surfaces
+
+Editing rule:
+- treat them as ordinary four-section state-machine owners
+- start in the owning service file, keep changes local, and avoid widening boot
+  or workflow surfaces unless the feature truly crosses that boundary
+
+File group: thin or naming-only helpers such as `event_codes.mc`,
+`identity_taxonomy.mc`, `workflow_service.mc`, and most individual
+`scenario_*.mc` files
+Status:
+- important to callers, but not major multi-owner control surfaces
+
+Editing rule:
+- touch them only when a direct naming, classification, or scenario spend site
+  change requires it
+
+Quick Routing Rules
+-------------------
+If the task is mainly about:
+
+- boot-wired service presence, service cells, generations, or restart outcome
+  fields: start in `kernel/src/boot/boot.mc`
+- restart policy or restart execution: start in `kernel/src/boot/init.mc`
+- lifecycle payload bytes, marks, or summary projection: start in
+  `kernel/src/boot/boot_identity.mc`
+- endpoint ids, service pid wiring, or restart-mode classification: start in
+  `kernel/src/identity/service_topology.mc`
+- shell command bytes: start in `kernel/src/shell/serial_protocol.mc`
+- shell command parsing and endpoint remapping: start in
+  `kernel/src/shell/shell_service.mc`
+- serial ingress or reply buffering: start in
+  `kernel/src/shell/serial_service.mc`
+- serial-shell composition: start in `kernel/src/shell/serial_shell_path.mc`
+- runtime routing or effect chasing: start in `kernel/src/kernel_dispatch.mc`
+- one bounded service state machine: start in the owning file under
+  `kernel/src/services`
+- workflow state meaning: start in `kernel/src/services/workflow_core.mc`
+- workflow message handling or multi-service orchestration: start in
+  `kernel/src/services/workflow_protocol.mc`
+- workflow automatic progression or delegated execution: start in
+  `kernel/src/services/workflow_advance.mc`
+- workflow restart or journal sync: start in
+  `kernel/src/services/workflow_restart.mc`
+- scenario registration or repo-owned probe sequencing: start in
+  `kernel/src/scenarios/scenarios.mc`

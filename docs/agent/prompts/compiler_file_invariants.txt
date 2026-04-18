@@ -1,0 +1,1209 @@
+Compiler File Invariants
+========================
+
+Purpose
+-------
+This file is a planning-time accelerator for work under `compiler/`.
+
+It is not a full architecture spec. It is a local invariant map for the major
+files that agents are most likely to touch.
+
+Use it to answer:
+
+- which file owns this behavior
+- which nearby files usually move with it
+- what must not be pushed into or out of that file
+- what the narrowest validation target usually is
+
+Global Compiler Rules
+---------------------
+1. Preserve the pipeline boundary.
+   `lex` tokenizes.
+   `parse` builds syntax.
+   `sema` owns language meaning, type checking, import resolution, and layout.
+   `mir` owns typed lowered control flow.
+   `codegen_llvm` owns backend lowering and target checks.
+   `driver` owns CLI and pipeline orchestration.
+2. Do not repair earlier-phase defects in later phases.
+   Parser gaps do not get patched in sema.
+   Sema gaps do not get patched in MIR.
+   MIR gaps do not get patched in the driver.
+3. Keep dumps deterministic.
+   `ast`, `sema`, and `mir` dump formats are test truth.
+4. Prefer the narrowest owning fixture family first.
+5. Smaller helper or placeholder files may be ignored unless the change makes
+   them the controlling owner.
+
+Major File Selection Policy
+---------------------------
+This document focuses on the major files in:
+
+- `compiler/lex`
+- `compiler/ast`
+- `compiler/parse`
+- `compiler/sema`
+- `compiler/mir`
+- `compiler/codegen_llvm`
+- `compiler/driver`
+- `compiler/support`
+
+`compiler/resolve` and `compiler/mci` are currently placeholder or reserved
+surfaces; see the brief note at the end.
+
+Lex
+---
+
+File: `compiler/lex/token.h`
+Owns:
+- the canonical token model and token-kind vocabulary consumed by the parser
+
+Local invariants:
+- token kind names are the single source of truth for parser-facing syntax
+- token structure must preserve source span and literal text/value payloads
+- token meaning is lexical only, not semantic
+
+Do not move into this file:
+- parser precedence or grammar decisions
+- type or name semantics
+- import resolution
+
+Safe editing rules:
+- add new token kinds here before teaching the lexer or parser about them
+- preserve source-span fidelity for every token shape
+- if a change adds a keyword-like surface, confirm whether it should be a new
+  token kind or remain an identifier recognized later by the parser
+
+Usual validation:
+- parser fixtures
+
+File: `compiler/lex/lexer.h`
+Owns:
+- the public lexer interface and result contract used by parser or driver
+
+Local invariants:
+- lexer public API stays small and phase-local
+- callers receive tokens plus diagnostic success or failure state, not partial
+  semantic interpretation
+
+Do not move into this file:
+- parser helpers
+- diagnostic formatting policy
+
+Safe editing rules:
+- keep interface changes rare and cross-check all direct callers before making
+  them
+
+Usual validation:
+- parser fixtures and any direct lexer unit coverage if present
+
+File: `compiler/lex/lexer.cpp`
+Owns:
+- handwritten tokenization, keyword recognition, literal lexing, and lexical
+  diagnostics
+
+Local invariants:
+- same source text must always yield the same token stream and spans
+- literal parsing stays lexical; range checking or type meaning stays later
+- comments and whitespace are consumed here, not in the parser
+
+Do not move into this file:
+- grammar or precedence logic
+- type-dependent literal interpretation
+
+Safe editing rules:
+- add or adjust keyword recognition here after updating `token.h`
+- keep error recovery local and lexical
+- when changing numeric literal handling, verify both literal payloads and span
+  fidelity
+
+Usual validation:
+- parser fixtures, especially syntax around the changed tokens
+
+AST
+---
+
+File: `compiler/ast/ast.h`
+Owns:
+- the repository's syntax-tree data model: declarations, statements,
+  expressions, patterns, type expressions, and source file structure
+
+Local invariants:
+- AST is structural syntax, not resolved meaning
+- nodes must carry source spans
+- node kinds and fields are the parser-to-sema contract
+- sema facts do not get stored back into AST nodes
+
+Do not move into this file:
+- resolved types
+- symbol bindings
+- imported-module surfaces
+- MIR-level lowering facts
+
+Safe editing rules:
+- add new node kinds only when a syntactic shape needs persistent structure
+- prefer extending an existing node over adding a new one when the syntax is
+  the same owner with one bounded extra field
+- if a field changes dump-visible structure, update parser goldens
+
+Usual validation:
+- parser fixtures comparing `.ast.txt`
+
+Cross-file contract:
+- parser builds these nodes
+- sema reads them but stores semantic truth separately in `sema::Module`
+
+File: `compiler/ast/ast.cpp`
+Owns:
+- AST textual dumping and any enum-to-string rendering used by parser fixtures
+
+Local invariants:
+- dump output is deterministic and stable enough for golden tests
+- dump formatting reflects syntax shape, not sema interpretation
+
+Do not move into this file:
+- parse logic
+- semantic formatting that depends on type checking
+
+Safe editing rules:
+- when AST structure changes, update dump support in the same change
+- avoid reformatting unrelated dump output because parser fixtures are broad
+
+Usual validation:
+- parser fixtures
+
+Parse
+-----
+
+File: `compiler/parse/parser.h`
+Owns:
+- the public parser interface and parse-result contract
+
+Local invariants:
+- parser returns syntax plus success or failure state
+- parser interface remains phase-local and does not expose sema or MIR details
+
+Do not move into this file:
+- parser implementation helpers
+- sema-owned classification rules
+
+Safe editing rules:
+- keep public interface changes minimal and update all call sites if touched
+
+Usual validation:
+- parser fixtures
+
+File: `compiler/parse/parser_internal.h`
+Owns:
+- parser class shape, private helper partitioning, lookahead helpers, and the
+  internal parser-state contract
+
+Local invariants:
+- parser borrows lexer tokens and reports into caller-owned diagnostics
+- recursion limits such as type and unary depth guards live here
+- statement, declaration, expression, and type-expression parsing are separate
+  private owner paths
+- parser recovery helpers are centralized here, not scattered ad hoc across
+  files
+
+Do not move into this file:
+- sema checks for legality
+- MIR-aware lowering shortcuts
+
+Safe editing rules:
+- if adding a new parser surface, add the helper declarations here in the
+  owning family rather than attaching one-off hidden statics elsewhere
+- preserve recovery and separator helpers; they are shared parser invariants
+
+Usual validation:
+- parser fixtures
+
+File: `compiler/parse/parser.cpp`
+Owns:
+- parser entry flow and the main top-level parsing path
+
+Local invariants:
+- top-level parse order and synchronization remain centralized here
+- parser emits syntax even after local failures when recovery is honest
+- parse result success tracks lexer failure state plus parser-reported errors
+
+Do not move into this file:
+- expression precedence ladders better owned by `parser_expr.cpp`
+- statement-local control-flow syntax owned by `parser_statements.cpp`
+- declaration tails better owned by `parser_decls.cpp`
+
+Safe editing rules:
+- keep this file as the coordinator for parser entry and top-level flow, not a
+  new center of gravity for all grammar work
+
+Usual validation:
+- parser fixtures
+
+File: `compiler/parse/parser_decls.cpp`
+Owns:
+- declaration syntax, binding patterns in declaration positions, and function,
+  type, struct, enum, distinct, alias, and top-level binding parse tails
+
+Local invariants:
+- declaration syntax stays parser-owned here
+- discard-target admission in binding positions is parser-owned here when the
+  source shape changes
+- declaration grammar should not perform sema legality checks
+
+Do not move into this file:
+- scope legality or rebinding rules owned by sema
+- MIR naming or storage rules
+
+Safe editing rules:
+- parser-only declaration shape changes start here
+- if a change adds a new binding target form, update only syntax here and push
+  meaning to sema unless the source shape itself changes
+
+Usual validation:
+- parser fixtures, then sema if declaration meaning changed
+
+File: `compiler/parse/parser_expr.cpp`
+Owns:
+- expression parsing, precedence ladder, aggregate-init syntax recognition,
+  postfix and unary parsing, and expression-list owners
+
+Local invariants:
+- operator precedence and associativity are parser truth here
+- repeated operator chains and comma-delimited list behavior are parser-owned
+- parser recognizes syntax like type-call or empty-collection surfaces, but
+  meaning may still belong to sema
+
+Do not move into this file:
+- expected-type meaning
+- type conversion legality
+- short-circuit lowering policy
+
+Safe editing rules:
+- precedence or trailing-comma work starts here
+- check whether an expression change needs a new AST shape or can reuse an
+  existing node
+- before changing MIR for a parser-shaped problem, confirm the parser still
+  cannot already build the right tree
+
+Usual validation:
+- parser fixtures first
+- MIR or executable follow-through only if the syntax change affects lowering
+
+File: `compiler/parse/parser_statements.cpp`
+Owns:
+- statement parsing, block structure, if or switch or loop syntax, return,
+  defer, assignment-vs-expression statement routing, and statement separators
+
+Local invariants:
+- statement boundaries and source separators are parser-owned here
+- switch or case body structure stays syntactic here; semantic classification
+  stays later
+- `for` syntax builds syntax only; sema classifies range-vs-iterable facts
+
+Do not move into this file:
+- loop semantic classification
+- assignment legality checks
+
+Safe editing rules:
+- statement-surface changes begin here
+- preserve synchronization behavior because parse-fail fixtures depend on local
+  diagnostic recovery
+
+Usual validation:
+- parser fixtures, then sema if statement meaning changed
+
+Sema
+----
+
+File: `compiler/sema/type.h`
+Owns:
+- the semantic type model exposed across sema, MIR, and backend boundaries
+
+Local invariants:
+- this is the canonical checked type vocabulary
+- type identity and printable structure must remain stable enough for sema and
+  MIR consumers
+- later phases may copy or interpret these types, but they do not redefine the
+  type model
+
+Do not move into this file:
+- AST syntax nodes
+- MIR-specific representation details
+- backend-only layout lowering
+
+Safe editing rules:
+- when adding a checked type family, update formatting and any downstream
+  canonicalization users in the same change
+- preserve comparison and equality behavior because many phases treat these
+  types as canonical keys
+
+Usual validation:
+- sema fixtures, then MIR fixtures if type identity affects lowering
+
+File: `compiler/sema/type.cpp`
+Owns:
+- semantic type construction, formatting, AST-to-type conversion helpers, and
+  core type equality or textual rendering
+
+Local invariants:
+- semantic type formatting truth lives here
+- AST type-expression conversion helpers feed sema, not parser or MIR
+- builtin and named type canonicalization logic stays here
+
+Do not move into this file:
+- name resolution
+- import resolution
+- expression checking
+
+Safe editing rules:
+- if a change is really about semantic type identity or formatting, start here
+- if a type change alters dump-visible output, update sema goldens
+
+Usual validation:
+- sema fixtures
+
+File: `compiler/sema/type_utils.cpp`
+Owns:
+- reusable semantic type predicates, canonicalization helpers, substitution,
+  assignability, and conversion classification
+
+Local invariants:
+- shared type queries used by checking should stay here instead of being
+  duplicated through `check.cpp`
+- this file supports the semantic type model; it does not own source traversal
+
+Do not move into this file:
+- high-level checking flow
+- import graph logic
+- layout computation
+
+Safe editing rules:
+- add shared type predicates here when more than one checking path needs them
+- do not let this file become a second checking engine with AST walking and
+  diagnostic emission everywhere
+
+Usual validation:
+- sema fixtures, with MIR follow-through if conversion or assignability changes
+
+File: `compiler/sema/check.h`
+Owns:
+- public sema entry points, module shape exposure, and query helpers consumed by
+  MIR or tests
+
+Local invariants:
+- sema public API stays narrow: check source file or program, query module
+  facts, dump module, const-eval helpers
+- MIR consumes sema facts through this boundary rather than rebuilding them
+
+Do not move into this file:
+- checking internals that are not part of the sema-to-MIR contract
+
+Safe editing rules:
+- public API changes here are high-impact; audit MIR and tests before editing
+
+Usual validation:
+- sema fixtures and MIR fixtures
+
+File: `compiler/sema/check.cpp`
+Owns:
+- the main semantic checking pass: scope rules, name resolution, import
+  resolution, type checking, semantic module construction, and checked facts
+  such as expression types and loop classification
+
+Local invariants:
+- language meaning lives here, not in MIR or driver
+- import resolution is sema-owned
+- module construction and semantic summaries are built here
+- expression-type lookup facts and for-in classification facts that MIR needs
+  originate here
+- private or hidden surface handling stays sema-owned
+
+Do not move out of this file:
+- name resolution
+- scope legality
+- import path or module-surface checking
+- source-level type checking
+
+Do not move into this file:
+- MIR representation policy
+- backend layout lowering
+- CLI orchestration
+
+Safe editing rules:
+- most semantic behavior changes start here
+- if a change only needs a shared type predicate, keep the helper in
+  `type_utils.cpp` and keep this file focused on checking flow
+- if a new semantic rule changes dump-visible module truth, update sema goldens
+
+Usual validation:
+- `mc_sema_fixture_unit`
+- `mc_mir_fixture_unit` if MIR consumes the changed fact
+
+Cross-file contract:
+- MIR calls helpers such as `FindExprType`, `FindForInFact`,
+  `ResolveTypeFromAst`, and const-eval entry points through the sema boundary
+
+File: `compiler/sema/check_const_eval.cpp`
+Owns:
+- sema-side constant-evaluation follow-through used by checking paths that need
+  compile-time values
+
+Local invariants:
+- constant evaluation belongs to sema because type and declaration context are
+  required
+- compile-time numeric truth for array extents and similar surfaces must stay
+  consistent with the checked type model
+
+Do not move into this file:
+- backend or runtime constant folding
+- parser literal lexing
+
+Safe editing rules:
+- keep this file focused on checked constant evaluation entry points, not the
+  entire arithmetic helper library
+
+Usual validation:
+- sema fixtures, then MIR fixtures when const-evaluated types feed lowering
+
+File: `compiler/sema/const_eval.cpp`
+Owns:
+- the arithmetic and comparison mechanics used by sema constant evaluation
+
+Local invariants:
+- compile-time arithmetic behavior is centralized here
+- overflow or checked-vs-wrap behavior used by sema must remain deterministic
+- const-value rendering and construction helpers stay sema-owned here
+
+Do not move into this file:
+- AST walking for whole-program checking
+- MIR folding passes
+
+Safe editing rules:
+- arithmetic semantics changes here are cross-cutting; validate array extents,
+  comparisons, and any compile-time expression fixtures affected by the change
+
+Usual validation:
+- sema fixtures
+
+File: `compiler/sema/layout.cpp`
+Owns:
+- semantic layout computation for checked types: size, alignment, and field
+  offsets
+
+Local invariants:
+- layout truth is computed in sema, before MIR or backend use it
+- layout dumps are deterministic and part of semantic test truth
+
+Do not move into this file:
+- target-specific LLVM lowering
+- parser structure decisions
+
+Safe editing rules:
+- layout changes usually require sema golden updates and possibly downstream
+  backend checks if representation changes matter
+
+Usual validation:
+- sema fixtures, then codegen coverage if ABI-visible behavior changed
+
+File: `compiler/sema/module_resolver.cpp`
+Owns:
+- imported module surface rewriting and qualification for sema-visible imports
+
+Local invariants:
+- imported surfaces are rewritten and qualified here, not ad hoc in checking or
+  driver code
+- hidden or private import handling remains sema-owned
+
+Do not move into this file:
+- build-graph project discovery
+- MIR import merging
+
+Safe editing rules:
+- import-surface or qualification work starts here or in `check.cpp`, not in
+  MIR or driver
+
+Usual validation:
+- sema fixtures covering imports, then MIR fixtures if imported types feed
+  lowering
+
+File: `compiler/sema/check_summary.cpp`
+Owns:
+- semantic module dump formatting and summary text used by sema fixtures
+
+Local invariants:
+- output is deterministic test truth
+- formatting reflects checked-module truth, not parser-only structure or
+  backend-only representation
+
+Do not move into this file:
+- checking logic
+- layout computation itself
+
+Safe editing rules:
+- when semantic module shape changes, update this file in the same change and
+  expect fixture churn
+
+Usual validation:
+- sema fixtures
+
+MIR
+---
+
+File: `compiler/mir/mir.h`
+Owns:
+- the public MIR data model, lowering entry points, validation entry points,
+  and MIR dump surface
+
+Local invariants:
+- MIR is typed and sema-derived, not an untyped rebuild of AST
+- instruction, terminator, local, function, and module shapes defined here are
+  the MIR-to-backend contract
+- atomic metadata and target metadata travel through MIR in explicit fields
+
+Do not move into this file:
+- parser syntax nodes
+- sema-only scope rules
+- backend-specific LLVM text
+
+Safe editing rules:
+- MIR shape changes are high-impact: update validation, dumping, lowering, and
+  backend consumers together
+
+Usual validation:
+- MIR fixtures, then codegen tests if backend consumption changes
+
+File: `compiler/mir/mir.cpp`
+Owns:
+- MIR-level helper logic and query utilities used across validation, dumping,
+  and backend consumption
+
+Local invariants:
+- shared MIR helper logic belongs here rather than being duplicated across
+  lowering or validation files
+- special call or metadata classification that is MIR-owned stays here
+
+Do not move into this file:
+- full lowering flow
+- dump formatting
+- backend text emission
+
+Safe editing rules:
+- keep this as shared MIR support, not a second lowering engine
+
+Usual validation:
+- MIR fixtures, then codegen if helper semantics affect backend lowering
+
+File: `compiler/mir/mir_lower.cpp`
+Owns:
+- AST-plus-sema to MIR lowering, function-lowering machinery, local binding to
+  MIR value or storage mapping, and control-flow block construction
+
+Local invariants:
+- lowering consumes sema truth instead of recomputing it
+- local storage naming and visibility rules that preserve sema distinctions are
+  owned here
+- imported-module context required for lowering must be threaded explicitly
+
+Do not move into this file:
+- sema legality checks
+- backend instruction text emission
+
+Safe editing rules:
+- if a feature already has the right sema type or fact, prefer reusing current
+  MIR instructions over inventing a new one
+- when changing type reconstruction or imported-module behavior, verify that
+  imported modules are threaded through the relevant lowering entry points
+
+Usual validation:
+- MIR fixtures
+- executable or codegen coverage if control-flow or representation changes
+
+File: `compiler/mir/mir_validate.cpp`
+Owns:
+- MIR instruction and module validation rules
+
+Local invariants:
+- MIR is validated after lowering and before backend use
+- operand counts, target kinds, atomic-order metadata, and typed instruction
+  contracts are checked here
+
+Do not move into this file:
+- repair logic that mutates MIR to hide lowering defects
+
+Safe editing rules:
+- if MIR shape changes, update validation in the same change
+- do not weaken validation to accommodate an earlier-phase bug without fixing
+  the real owner
+
+Usual validation:
+- MIR fixtures and unit tests
+
+File: `compiler/mir/mir_validate_flow.cpp`
+Owns:
+- control-flow structure validation such as block reachability or dominance
+
+Local invariants:
+- flow validation stays separate from instruction validation
+- function-structure truth is explicit and deterministic
+
+Do not move into this file:
+- lowering-time construction logic
+
+Safe editing rules:
+- flow-sensitive MIR changes should update this file when block or terminator
+  invariants change
+
+Usual validation:
+- MIR fixtures and unit tests
+
+File: `compiler/mir/mir_text.cpp`
+Owns:
+- MIR textual rendering and inline formatting helpers used by dump output
+
+Local invariants:
+- MIR dump output is deterministic test truth
+- printed names, instruction kinds, and inline type or expression renderings
+  reflect MIR structure, not backend lowering
+
+Do not move into this file:
+- lowering or validation logic
+
+Safe editing rules:
+- when MIR structure changes, update dump text here in the same change
+- avoid unrelated formatting churn because MIR goldens are sensitive
+
+Usual validation:
+- MIR fixtures
+
+Codegen LLVM
+------------
+
+File: `compiler/codegen_llvm/backend.h`
+Owns:
+- the public backend interface and target-config surface consumed by the driver
+
+Local invariants:
+- public backend entry stays narrow: validate target, lower module, build
+  artifacts
+- backend public API should not leak internal per-instruction lowering details
+
+Do not move into this file:
+- split lowering helpers better owned by internal files
+
+Safe editing rules:
+- public API changes here require driver audit and test updates
+
+Usual validation:
+- codegen executable tests and tool workflows that build binaries
+
+File: `compiler/codegen_llvm/backend_internal.h`
+Owns:
+- the internal shared contract across the split executable-backend lowering
+  files
+
+Local invariants:
+- shared backend helper declarations live here rather than being duplicated
+- target validation, type lowering, naming, and executable emission context are
+  coordinated through this header
+- split lowering files depend on this as their internal contract surface
+
+Do not move into this file:
+- user-facing driver CLI concerns
+- sema or MIR ownership
+
+Safe editing rules:
+- when a helper is needed by more than one backend source file, add it here
+- avoid turning this header into a second public API for non-backend code
+
+Usual validation:
+- codegen executable tests
+
+File: `compiler/codegen_llvm/backend.cpp`
+Owns:
+- the public executable-backend owner: target validation, module assembly,
+  global collection, function rendering orchestration, helper emission, and the
+  main instruction-dispatch surface
+
+Local invariants:
+- this file is the center for module-level backend orchestration
+- target capability checks happen before emission
+- executable function emission routes per instruction kind into the split
+  lowering owners instead of duplicating their logic here
+
+Do not move into this file:
+- detailed numeric, call, aggregate, or memory lowering that already has a
+  split owner
+- driver-level artifact policy
+
+Safe editing rules:
+- module-level backend changes start here
+- keep file-family ownership clear: delegate specialized instruction lowering
+  to the split owner files
+
+Usual validation:
+- codegen executable tests; tool build or run workflows if artifact behavior
+  changed
+
+File: `compiler/codegen_llvm/backend_types.cpp`
+Owns:
+- sema or MIR type lowering into backend type info and enum or aggregate layout
+  support used by emission
+
+Local invariants:
+- backend type lowering is backend-owned here, not in sema
+- target-specific representation details stay here
+
+Do not move into this file:
+- semantic layout truth that belongs to sema
+- per-instruction emission
+
+Safe editing rules:
+- if backend type rendering changes, audit all instruction families that depend
+  on the lowered type info
+
+Usual validation:
+- codegen executable tests
+
+File: `compiler/codegen_llvm/backend_names.cpp`
+Owns:
+- backend-visible symbol and temporary naming
+
+Local invariants:
+- emitted names are deterministic
+- LLVM-facing name sanitization and mangling stay centralized here
+
+Do not move into this file:
+- semantic qualification rules
+- per-instruction lowering
+
+Safe editing rules:
+- naming changes are wide-impact; audit dump text, symbol references, and host
+  wrapper paths together
+
+Usual validation:
+- codegen executable tests
+
+File: `compiler/codegen_llvm/backend_dump.cpp`
+Owns:
+- backend module dump support for inspectability fixtures
+
+Local invariants:
+- dump output is deterministic and backend-structural
+
+Do not move into this file:
+- real emission logic
+
+Safe editing rules:
+- update when backend data-model shape changes
+
+Usual validation:
+- codegen inspectability fixtures
+
+File: `compiler/codegen_llvm/backend_host.cpp`
+Owns:
+- host-tool invocation for object build, link, archive, and external command
+  execution
+
+Local invariants:
+- host command composition stays backend-owned here, not in the driver
+- shell quoting and artifact cleanup behavior are centralized here
+
+Do not move into this file:
+- project-graph discovery
+- CLI parsing
+
+Safe editing rules:
+- host command changes should be validated through codegen or tool workflows,
+  not just compile checks
+
+Usual validation:
+- executable codegen tests and tool workflows that build or run binaries
+
+File: `compiler/codegen_llvm/backend_executable_calls.cpp`
+Owns:
+- executable call lowering and call-signature resolution
+
+Local invariants:
+- call lowering stays separated from numeric or aggregate lowering
+
+Do not move into this file:
+- non-call instruction families
+
+Safe editing rules:
+- call-specific backend bugs start here
+
+Usual validation:
+- codegen executable tests that cover calls
+
+File: `compiler/codegen_llvm/backend_executable_numeric.cpp`
+Owns:
+- executable numeric ops, comparisons, conversions, and checked helper analysis
+
+Local invariants:
+- numeric emission and compare semantics stay centralized here
+- checked divide or shift helper requirements stay backend-owned here
+
+Do not move into this file:
+- aggregate or memory-container emission
+
+Safe editing rules:
+- numeric or comparison backend issues start here
+
+Usual validation:
+- codegen executable core tests
+
+File: `compiler/codegen_llvm/backend_executable_aggregate.cpp`
+Owns:
+- aggregate init, enum or variant lowering, slice lowering, and aggregate
+  memory-container emission
+
+Local invariants:
+- aggregate and variant lowering stay separated from generic numeric or call
+  lowering
+
+Do not move into this file:
+- sema aggregate meaning
+
+Safe editing rules:
+- enum, aggregate-init, and slice backend work starts here
+
+Usual validation:
+- codegen executable tests that cover aggregates, slices, and enums
+
+File: `compiler/codegen_llvm/backend_executable_memory.cpp`
+Owns:
+- local-address, store-target, field/index address, and memory-oriented
+  executable lowering
+
+Local invariants:
+- address and store-target lowering stay centralized here
+
+Do not move into this file:
+- source-level lvalue legality checks
+
+Safe editing rules:
+- memory-address backend bugs start here
+
+Usual validation:
+- codegen executable tests exercising field, index, address, and store flows
+
+Driver
+------
+
+File: `compiler/driver/driver.cpp`
+Owns:
+- CLI parsing, usage text, invocation classification, and high-level command
+  orchestration for `check`, `build`, `run`, `test`, and `dump-paths`
+
+Local invariants:
+- command-line behavior is owned here
+- parse-to-sema-to-MIR-to-backend orchestration stays here, not in sema or
+  backend code
+- direct-source and project invocation modes are distinguished here
+
+Do not move into this file:
+- semantic checking logic
+- project manifest parsing details better owned by `project.cpp`
+- build-graph discovery better owned by `build_graph.cpp`
+
+Safe editing rules:
+- CLI behavior changes start here
+- keep user-visible option validation centralized here rather than distributing
+  it into lower layers
+
+Usual validation:
+- grouped tool tests, especially workflow or project-validation suites
+
+File: `compiler/driver/project.h`
+Owns:
+- public project-model and manifest-loading boundary consumed by other driver
+  code
+
+Local invariants:
+- project manifest types and helper entry points form the driver-internal
+  project contract
+
+Do not move into this file:
+- CLI command orchestration
+
+Safe editing rules:
+- project model changes here require audit of all driver users
+
+Usual validation:
+- tool project-validation and real-project tests
+
+File: `compiler/driver/project.cpp`
+Owns:
+- `build.toml` parsing, project validation, target selection, and target-owned
+  import-root computation
+
+Local invariants:
+- project manifest interpretation is driver-owned here
+- duplicate configured paths, target notes, and selection errors stay local to
+  this owner
+- module-set and target configuration parsing stays explicit and deterministic
+
+Do not move into this file:
+- sema import resolution
+- backend artifact building
+
+Safe editing rules:
+- manifest schema changes start here
+- validate through grouped tool tests because CLI-only smoke checks are too
+  shallow
+
+Usual validation:
+- project-validation, workflow, and real-project grouped tests
+
+File: `compiler/driver/build_graph.cpp`
+Owns:
+- logical module graph discovery, source concatenation boundaries, module-set
+  source parsing, target graph construction, and topological build ordering
+
+Local invariants:
+- project module graph truth is owned here
+- source concatenation line-offset rewriting stays explicit here so diagnostics
+  still map back to original files
+- topological build order and module artifact key construction stay here
+
+Do not move into this file:
+- semantic import legality
+- host linker invocation
+
+Safe editing rules:
+- project module-graph or multi-file module behavior changes start here
+- if a change touches source concatenation, audit span-offset helpers and any
+  tests that rely on diagnostic locations
+
+Usual validation:
+- workflow, multifile-module, and real-project grouped tests
+
+File: `compiler/driver/build_support.cpp`
+Owns:
+- repository-root and import-root helpers, runtime-support source discovery,
+  build-state file paths, state hashing, and object-reuse checks
+
+Local invariants:
+- build-state and artifact-path policy lives here
+- incremental reuse decisions are made here, not hidden in the backend
+
+Do not move into this file:
+- project manifest parsing
+- semantic import resolution
+
+Safe editing rules:
+- build caching or artifact-path work starts here
+- validate reuse changes with owning build-state tests and, when practical,
+  cold-plus-warm runs
+
+Usual validation:
+- `mc_tool_build_state_unit`
+- workflow tests if artifact reuse behavior changed
+
+File: `compiler/driver/builder.cpp`
+Owns:
+- direct build execution over the resolved graph, MIR compilation path, and
+  relink or archive decisions
+
+Local invariants:
+- build execution policy is driver-owned here
+- artifact freshness checks stay here rather than in the backend or project
+  parser
+
+Do not move into this file:
+- CLI parsing
+- host command mechanics already owned by backend host support
+
+Safe editing rules:
+- build behavior or artifact emission policy changes start here after graph
+  resolution has already been decided
+
+Usual validation:
+- build-state and workflow grouped tests
+
+File: `compiler/driver/builder_merge.cpp`
+Owns:
+- merge and namespacing logic for imported build units and interface artifacts
+
+Local invariants:
+- imported build-unit rewriting and namespacing are driver-owned here, not in
+  MIR or backend
+- span-offset rewriting for merged units stays explicit here
+
+Do not move into this file:
+- sema import visibility rules
+
+Safe editing rules:
+- cross-module merge bugs start here when the graph is already correct but the
+  merged unit is wrong
+
+Usual validation:
+- real-project and multifile-module grouped tests
+
+Support
+-------
+
+File: `compiler/support/diagnostics.h`
+Owns:
+- the shared diagnostic data model, severity vocabulary, sink interface, import
+  path helper declarations, and diagnostic formatting entry points
+
+Local invariants:
+- all phases report through the same sink interface
+- diagnostic structure includes file path, span, severity, and message
+
+Do not move into this file:
+- phase-specific diagnostic generation policy
+
+Safe editing rules:
+- interface changes here are repo-wide; audit all phases before touching
+
+Usual validation:
+- any affected phase fixtures; diagnostics are cross-cutting
+
+File: `compiler/support/diagnostics.cpp`
+Owns:
+- diagnostic formatting, severity text, import-path resolution helpers, and
+  simple array-length parsing support used across phases
+
+Local invariants:
+- diagnostic rendering order and formatting stay deterministic
+- filesystem-based import lookup helpers are centralized here for sema use
+
+Do not move into this file:
+- sema import graph policy
+- CLI-specific output policy
+
+Safe editing rules:
+- import-path helper changes usually require sema or tool validation, not just
+  support-level confidence
+
+Usual validation:
+- sema import fixtures and any tool workflows affected by diagnostic text
+
+File: `compiler/support/dump_paths.h`
+Owns:
+- the public artifact-path contract used by driver or tests for dumps and build
+  outputs
+
+Local invariants:
+- artifact naming helpers stay shared and deterministic
+
+Do not move into this file:
+- command-specific driver policy
+
+Safe editing rules:
+- path contract changes here require driver and fixture audit
+
+Usual validation:
+- tool workflows and any tests that assert dump paths
+
+File: `compiler/support/dump_paths.cpp`
+Owns:
+- deterministic dump and build-artifact path construction from source paths or
+  logical artifact keys
+
+Local invariants:
+- artifact paths are stable and sanitized
+- build-tree layout policy stays centralized here instead of being recomputed
+  across the driver
+
+Do not move into this file:
+- build execution policy
+- semantic module naming
+
+Safe editing rules:
+- artifact naming changes are cross-cutting; validate tool workflows and any
+  dump-path tests
+
+Usual validation:
+- tool workflows, especially `dump-paths` and build-related tests
+
+File: `compiler/support/source_manager.h` and `compiler/support/source_manager.cpp`
+Owns:
+- shared source-text loading and source-file support utilities
+
+Local invariants:
+- source loading stays a shared support boundary rather than being duplicated in
+  driver or sema
+
+Do not move into these files:
+- parse or sema logic
+
+Safe editing rules:
+- I/O boundary changes should be minimal and validated through the first owner
+  that consumes the changed behavior
+
+Usual validation:
+- whichever phase first reads source through the changed path
+
+File: `compiler/support/source_span.h`
+Owns:
+- source position and span primitives shared across phases
+
+Local invariants:
+- span fidelity is a cross-phase invariant; diagnostics, AST, sema, and MIR all
+  depend on it
+
+Do not move into this file:
+- diagnostic formatting
+- source loading
+
+Safe editing rules:
+- span changes are high-impact; audit lexer, parser, sema, and diagnostics if
+  touched
+
+Usual validation:
+- parser and sema diagnostics at minimum
+
+File: `compiler/support/target.h`
+Owns:
+- shared target configuration vocabulary used by driver and backend
+
+Local invariants:
+- target vocabulary is shared support truth, not duplicated in driver and
+  backend separately
+
+Do not move into this file:
+- backend validation policy
+- CLI option parsing
+
+Safe editing rules:
+- target model changes require driver and backend coordination
+
+Usual validation:
+- codegen and workflow tests touching target selection
+
+Reserved Or Minor Surfaces
+--------------------------
+
+Directory: `compiler/resolve`
+Current status:
+- reserved for future dedicated import or name-resolution infrastructure
+
+Editing rule:
+- do not move live bootstrap sema ownership into this directory unless the
+  repository explicitly phases that split
+
+Directory: `compiler/mci`
+Current status:
+- reserved for future interface-artifact support
+
+Editing rule:
+- do not invent interface-artifact frameworks here to solve current bootstrap
+  sema or driver problems unless the active phase explicitly requires it
+
+Quick Routing Rules
+-------------------
+If the task is mainly about:
+
+- token spelling or keyword recognition: start in `compiler/lex`
+- source grammar or precedence: start in `compiler/parse`
+- meaning, types, imports, layout, scope, or diagnostics about legality: start
+  in `compiler/sema/check.cpp` and related sema type files
+- typed lowered control flow or instruction structure: start in `compiler/mir`
+- LLVM emission or backend capability checks: start in
+  `compiler/codegen_llvm`
+- CLI, project manifests, build graph, or artifact reuse: start in
+  `compiler/driver`
+- diagnostic formatting, spans, or deterministic artifact paths: start in
+  `compiler/support`

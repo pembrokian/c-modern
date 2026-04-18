@@ -1,0 +1,200 @@
+Phase 253 -- Bounded Live Receive Owner Probe
+=============================================
+
+Status
+------
+PROPOSED
+
+Purpose
+-------
+Admit one bounded live receive or event-source owner on the hosted reset-lane
+kernel so the image can process one real stream of incoming events through the
+existing serial or shell path instead of relying only on scripted observation
+sequences.
+
+This phase exists now because the kernel has accumulated enough shell,
+connection, workflow, and durable behavior that the strongest remaining OS-like
+pressure is no longer another scripted scenario alone. The next honest move is
+one live ingress owner, not a scheduler, interrupt framework, or general event
+subsystem.
+
+Repository status note
+----------------------
+- The backlog still explicitly keeps the reset-lane entry on the scripted event
+  loop until a live receive owner is justified.
+- `kernel/src/main.mc` is already intentionally thin, and
+  `kernel/src/scenarios/scenarios.mc` currently owns repo-owned scripted probe
+  sequencing.
+- `kernel/src/shell/serial_service.mc`,
+  `kernel/src/shell/shell_service.mc`, and
+  `kernel/src/shell/serial_shell_path.mc` already own the live serial framing,
+  shell decode, and one-step composition path for bounded ingress once an
+  actual event source exists.
+- The repository still lacks one admitted runtime owner that turns live hosted
+  input into the observation or step stream those existing owners can consume.
+
+Problem being solved
+--------------------
+- The current kernel image is still fundamentally scenario-driven. It proves
+  owner behavior honestly, but it does not yet admit one real live receive or
+  event-source owner on the hosted path.
+- Without that owner, the repository cannot test whether the current serial and
+  shell split remains honest once events arrive from a live source instead of a
+  pre-scripted sequence.
+- This is now a real OS-development pressure because the existing serial and
+  shell layers are mature enough that the missing piece is the event-source
+  owner itself, not another shell feature or service-local state machine.
+
+Non-goals
+---------
+- no scheduler framework
+- no interrupt subsystem or hardware IRQ model
+- no general mailbox or broker framework
+- no network stack or poller framework
+- no replacement of the existing scripted scenario lane as the only validation
+  surface
+- no growth of `main.mc` into a runtime policy owner
+
+Invariants
+----------
+- The reset-lane owner split remains intact: shell owns decode, dispatch owns
+  routing, services own service-local truth, and scenarios remain the scripted
+  integration owner for repo-owned probes.
+- `main.mc` stays thin and must not become a runtime control framework.
+- The four-byte shell frame stays fixed.
+- `serial_service.mc` remains the owner of serial ingress buffering and reply
+  slot management.
+- `serial_shell_path.mc` remains a narrow composition seam rather than a new
+  hidden dispatcher.
+
+Required surface changes
+------------------------
+1. Admit one bounded hosted live receive or event-source owner that can feed
+   the existing serial or shell path with real input events.
+2. Keep the event-source contract explicit about no-input, closed-input, and
+   one received payload step so the live path stays deterministic and bounded.
+3. Reuse the existing serial and shell owners for framing and decode rather
+   than duplicating that logic in the new live owner.
+4. Add one deterministic repo-owned validation path that drives live input
+   through the admitted owner without requiring an interactive human session.
+5. Keep the existing scripted scenario lane intact and additive rather than
+   replacing it.
+
+Forbidden changes
+-----------------
+- do not widen into an interrupt, scheduler, or poller framework
+- do not move shell decode or serial buffering truth into `main.mc` or a new
+  runtime wrapper
+- do not turn `serial_shell_path.mc` into a second dispatch layer
+- do not discard the scripted scenario lane in the name of realism
+- do not widen transport primitives first unless the task proves the current
+  wire shape is the controlling blocker
+
+Phase role in the larger sequence
+---------------------------------
+- This phase is the strongest current kernel or OS-development next step
+  because it converts the existing scripted shell ingress proof into one
+  bounded live runtime path.
+- It consumes the backlog pressure that has intentionally deferred live receive
+  ownership until the surrounding owners were mature enough.
+- It prepares later runtime or OS work by proving whether one live source can
+  fit the current serial, shell, dispatch, and scenario boundaries honestly.
+
+Relevant backlog items this phase intentionally brings under pressure
+--------------------------------------------------------------------
+- keep the reset-lane entry on the scripted event loop until a live receive
+  owner is justified
+- enforce the main.mc growth boundary established by the scenario extraction
+- keep kernel observability effect-backed and prohibit replay-based trace paths
+
+Questions this phase must answer
+--------------------------------
+1. What is the narrowest honest live receive owner: a small hosted event-source
+   seam, a serial-path extension, or one new bounded service?
+2. How should no-input, closed-input, and one-step delivery be represented
+   without inventing a scheduler or mailbox framework?
+3. Which existing serial and shell owners can be reused unchanged once live
+   ingress exists?
+4. What deterministic validation path can prove live receive behavior without
+   depending on an interactive manual session?
+
+Preferred implementation shape
+------------------------------
+- Reuse `serial_service.mc`, `shell_service.mc`, and `serial_shell_path.mc`
+  rather than inventing another shell path.
+- Keep the live event-source owner narrow and explicit about step semantics.
+- Keep `main.mc` as entry and handoff only; put any new orchestration in the
+  nearest existing owner or one new bounded runtime owner.
+- Preserve the scripted scenario lane for repo-owned integration probes even if
+  the new live path gains its own dedicated validation fixture.
+- Keep any hosted runtime hook explicit and minimal if the live owner needs one
+  host-facing seam.
+
+Implementation accelerators
+---------------------------
+Main files and navigations
+- Primary controlling owners: `kernel/src/shell/serial_service.mc` for live
+  ingress buffering, `kernel/src/shell/serial_shell_path.mc` for serial-to-
+  shell composition, and `kernel/src/scenarios/scenarios.mc` or a new adjacent
+  runtime seam only if the live source cannot stay inside the existing shell
+  path owners.
+- First-hop adjacent files: `kernel/src/shell/shell_service.mc`,
+  `kernel/src/kernel_dispatch.mc`, `kernel/src/main.mc`, and the narrow hosted
+  runtime seam only if one is required.
+- Nearby accelerator docs: `docs/agent/prompts/kernel_file_invariants.txt` for
+  the serial, shell, dispatch, and scenario owner split.
+- Expected first validation target when the owner changes: `Build debug`, then
+  the narrowest deterministic live-input system fixture or grouped reset-lane
+  workflow case that spends the new owner.
+
+Relevant cookbook patterns
+- No exact existing cookbook pattern fits perfectly because the phase is more
+  about composing an existing shell path with one new live source than about a
+  wholly new service or a pure scenario addition.
+- Pattern 9 -- Add A New Runtime Service is the nearest analogy only if the
+  live receive owner becomes a distinct bounded runtime owner; if the slice can
+  stay inside the existing serial-path composition, use that pattern only as a
+  loose touch-set guide.
+
+Relevant file-local invariants
+- `kernel/src/shell/serial_service.mc` owns serial ingress buffering and reply
+  slot management; live receive work must not move shell decode into it.
+- `kernel/src/shell/serial_shell_path.mc` owns composition only; it must stay a
+  narrow seam and not become a framework dispatcher.
+- `kernel/src/shell/shell_service.mc` already owns shell decode and target-byte
+  remapping; a live source should reuse that contract.
+- `kernel/src/main.mc` must stay thin even if the live path changes the image
+  entry contract.
+- Narrow validation should stay on one dedicated live-input fixture before any
+  broader kernel workflow pass.
+
+Test obligations
+----------------
+- `Build debug`
+- one deterministic system fixture or equivalent grouped reset-lane case that
+  drives live input through the admitted owner
+- the narrowest owning reset-lane workflow target that exercises the new live
+  path
+- one regression proving the scripted scenario lane still works after the live
+  path is added
+
+Acceptance criteria
+-------------------
+- the hosted reset-lane kernel has one bounded live receive or event-source
+  owner that feeds the existing serial or shell path honestly
+- the new live path remains deterministic enough for repo-owned automated
+  validation
+- `main.mc` stays thin and the serial or shell or dispatch owner split remains
+  intact
+- the landing does not widen into a scheduler, interrupt framework, or general
+  event subsystem
+
+Future follow-up
+----------------
+- If one live receive owner proves insufficient for later runtime pressure,
+  record the next blocked surface explicitly in `docs/plan/backlog.txt` rather
+  than widening this phase into a generic event framework.
+- If the live source exposes a transport-shape limitation, reopen that as a
+  transport-owned phase rather than smearing it across shell or scenario code.
+- If later OS work needs mailbox, poller, or interrupt semantics, those should
+  each be separate bounded owners after this first live-source proof lands.

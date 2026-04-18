@@ -1,0 +1,204 @@
+Phase 254 -- Object Version Truth For Delegated Durable Mutation
+================================================================
+
+Status
+------
+PROPOSED
+
+Purpose
+-------
+Admit one bounded durable-mutation follow-through that makes object-local
+version truth explicit when delegated durable mutation crosses workflow,
+lease, restart, and object-store boundaries.
+
+This phase exists now because Phase 236 explicitly deferred object-version
+truth as the next plausible pressure once delegated durable mutation became
+real. The next honest move is to make one version-aware stale or conflict
+boundary explicit, not to widen into transactions or a broader storage
+framework.
+
+Repository status note
+----------------------
+- Phase 234 admitted `object_store_service` as the durable named-object truth
+  owner.
+- Phase 235 admitted restart-safe named-object update workflows.
+- Phase 236 admitted delegated durable mutation through `lease_service` and
+  `workflow_service`, while explicitly deferring object-local version truth.
+- Phase 237 proved backlog and restart-delivery pressure on durable mutation,
+  but the durable object still has no object-local version contract.
+- The repository still lacks one caller-visible rule for what happens when
+  delegated mutation races with object replacement or restart timing at the
+  object owner itself.
+
+Problem being solved
+--------------------
+- Delegated durable mutation already has lease-level stale boundaries, but it
+  still lacks object-local version truth at the durable owner.
+- Without that object-local truth, the current model cannot state one honest
+  answer when a delegated write acts on object state that has changed since the
+  lease or workflow was issued.
+- This is a real repository gap now that delegated named-object updates are no
+  longer speculative; the remaining ambiguity is not about whether delegated
+  mutation exists, but about what object truth governs it.
+
+Non-goals
+---------
+- no transaction framework
+- no MVCC or history system
+- no generic compare-and-swap framework for all durable owners
+- no widened authority or ACL framework
+- no filesystem or namespace redesign
+- no broader workflow or completion framework redesign
+
+Invariants
+----------
+- `object_store_service` remains the owner of durable named-object truth.
+- `lease_service` remains the owner of temporary delegated authority.
+- `workflow_core.mc` remains the owner of workflow state meaning.
+- Restart and reload semantics remain explicit and owner-local.
+- The four-byte shell frame stays fixed unless a later phase proves it is the
+  controlling blocker.
+
+Required surface changes
+------------------------
+1. Add one explicit object-local version truth at `object_store_service` for
+   the delegated durable-mutation path.
+2. Thread that version truth through the delegated update workflow so a
+   delegated mutation can reject one object-version mismatch or conflict
+   deterministically.
+3. Keep the version contract explicit under restart and reload so durable state
+   and version state do not diverge.
+4. Add one caller-visible delegated durable-mutation outcome for object-version
+   mismatch or conflict if the current outcome set cannot already carry it
+   honestly.
+5. Add one focused scenario and one focused reset-lane fixture covering direct
+   object change plus delegated stale-or-conflict rejection.
+
+Forbidden changes
+-----------------
+- do not widen into a transaction system, rollback engine, or generic versioned
+  storage framework
+- do not move durable object truth out of `object_store_service`
+- do not move lease truth into workflow or dispatch just to simplify the stale
+  check
+- do not introduce hidden retry, merge, or last-writer-wins policy without an
+  explicit phase contract
+- do not widen this phase into broader durable-owner coordination beyond the
+  named-object delegated path
+
+Phase role in the larger sequence
+---------------------------------
+- This phase consumes the explicit deferred ambiguity named in Phase 236.
+- It deepens the durable delegated-work model without reopening the already
+  admitted lease, workflow, mailbox, or durable-owner boundaries.
+- It prepares any later durable coordination work by making object-local stale
+  truth explicit before more delegated durable workloads accumulate.
+
+Relevant backlog items this phase intentionally brings under pressure
+--------------------------------------------------------------------
+- keep delegated durable mutation bounded to one workflow-scheduled named-
+  object update lease kind and defer object-local version truth until a real
+  ambiguity appears
+- keep durable named-state and replay bounded to the explicit durable owners
+  plus explicit boot/init reload
+
+Questions this phase must answer
+--------------------------------
+1. What is the narrowest honest object-local version contract for delegated
+   mutation: one version byte, one generation counter, or another bounded
+   owner-local marker?
+2. Should delegated stale detection compare against object-store-owned version
+   truth at lease issuance time, workflow enqueue time, or mutation commit
+   time?
+3. Does the current delegated outcome vocabulary already carry object-version
+   mismatch honestly, or is one explicit new outcome required?
+4. How should restart and durable reload preserve version truth so delegated
+   mutation remains deterministic after restart?
+
+Preferred implementation shape
+------------------------------
+- Keep object-local version truth in `object_store_service` and persist it with
+  the durable object state.
+- Keep delegated authority issuance in `lease_service`, capturing only the
+  version information necessary for a bounded stale check.
+- Keep workflow scheduling and restart continuity in the workflow owners rather
+  than turning version checks into a new framework.
+- Reuse the current completion and workflow outcome surfaces where they remain
+  honest; only add one new outcome if the existing vocabulary cannot carry the
+  conflict truth.
+- Spend the feature in the existing delegated named-object processing lane
+  rather than inventing a second durable delegated consumer.
+
+Implementation accelerators
+---------------------------
+Main files and navigations
+- Primary controlling owners: `kernel/src/services/object_store_service.mc`
+  for durable object truth and `kernel/src/services/lease_service.mc` for the
+  delegated stale boundary.
+- First-hop adjacent files: `kernel/src/services/workflow_core.mc`,
+  `kernel/src/services/workflow_protocol.mc`,
+  `kernel/src/services/workflow_advance.mc`,
+  `kernel/src/services/workflow_restart.mc`, and the existing delegated object
+  scenario plus fixture.
+- Nearby accelerator docs: `docs/plan/active/phase236_delegated_named_object_processing_lane.txt`
+  and `docs/agent/prompts/kernel_file_invariants.txt` for the object-store,
+  lease, and workflow owner split.
+- Expected first validation target when the owner changes: `Build debug`, then
+  the delegated named-object processing system fixture and the narrowest reset-
+  lane workflow target that exercises it.
+
+Relevant cookbook patterns
+- Pattern 3 -- Add A Service State Field is the nearest fit because the likely
+  first honest move is one new durable owner-local fact on
+  `object_store_service`, and the phase must then carry restart and fixture
+  follow-through.
+- The phase intentionally differs from the default pattern because one service-
+  local field is not enough by itself; `lease_service` and the workflow family
+  also need bounded follow-through so the version truth remains explicit end to
+  end.
+
+Relevant file-local invariants
+- `kernel/src/services/object_store_service.mc` is the sole owner of durable
+  named-object state and artifact bytes; version truth must live there rather
+  than in workflow or dispatch.
+- `kernel/src/services/lease_service.mc` owns lease ids, kinds, and generation-
+  aware delegation coupling; it may capture object version for stale checks,
+  but it must not redefine object ownership.
+- `kernel/src/services/workflow_core.mc` owns workflow state meaning, while
+  `workflow_protocol.mc`, `workflow_advance.mc`, and `workflow_restart.mc` own
+  message orchestration, progression, and restart sync respectively; version
+  work should respect that split.
+- Narrow validation should start on the delegated object path before any wider
+  durable or workflow suite.
+
+Test obligations
+----------------
+- `Build debug`
+- one focused delegated durable-mutation scenario covering object-version
+  mismatch or conflict
+- one focused reset-lane fixture for the delegated named-object processing path
+  with the new version truth
+- the narrowest grouped reset-lane workflow target that exercises delegated
+  object processing
+
+Acceptance criteria
+-------------------
+- delegated durable mutation now has one explicit object-local version truth at
+  the durable owner
+- a delegated write that no longer matches current object version is rejected
+  deterministically
+- restart and durable reload preserve object value and version truth together
+- the landing stays bounded to the delegated named-object mutation path and
+  does not widen into transactions or a generic version framework
+
+Future follow-up
+----------------
+- If another durable owner later needs the same version-aware contract, record
+  that separately in `docs/plan/backlog.txt` rather than widening this phase
+  into a multi-owner durability framework.
+- If object-version conflict handling needs richer caller-visible metadata,
+  record that in `docs/plan/decision_log.txt` as a bounded outcome-surface
+  follow-through.
+- If version truth still leaves a second ambiguity around multi-object durable
+  work, treat that as a later transaction-pressure phase rather than an
+  implied continuation of this slice.

@@ -1,0 +1,152 @@
+==== kernel/src/identity/identity_taxonomy.mc ====
+FUNCTION_DECL: identity_target_is_lane
+   Return: bool
+   Param: u8 target
+FUNCTION_DECL: identity_target_has_generation_query
+   Return: bool
+   Param: u8 target
+FUNCTION_DECL: identity_target_has_direct_generation
+   Return: bool
+   Param: u8 target
+
+==== kernel/src/identity/service_identity.mc ====
+STRUCT_DECL: ServiceRef
+STRUCT_DECL: ServiceMark
+FUNCTION_DECL: service_ref
+   Return: ServiceRef
+   Param: u32 endpoint_id
+FUNCTION_DECL: service_mark
+   Return: ServiceMark
+   Param: u32 endpoint_id
+   Param: u32 pid
+   Param: u32 generation
+FUNCTION_DECL: ref_endpoint
+   Return: u32
+   Param: ServiceRef ref
+FUNCTION_DECL: mark_endpoint
+   Return: u32
+   Param: ServiceMark mark
+FUNCTION_DECL: mark_pid
+   Return: u32
+   Param: ServiceMark mark
+FUNCTION_DECL: mark_generation
+   Return: u32
+   Param: ServiceMark mark
+FUNCTION_DECL: generation_payload
+   Return: [4]u8
+   Param: u32 generation
+FUNCTION_DECL: mark_generation_payload
+   Return: [4]u8
+   Param: ServiceMark mark
+FUNCTION_DECL: refs_equal
+   Return: bool
+   Param: ServiceRef a
+   Param: ServiceRef b
+FUNCTION_DECL: ref_matches_mark
+   Return: bool
+   Param: ServiceRef ref
+   Param: ServiceMark mark
+FUNCTION_DECL: marks_same_endpoint
+   Return: bool
+   Param: ServiceMark a
+   Param: ServiceMark b
+FUNCTION_DECL: marks_same_pid
+   Return: bool
+   Param: ServiceMark a
+   Param: ServiceMark b
+FUNCTION_DECL: marks_same_instance
+   Return: bool
+   Param: ServiceMark a
+   Param: ServiceMark b
+FUNCTION_DECL: ref_is_valid
+   Return: bool
+   Param: ServiceRef ref
+
+==== kernel/src/identity/service_state.mc ====
+FUNCTION_DECL: state_class
+   Return: u8
+   Param: u8 target
+FUNCTION_DECL: state_mode_code
+   Return: u8
+   Param: u8 mode
+FUNCTION_DECL: state_participation
+   Return: u8
+   Param: u8 target
+FUNCTION_DECL: state_policy_code
+   Return: u8
+   Param: u8 policy
+FUNCTION_DECL: state_generation_marker
+   Return: u8
+   Param: u32 generation
+FUNCTION_DECL: state_durability
+   Return: u8
+   Param: u8 target
+FUNCTION_DECL: state_durable_level
+   Return: u8
+   Param: u8 target
+FUNCTION_DECL: state_durable_requirements
+   Return: u8
+   Param: u8 target
+FUNCTION_DECL: state_durability_payload
+   Return: [4]u8
+   Param: u8 target
+FUNCTION_DECL: state_payload
+   Return: [4]u8
+   Param: u8 target
+   Param: u8 class
+   Param: u8 mode
+   Param: u8 participation
+   Param: u8 policy
+   Param: u8 metadata
+   Param: u8 generation
+FUNCTION_DECL: state_target
+   Return: u8
+   Param: [4]u8 payload
+FUNCTION_DECL: state_class_from_payload
+   Return: u8
+   Param: [4]u8 payload
+FUNCTION_DECL: state_mode_from_payload
+   Return: u8
+   Param: [4]u8 payload
+FUNCTION_DECL: state_participation_from_payload
+   Return: u8
+   Param: [4]u8 payload
+FUNCTION_DECL: state_policy_from_payload
+   Return: u8
+   Param: [4]u8 payload
+FUNCTION_DECL: state_metadata_from_payload
+   Return: u8
+   Param: [4]u8 payload
+FUNCTION_DECL: state_generation_from_payload
+   Return: u8
+   Param: [4]u8 payload
+
+==== kernel/src/identity/service_topology.mc ====
+STRUCT_DECL: ServiceSlot
+FUNCTION_DECL: service_count
+   Return: usize
+FUNCTION_DECL: service_slot_at
+   Return: ServiceSlot
+   Param: usize index
+FUNCTION_DECL: service_slot_for_endpoint
+   Return: ServiceSlot
+   Param: u32 endpoint
+FUNCTION_DECL: service_slot_is_valid
+   Return: bool
+   Param: ServiceSlot slot
+FUNCTION_DECL: service_restart_mode
+   Return: ServiceRestartMode
+   Param: u32 endpoint
+FUNCTION_DECL: service_can_restart
+   Return: bool
+   Param: u32 endpoint
+FUNCTION_DECL: service_restart_reloads_state
+   Return: bool
+   Param: u32 endpoint
+FUNCTION_DECL: service_authority_class
+   Return: ServiceAuthorityClass
+   Param: u32 endpoint
+FUNCTION_DECL: endpoint_is_boot_wired
+   Return: bool
+   Param: u32 endpoint
+

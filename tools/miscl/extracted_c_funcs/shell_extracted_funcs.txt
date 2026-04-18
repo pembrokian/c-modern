@@ -342,7 +342,6 @@ FUNCTION_DECL: path_commit_reply
 ==== kernel/src/shell/shell_service.mc ====
 STRUCT_DECL: LifecycleControl
 STRUCT_DECL: ShellServiceState
-STRUCT_DECL: OpHandler
 FUNCTION_DECL: shell_init
    Return: ShellServiceState
    Param: u32 pid
@@ -356,25 +355,11 @@ FUNCTION_DECL: forward_payload
    Param: u32 endpoint
    Param: usize send_len
    Param: [4]u8 payload
-FUNCTION_DECL: forward_empty
+FUNCTION_DECL: forward
    Return: service_effect.Effect
    Param: ShellServiceState s
    Param: u32 endpoint
-FUNCTION_DECL: forward_one
-   Return: service_effect.Effect
-   Param: ShellServiceState s
-   Param: u32 endpoint
-   Param: u8 value0
-FUNCTION_DECL: forward_two
-   Return: service_effect.Effect
-   Param: ShellServiceState s
-   Param: u32 endpoint
-   Param: u8 value0
-   Param: u8 value1
-FUNCTION_DECL: forward_three
-   Return: service_effect.Effect
-   Param: ShellServiceState s
-   Param: u32 endpoint
+   Param: usize send_len
    Param: u8 value0
    Param: u8 value1
    Param: u8 value2
@@ -386,13 +371,6 @@ FUNCTION_DECL: bang3
    Param: service_effect.Message m
 FUNCTION_DECL: bang23
    Return: bool
-   Param: service_effect.Message m
-FUNCTION_DECL: anymsg
-   Return: bool
-   Param: service_effect.Message m
-FUNCTION_DECL: invalid_route
-   Return: service_effect.Effect
-   Param: ShellServiceState s
    Param: service_effect.Message m
 FUNCTION_DECL: lifecycle_op_supported
    Return: bool
@@ -418,36 +396,10 @@ FUNCTION_DECL: lifecycle_forward
    Return: service_effect.Effect
    Param: ShellServiceState s
    Param: service_effect.Message m
-FUNCTION_DECL: lifecycle_identity_effect
-   Return: service_effect.Effect
-   Param: syscall.SyscallStatus status
-   Param: [4]u8 generation_payload
-FUNCTION_DECL: lifecycle_authority_effect
+FUNCTION_DECL: lifecycle_payload_effect
    Return: service_effect.Effect
    Param: syscall.SyscallStatus status
    Param: [4]u8 payload
-FUNCTION_DECL: lifecycle_state_effect
-   Return: service_effect.Effect
-   Param: syscall.SyscallStatus status
-   Param: [4]u8 payload
-FUNCTION_DECL: lifecycle_durability_effect
-   Return: service_effect.Effect
-   Param: syscall.SyscallStatus status
-   Param: [4]u8 payload
-FUNCTION_DECL: lifecycle_policy_effect
-   Return: service_effect.Effect
-   Param: syscall.SyscallStatus status
-   Param: [4]u8 payload
-FUNCTION_DECL: lifecycle_summary_effect
-   Return: service_effect.Effect
-   Param: syscall.SyscallStatus status
-   Param: [4]u8 payload
-FUNCTION_DECL: dispatch
-   Return: service_effect.Effect
-   Param: [5]OpHandler routes
-   Param: ShellServiceState s
-   Param: service_effect.Message m
-   Param: u8 op
 FUNCTION_DECL: lifecycle_validate_target
    Return: bool
    Param: u8 target

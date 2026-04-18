@@ -14,6 +14,8 @@ requiring each phase plan to state:
 - what the phase will not do
 - the invariants that must remain true
 - the required and forbidden surface changes
+- the main files, navigations, patterns, and owner-local invariants that will
+	reduce implementation search time
 - the test obligations and acceptance criteria
 - the expected future follow-up
 
@@ -49,6 +51,8 @@ Each phase plan MUST:
 - describe one bounded problem
 - identify the smallest honest slice that solves that problem
 - protect existing architectural boundaries explicitly
+- extract the planning-time information that will shorten later navigation and
+	implementation work
 - define what evidence will count as success
 - define what changes are out of scope even if they look adjacent
 
@@ -79,9 +83,10 @@ Each phase plan MUST use the following top-level section order.
 11. `Relevant backlog items this phase intentionally brings under pressure`
 12. `Questions this phase must answer`
 13. `Preferred implementation shape`
-14. `Test obligations`
-15. `Acceptance criteria`
-16. `Future follow-up`
+14. `Implementation accelerators`
+15. `Test obligations`
+16. `Acceptance criteria`
+17. `Future follow-up`
 
 The document MAY include additional sections after these if they materially
 improve clarity, but the required sections MUST appear and MUST remain easy to
@@ -283,6 +288,112 @@ It SHOULD identify:
 - which existing surfaces should be reused
 - which boundaries should not be crossed
 
+Implementation accelerators
+---------------------------
+This section is REQUIRED.
+
+Its purpose is to reduce implementation-time search, orientation, and
+re-derivation work by forcing the plan to extract the most useful repo-local
+accelerators while the problem is still being framed.
+
+This section MUST stay implementation-facing rather than contractual. It does
+not replace `Invariants`, `Required surface changes`, or `Acceptance criteria`.
+
+It MUST include three parts:
+
+1. `Main files and navigations`
+2. `Relevant cookbook patterns`
+3. `Relevant file-local invariants`
+
+Main files and navigations
+~~~~~~~~~~~~~~~~~~~~~~~~~~
+This subsection MUST identify the likely controlling owner and the first-hop
+navigation set an implementer should read before editing.
+
+It MUST name:
+
+- the primary controlling file or module
+- the small set of adjacent files that usually move with it
+- the expected first validation target when the owner changes
+
+It SHOULD also name nearby prompts, fixtures, or declarations accelerators
+when they materially reduce search time, for example:
+
+- `docs/agent/prompts/patterns_cookbook.txt`
+- `docs/agent/prompts/compiler_file_invariants.txt`
+- `docs/agent/prompts/kernel_file_invariants.txt`
+- `tools/miscl/extracted_c_funcs/`
+- `tools/miscl/extracted_decls/`
+
+This subsection MUST stay selective. It is not a full file inventory.
+
+Relevant cookbook patterns
+~~~~~~~~~~~~~~~~~~~~~~~~~~
+This subsection MUST identify any existing cookbook pattern that cleanly fits
+the phase slice.
+
+It SHOULD name:
+
+- the relevant pattern title
+- why it applies here
+- any important way this phase intentionally differs from the default pattern
+
+If no current cookbook pattern fits honestly, the plan SHOULD say so
+explicitly rather than forcing a weak analogy.
+
+Relevant file-local invariants
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+This subsection MUST capture the owner-local or file-local truths that an
+implementer is likely to need during editing but that are more granular than
+the broader phase invariants.
+
+These invariants SHOULD answer questions such as:
+
+- which file is the single owner of this truth
+- what nearby truth must not be moved across a boundary
+- which helper or sibling file usually changes in the same slice
+- what narrow validation is normal for edits in that owner
+
+These MAY reference repository prompt docs or restate the needed facts in a
+shorter phase-local form.
+
+This subsection MUST NOT duplicate the entire contents of a file-invariants
+document. It should extract only the invariants relevant to the current phase.
+
+Recommended accelerator extraction workflow
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+When developing a new phase plan, authors SHOULD extract this section in the
+following order so the plan solves implementation-routing work early rather
+than leaving it to the coding pass.
+
+1. Identify the controlling owner.
+	Start from the file, module, service, or test owner that directly decides
+	the behavior named in the problem statement.
+2. Extract the first-hop navigation set.
+	Record the controlling file, the small adjacent touch set, and the
+	narrowest expected first validation target.
+3. Check for a relevant cookbook pattern.
+	Consult `docs/agent/prompts/patterns_cookbook.txt` and record any pattern
+	that fits honestly.
+4. Check for owner-local invariant material.
+	Consult the relevant file-invariants prompt such as
+	`docs/agent/prompts/compiler_file_invariants.txt` or
+	`docs/agent/prompts/kernel_file_invariants.txt` and extract only the local
+	truths that matter for this phase slice.
+5. Use declaration summaries only to reduce search, not to define ownership.
+	`tools/miscl/extracted_c_funcs/` and `tools/miscl/extracted_decls/` are
+	navigation aids for discovering nearby files, declarations, and helper
+	families. They MUST NOT override the ownership defined by code and
+	architecture docs.
+6. Compress the result into the plan.
+	The final accelerator content should be short, selective, and executable by
+	a future implementer. It should answer where to start, what to read next,
+	which pattern applies, and which local truths must be preserved.
+
+Authors SHOULD prefer extraction over restatement. If an existing prompt or
+repo-local helper already captures the truth well, the plan should point to it
+and summarize only the phase-relevant parts.
+
 Test obligations
 ----------------
 This section is REQUIRED.
@@ -345,6 +456,7 @@ Recommended optional sections
 The following sections are OPTIONAL but recommended when they materially help:
 
 - `Files expected to change`
+- `Accelerator source notes`
 - `Concrete examples this phase should make possible`
 - `Failure modes to watch for`
 - `Migration or compatibility notes`
@@ -377,6 +489,8 @@ Phase plans SHOULD:
 - name actual files, services, commands, and tests when the repo already knows
 	them
 - describe one bounded slice rather than multiple loosely-related landings
+- extract accelerator material while drafting rather than expecting the coding
+	pass to rediscover it
 - keep the contract honest to the repository's current architecture
 
 Phase plans MUST NOT:
@@ -410,6 +524,8 @@ Recommended mapping:
 
 - `Core rule` content should move into `Invariants` and `Forbidden changes`
 - `Chosen slice for this phase` content should move into `Required surface changes`
+- planning-time file routing, cookbook-pattern selection, and owner-local
+	editing notes should move into `Implementation accelerators`
 - `Validation expectations` should move into `Test obligations`
 - `Exit criteria` should move into `Acceptance criteria`
 
@@ -475,6 +591,22 @@ Preferred implementation shape
 ------------------------------
 - ...
 
+Implementation accelerators
+---------------------------
+Main files and navigations
+- controlling owner ...
+- first-hop adjacent files ...
+- first validation target ...
+
+Relevant cookbook patterns
+- Pattern ... because ...
+- No exact existing pattern fits because ...
+
+Relevant file-local invariants
+- owner-local truth ...
+- must not move ...
+- usual narrow validation ...
+
 Test obligations
 ----------------
 - Build debug
@@ -499,11 +631,13 @@ yes:
 2. Does it state what the phase will not do?
 3. Does it protect the critical invariants explicitly?
 4. Does it enumerate the required surface changes rather than hinting at them?
-5. Does it enumerate forbidden implementation moves?
-6. Does it define concrete test obligations?
-7. Does it define acceptance criteria that can actually be checked?
-8. Does it identify the likely next follow-up without widening the current
+5. Does it extract the main files, navigations, relevant patterns, and
+	owner-local invariants that will shorten implementation work?
+6. Does it enumerate forbidden implementation moves?
+7. Does it define concrete test obligations?
+8. Does it define acceptance criteria that can actually be checked?
+9. Does it identify the likely next follow-up without widening the current
 	 phase?
-9. Would a reviewer be able to reject scope creep using this document alone?
+10. Would a reviewer be able to reject scope creep using this document alone?
 
 If any answer is no, the plan is not yet specific enough.

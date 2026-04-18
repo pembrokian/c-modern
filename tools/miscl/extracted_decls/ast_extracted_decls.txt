@@ -1,0 +1,118 @@
+==== compiler/ast/ast.cpp ====
+NAMESPACE: mc
+NAMESPACE: ast
+NAMESPACE: 
+TYPE_ALIAS_DECL: Indent
+FUNCTION_DECL: ToString
+   Return: int
+   Param: int kind
+FUNCTION_DECL: ToString
+   Return: int
+   Param: int kind
+FUNCTION_DECL: ToString
+   Return: int
+   Param: int kind
+FUNCTION_DECL: ToString
+   Return: int
+   Param: int kind
+FUNCTION_DECL: ToString
+   Return: int
+   Param: int kind
+FUNCTION_DECL: WriteIndent
+   Return: void
+   Param: int & stream
+   Param: Indent indent
+FUNCTION_DECL: WriteLine
+   Return: void
+   Param: int & stream
+   Param: Indent indent
+   Param: int text
+FUNCTION_DECL: ReachedDumpDepthLimit
+   Return: bool
+   Param: int & stream
+   Param: Indent indent
+   Param: int depth
+FUNCTION_DECL: SecondaryTextLabel
+   Return: int
+   Param: const int & expr
+FUNCTION_DECL: DumpType
+   Return: void
+   Param: const int & type
+   Param: int & stream
+   Param: Indent indent
+   Param: int depth
+FUNCTION_DECL: DumpExpr
+   Return: void
+   Param: const int & expr
+   Param: int & stream
+   Param: Indent indent
+   Param: int depth
+FUNCTION_DECL: DumpStmt
+   Return: void
+   Param: const int & stmt
+   Param: int & stream
+   Param: Indent indent
+   Param: int depth
+FUNCTION_DECL: DumpDecl
+   Return: void
+   Param: const int & decl
+   Param: int & stream
+   Param: Indent indent
+   Param: int depth
+FUNCTION_DECL: DumpAttributes
+   Return: void
+   Param: const int & attributes
+   Param: int & stream
+   Param: Indent indent
+FUNCTION_DECL: DumpPattern
+   Return: void
+   Param: const int & pattern
+   Param: int & stream
+   Param: Indent indent
+FUNCTION_DECL: DumpField
+   Return: void
+   Param: const int & field
+   Param: int & stream
+   Param: Indent indent
+FUNCTION_DECL: DumpType
+   Return: void
+   Param: const int & type
+   Param: int & stream
+   Param: Indent indent
+   Param: int depth
+FUNCTION_DECL: DumpFieldInit
+   Return: void
+   Param: const int & init
+   Param: int & stream
+   Param: Indent indent
+   Param: int depth
+FUNCTION_DECL: DumpExpr
+   Return: void
+   Param: const int & expr
+   Param: int & stream
+   Param: Indent indent
+   Param: int depth
+FUNCTION_DECL: DumpCasePattern
+   Return: void
+   Param: const int & pattern
+   Param: int & stream
+   Param: Indent indent
+   Param: int depth
+FUNCTION_DECL: DumpStmt
+   Return: void
+   Param: const int & stmt
+   Param: int & stream
+   Param: Indent indent
+   Param: int depth
+FUNCTION_DECL: DumpDecl
+   Return: void
+   Param: const int & decl
+   Param: int & stream
+   Param: Indent indent
+   Param: int depth
+FUNCTION_DECL: DumpSourceFile
+   Return: int
+   Param: const int & source_file
+
+==== compiler/ast/ast.h ====
+

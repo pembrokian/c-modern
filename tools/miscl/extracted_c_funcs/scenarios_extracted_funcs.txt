@@ -1,0 +1,788 @@
+==== kernel/src/scenarios/scenario_assert.mc ====
+FUNCTION_DECL: expect_restart_identity
+   Return: i32
+   Param: u32 before_endpoint
+   Param: u32 before_pid
+   Param: u32 before_generation
+   Param: u32 after_endpoint
+   Param: u32 after_pid
+   Param: u32 after_generation
+   Param: i32 base
+FUNCTION_DECL: expect_lifecycle
+   Return: bool
+   Param: service_effect.Effect effect
+   Param: syscall.SyscallStatus status
+   Param: u8 target
+   Param: u8 mode
+FUNCTION_DECL: expect_identity
+   Return: bool
+   Param: service_effect.Effect effect
+   Param: syscall.SyscallStatus status
+   Param: service_identity.ServiceMark mark
+FUNCTION_DECL: expect_policy
+   Return: bool
+   Param: service_effect.Effect effect
+   Param: syscall.SyscallStatus status
+   Param: u8 target
+   Param: u8 owner0
+   Param: u8 owner1
+   Param: u8 policy
+FUNCTION_DECL: expect_authority
+   Return: bool
+   Param: service_effect.Effect effect
+   Param: syscall.SyscallStatus status
+   Param: u8 target
+   Param: u8 class
+   Param: u8 transfer
+   Param: u8 scope
+FUNCTION_DECL: expect_service_state
+   Return: bool
+   Param: service_effect.Effect effect
+   Param: syscall.SyscallStatus status
+   Param: u8 target
+   Param: u8 class
+   Param: u8 mode
+   Param: u8 participation
+   Param: u8 policy
+   Param: u8 metadata
+   Param: u8 generation
+FUNCTION_DECL: expect_durability
+   Return: bool
+   Param: service_effect.Effect effect
+   Param: syscall.SyscallStatus status
+   Param: u8 target
+FUNCTION_DECL: expect_generation_payload
+   Return: bool
+   Param: service_effect.Effect effect
+   Param: syscall.SyscallStatus status
+   Param: u32 generation
+FUNCTION_DECL: expect_summary
+   Return: bool
+   Param: service_effect.Effect effect
+   Param: syscall.SyscallStatus status
+   Param: boot.RetainedSummaryParticipation participation
+   Param: boot.RestartOutcome outcome
+   Param: u32 generation
+
+==== kernel/src/scenarios/scenario_audit_coordination.mc ====
+FUNCTION_DECL: run_retained_audit_coordination_probe
+   Return: i32
+   Param: *boot.KernelBootState state
+
+==== kernel/src/scenarios/scenario_authority.mc ====
+FUNCTION_DECL: run_authority_probe
+   Return: i32
+
+==== kernel/src/scenarios/scenario_completion_mailbox.mc ====
+FUNCTION_DECL: expect_reply_shape
+   Return: i32
+   Param: service_effect.Effect effect
+   Param: syscall.SyscallStatus status
+   Param: usize payload_len
+   Param: i32 code
+FUNCTION_DECL: expect_workflow
+   Return: bool
+   Param: service_effect.Effect effect
+   Param: syscall.SyscallStatus status
+   Param: u8 state
+   Param: u8 restart
+   Param: u8 task
+FUNCTION_DECL: expect_delivery_payload
+   Return: i32
+   Param: service_effect.Effect effect
+   Param: u8 state
+   Param: u8 outcome
+   Param: i32 state_code
+   Param: i32 outcome_code
+FUNCTION_DECL: expected_task_id
+   Return: u8
+   Param: u8 submission_count
+FUNCTION_DECL: run_completion_mailbox_probe
+   Return: i32
+
+==== kernel/src/scenarios/scenario_connection_backed_workflow.mc ====
+FUNCTION_DECL: expect_schedule
+   Return: bool
+   Param: service_effect.Effect effect
+   Param: u8 id
+FUNCTION_DECL: expect_workflow
+   Return: bool
+   Param: service_effect.Effect effect
+   Param: syscall.SyscallStatus status
+   Param: u8 state
+   Param: u8 restart
+FUNCTION_DECL: expect_completion
+   Return: bool
+   Param: service_effect.Effect effect
+   Param: u8 id
+   Param: u8 state
+   Param: u8 restart
+   Param: u8 generation
+FUNCTION_DECL: run_connection_backed_workflow_probe
+   Return: i32
+
+==== kernel/src/scenarios/scenario_connection_completion_pressure.mc ====
+FUNCTION_DECL: expect_schedule
+   Return: bool
+   Param: service_effect.Effect reply
+   Param: u8 id
+FUNCTION_DECL: expect_workflow
+   Return: bool
+   Param: service_effect.Effect reply
+   Param: syscall.SyscallStatus status
+   Param: u8 state
+   Param: u8 restart
+   Param: u8 value
+FUNCTION_DECL: expect_reply_shape
+   Return: bool
+   Param: service_effect.Effect reply
+   Param: syscall.SyscallStatus status
+   Param: usize payload_len
+FUNCTION_DECL: run_connection_completion_pressure_probe
+   Return: i32
+
+==== kernel/src/scenarios/scenario_connection_service.mc ====
+FUNCTION_DECL: expect_reply
+   Return: bool
+   Param: service_effect.Effect effect
+   Param: syscall.SyscallStatus status
+   Param: usize len
+   Param: u8 b0
+   Param: u8 b1
+   Param: u8 b2
+   Param: u8 b3
+FUNCTION_DECL: run_connection_service_probe
+   Return: i32
+
+==== kernel/src/scenarios/scenario_coordination.mc ====
+FUNCTION_DECL: run_retained_coordination_probe
+   Return: i32
+   Param: *boot.KernelBootState state
+
+==== kernel/src/scenarios/scenario_delegated_external_request_handling.mc ====
+FUNCTION_DECL: expect_schedule
+   Return: bool
+   Param: service_effect.Effect effect
+   Param: u8 id
+FUNCTION_DECL: expect_workflow
+   Return: bool
+   Param: service_effect.Effect effect
+   Param: syscall.SyscallStatus status
+   Param: u8 state
+   Param: u8 restart
+FUNCTION_DECL: expect_completion
+   Return: bool
+   Param: service_effect.Effect effect
+   Param: u8 id
+   Param: u8 state
+   Param: u8 restart
+   Param: u8 generation
+FUNCTION_DECL: expect_two_byte_reply
+   Return: bool
+   Param: service_effect.Effect effect
+FUNCTION_DECL: delegated_request
+   Return: u8
+   Param: u8 lease_id
+FUNCTION_DECL: run_delegated_external_request_probe
+   Return: i32
+
+==== kernel/src/scenarios/scenario_delegated_installer_authority.mc ====
+FUNCTION_DECL: expect_workflow
+   Return: bool
+   Param: service_effect.Effect effect
+   Param: syscall.SyscallStatus status
+   Param: u8 state
+   Param: u8 restart
+FUNCTION_DECL: expect_completion
+   Return: bool
+   Param: service_effect.Effect effect
+   Param: u8 id
+   Param: u8 state
+   Param: u8 restart
+   Param: u8 generation
+FUNCTION_DECL: run_delegated_installer_authority_probe
+   Return: i32
+
+==== kernel/src/scenarios/scenario_delegated_object_processing.mc ====
+FUNCTION_DECL: expect_value
+   Return: bool
+   Param: service_effect.Effect effect
+   Param: u8 value
+FUNCTION_DECL: expect_workflow
+   Return: bool
+   Param: service_effect.Effect effect
+   Param: syscall.SyscallStatus status
+   Param: u8 state
+   Param: u8 restart
+FUNCTION_DECL: expect_completion
+   Return: bool
+   Param: service_effect.Effect effect
+   Param: u8 id
+   Param: u8 state
+   Param: u8 restart
+   Param: u8 generation
+FUNCTION_DECL: run_delegated_named_object_processing_probe
+   Return: i32
+
+==== kernel/src/scenarios/scenario_durability.mc ====
+FUNCTION_DECL: run_retained_durable_boundary_probe
+   Return: i32
+
+==== kernel/src/scenarios/scenario_file_service.mc ====
+FUNCTION_DECL: expect_ok
+   Return: bool
+   Param: service_effect.Effect effect
+FUNCTION_DECL: expect_status
+   Return: bool
+   Param: service_effect.Effect effect
+   Param: syscall.SyscallStatus status
+FUNCTION_DECL: expect_count
+   Return: bool
+   Param: service_effect.Effect effect
+   Param: usize n
+FUNCTION_DECL: expect_read_prefix
+   Return: bool
+   Param: service_effect.Effect effect
+   Param: usize len
+   Param: u8 b0
+   Param: u8 b1
+   Param: u8 b2
+   Param: u8 b3
+FUNCTION_DECL: run_file_service_probe
+   Return: i32
+
+==== kernel/src/scenarios/scenario_journal_service.mc ====
+FUNCTION_DECL: expect_replay
+   Return: bool
+   Param: service_effect.Effect effect
+   Param: usize count
+   Param: u8 first
+   Param: u8 second
+   Param: u8 third
+FUNCTION_DECL: run_journal_service_probe
+   Return: i32
+
+==== kernel/src/scenarios/scenario_lease_service.mc ====
+FUNCTION_DECL: expect_workflow
+   Return: bool
+   Param: service_effect.Effect effect
+   Param: syscall.SyscallStatus status
+   Param: u8 state
+   Param: u8 restart
+FUNCTION_DECL: lease_issue_obs
+   Return: syscall.ReceiveObservation
+   Param: u32 pid
+   Param: u8 workflow
+FUNCTION_DECL: lease_consume_obs
+   Return: syscall.ReceiveObservation
+   Param: u32 pid
+   Param: u8 id
+   Param: u8 workflow
+FUNCTION_DECL: run_lease_service_probe
+   Return: i32
+
+==== kernel/src/scenarios/scenario_lifecycle.mc ====
+FUNCTION_DECL: run_shell_lifecycle_probe
+   Return: i32
+   Param: *boot.KernelBootState state
+
+==== kernel/src/scenarios/scenario_named_object_delivery_pressure.mc ====
+FUNCTION_DECL: expect_value
+   Return: bool
+   Param: service_effect.Effect effect
+   Param: u8 value
+FUNCTION_DECL: expect_workflow
+   Return: bool
+   Param: service_effect.Effect effect
+   Param: syscall.SyscallStatus status
+   Param: u8 state
+   Param: u8 restart
+FUNCTION_DECL: expect_delivery_outcome
+   Return: bool
+   Param: service_effect.Effect effect
+   Param: u8 outcome
+FUNCTION_DECL: expect_completion
+   Return: bool
+   Param: service_effect.Effect effect
+   Param: u8 id
+   Param: u8 state
+   Param: u8 restart
+   Param: u8 generation
+FUNCTION_DECL: expected_task_id
+   Return: u8
+   Param: u8 submission_count
+FUNCTION_DECL: expect_count
+   Return: bool
+   Param: service_effect.Effect effect
+   Param: usize count
+FUNCTION_DECL: run_named_object_delivery_pressure_probe
+   Return: i32
+
+==== kernel/src/scenarios/scenario_object_store_service.mc ====
+FUNCTION_DECL: expect_value
+   Return: bool
+   Param: service_effect.Effect effect
+   Param: u8 value
+FUNCTION_DECL: run_object_store_service_probe
+   Return: i32
+
+==== kernel/src/scenarios/scenario_object_update_workflow.mc ====
+FUNCTION_DECL: expect_value
+   Return: bool
+   Param: service_effect.Effect effect
+   Param: u8 value
+FUNCTION_DECL: expect_workflow
+   Return: bool
+   Param: service_effect.Effect effect
+   Param: syscall.SyscallStatus status
+   Param: u8 state
+   Param: u8 restart
+FUNCTION_DECL: expect_completion
+   Return: bool
+   Param: service_effect.Effect effect
+   Param: u8 id
+   Param: u8 state
+   Param: u8 restart
+   Param: u8 generation
+FUNCTION_DECL: run_named_object_update_workflow_probe
+   Return: i32
+
+==== kernel/src/scenarios/scenario_queue.mc ====
+FUNCTION_DECL: run_queue_observability_probe
+   Return: i32
+   Param: *boot.KernelBootState state
+FUNCTION_DECL: run_queue_pressure_probe
+   Return: i32
+   Param: *boot.KernelBootState state
+
+==== kernel/src/scenarios/scenario_restart.mc ====
+FUNCTION_DECL: run_restart_probe
+   Return: i32
+   Param: *boot.KernelBootState state
+
+==== kernel/src/scenarios/scenario_retained_policy.mc ====
+FUNCTION_DECL: run_retained_policy_probe
+   Return: i32
+
+==== kernel/src/scenarios/scenario_retained_restart_identity.mc ====
+FUNCTION_DECL: run_retained_restart_identity_probe
+   Return: i32
+
+==== kernel/src/scenarios/scenario_retained_summary.mc ====
+FUNCTION_DECL: run_retained_summary_probe
+   Return: i32
+
+==== kernel/src/scenarios/scenario_service_state.mc ====
+FUNCTION_DECL: run_service_state_probe
+   Return: i32
+
+==== kernel/src/scenarios/scenario_stall.mc ====
+FUNCTION_DECL: run_stall_probe
+   Return: i32
+   Param: *boot.KernelBootState state
+
+==== kernel/src/scenarios/scenario_steps.mc ====
+STRUCT_DECL: StepCheck
+STRUCT_DECL: StepSpec
+FUNCTION_DECL: step
+   Return: StepSpec
+   Param: syscall.ReceiveObservation obs
+   Param: i32 failure_code
+   Param: StepCheck check
+FUNCTION_DECL: routed_step
+   Return: StepSpec
+   Param: syscall.ReceiveObservation obs
+   Param: i32 failure_code
+FUNCTION_DECL: status_step
+   Return: StepSpec
+   Param: syscall.ReceiveObservation obs
+   Param: i32 failure_code
+   Param: syscall.SyscallStatus status
+FUNCTION_DECL: payload1_step
+   Return: StepSpec
+   Param: syscall.ReceiveObservation obs
+   Param: i32 failure_code
+   Param: syscall.SyscallStatus status
+   Param: u8 payload1
+FUNCTION_DECL: payload0_step
+   Return: StepSpec
+   Param: syscall.ReceiveObservation obs
+   Param: i32 failure_code
+   Param: syscall.SyscallStatus status
+   Param: u8 payload0
+FUNCTION_DECL: log_tail_state_step
+   Return: StepSpec
+   Param: syscall.ReceiveObservation obs
+   Param: i32 failure_code
+   Param: syscall.SyscallStatus status
+   Param: u8 payload0
+   Param: u8 payload1
+FUNCTION_DECL: reply_len_step
+   Return: StepSpec
+   Param: syscall.ReceiveObservation obs
+   Param: i32 failure_code
+   Param: syscall.SyscallStatus status
+   Param: usize reply_len
+FUNCTION_DECL: reply_len_log_len_step
+   Return: StepSpec
+   Param: syscall.ReceiveObservation obs
+   Param: i32 failure_code
+   Param: syscall.SyscallStatus status
+   Param: usize reply_len
+   Param: usize log_len
+FUNCTION_DECL: witness_step
+   Return: StepSpec
+   Param: syscall.ReceiveObservation obs
+   Param: i32 failure_code
+   Param: syscall.SyscallStatus status
+   Param: u32 send_dropped
+FUNCTION_DECL: step_table
+   Return: [31]StepSpec
+FUNCTION_DECL: step_matches
+   Return: u32
+   Param: StepSpec spec
+   Param: *boot.KernelBootState state
+   Param: service_effect.Effect effect
+FUNCTION_DECL: run_main
+   Return: i32
+   Param: *boot.KernelBootState state
+
+==== kernel/src/scenarios/scenario_timer_task_service.mc ====
+FUNCTION_DECL: expect_status
+   Return: bool
+   Param: service_effect.Effect effect
+   Param: syscall.SyscallStatus status
+FUNCTION_DECL: query_state_is
+   Return: bool
+   Param: service_effect.Effect effect
+   Param: u8 state
+FUNCTION_DECL: submit_state_is
+   Return: bool
+   Param: service_effect.Effect effect
+   Param: u8 state
+FUNCTION_DECL: list_first_is
+   Return: bool
+   Param: service_effect.Effect effect
+   Param: u8 id
+FUNCTION_DECL: run_timer_task_probe
+   Return: i32
+
+==== kernel/src/scenarios/scenario_transfer.mc ====
+STRUCT_DECL: GrantPair
+FUNCTION_DECL: transfer_obs
+   Return: syscall.ReceiveObservation
+   Param: u32 pid
+   Param: usize payload_len
+   Param: u32 slot
+   Param: usize count
+   Param: [4]u8 payload
+FUNCTION_DECL: bind_payload
+   Return: [4]u8
+FUNCTION_DECL: log_payload
+   Return: [4]u8
+   Param: u8 value
+FUNCTION_DECL: kv_payload
+   Return: [4]u8
+   Param: u8 key
+   Param: u8 value
+FUNCTION_DECL: issue_pair
+   Return: GrantPair
+   Param: boot.KernelBootState state
+   Param: u32 pid
+FUNCTION_DECL: run_transfer_probe
+   Return: i32
+   Param: *boot.KernelBootState state
+
+==== kernel/src/scenarios/scenario_transport.mc ====
+STRUCT_DECL: SerialRoute
+FUNCTION_DECL: serial_obs
+   Return: syscall.ReceiveObservation
+   Param: u32 endpoint
+   Param: u32 pid
+   Param: [4]u8 payload
+FUNCTION_DECL: cmd_log_append
+   Return: syscall.ReceiveObservation
+   Param: u8 value
+FUNCTION_DECL: cmd_log_tail
+   Return: syscall.ReceiveObservation
+FUNCTION_DECL: cmd_echo
+   Return: syscall.ReceiveObservation
+   Param: u8 left
+   Param: u8 right
+FUNCTION_DECL: cmd_kv_set
+   Return: syscall.ReceiveObservation
+   Param: u8 key
+   Param: u8 value
+FUNCTION_DECL: cmd_kv_get
+   Return: syscall.ReceiveObservation
+   Param: u8 key
+FUNCTION_DECL: cmd_lifecycle_query
+   Return: syscall.ReceiveObservation
+   Param: u8 target
+FUNCTION_DECL: cmd_lifecycle_authority
+   Return: syscall.ReceiveObservation
+   Param: u8 target
+FUNCTION_DECL: cmd_lifecycle_state
+   Return: syscall.ReceiveObservation
+   Param: u8 target
+FUNCTION_DECL: cmd_lifecycle_durability
+   Return: syscall.ReceiveObservation
+   Param: u8 target
+FUNCTION_DECL: cmd_lifecycle_identity
+   Return: syscall.ReceiveObservation
+   Param: u8 target
+FUNCTION_DECL: cmd_lifecycle_policy
+   Return: syscall.ReceiveObservation
+   Param: u8 target
+FUNCTION_DECL: cmd_lifecycle_summary
+   Return: syscall.ReceiveObservation
+   Param: u8 target
+FUNCTION_DECL: cmd_lifecycle_compare
+   Return: syscall.ReceiveObservation
+   Param: u8 target
+FUNCTION_DECL: cmd_lifecycle_restart
+   Return: syscall.ReceiveObservation
+   Param: u8 target
+FUNCTION_DECL: cmd_queue_enqueue
+   Return: syscall.ReceiveObservation
+   Param: u8 value
+FUNCTION_DECL: cmd_queue_dequeue
+   Return: syscall.ReceiveObservation
+FUNCTION_DECL: cmd_queue_count
+   Return: syscall.ReceiveObservation
+FUNCTION_DECL: cmd_queue_peek
+   Return: syscall.ReceiveObservation
+FUNCTION_DECL: cmd_queue_stall_count
+   Return: syscall.ReceiveObservation
+FUNCTION_DECL: cmd_ticket_issue
+   Return: syscall.ReceiveObservation
+FUNCTION_DECL: cmd_ticket_use
+   Return: syscall.ReceiveObservation
+   Param: u8 epoch
+   Param: u8 id
+FUNCTION_DECL: cmd_file_create
+   Return: syscall.ReceiveObservation
+   Param: u8 name
+FUNCTION_DECL: cmd_file_write
+   Return: syscall.ReceiveObservation
+   Param: u8 name
+   Param: u8 val
+FUNCTION_DECL: cmd_file_read
+   Return: syscall.ReceiveObservation
+   Param: u8 name
+FUNCTION_DECL: cmd_file_count
+   Return: syscall.ReceiveObservation
+FUNCTION_DECL: cmd_object_create
+   Return: syscall.ReceiveObservation
+   Param: u8 name
+   Param: u8 value
+FUNCTION_DECL: cmd_object_read
+   Return: syscall.ReceiveObservation
+   Param: u8 name
+FUNCTION_DECL: cmd_object_replace
+   Return: syscall.ReceiveObservation
+   Param: u8 name
+   Param: u8 value
+FUNCTION_DECL: cmd_update_stage
+   Return: syscall.ReceiveObservation
+   Param: u8 value
+FUNCTION_DECL: cmd_update_clear
+   Return: syscall.ReceiveObservation
+FUNCTION_DECL: cmd_update_query
+   Return: syscall.ReceiveObservation
+FUNCTION_DECL: cmd_update_manifest
+   Return: syscall.ReceiveObservation
+   Param: u8 version
+   Param: u8 expected_len
+FUNCTION_DECL: cmd_timer_create
+   Return: syscall.ReceiveObservation
+   Param: u8 id
+   Param: u8 due
+FUNCTION_DECL: cmd_timer_cancel
+   Return: syscall.ReceiveObservation
+   Param: u8 id
+FUNCTION_DECL: cmd_timer_query
+   Return: syscall.ReceiveObservation
+   Param: u8 id
+FUNCTION_DECL: cmd_timer_expired
+   Return: syscall.ReceiveObservation
+   Param: u8 window
+FUNCTION_DECL: cmd_task_submit
+   Return: syscall.ReceiveObservation
+   Param: u8 opcode
+FUNCTION_DECL: cmd_task_query
+   Return: syscall.ReceiveObservation
+   Param: u8 id
+FUNCTION_DECL: cmd_task_cancel
+   Return: syscall.ReceiveObservation
+   Param: u8 id
+FUNCTION_DECL: cmd_task_complete
+   Return: syscall.ReceiveObservation
+   Param: u8 id
+FUNCTION_DECL: cmd_task_list
+   Return: syscall.ReceiveObservation
+   Param: u8 window
+FUNCTION_DECL: cmd_journal_append
+   Return: syscall.ReceiveObservation
+   Param: u8 name
+   Param: u8 value
+FUNCTION_DECL: cmd_journal_replay
+   Return: syscall.ReceiveObservation
+   Param: u8 name
+FUNCTION_DECL: cmd_journal_clear
+   Return: syscall.ReceiveObservation
+   Param: u8 name
+FUNCTION_DECL: cmd_workflow_schedule
+   Return: syscall.ReceiveObservation
+   Param: u8 id
+   Param: u8 due
+FUNCTION_DECL: cmd_workflow_update
+   Return: syscall.ReceiveObservation
+   Param: u8 name
+   Param: u8 value
+FUNCTION_DECL: cmd_workflow_apply_update
+   Return: syscall.ReceiveObservation
+FUNCTION_DECL: cmd_workflow_apply_update_lease
+   Return: syscall.ReceiveObservation
+   Param: u8 id
+FUNCTION_DECL: cmd_workflow_query
+   Return: syscall.ReceiveObservation
+   Param: u8 id
+FUNCTION_DECL: cmd_workflow_cancel
+   Return: syscall.ReceiveObservation
+   Param: u8 id
+FUNCTION_DECL: cmd_lease_issue
+   Return: syscall.ReceiveObservation
+   Param: u8 workflow
+FUNCTION_DECL: cmd_lease_issue_installer_apply
+   Return: syscall.ReceiveObservation
+FUNCTION_DECL: cmd_lease_consume
+   Return: syscall.ReceiveObservation
+   Param: u8 id
+   Param: u8 workflow
+FUNCTION_DECL: cmd_lease_issue_object_update
+   Return: syscall.ReceiveObservation
+   Param: u8 name
+   Param: u8 value
+FUNCTION_DECL: cmd_lease_issue_external_ticket
+   Return: syscall.ReceiveObservation
+   Param: u8 epoch
+   Param: u8 id
+FUNCTION_DECL: cmd_lease_consume_object_update
+   Return: syscall.ReceiveObservation
+   Param: u8 id
+FUNCTION_DECL: cmd_completion_fetch
+   Return: syscall.ReceiveObservation
+FUNCTION_DECL: cmd_completion_ack
+   Return: syscall.ReceiveObservation
+FUNCTION_DECL: cmd_completion_count
+   Return: syscall.ReceiveObservation
+FUNCTION_DECL: cmd_connection_open
+   Return: syscall.ReceiveObservation
+   Param: u8 slot
+   Param: u8 budget
+FUNCTION_DECL: cmd_connection_receive
+   Return: syscall.ReceiveObservation
+   Param: u8 slot
+   Param: u8 value
+FUNCTION_DECL: cmd_connection_send
+   Return: syscall.ReceiveObservation
+   Param: u8 slot
+   Param: u8 value
+FUNCTION_DECL: cmd_connection_close
+   Return: syscall.ReceiveObservation
+   Param: u8 slot
+   Param: u8 reason
+FUNCTION_DECL: cmd_connection_execute
+   Return: syscall.ReceiveObservation
+   Param: u8 slot
+FUNCTION_DECL: kv_count_obs
+   Return: syscall.ReceiveObservation
+   Param: u32 pid
+
+==== kernel/src/scenarios/scenario_update_apply_workflow.mc ====
+FUNCTION_DECL: expect_workflow
+   Return: bool
+   Param: service_effect.Effect effect
+   Param: syscall.SyscallStatus status
+   Param: u8 state
+   Param: u8 restart
+FUNCTION_DECL: expect_completion
+   Return: bool
+   Param: service_effect.Effect effect
+   Param: u8 id
+   Param: u8 state
+   Param: u8 restart
+   Param: u8 generation
+FUNCTION_DECL: expect_applied_target
+   Return: bool
+   Param: update_store_service.UpdateStoreServiceState s
+   Param: u8 version
+   Param: usize len
+   Param: u8 b0
+   Param: u8 b1
+FUNCTION_DECL: run_update_apply_workflow_probe
+   Return: i32
+
+==== kernel/src/scenarios/scenario_update_recovery_completion_pressure.mc ====
+FUNCTION_DECL: expect_workflow
+   Return: bool
+   Param: service_effect.Effect effect
+   Param: syscall.SyscallStatus status
+   Param: u8 state
+   Param: u8 restart
+FUNCTION_DECL: expect_delivery_outcome
+   Return: bool
+   Param: service_effect.Effect effect
+   Param: u8 outcome
+FUNCTION_DECL: expect_completion
+   Return: bool
+   Param: service_effect.Effect effect
+   Param: u8 id
+   Param: u8 state
+   Param: u8 restart
+   Param: u8 generation
+FUNCTION_DECL: expect_applied_target
+   Return: bool
+   Param: update_store_service.UpdateStoreServiceState s
+   Param: u8 version
+   Param: usize len
+   Param: u8 b0
+   Param: u8 b1
+FUNCTION_DECL: expect_count
+   Return: bool
+   Param: service_effect.Effect effect
+   Param: usize count
+FUNCTION_DECL: run_update_recovery_completion_pressure_probe
+   Return: i32
+
+==== kernel/src/scenarios/scenario_update_store_service.mc ====
+FUNCTION_DECL: expect_update_query
+   Return: bool
+   Param: service_effect.Effect effect
+   Param: u8 class
+   Param: u8 version
+   Param: u8 len
+   Param: u8 expected_len
+FUNCTION_DECL: run_update_store_service_probe
+   Return: i32
+
+==== kernel/src/scenarios/scenario_workflow_service.mc ====
+FUNCTION_DECL: expect_workflow
+   Return: bool
+   Param: service_effect.Effect effect
+   Param: u8 state
+   Param: u8 restart
+FUNCTION_DECL: run_workflow_service_probe
+   Return: i32
+
+==== kernel/src/scenarios/scenario_workset_identity.mc ====
+FUNCTION_DECL: run_workset_identity_probe
+   Return: i32
+   Param: *boot.KernelBootState state
+
+==== kernel/src/scenarios/scenarios.mc ====
+FUNCTION_DECL: run
+   Return: i32
+   Param: *boot.KernelBootState state
+

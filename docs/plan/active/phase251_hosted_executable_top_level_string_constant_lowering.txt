@@ -1,0 +1,201 @@
+Phase 251 -- Hosted Executable Top-Level String Constant Lowering
+================================================================
+
+Status
+------
+PROPOSED
+
+Purpose
+-------
+Admit one bounded backend follow-through that makes top-level `const str`
+values lower honestly on the hosted executable path.
+
+This phase exists now because Phase 230 exposed a real executable-path defect,
+and Phase 250 has now decomposed the executable backend enough that the
+narrowest honest next move is a behavior fix rather than another structural
+refactor or a broader constant-data framework.
+
+Repository status note
+----------------------
+- Phase 230 recorded a real hosted executable limitation: one top-level
+  `const str` durable-artifact path produced invalid backend output, so the
+  owner had to inline the path literal instead.
+- The backlog now carries that defect explicitly as a deferred compiler item.
+- Phase 250 has already split executable lowering across
+  `backend.cpp`, `backend_executable_calls.cpp`,
+  `backend_executable_numeric.cpp`, `backend_executable_aggregate.cpp`, and
+  `backend_executable_memory.cpp`, so the controlling owner is clearer than it
+  was when the workaround first landed.
+- The repository still lacks one explicit compiler phase whose sole purpose is
+  to make top-level string constants executable on the hosted backend path.
+
+Problem being solved
+--------------------
+- The hosted backend still cannot lower some top-level `const str` values
+  honestly, even though string literals and `str`-shaped values already exist
+  elsewhere in the admitted language and backend path.
+- That defect forces owner-local inline literal workarounds in real repository
+  code, which makes the source less honest and leaves the executable path with
+  a known unsupported constant form.
+- This is a backend-owned contradiction, not a language-design gap: the
+  repository already intends top-level constants to be valid source, but the
+  hosted executable path still fails to materialize the required global data.
+
+Non-goals
+---------
+- no general constant-data framework
+- no new string runtime type or ABI redesign
+- no second target or broader backend-policy expansion
+- no broader compile-time evaluation wave
+- no string interning or deduplication framework work beyond what the narrow
+  lowering fix requires
+- no driver or project-manifest surface change
+
+Invariants
+----------
+- Language meaning remains in sema and MIR; backend work may not redefine what
+  `str` means.
+- Hosted executable lowering remains owned by `compiler/codegen_llvm`.
+- `backend.cpp` remains the public executable-backend orchestration owner after
+  Phase 250.
+- The current bootstrap hosted target remains the only target policy this
+  phase may claim.
+- Deterministic emitted LLVM text and deterministic object-build behavior must
+  remain stable.
+- Existing non-string global-constant behavior must remain correct.
+
+Required surface changes
+------------------------
+1. Make the hosted executable backend lower admitted top-level `const str`
+   values into valid global constant data plus the corresponding `str`-shaped
+   value projection.
+2. Keep the repair as narrow as possible to the existing hosted executable
+   backend path; only thread sema or MIR follow-through if the current backend
+   lacks necessary constant-shape information.
+3. Replace at least one real repository-owned inline-literal workaround with a
+   truthful top-level string constant spend site if the existing owner still
+   carries that workaround.
+4. Add one focused executable regression for top-level `const str` lowering.
+5. Keep unsupported or unrelated constant families explicit rather than
+   treating this repair as general permission to widen global constant support.
+
+Forbidden changes
+-----------------
+- do not widen into a general constant-lowering rewrite after Phase 250
+- do not invent a new backend registry, plugin layer, or framework to solve
+  this narrow hosted path defect
+- do not hide the defect in driver-side literal inlining or build-time source
+  rewriting
+- do not widen target policy, artifact workflow, or runtime string semantics
+- do not reopen unrelated backend limitations such as broader generic support
+  or second-target work inside the same phase
+
+Phase role in the larger sequence
+---------------------------------
+- This phase is the cleanest immediate correctness follow-through after Phase
+  250 because it cashes in the backend decomposition on a known executable-path
+  defect.
+- It consumes the explicit deferred limitation recorded during Phase 230.
+- It prepares later compiler work by removing one owner-local workaround from
+  the hosted executable path before the next broader capability slice.
+
+Relevant backlog items this phase intentionally brings under pressure
+--------------------------------------------------------------------
+- make executable lowering of top-level string constants honest on the hosted
+  backend path
+- keep broader backend and target widening explicit after the current one
+  hosted target first decision
+
+Questions this phase must answer
+--------------------------------
+1. Which backend owner now directly decides top-level `const str` emission
+   after the Phase 250 decomposition?
+2. Can the hosted executable path materialize `const str` using existing
+   constant and aggregate machinery, or does it need one small dedicated
+   global-string lowering seam?
+3. What is the narrowest real repository-owned caller that should spend this
+   repair once it lands?
+4. How can the phase keep broader constant families explicitly deferred rather
+   than letting this repair become a general global-constant rewrite?
+
+Preferred implementation shape
+------------------------------
+- Keep the controlling owner in `compiler/codegen_llvm`.
+- Start from the existing executable global-collection and aggregate-lowering
+  path rather than inventing a second constant pipeline.
+- Reuse the existing semantic `str` shape and MIR truth; only add new MIR
+  surface if the backend genuinely lacks the information required to emit the
+  global constant honestly.
+- Spend the feature in one existing repository-owned caller if that caller is
+  still carrying an inline literal workaround.
+- Keep the hosted-target behavior narrow and explicit.
+
+Implementation accelerators
+---------------------------
+Main files and navigations
+- Primary controlling owner: `compiler/codegen_llvm/backend.cpp` for module-
+  level global collection and routing into the split executable lowering
+  owners.
+- First-hop adjacent files: `compiler/codegen_llvm/backend_internal.h`,
+  `compiler/codegen_llvm/backend_executable_aggregate.cpp`,
+  `compiler/codegen_llvm/backend_names.cpp`, and `compiler/driver/driver.cpp`
+  only if a real caller-visible build path needs follow-through.
+- Nearby accelerator docs: `docs/plan/active/phase250_llvm_executable_backend_decomposition.txt`
+  for the current backend split and
+  `docs/agent/prompts/compiler_file_invariants.txt` for owner-local backend
+  rules.
+- Expected first validation target when the owner changes: the narrowest
+  executable codegen regression in `tests/compiler/codegen/` plus the grouped
+  executable test owner in `tests/compiler/codegen/codegen_executable_tests.cpp`.
+
+Relevant cookbook patterns
+- Pattern 6 -- Add A Compiler Phase applies because this is a bounded
+  repository-owned compiler slice with one explicit deferred limitation and one
+  narrow owning test family.
+- No exact existing cookbook pattern covers backend-only constant lowering,
+  which is why this phase should stay explicit about the backend owner rather
+  than forcing an analogy to parser/sema follow-through.
+
+Relevant file-local invariants
+- `compiler/codegen_llvm/backend.cpp` must remain the public orchestration
+  owner; detailed constant or aggregate emission belongs in the split lowering
+  owners, not back in one large file.
+- `compiler/codegen_llvm/backend_executable_aggregate.cpp` owns aggregate,
+  slice, enum, and related constant-shape executable lowering; if the string
+  fix can stay in that family, keep it there.
+- `compiler/codegen_llvm/backend_host.cpp` owns host-tool invocation only and
+  should not become a workaround surface for missing backend lowering.
+- Narrow validation should stay on executable codegen tests first, not on a
+  broad workflow suite.
+
+Test obligations
+----------------
+- `Build debug`
+- one focused executable regression for a top-level `const str` caller on the
+  hosted backend path
+- the narrowest owning executable codegen test target that covers object and
+  executable artifact materialization
+- one follow-through validation on the real repository-owned spend site if an
+  existing workaround is removed
+
+Acceptance criteria
+-------------------
+- a top-level `const str` value lowers honestly through the hosted executable
+  backend path
+- at least one real repository-owned caller no longer needs an inline string
+  literal workaround solely because of the old backend limitation
+- the landing stays backend-scoped and does not widen into a general constant
+  framework or second-target work
+- executable codegen output remains deterministic and valid on the current
+  hosted target
+
+Future follow-up
+----------------
+- If another global constant family remains blocked after this landing, record
+  it explicitly in `docs/plan/backlog.txt` rather than treating this phase as
+  a blanket constant-lowering completion claim.
+- If string-global lowering exposes a shared helper boundary inside the split
+  backend files, record that in `docs/plan/decision_log.txt` as a local
+  backend-owner follow-through, not as a new framework.
+- The next adjacent compiler phase should move to a separate capability slice
+  such as value-shaped generic helpers rather than widening this repair.

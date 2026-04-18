@@ -1,0 +1,3221 @@
+==== compiler/ast/ast.cpp ====
+NAMESPACE: mc
+NAMESPACE: ast
+NAMESPACE: 
+TYPE_ALIAS_DECL: Indent
+FUNCTION_DECL: ToString
+   Return: int
+   Param: int kind
+FUNCTION_DECL: ToString
+   Return: int
+   Param: int kind
+FUNCTION_DECL: ToString
+   Return: int
+   Param: int kind
+FUNCTION_DECL: ToString
+   Return: int
+   Param: int kind
+FUNCTION_DECL: ToString
+   Return: int
+   Param: int kind
+FUNCTION_DECL: WriteIndent
+   Return: void
+   Param: int & stream
+   Param: Indent indent
+FUNCTION_DECL: WriteLine
+   Return: void
+   Param: int & stream
+   Param: Indent indent
+   Param: int text
+FUNCTION_DECL: ReachedDumpDepthLimit
+   Return: bool
+   Param: int & stream
+   Param: Indent indent
+   Param: int depth
+FUNCTION_DECL: SecondaryTextLabel
+   Return: int
+   Param: const int & expr
+FUNCTION_DECL: DumpType
+   Return: void
+   Param: const int & type
+   Param: int & stream
+   Param: Indent indent
+   Param: int depth
+FUNCTION_DECL: DumpExpr
+   Return: void
+   Param: const int & expr
+   Param: int & stream
+   Param: Indent indent
+   Param: int depth
+FUNCTION_DECL: DumpStmt
+   Return: void
+   Param: const int & stmt
+   Param: int & stream
+   Param: Indent indent
+   Param: int depth
+FUNCTION_DECL: DumpDecl
+   Return: void
+   Param: const int & decl
+   Param: int & stream
+   Param: Indent indent
+   Param: int depth
+FUNCTION_DECL: DumpAttributes
+   Return: void
+   Param: const int & attributes
+   Param: int & stream
+   Param: Indent indent
+FUNCTION_DECL: DumpPattern
+   Return: void
+   Param: const int & pattern
+   Param: int & stream
+   Param: Indent indent
+FUNCTION_DECL: DumpField
+   Return: void
+   Param: const int & field
+   Param: int & stream
+   Param: Indent indent
+FUNCTION_DECL: DumpType
+   Return: void
+   Param: const int & type
+   Param: int & stream
+   Param: Indent indent
+   Param: int depth
+FUNCTION_DECL: DumpFieldInit
+   Return: void
+   Param: const int & init
+   Param: int & stream
+   Param: Indent indent
+   Param: int depth
+FUNCTION_DECL: DumpExpr
+   Return: void
+   Param: const int & expr
+   Param: int & stream
+   Param: Indent indent
+   Param: int depth
+FUNCTION_DECL: DumpCasePattern
+   Return: void
+   Param: const int & pattern
+   Param: int & stream
+   Param: Indent indent
+   Param: int depth
+FUNCTION_DECL: DumpStmt
+   Return: void
+   Param: const int & stmt
+   Param: int & stream
+   Param: Indent indent
+   Param: int depth
+FUNCTION_DECL: DumpDecl
+   Return: void
+   Param: const int & decl
+   Param: int & stream
+   Param: Indent indent
+   Param: int depth
+FUNCTION_DECL: DumpSourceFile
+   Return: int
+   Param: const int & source_file
+
+==== compiler/ast/ast.h ====
+
+==== compiler/codegen_llvm/backend.cpp ====
+NAMESPACE: mc
+NAMESPACE: codegen_llvm
+NAMESPACE: 
+FUNCTION_DECL: UnsupportedExecutableInstructionName
+   Return: int
+   Param: int kind
+FUNCTION_DECL: IsBootstrapTarget
+   Return: bool
+   Param: const int & target
+FUNCTION_DECL: FunctionSupportsErasedGenericEmission
+   Return: bool
+   Param: const int & module
+   Param: const int & function
+FUNCTION_DECL: RenderExecutableInstruction
+   Return: bool
+   Param: const int & instruction
+   Param: int function_index
+   Param: int block_index
+   Param: int instruction_index
+   Param: const int & function_symbols
+   Param: const int & source_path
+   Param: int & diagnostics
+   Param: int & state
+   Param: int & output_lines
+FUNCTION_DECL: RenderExecutableTerminator
+   Return: bool
+   Param: const int & block
+   Param: const int & source_path
+   Param: int & diagnostics
+   Param: const int & state
+   Param: int & output_lines
+FUNCTION_DECL: CollectExecutableGlobals
+   Return: bool
+   Param: const int & module
+   Param: const int & source_path
+   Param: int & diagnostics
+   Param: int & globals
+FUNCTION_DECL: RenderExecutableBlocks
+   Return: bool
+   Param: const int & function
+   Param: int function_index
+   Param: const int & function_symbols
+   Param: const int & source_path
+   Param: int & diagnostics
+   Param: int & state
+   Param: int & stream
+FUNCTION_DECL: TypeSupportsErasedGenericEmission
+   Return: bool
+   Param: const int & module
+   Param: const int & type
+FUNCTION_DECL: FunctionSupportsErasedGenericEmission
+   Return: bool
+   Param: const int & module
+   Param: const int & function
+FUNCTION_DECL: ShouldEmitFunctionForExecutable
+   Return: bool
+   Param: const int & module
+   Param: const int & function
+FUNCTION_DECL: UnsupportedExecutableInstructionName
+   Return: int
+   Param: int kind
+FUNCTION_DECL: ResolveExecutableBlock
+   Return: bool
+   Param: const int & state
+   Param: const int & block_name
+   Param: const int & block
+   Param: const int & source_path
+   Param: int & diagnostics
+   Param: int & label
+FUNCTION_DECL: DivCheckHelperName
+   Return: int
+   Param: const int & type_info
+FUNCTION_DECL: ShiftCheckHelperName
+   Return: int
+   Param: const int & type_info
+FUNCTION_DECL: EmitDivCheckHelperDefinition
+   Return: void
+   Param: int & stream
+   Param: int backend_name
+FUNCTION_DECL: EmitShiftCheckHelperDefinition
+   Return: void
+   Param: int & stream
+   Param: int bit_width
+STRUCT_DECL: ExecutableRuntimeRequirements
+FUNCTION_DECL: CollectExecutableRuntimeRequirements
+   Return: ExecutableRuntimeRequirements
+   Param: const int & module
+FUNCTION_DECL: RenderExecutableInstruction
+   Return: bool
+   Param: const int & instruction
+   Param: int function_index
+   Param: int block_index
+   Param: int instruction_index
+   Param: const int & function_symbols
+   Param: const int & source_path
+   Param: int & diagnostics
+   Param: int & state
+   Param: int & output_lines
+FUNCTION_DECL: RenderExecutableTerminator
+   Return: bool
+   Param: const int & block
+   Param: const int & source_path
+   Param: int & diagnostics
+   Param: const int & state
+   Param: int & output_lines
+FUNCTION_DECL: RenderExecutableFunction
+   Return: bool
+   Param: const int & module
+   Param: const int & function
+   Param: int function_index
+   Param: bool wrap_hosted_main
+   Param: const int & function_symbols
+   Param: const int & globals
+   Param: const int & source_path
+   Param: int & diagnostics
+   Param: int & stream
+FUNCTION_DECL: IsCanonicalHostedMainParam
+   Return: bool
+   Param: const int & local
+FUNCTION_DECL: RenderExternFunctionDeclaration
+   Return: bool
+   Param: const int & module
+   Param: const int & function
+   Param: bool wrap_hosted_main
+   Param: const int & source_path
+   Param: int & diagnostics
+   Param: int & stream
+FUNCTION_DECL: RenderHostedEntryWrapper
+   Return: bool
+   Param: const int & module
+   Param: const int & main_function
+   Param: bool wrap_hosted_main
+   Param: const int & source_path
+   Param: int & diagnostics
+   Param: int & stream
+FUNCTION_DECL: RenderLlvmModuleImpl
+   Return: bool
+   Param: const int & module
+   Param: const int & target
+   Param: const int & source_path
+   Param: bool wrap_hosted_main
+   Param: int & diagnostics
+   Param: int & llvm_ir
+FUNCTION_DECL: ValidateBootstrapTarget
+   Return: bool
+   Param: const int & target
+   Param: const int & source_path
+   Param: int & diagnostics
+FUNCTION_DECL: ValidateExecutableBackendCapabilities
+   Return: bool
+   Param: const int & module
+   Param: const int & target
+   Param: const int & source_path
+   Param: int & diagnostics
+FUNCTION_DECL: RenderLlvmModule
+   Return: bool
+   Param: const int & module
+   Param: const int & target
+   Param: const int & source_path
+   Param: bool wrap_hosted_main
+   Param: int & diagnostics
+   Param: int & llvm_ir
+FUNCTION_DECL: BootstrapTargetConfig
+   Return: int
+FUNCTION_DECL: LowerModule
+   Return: int
+   Param: const int & module
+   Param: const int & source_path
+   Param: const int & options
+   Param: int & diagnostics
+FUNCTION_DECL: BuildObjectFile
+   Return: int
+   Param: const int & module
+   Param: const int & source_path
+   Param: const int & options
+   Param: int & diagnostics
+FUNCTION_DECL: LinkExecutable
+   Return: int
+   Param: const int & source_path
+   Param: const int & options
+   Param: int & diagnostics
+FUNCTION_DECL: ArchiveStaticLibrary
+   Return: int
+   Param: const int & source_path
+   Param: const int & options
+   Param: int & diagnostics
+FUNCTION_DECL: BuildExecutable
+   Return: int
+   Param: const int & module
+   Param: const int & source_path
+   Param: const int & options
+   Param: int & diagnostics
+FUNCTION_DECL: FunctionBlockContext
+   Return: int
+   Param: int operation
+   Param: int function_name
+   Param: const int & block
+FUNCTION_DECL: ExecutableFunctionBlockContext
+   Return: int
+   Param: int operation
+   Param: const int & state
+   Param: const int & block
+FUNCTION_DECL: RequireOperandRange
+   Return: bool
+   Param: const int & instruction
+   Param: int minimum_count
+   Param: int maximum_count
+   Param: int backend_name
+   Param: int requirement
+   Param: int function_name
+   Param: const int & block
+   Param: const int & source_path
+   Param: int & diagnostics
+FUNCTION_DECL: EmitSliceLengthValue
+   Return: int
+   Param: int function_index
+   Param: int block_index
+   Param: int instruction_index
+   Param: int suffix
+   Param: int lower_i64
+   Param: const int & upper_i64
+   Param: int fallback_upper_bound
+   Param: int & output_lines
+FUNCTION_DECL: EmitAggregateStackSlot
+   Return: int
+   Param: const int & value
+   Param: int function_index
+   Param: int block_index
+   Param: int instruction_index
+   Param: int suffix
+   Param: int & output_lines
+
+==== compiler/codegen_llvm/backend.h ====
+
+==== compiler/codegen_llvm/backend_dump.cpp ====
+NAMESPACE: mc
+NAMESPACE: codegen_llvm
+NAMESPACE: 
+FUNCTION_DECL: WriteIndent
+   Return: void
+   Param: int & stream
+   Param: int indent
+FUNCTION_DECL: WriteLine
+   Return: void
+   Param: int & stream
+   Param: int indent
+   Param: const int & text
+FUNCTION_DECL: DumpModule
+   Return: int
+   Param: const int & module
+
+==== compiler/codegen_llvm/backend_executable_aggregate.cpp ====
+NAMESPACE: mc
+NAMESPACE: codegen_llvm
+FUNCTION_DECL: ResolveEnumInstructionLayout
+   Return: bool
+   Param: const int & instruction
+   Param: const int & module
+   Param: const int & source_path
+   Param: int & diagnostics
+   Param: const int & context
+   Param: int & layout
+   Param: int & variant_index
+FUNCTION_DECL: EmitEnumPayloadFieldPointer
+   Return: int
+   Param: const int & enum_slot
+   Param: const int & layout
+   Param: int payload_offset
+   Param: int function_index
+   Param: int block_index
+   Param: int instruction_index
+   Param: int suffix
+   Param: int & output_lines
+FUNCTION_DECL: EmitAggregateInitInstruction
+   Return: bool
+   Param: const int & instruction
+   Param: const int & context
+FUNCTION_DECL: EmitVariantInitInstruction
+   Return: bool
+   Param: const int & instruction
+   Param: const int & context
+FUNCTION_DECL: EmitVariantMatchInstruction
+   Return: bool
+   Param: const int & instruction
+   Param: const int & context
+FUNCTION_DECL: EmitVariantExtractInstruction
+   Return: bool
+   Param: const int & instruction
+   Param: const int & context
+FUNCTION_DECL: EmitArenaNewInstruction
+   Return: bool
+   Param: const int & instruction
+   Param: const int & context
+FUNCTION_DECL: EmitSliceInstruction
+   Return: bool
+   Param: const int & instruction
+   Param: const int & context
+
+==== compiler/codegen_llvm/backend_executable_atomic.cpp ====
+NAMESPACE: mc
+NAMESPACE: codegen_llvm
+NAMESPACE: 
+FUNCTION_DECL: FindFunctionValueType
+   Return: int
+   Param: const int & module
+   Param: const int & function
+   Param: int value_name
+FUNCTION_DECL: ResolveAtomicElementBackendType
+   Return: bool
+   Param: const int & module
+   Param: const int & function
+   Param: const int & instruction
+   Param: const int & source_path
+   Param: int & diagnostics
+   Param: int context
+   Param: int & element_type
+FUNCTION_DECL: RequireAtomicInstructionResult
+   Return: bool
+   Param: const int & instruction
+   Param: const int & block
+   Param: const int & source_path
+   Param: int & diagnostics
+   Param: const int & state
+   Param: int op_name
+FUNCTION_DECL: RequireAtomicOperandCount
+   Return: bool
+   Param: const int & instruction
+   Param: int expected_count
+   Param: const int & block
+   Param: const int & source_path
+   Param: int & diagnostics
+   Param: const int & state
+   Param: int op_name
+FUNCTION_DECL: ExecutableAtomicContext
+   Return: int
+   Param: int operation
+   Param: const int & state
+   Param: const int & block
+NAMESPACE: executable_atomic
+FUNCTION_DECL: RenderAtomicInstruction
+   Return: bool
+   Param: const int & instruction
+   Param: const int & context
+
+==== compiler/codegen_llvm/backend_executable_calls.cpp ====
+NAMESPACE: mc
+NAMESPACE: codegen_llvm
+NAMESPACE: 
+FUNCTION_DECL: FormatExecutableCallArguments
+   Return: bool
+   Param: const int & instruction
+   Param: const int & call_signature
+   Param: const int & context
+   Param: int & args_text
+FUNCTION_DECL: ResolveExecutableCallSignature
+   Return: bool
+   Param: const int & instruction
+   Param: const int & function_symbols
+   Param: const int & context
+   Param: int & signature
+FUNCTION_DECL: EmitSymbolRefInstruction
+   Return: bool
+   Param: const int & instruction
+   Param: const int & context
+   Param: const int & function_symbols
+FUNCTION_DECL: IsProcedureSourceType
+   Return: bool
+   Param: int source_name
+FUNCTION_DECL: EmitCallInstruction
+   Return: bool
+   Param: const int & instruction
+   Param: const int & context
+   Param: const int & function_symbols
+
+==== compiler/codegen_llvm/backend_executable_memory.cpp ====
+NAMESPACE: mc
+NAMESPACE: codegen_llvm
+NAMESPACE: 
+FUNCTION_DECL: FindFieldIndexForMemory
+   Return: int
+   Param: const int & module
+   Param: const int & base_type
+   Param: int field_name
+FUNCTION_DECL: FindFieldTypeForMemory
+   Return: int
+   Param: const int & module
+   Param: const int & base_type
+   Param: int field_name
+FUNCTION_DECL: FindFunctionLocal
+   Return: const int *
+   Param: const int & function
+   Param: int name
+FUNCTION_DECL: ResolveExecutableLocalSlot
+   Return: bool
+   Param: const int & state
+   Param: const int & local_name
+   Param: const int & block
+   Param: const int & source_path
+   Param: int & diagnostics
+   Param: int & local_slot
+FUNCTION_DECL: ResolveArrayOrSliceElementPtr
+   Return: bool
+   Param: const int & base
+   Param: const int & index_i64
+   Param: const int & element_type
+   Param: int base_storage
+   Param: int base_name
+   Param: const int & context
+   Param: int tag
+   Param: int operation
+   Param: int & ptr_temp
+FUNCTION_DECL: EmitLocalAddrGlobal
+   Return: bool
+   Param: const int & instruction
+   Param: const int & context
+   Param: const int & type_info
+FUNCTION_DECL: EmitLocalAddrField
+   Return: bool
+   Param: const int & instruction
+   Param: const int & context
+   Param: const int & type_info
+FUNCTION_DECL: EmitLocalAddrIndex
+   Return: bool
+   Param: const int & instruction
+   Param: const int & context
+   Param: const int & type_info
+FUNCTION_DECL: EmitLocalAddrLocal
+   Return: bool
+   Param: const int & instruction
+   Param: const int & context
+   Param: const int & type_info
+FUNCTION_DECL: EmitLocalAddrInstruction
+   Return: bool
+   Param: const int & instruction
+   Param: const int & context
+FUNCTION_DECL: EmitStoreTargetGlobal
+   Return: bool
+   Param: const int & instruction
+   Param: const int & context
+FUNCTION_DECL: EmitStoreTargetField
+   Return: bool
+   Param: const int & instruction
+   Param: const int & context
+FUNCTION_DECL: EmitStoreTargetPointer
+   Return: bool
+   Param: const int & instruction
+   Param: const int & context
+FUNCTION_DECL: EmitStoreTargetIndex
+   Return: bool
+   Param: const int & instruction
+   Param: const int & context
+FUNCTION_DECL: EmitStoreTargetInstruction
+   Return: bool
+   Param: const int & instruction
+   Param: const int & context
+FUNCTION_DECL: EmitMemoryInstruction
+   Return: bool
+   Param: const int & instruction
+   Param: const int & context
+
+==== compiler/codegen_llvm/backend_executable_numeric.cpp ====
+NAMESPACE: mc
+NAMESPACE: codegen_llvm
+NAMESPACE: 
+STRUCT_DECL: CheckedHelperAnalysisContext
+FUNCTION_DECL: SeedFunctionValueTypes
+   Return: void
+   Param: const int & function
+   Param: int & value_types
+FUNCTION_DECL: LookupCheckedHelperValueType
+   Return: const int *
+   Param: const CheckedHelperAnalysisContext & context
+   Param: int value_name
+   Param: int check_name
+FUNCTION_DECL: CheckedHelperAnalysisContextString
+   Return: int
+   Param: int check_name
+   Param: const CheckedHelperAnalysisContext & context
+FUNCTION_DECL: AddDivCheckRequirement
+   Return: bool
+   Param: const CheckedHelperAnalysisContext & context
+   Param: const int & instruction
+FUNCTION_DECL: AddShiftCheckRequirement
+   Return: bool
+   Param: const CheckedHelperAnalysisContext & context
+   Param: const int & instruction
+FUNCTION_DECL: EmitAggregateEqualityComparison
+   Return: bool
+   Param: const int & lhs
+   Param: const int & rhs
+   Param: int function_index
+   Param: int block_index
+   Param: int instruction_index
+   Param: int suffix
+   Param: int & output_lines
+   Param: int & eq_result
+FUNCTION_DECL: PreferredOperandType
+   Return: int
+   Param: const int & lhs
+   Param: const int & rhs
+FUNCTION_DECL: ParseEnumPayloadSize
+   Return: int
+   Param: const int & type_info
+STRUCT_DECL: EnumCompareInfo
+FUNCTION_DECL: ResolveEnumCompareInfo
+   Return: int
+   Param: const int & module
+   Param: const int & value
+FUNCTION_DECL: EmitScalarComparison
+   Return: bool
+   Param: int op
+   Param: const int & lhs
+   Param: const int & rhs
+   Param: int function_index
+   Param: int block_index
+   Param: int instruction_index
+   Param: int suffix
+   Param: int & output_lines
+   Param: int & result
+FUNCTION_DECL: EmitOrderedEnumFieldComparison
+   Return: bool
+   Param: const int & module
+   Param: const int & field_type
+   Param: const int & backend_type
+   Param: const int & lhs_text
+   Param: const int & rhs_text
+   Param: int function_index
+   Param: int block_index
+   Param: int instruction_index
+   Param: int suffix
+   Param: const int & source_path
+   Param: int & diagnostics
+   Param: int & output_lines
+   Param: int & eq_result
+   Param: int & lt_result
+   Param: int & gt_result
+FUNCTION_DECL: EmitEnumPayloadEqualityComparison
+   Return: bool
+   Param: const int & module
+   Param: const EnumCompareInfo & compare_info
+   Param: const int & lhs_slot
+   Param: const int & rhs_slot
+   Param: const int & lhs_tag
+   Param: int function_index
+   Param: int block_index
+   Param: int instruction_index
+   Param: const int & source_path
+   Param: int & diagnostics
+   Param: int & output_lines
+   Param: int & payload_eq_result
+FUNCTION_DECL: EmitEnumCompare
+   Return: void
+   Param: const int & instruction
+   Param: int function_index
+   Param: int block_index
+   Param: int instruction_index
+   Param: int compare_predicate
+   Param: const int & lhs
+   Param: const int & rhs
+   Param: const EnumCompareInfo & compare_info
+   Param: const int & source_path
+   Param: const int & block
+   Param: int & diagnostics
+   Param: const int & result_type
+   Param: int & state
+   Param: int & output_lines
+   Param: bool & emitted
+STRUCT_DECL: BinaryOpcodeEntry
+STRUCT_DECL: ComparePredicateEntry
+FUNCTION_DECL: BinaryOpcodeForLLVM
+   Return: int
+   Param: const int & instruction
+   Param: const int & lhs
+   Param: const int & result_type
+FUNCTION_DECL: ComparePredicateForLLVM
+   Return: int
+   Param: const int & instruction
+   Param: const int & lhs
+FUNCTION_DECL: CollectCheckedHelperRequirements
+   Return: bool
+   Param: const int & module
+   Param: const int & source_path
+   Param: int & diagnostics
+   Param: int & requirements
+FUNCTION_DECL: EmitConvertDistinctInstruction
+   Return: bool
+   Param: const int & instruction
+   Param: const int & context
+FUNCTION_DECL: EmitConvertInstruction
+   Return: bool
+   Param: const int & instruction
+   Param: const int & context
+FUNCTION_DECL: EmitConvertNumericInstruction
+   Return: bool
+   Param: const int & instruction
+   Param: const int & context
+FUNCTION_DECL: EmitPointerToIntInstruction
+   Return: bool
+   Param: const int & instruction
+   Param: const int & context
+FUNCTION_DECL: EmitIntToPointerInstruction
+   Return: bool
+   Param: const int & instruction
+   Param: const int & context
+FUNCTION_DECL: EmitBoundsCheckCall
+   Return: bool
+   Param: const int & instruction
+   Param: const int & context
+FUNCTION_DECL: EmitDivCheckCall
+   Return: bool
+   Param: const int & instruction
+   Param: const int & context
+FUNCTION_DECL: EmitShiftCheckCall
+   Return: bool
+   Param: const int & instruction
+   Param: const int & context
+FUNCTION_DECL: EmitBinaryInstruction
+   Return: bool
+   Param: const int & instruction
+   Param: const int & context
+
+==== compiler/codegen_llvm/backend_executable_support.cpp ====
+NAMESPACE: mc
+NAMESPACE: codegen_llvm
+NAMESPACE: 
+FUNCTION_DECL: ParameterLocals
+   Return: int
+   Param: const int & function
+FUNCTION_DECL: FindFunction
+   Return: const int *
+   Param: const int & module
+   Param: int name
+FUNCTION_DECL: RenderLLVMParameter
+   Return: int
+   Param: const int & type_info
+   Param: const int & param
+   Param: bool include_name
+FUNCTION_DECL: DecodeStringLiteral
+   Return: int
+   Param: int literal
+FUNCTION_DECL: EncodeLLVMStringBytes
+   Return: int
+   Param: int decoded
+FUNCTION_DECL: EscapeLLVMQuotedString
+   Return: int
+   Param: int text
+FUNCTION_DECL: FormatLLVMLiteral
+   Return: int
+   Param: const int & type_info
+   Param: int value
+NAMESPACE: 
+FUNCTION_DECL: LLVMZeroValue
+   Return: int
+   Param: const int & type_info
+FUNCTION_DECL: RenderLLVMEnumConstValue
+   Return: bool
+   Param: const int & module
+   Param: const int & enum_type
+   Param: const int & value
+   Param: const int & source_path
+   Param: int & diagnostics
+   Param: int & rendered
+FUNCTION_DECL: LLVMStructInsertBase
+   Return: int
+   Param: const int & type_info
+FUNCTION_DECL: RenderLLVMGlobalConstValue
+   Return: bool
+   Param: const int & module
+   Param: int type
+   Param: const int & value
+   Param: bool wrap_hosted_main
+   Param: const int & source_path
+   Param: int & diagnostics
+   Param: int & rendered
+FUNCTION_DECL: IsSignedSourceType
+   Return: bool
+   Param: int source_name
+FUNCTION_DECL: IsUnsignedSourceType
+   Return: bool
+   Param: int source_name
+FUNCTION_DECL: IsFloatType
+   Return: bool
+   Param: const int & type_info
+FUNCTION_DECL: IntegerBitWidth
+   Return: int
+   Param: const int & type_info
+FUNCTION_DECL: ResolveExecutableValue
+   Return: bool
+   Param: const int & state
+   Param: const int & value_name
+   Param: const int & block
+   Param: const int & source_path
+   Param: int & diagnostics
+   Param: int & value
+FUNCTION_DECL: ResolveExecutableOperands
+   Return: bool
+   Param: const int & instruction
+   Param: const int & block
+   Param: const int & source_path
+   Param: int & diagnostics
+   Param: const int & state
+   Param: int & first
+FUNCTION_DECL: ResolveExecutableOperands
+   Return: bool
+   Param: const int & instruction
+   Param: const int & block
+   Param: const int & source_path
+   Param: int & diagnostics
+   Param: const int & state
+   Param: int & first
+   Param: int & second
+FUNCTION_DECL: ResolveExecutableOperands
+   Return: bool
+   Param: const int & instruction
+   Param: const int & block
+   Param: const int & source_path
+   Param: int & diagnostics
+   Param: const int & state
+   Param: int & first
+   Param: int & second
+   Param: int & third
+FUNCTION_DECL: ResolveExecutableFieldBaseType
+   Return: int
+   Param: const int & module
+   Param: const int & metadata_base_type
+   Param: const int & base_value
+FUNCTION_DECL: RecordExecutableValue
+   Return: void
+   Param: int & state
+   Param: const int & result_name
+   Param: const int & text
+   Param: const int & type
+   Param: int storage_slot
+   Param: int source_type
+FUNCTION_DECL: EmitValueRepresentationCoercion
+   Return: bool
+   Param: const int & value
+   Param: const int & target_type
+   Param: int function_index
+   Param: int block_index
+   Param: int instruction_index
+   Param: int suffix
+   Param: int & output_lines
+   Param: int & coerced
+FUNCTION_DECL: ExtendIntegerToI64
+   Return: bool
+   Param: const int & value
+   Param: int function_index
+   Param: int block_index
+   Param: int instruction_index
+   Param: int suffix
+   Param: int & output_lines
+   Param: int & extended
+FUNCTION_DECL: EmitNumericConversion
+   Return: bool
+   Param: const int & operand
+   Param: const int & result_type
+   Param: int function_index
+   Param: int block_index
+   Param: int instruction_index
+   Param: int & output_lines
+   Param: int & result_text
+NAMESPACE: executable_support
+FUNCTION_DECL: NormalizeFunctionSignature
+   Return: int
+   Param: const int & function
+FUNCTION_DECL: NormalizeProcedureTypeSignature
+   Return: bool
+   Param: const int & procedure_type
+   Param: const int & source_path
+   Param: int & diagnostics
+   Param: int context
+   Param: int & signature
+FUNCTION_DECL: SignatureResultType
+   Return: int
+   Param: const int & signature
+FUNCTION_DECL: LowerExecutableParamTypes
+   Return: bool
+   Param: const int & module
+   Param: const int & signature
+   Param: const int & source_path
+   Param: int & diagnostics
+   Param: const int & describe_param
+   Param: int & param_types
+FUNCTION_DECL: LowerExecutableReturnType
+   Return: bool
+   Param: const int & module
+   Param: const int & signature
+   Param: const int & source_path
+   Param: int & diagnostics
+   Param: int context
+   Param: int & return_type
+FUNCTION_DECL: RenderExecutableParameterList
+   Return: void
+   Param: const int & function_signature
+   Param: const int & param_types
+   Param: bool include_names
+   Param: int & stream
+FUNCTION_DECL: LowerExecutableLocalTypes
+   Return: bool
+   Param: const int & module
+   Param: const int & function
+   Param: const int & source_path
+   Param: int & diagnostics
+   Param: int & local_types
+FUNCTION_DECL: RenderExecutableEntryPrologue
+   Return: void
+   Param: const int & function
+   Param: const int & function_signature
+   Param: const int & local_types
+   Param: const int & param_types
+   Param: int & stream
+FUNCTION_DECL: InitializeExecutableFunctionState
+   Return: int
+   Param: const int & module
+   Param: const int & function
+   Param: const int & function_signature
+   Param: int function_index
+   Param: const int & globals
+   Param: int string_constants
+FUNCTION_DECL: CollectExecutableStringConstants
+   Return: bool
+   Param: const int & module
+   Param: const int & function
+   Param: int function_index
+   Param: const int & source_path
+   Param: int & diagnostics
+   Param: int & stream
+   Param: int & string_constants
+
+==== compiler/codegen_llvm/backend_host.cpp ====
+NAMESPACE: mc
+NAMESPACE: codegen_llvm
+NAMESPACE: 
+FUNCTION_DECL: QuoteShellArg
+   Return: int
+   Param: int argument
+FUNCTION_DECL: JoinCommand
+   Return: int
+   Param: const int & args
+STRUCT_DECL: HostCommandResult
+FUNCTION_DECL: RunCapturedHostCommand
+   Return: HostCommandResult
+   Param: const int & args
+FUNCTION_DECL: TrimTrailingNewlines
+   Return: int
+   Param: int text
+FUNCTION_DECL: RemoveArtifactIfExists
+   Return: void
+   Param: const int & artifact_path
+FUNCTION_DECL: BuildHostToolCommand
+   Return: int
+   Param: const int & target
+   Param: int tool
+   Param: int args
+FUNCTION_DECL: RunHostCommand
+   Return: bool
+   Param: const int & args
+   Param: const int & source_path
+   Param: int & diagnostics
+   Param: const int & description
+   Param: const int & related_artifact_path
+FUNCTION_DECL: BuildObjectFile
+   Return: int
+   Param: const int & module
+   Param: const int & source_path
+   Param: const int & options
+   Param: int & diagnostics
+FUNCTION_DECL: LinkExecutable
+   Return: int
+   Param: const int & source_path
+   Param: const int & options
+   Param: int & diagnostics
+FUNCTION_DECL: ArchiveStaticLibrary
+   Return: int
+   Param: const int & source_path
+   Param: const int & options
+   Param: int & diagnostics
+FUNCTION_DECL: BuildExecutable
+   Return: int
+   Param: const int & module
+   Param: const int & source_path
+   Param: const int & options
+   Param: int & diagnostics
+
+==== compiler/codegen_llvm/backend_inspect.cpp ====
+NAMESPACE: mc
+NAMESPACE: codegen_llvm
+NAMESPACE: 
+FUNCTION_DECL: LowerInstruction
+   Return: bool
+   Param: const int & instruction
+   Param: int block_index
+   Param: int instruction_index
+   Param: const int & source_path
+   Param: int & diagnostics
+   Param: int & state
+   Param: int & backend_block
+FUNCTION_DECL: LowerTerminator
+   Return: bool
+   Param: const int & block
+   Param: const int & source_path
+   Param: int & diagnostics
+   Param: const int & state
+   Param: int & backend_block
+FUNCTION_DECL: LowerFunction
+   Return: bool
+   Param: const int & module
+   Param: const int & function
+   Param: int function_index
+   Param: const int & source_path
+   Param: int & diagnostics
+   Param: int & backend_module
+FUNCTION_DECL: LowerGlobal
+   Return: bool
+   Param: const int & module
+   Param: const int & global
+   Param: const int & source_path
+   Param: int & diagnostics
+   Param: int & backend_module
+FUNCTION_DECL: LowerInspectModule
+   Return: int
+   Param: const int & module
+   Param: const int & source_path
+   Param: const int & target
+   Param: int & diagnostics
+
+==== compiler/codegen_llvm/backend_internal.h ====
+
+==== compiler/codegen_llvm/backend_names.cpp ====
+NAMESPACE: mc
+NAMESPACE: codegen_llvm
+NAMESPACE: 
+FUNCTION_DECL: IsSafeLLVMIdentifierChar
+   Return: bool
+   Param: unsigned char ch
+FUNCTION_DECL: SanitizeLLVMIdentifier
+   Return: int
+   Param: int source_name
+FUNCTION_DECL: BackendFunctionName
+   Return: int
+   Param: const int & source_name
+FUNCTION_DECL: BackendGlobalName
+   Return: int
+   Param: const int & source_name
+FUNCTION_DECL: BackendLocalName
+   Return: int
+   Param: const int & source_name
+FUNCTION_DECL: BackendBlockName
+   Return: int
+   Param: int function_index
+   Param: int block_index
+   Param: const int & source_name
+FUNCTION_DECL: BackendTempName
+   Return: int
+   Param: int function_index
+   Param: int block_index
+   Param: int instruction_index
+FUNCTION_DECL: LLVMFunctionSymbol
+   Return: int
+   Param: int source_name
+   Param: bool wrap_hosted_main
+FUNCTION_DECL: LLVMBlockLabel
+   Return: int
+   Param: int function_index
+   Param: int block_index
+   Param: const int & source_label
+FUNCTION_DECL: LLVMLocalSlotName
+   Return: int
+   Param: int source_name
+FUNCTION_DECL: LLVMParamName
+   Return: int
+   Param: int source_name
+FUNCTION_DECL: LLVMTempName
+   Return: int
+   Param: int function_index
+   Param: int block_index
+   Param: int instruction_index
+FUNCTION_DECL: LLVMGlobalName
+   Return: int
+   Param: int source_name
+
+==== compiler/codegen_llvm/backend_types.cpp ====
+NAMESPACE: mc
+NAMESPACE: codegen_llvm
+FUNCTION_DECL: InstantiateAliasedType
+   Return: int
+   Param: const int & type_decl
+   Param: const int & instantiated_type
+FUNCTION_DECL: IsAggregateType
+   Return: bool
+   Param: const int & type_info
+NAMESPACE: 
+FUNCTION_DECL: LowerTypeInfoImpl
+   Return: int
+   Param: const int & module
+   Param: const int & type
+   Param: bool aggregate_field_storage
+FUNCTION_DECL: AlignTo
+   Return: int
+   Param: int value
+   Param: int alignment
+FUNCTION_DECL: LowerStructTypeInfo
+   Return: int
+   Param: const int & module
+   Param: const int & type_decl
+   Param: const int & original_type
+FUNCTION_DECL: LowerTypeInfoImpl
+   Return: int
+   Param: const int & module
+   Param: const int & type
+   Param: bool aggregate_field_storage
+FUNCTION_DECL: ReportBackendError
+   Return: void
+   Param: const int & source_path
+   Param: const int & message
+   Param: int & diagnostics
+FUNCTION_DECL: FindTypeDecl
+   Return: const int *
+   Param: const int & module
+   Param: int name
+FUNCTION_DECL: FindVariantDecl
+   Return: const int *
+   Param: const int & type_decl
+   Param: int variant_name
+   Param: int * variant_index
+FUNCTION_DECL: ParseBackendArrayLength
+   Return: int
+   Param: int text
+FUNCTION_DECL: LowerEnumLayout
+   Return: int
+   Param: const int & module
+   Param: const int & type_decl
+   Param: const int & original_type
+FUNCTION_DECL: LowerTypeInfo
+   Return: int
+   Param: const int & module
+   Param: const int & type
+FUNCTION_DECL: LowerAggregateFieldStorageType
+   Return: int
+   Param: const int & module
+   Param: const int & aggregate_type
+   Param: int field_name
+FUNCTION_DECL: FormatTypeInfo
+   Return: int
+   Param: const int & type_info
+FUNCTION_DECL: LowerInstructionType
+   Return: bool
+   Param: const int & module
+   Param: const int & type
+   Param: const int & source_path
+   Param: int & diagnostics
+   Param: const int & context
+   Param: int & type_info
+FUNCTION_DECL: FormatReturnTypes
+   Return: int
+   Param: const int & types
+FUNCTION_DECL: LowerFunctionReturnType
+   Return: int
+   Param: const int & module
+   Param: const int & return_types
+
+==== compiler/driver/build_graph.cpp ====
+NAMESPACE: mc
+NAMESPACE: driver
+NAMESPACE: 
+FUNCTION_DECL: JoinPaths
+   Return: int
+   Param: const int & paths
+FUNCTION_DECL: OffsetSpan
+   Return: void
+   Param: int & span
+   Param: int line_offset
+FUNCTION_DECL: OffsetTypeExprSpans
+   Return: void
+   Param: int * type_expr
+   Param: int line_offset
+FUNCTION_DECL: OffsetExprSpans
+   Return: void
+   Param: int * expr
+   Param: int line_offset
+FUNCTION_DECL: OffsetStmtSpans
+   Return: void
+   Param: int * stmt
+   Param: int line_offset
+FUNCTION_DECL: OffsetNamePatternSpans
+   Return: void
+   Param: int & pattern
+   Param: int line_offset
+FUNCTION_DECL: OffsetAttributeArgSpans
+   Return: void
+   Param: int & arg
+   Param: int line_offset
+FUNCTION_DECL: OffsetAttributeSpans
+   Return: void
+   Param: int & attribute
+   Param: int line_offset
+FUNCTION_DECL: OffsetFieldDeclSpans
+   Return: void
+   Param: int & field_decl
+   Param: int line_offset
+FUNCTION_DECL: OffsetEnumVariantDeclSpans
+   Return: void
+   Param: int & variant_decl
+   Param: int line_offset
+FUNCTION_DECL: OffsetParamDeclSpans
+   Return: void
+   Param: int & param_decl
+   Param: int line_offset
+FUNCTION_DECL: OffsetFieldInitSpans
+   Return: void
+   Param: int & field_init
+   Param: int line_offset
+FUNCTION_DECL: OffsetCasePatternSpans
+   Return: void
+   Param: int & pattern
+   Param: int line_offset
+FUNCTION_DECL: OffsetSwitchCaseSpans
+   Return: void
+   Param: int & switch_case
+   Param: int line_offset
+FUNCTION_DECL: OffsetDefaultCaseSpans
+   Return: void
+   Param: int & default_case
+   Param: int line_offset
+FUNCTION_DECL: OffsetTypeExprSpans
+   Return: void
+   Param: int * type_expr
+   Param: int line_offset
+FUNCTION_DECL: OffsetExprSpans
+   Return: void
+   Param: int * expr
+   Param: int line_offset
+FUNCTION_DECL: OffsetStmtSpans
+   Return: void
+   Param: int * stmt
+   Param: int line_offset
+FUNCTION_DECL: OffsetDeclSpans
+   Return: void
+   Param: int & decl
+   Param: int line_offset
+FUNCTION_DECL: OffsetSourceFileSpans
+   Return: void
+   Param: int & source_file
+   Param: int line_offset
+FUNCTION_DECL: MakeModuleArtifactKey
+   Return: int
+   Param: int package_identity
+   Param: int module_name
+STRUCT_DECL: ResolvedModuleSource
+FUNCTION_DECL: ResolveImportPathWithPackageRules
+   Return: int
+   Param: const int & importer_path
+   Param: int module_name
+   Param: const int & search_roots
+   Param: const int & importer_package_identity
+   Param: const int (const int &) 
+FUNCTION_DECL: CanonicalizeModuleSourcePaths
+   Return: int
+   Param: const int & source_paths
+FUNCTION_DECL: ParseLogicalModuleSources
+   Return: int
+   Param: const int & source_paths
+   Param: int & diagnostics
+FUNCTION_DECL: ResolveProjectTargetConfig
+   Return: int
+   Param: const int & project
+   Param: const int & target
+   Param: int & diagnostics
+FUNCTION_DECL: CollectOwnedSourcePathsForLink
+   Return: void
+   Param: const int & graph
+   Param: int owner_name
+   Param: int & owned_paths
+   Param: int & owners
+   Param: const int & consumer_target
+   Param: const int & project
+   Param: int & diagnostics
+FUNCTION_DECL: LookupKnownProjectModuleSources
+   Return: int
+   Param: const int & target
+   Param: const int & linked_targets
+   Param: int module_name
+FUNCTION_DECL: DiscoverModuleGraphRecursive
+   Return: bool
+   Param: const ResolvedModuleSource & module_source
+   Param: const int & import_roots
+   Param: const int (const int &) 
+FUNCTION_DECL: LoadSelectedProject
+   Return: int
+   Param: const int & options
+   Param: int & diagnostics
+FUNCTION_DECL: SupportsBootstrapTarget
+   Return: bool
+   Param: const int & target
+   Param: const int & project
+   Param: int & diagnostics
+FUNCTION_DECL: DiscoverModuleGraph
+   Return: int
+   Param: const int & entry_source_path
+   Param: const int & import_roots
+   Param: const int (const int &) 
+FUNCTION_DECL: AssertCompileGraphTopologicalOrder
+   Return: void
+   Param: const int & graph
+FUNCTION_DECL: BuildResolvedTargetGraph
+   Return: int
+   Param: const int & project
+   Param: const int & target
+   Param: const int & cli_import_roots
+   Param: int & diagnostics
+   Param: int & visiting_targets
+FUNCTION_DECL: BuildTargetGraph
+   Return: int
+   Param: const int & options
+   Param: int & diagnostics
+
+==== compiler/driver/build_support.cpp ====
+NAMESPACE: mc
+NAMESPACE: driver
+NAMESPACE: 
+FUNCTION_DECL: IsInternalModulePath
+   Return: bool
+   Param: const int & path
+FUNCTION_DECL: IsPathWithinRoot
+   Return: bool
+   Param: const int & path
+   Param: const int & root
+FUNCTION_DECL: DiscoverRepositoryRoot
+   Return: int
+   Param: const int & start_path
+FUNCTION_DECL: ResolveDirectSourcePackageIdentity
+   Return: int
+   Param: const int & source_path
+   Param: const int & import_roots
+FUNCTION_DECL: ResolveExternalSourcePackageIdentity
+   Return: int
+   Param: const int & source_path
+   Param: const int & import_roots
+FUNCTION_DECL: DiscoverHostedRuntimeSupportSource
+   Return: int
+   Param: const int & source_path
+FUNCTION_DECL: DiscoverRuntimeSupportSource
+   Return: int
+   Param: int env
+   Param: int startup
+   Param: const int & source_path
+FUNCTION_DECL: ComputeEffectiveImportRoots
+   Return: int
+   Param: const int & source_path
+   Param: const int & import_roots
+FUNCTION_DECL: ReadSourceText
+   Return: int
+   Param: const int & path
+   Param: int & diagnostics
+FUNCTION_DECL: ParseSourcePath
+   Return: int
+   Param: const int & path
+   Param: int & diagnostics
+FUNCTION_DECL: DefaultProjectPath
+   Return: int
+FUNCTION_DECL: BootstrapTargetIdentity
+   Return: int
+FUNCTION_DECL: IsSupportedMode
+   Return: bool
+   Param: int mode
+FUNCTION_DECL: IsSupportedEnv
+   Return: bool
+   Param: int env
+FUNCTION_DECL: IsExecutableTargetKind
+   Return: bool
+   Param: int kind
+FUNCTION_DECL: IsStaticLibraryTargetKind
+   Return: bool
+   Param: int kind
+FUNCTION_DECL: HexU64
+   Return: int
+   Param: int value
+FUNCTION_DECL: HashText
+   Return: int
+   Param: int text
+FUNCTION_DECL: ComputeModuleStatePath
+   Return: int
+   Param: const int & source_path
+   Param: const int & build_dir
+FUNCTION_DECL: ComputeLogicalModuleStatePath
+   Return: int
+   Param: int artifact_key
+   Param: const int & build_dir
+FUNCTION_DECL: ComputeRuntimeObjectPath
+   Return: int
+   Param: const int & entry_source_path
+   Param: const int & build_dir
+   Param: int env
+   Param: int startup
+FUNCTION_DECL: ComputeLogicalRuntimeObjectPath
+   Return: int
+   Param: int artifact_key
+   Param: const int & build_dir
+   Param: int env
+   Param: int startup
+FUNCTION_DECL: LoadModuleBuildState
+   Return: int
+   Param: const int & path
+   Param: int & diagnostics
+FUNCTION_DECL: WriteModuleBuildState
+   Return: bool
+   Param: const int & path
+   Param: const int & state
+   Param: int & diagnostics
+FUNCTION_DECL: ShouldReuseModuleObject
+   Return: bool
+   Param: const int & state
+   Param: const int & current
+   Param: const int & object_path
+   Param: const int & mci_path
+
+==== compiler/driver/builder.cpp ====
+NAMESPACE: mc
+NAMESPACE: driver
+NAMESPACE: 
+FUNCTION_DECL: IsOutputOlderThan
+   Return: bool
+   Param: const int & output_path
+   Param: const int & input_path
+FUNCTION_DECL: ShouldRelinkProjectExecutable
+   Return: bool
+   Param: const int & executable_path
+   Param: const int & runtime_object_path
+   Param: const int & runtime_source_path
+   Param: const int & link_inputs
+   Param: const int & library_paths
+   Param: const int & units
+FUNCTION_DECL: ShouldArchiveProjectStaticLibrary
+   Return: bool
+   Param: const int & archive_path
+   Param: const int & units
+FUNCTION_DECL: CompileToMir
+   Return: int
+   Param: const int & options
+   Param: int & diagnostics
+   Param: bool include_imports_for_build
+FUNCTION_DECL: WriteTextArtifact
+   Return: bool
+   Param: const int & path
+   Param: int contents
+   Param: int description
+   Param: int & diagnostics
+FUNCTION_DECL: BuildProjectTarget
+   Return: int
+   Param: int & graph
+   Param: int & diagnostics
+
+==== compiler/driver/builder_merge.cpp ====
+NAMESPACE: mc
+NAMESPACE: driver
+NAMESPACE: 
+FUNCTION_DECL: OffsetSpan
+   Return: void
+   Param: int & span
+   Param: int line_offset
+FUNCTION_DECL: OffsetTypeExprSpans
+   Return: void
+   Param: int * type_expr
+   Param: int line_offset
+FUNCTION_DECL: OffsetExprSpans
+   Return: void
+   Param: int * expr
+   Param: int line_offset
+FUNCTION_DECL: OffsetStmtSpans
+   Return: void
+   Param: int * stmt
+   Param: int line_offset
+FUNCTION_DECL: OffsetNamePatternSpans
+   Return: void
+   Param: int & pattern
+   Param: int line_offset
+FUNCTION_DECL: OffsetAttributeArgSpans
+   Return: void
+   Param: int & arg
+   Param: int line_offset
+FUNCTION_DECL: OffsetAttributeSpans
+   Return: void
+   Param: int & attribute
+   Param: int line_offset
+FUNCTION_DECL: OffsetFieldDeclSpans
+   Return: void
+   Param: int & field_decl
+   Param: int line_offset
+FUNCTION_DECL: OffsetEnumVariantDeclSpans
+   Return: void
+   Param: int & variant_decl
+   Param: int line_offset
+FUNCTION_DECL: OffsetParamDeclSpans
+   Return: void
+   Param: int & param_decl
+   Param: int line_offset
+FUNCTION_DECL: OffsetFieldInitSpans
+   Return: void
+   Param: int & field_init
+   Param: int line_offset
+FUNCTION_DECL: OffsetCasePatternSpans
+   Return: void
+   Param: int & pattern
+   Param: int line_offset
+FUNCTION_DECL: OffsetSwitchCaseSpans
+   Return: void
+   Param: int & switch_case
+   Param: int line_offset
+FUNCTION_DECL: OffsetDefaultCaseSpans
+   Return: void
+   Param: int & default_case
+   Param: int line_offset
+FUNCTION_DECL: OffsetTypeExprSpans
+   Return: void
+   Param: int * type_expr
+   Param: int line_offset
+FUNCTION_DECL: OffsetExprSpans
+   Return: void
+   Param: int * expr
+   Param: int line_offset
+FUNCTION_DECL: OffsetStmtSpans
+   Return: void
+   Param: int * stmt
+   Param: int line_offset
+FUNCTION_DECL: OffsetDeclSpans
+   Return: void
+   Param: int & decl
+   Param: int line_offset
+FUNCTION_DECL: OffsetSourceFileSpans
+   Return: void
+   Param: int & source_file
+   Param: int line_offset
+FUNCTION_DECL: QualifyImportedSymbol
+   Return: int
+   Param: int module_name
+   Param: int symbol_name
+FUNCTION_DECL: ConvertImportedTypeDecl
+   Return: int
+   Param: const int & type_decl
+FUNCTION_DECL: RewriteImportedTypeNames
+   Return: int
+   Param: int type
+   Param: const int & renamed_types
+FUNCTION_DECL: RewriteImportedTypeDecl
+   Return: void
+   Param: int & type_decl
+   Param: const int & renamed_types
+FUNCTION_DECL: RewriteImportedConstValue
+   Return: int
+   Param: int value
+   Param: const int & renamed_types
+   Param: const int & renamed_functions
+FUNCTION_DECL: RewriteImportedSymbolReference
+   Return: void
+   Param: const int & renamed_functions
+   Param: const int & renamed_globals
+   Param: int target_kind
+   Param: int & value
+FUNCTION_DECL: InstructionUsesTypeTargetMetadata
+   Return: bool
+   Param: int kind
+FUNCTION_DECL: InstructionUsesVariantTargetMetadata
+   Return: bool
+   Param: int kind
+FUNCTION_DECL: CanonicalVariantTarget
+   Return: int
+   Param: const int & base_type
+   Param: int variant_name
+FUNCTION_DECL: RewriteImportedInstructionMetadata
+   Return: void
+   Param: int & instruction
+   Param: const int & renamed_functions
+   Param: const int & renamed_globals
+FUNCTION_DECL: MakeModuleArtifactKey
+   Return: int
+   Param: int package_identity
+   Param: int module_name
+FUNCTION_DECL: CanonicalizeModuleSourcePaths
+   Return: int
+   Param: const int & source_paths
+FUNCTION_DECL: ParseLogicalModuleSources
+   Return: int
+   Param: const int & source_paths
+   Param: int & diagnostics
+FUNCTION_DECL: ReadLogicalModuleSourceText
+   Return: int
+   Param: const int & source_paths
+   Param: int & diagnostics
+FUNCTION_DECL: MakeModuleInterfaceArtifact
+   Return: int
+   Param: const int & source_path
+   Param: int module_name
+   Param: const int & source_file
+   Param: const int & checked_module
+   Param: int target_identity
+FUNCTION_DECL: WriteModuleInterface
+   Return: bool
+   Param: int artifact_key
+   Param: const int & artifact
+   Param: const int & build_dir
+   Param: int & diagnostics
+FUNCTION_DECL: LoadImportedInterfaces
+   Return: int
+   Param: const int & node
+   Param: int target_identity
+   Param: const int & build_dir
+   Param: int & diagnostics
+FUNCTION_DECL: NamespaceImportedBuildUnit
+   Return: void
+   Param: int & module
+   Param: int module_name
+FUNCTION_DECL: AddImportedExternDeclarations
+   Return: void
+   Param: int & module
+   Param: const int & imported_modules
+FUNCTION_DECL: MergeBuildUnits
+   Return: int
+   Param: const int & units
+   Param: const int & entry_module
+   Param: const int & entry_source_path
+   Param: int & diagnostics
+
+==== compiler/driver/driver.cpp ====
+NAMESPACE: mc
+NAMESPACE: driver
+NAMESPACE: 
+FUNCTION_DECL: ClassifyInvocation
+   Return: int
+   Param: const int & options
+FUNCTION_DECL: PrintUsage
+   Return: void
+   Param: int & stream
+FUNCTION_DECL: UsesProjectOnlyOptions
+   Return: bool
+   Param: const int & options
+FUNCTION_DECL: ValidateInvocationForCommand
+   Return: bool
+   Param: int command
+   Param: const int & options
+   Param: int & errors
+FUNCTION_DECL: ParseCommandOptions
+   Return: int
+   Param: int argc
+   Param: const char *[] argv
+   Param: int start_index
+   Param: int & errors
+STRUCT_DECL: BoolFlag
+FUNCTION_DECL: PrintDumpTargets
+   Return: void
+   Param: const int & targets
+   Param: int & stream
+FUNCTION_DECL: PrintArtifactTargets
+   Return: void
+   Param: const int & dump_targets
+   Param: const int & build_targets
+   Param: int & stream
+FUNCTION_DECL: BuildDirectSource
+   Return: int
+   Param: const int & options
+   Param: int & diagnostics
+FUNCTION_DECL: PrintDirectSourceBuildSummary
+   Return: void
+   Param: const int & build_result
+   Param: bool emit_dump_paths
+FUNCTION_DECL: MergeRenderedDiagnostics
+   Return: int
+   Param: int primary
+   Param: int secondary
+NAMESPACE: 
+FUNCTION_DECL: RunBuild
+   Return: int
+   Param: const int & options
+FUNCTION_DECL: RunCheck
+   Return: int
+   Param: const int & options
+NAMESPACE: 
+FUNCTION_DECL: CollectAllGraphSourcePaths
+   Return: bool
+   Param: const int & graph
+   Param: int cutoff
+FUNCTION_DECL: IsProjectBuildFreshForDump
+   Return: bool
+   Param: const int & graph
+FUNCTION_DECL: RunBuild
+   Return: int
+   Param: const int & options
+FUNCTION_DECL: RunRun
+   Return: int
+   Param: const int & options
+FUNCTION_DECL: RunDumpPaths
+   Return: int
+   Param: const int & options
+FUNCTION_DECL: Run
+   Return: int
+   Param: int argc
+   Param: const char *[] argv
+
+==== compiler/driver/driver.h ====
+
+==== compiler/driver/driver_test.cpp ====
+NAMESPACE: mc
+NAMESPACE: driver
+NAMESPACE: 
+FUNCTION_DECL: JoinNames
+   Return: int
+   Param: const int & names
+FUNCTION_DECL: CollectEnabledTestTargetNames
+   Return: int
+   Param: const int & project
+STRUCT_DECL: OrdinaryTestCase
+ENUM_DECL: CompilerRegressionKind
+STRUCT_DECL: CompilerRegressionCase
+STRUCT_DECL: DiscoveredTargetTests
+FUNCTION_DECL: TrimWhitespace
+   Return: int
+   Param: int text
+FUNCTION_DECL: StripComment
+   Return: int
+   Param: int text
+FUNCTION_DECL: HasSuffix
+   Return: bool
+   Param: int text
+   Param: int suffix
+FUNCTION_DECL: IsBootstrapTestReturnType
+   Return: bool
+   Param: const int & type_expr
+FUNCTION_DECL: ComputeTargetTestRoots
+   Return: int
+   Param: const int & project
+   Param: const int & target
+FUNCTION_DECL: DiscoverFilesRecursive
+   Return: int
+   Param: const int & roots
+   Param: int suffix
+FUNCTION_DECL: DiscoverOrdinaryTestsInFile
+   Return: bool
+   Param: const int & source_path
+   Param: int & diagnostics
+   Param: int & ordinary_tests
+FUNCTION_DECL: ParseRegressionKind
+   Return: int
+   Param: int token
+FUNCTION_DECL: AcceptedCompilerRegressionKinds
+   Return: int
+FUNCTION_DECL: ParseCompilerManifest
+   Return: bool
+   Param: const int & manifest_path
+   Param: int & diagnostics
+   Param: int & regression_cases
+FUNCTION_DECL: DiscoverTargetTests
+   Return: int
+   Param: const int & project
+   Param: const int & target
+   Param: int & diagnostics
+FUNCTION_DECL: ReadExpectedLines
+   Return: int
+   Param: const int & path
+   Param: int & diagnostics
+FUNCTION_DECL: BuildOrdinaryRunnerSource
+   Return: int
+   Param: const int & ordinary_tests
+FUNCTION_DECL: RunOrdinaryTestsForTarget
+   Return: bool
+   Param: const int & project
+   Param: const int & target
+   Param: const int & options
+   Param: const int & test_roots
+   Param: const int & ordinary_tests
+   Param: const int & build_dir
+FUNCTION_DECL: EvaluateCheckPassCase
+   Return: bool
+   Param: const CompilerRegressionCase & regression_case
+   Param: const int & import_roots
+   Param: const int & build_dir
+   Param: int & failure_detail
+FUNCTION_DECL: EvaluateCheckFailCase
+   Return: bool
+   Param: const CompilerRegressionCase & regression_case
+   Param: const int & import_roots
+   Param: const int & build_dir
+   Param: int & failure_detail
+FUNCTION_DECL: EvaluateMirCase
+   Return: bool
+   Param: const CompilerRegressionCase & regression_case
+   Param: const int & import_roots
+   Param: const int & build_dir
+   Param: int & failure_detail
+FUNCTION_DECL: EvaluateRunOutputCase
+   Return: bool
+   Param: const CompilerRegressionCase & regression_case
+   Param: const int & import_roots
+   Param: const int & build_dir
+   Param: const int & timeout_ms
+   Param: int & failure_detail
+FUNCTION_DECL: RunCompilerRegressionCases
+   Return: bool
+   Param: const int & regression_cases
+   Param: const int & import_roots
+   Param: const int & build_dir
+   Param: const int & timeout_ms
+FUNCTION_DECL: SelectTestTargets
+   Return: int
+   Param: const int & project
+   Param: const int & explicit_target
+   Param: int & diagnostics
+FUNCTION_DECL: RunTestCommand
+   Return: int
+   Param: const int & options
+
+==== compiler/driver/internal.h ====
+
+==== compiler/driver/main.cpp ====
+FUNCTION_DECL: main
+   Return: int
+   Param: int argc
+   Param: const char *[] argv
+
+==== compiler/driver/ops.cpp ====
+NAMESPACE: mc
+NAMESPACE: driver
+NAMESPACE: 
+FUNCTION_DECL: ReadCapturedText
+   Return: int
+   Param: const int & path
+FUNCTION_DECL: FormatCommandForDisplay
+   Return: int
+   Param: const int & args
+FUNCTION_DECL: WaitForChildProcess
+   Return: int
+   Param: const int pid
+   Param: const int & timeout_ms
+   Param: int & status
+STRUCT_DECL: WaitState
+FUNCTION_DECL: RunExecutableCommand
+   Return: int
+   Param: const int & executable_path
+   Param: const int & arguments
+   Param: const int & timeout_ms
+FUNCTION_DECL: RunExecutableCapture
+   Return: int
+   Param: const int & executable_path
+   Param: const int & arguments
+   Param: const int & output_path
+   Param: const int & timeout_ms
+
+==== compiler/driver/project.cpp ====
+NAMESPACE: mc
+NAMESPACE: driver
+NAMESPACE: 
+FUNCTION_DECL: IsSupportedBootstrapTargetKind
+   Return: bool
+   Param: int kind
+FUNCTION_DECL: IsSupportedBootstrapEnv
+   Return: bool
+   Param: int env
+FUNCTION_DECL: IsPlainStartupName
+   Return: bool
+   Param: int name
+FUNCTION_DECL: JoinBootstrapTargetChoices
+   Return: int
+   Param: const int & config
+STRUCT_DECL: ParsedValue
+ENUM_DECL: Kind
+STRUCT_DECL: SourceLine
+FUNCTION_DECL: Trim
+   Return: int
+   Param: int text
+FUNCTION_DECL: StripComment
+   Return: int
+   Param: int line
+FUNCTION_DECL: ReportProjectError
+   Return: void
+   Param: const int & path
+   Param: int line
+   Param: int message
+   Param: int & diagnostics
+FUNCTION_DECL: CountBracketDelta
+   Return: int
+   Param: int text
+FUNCTION_DECL: ReadLogicalProjectLines
+   Return: int
+   Param: int & input
+   Param: const int & project_path
+   Param: int & diagnostics
+FUNCTION_DECL: Trim
+   Return: int
+   Param: int text
+FUNCTION_DECL: MakeLineSpan
+   Return: int
+   Param: int line
+FUNCTION_DECL: ReportProjectError
+   Return: void
+   Param: const int & path
+   Param: int line
+   Param: int message
+   Param: int & diagnostics
+FUNCTION_DECL: ReportDuplicateConfiguredPaths
+   Return: bool
+   Param: const int & project_path
+   Param: int target_name
+   Param: int label
+   Param: const int & paths
+   Param: int & diagnostics
+FUNCTION_DECL: StripComment
+   Return: int
+   Param: int line
+FUNCTION_DECL: JoinSortedNames
+   Return: int
+   Param: const int & names
+FUNCTION_DECL: SortedTargetNames
+   Return: int
+   Param: const int & project
+FUNCTION_DECL: ReportTargetSelectionNotes
+   Return: void
+   Param: const int & project
+   Param: int & diagnostics
+FUNCTION_DECL: ReportBootstrapTargetNotesImpl
+   Return: void
+   Param: const int & project
+   Param: int target_name
+   Param: int & diagnostics
+FUNCTION_DECL: ParseQuotedString
+   Return: int
+   Param: int text
+FUNCTION_DECL: ParseValue
+   Return: int
+   Param: int text
+FUNCTION_DECL: ExpectValueKind
+   Return: bool
+   Param: const ParsedValue & value
+   Param: ParsedValue::Kind expected
+   Param: const int & path
+   Param: int line
+   Param: int key
+   Param: int & diagnostics
+FUNCTION_DECL: LookupTarget
+   Return: int *
+   Param: int & project
+   Param: int target_name
+   Param: const int & path
+   Param: int line
+   Param: int & diagnostics
+FUNCTION_DECL: LookupTargetModuleSet
+   Return: int *
+   Param: int & target
+   Param: int module_name
+FUNCTION_DECL: ReportBootstrapTargetNotes
+   Return: void
+   Param: const int & project
+   Param: int target_name
+   Param: int & diagnostics
+FUNCTION_DECL: LoadProjectFile
+   Return: int
+   Param: const int & path
+   Param: int & diagnostics
+FUNCTION_DECL: SelectProjectTarget
+   Return: const int *
+   Param: const int & project
+   Param: const int & explicit_target
+   Param: int & diagnostics
+FUNCTION_DECL: ComputeProjectImportRoots
+   Return: int
+   Param: const int & project
+   Param: const int & target
+   Param: const int & cli_import_roots
+FUNCTION_DECL: LookupProjectModuleSet
+   Return: const int *
+   Param: const int & target
+   Param: int module_name
+FUNCTION_DECL: FindProjectModuleSetForSource
+   Return: const int *
+   Param: const int & target
+   Param: const int & source_path
+FUNCTION_DECL: ResolveTargetPackageIdentity
+   Return: int
+   Param: const int & target
+   Param: const int & source_path
+
+==== compiler/driver/project.h ====
+
+==== compiler/lex/lexer.cpp ====
+NAMESPACE: mc
+NAMESPACE: lex
+NAMESPACE: 
+FUNCTION_DECL: DigitValue
+   Return: int
+   Param: char ch
+FUNCTION_DECL: ParseIntegerLiteralValue
+   Return: int
+   Param: int text
+FUNCTION_DECL: ParseFloatLiteralValue
+   Return: int
+   Param: int text
+CLASS_DECL: Lexer
+FUNCTION_DECL: ToString
+   Return: int
+   Param: int kind
+FUNCTION_DECL: Lex
+   Return: int
+   Param: int source_text
+   Param: int file_path
+   Param: int & diagnostics
+
+==== compiler/lex/lexer.h ====
+
+==== compiler/lex/token.h ====
+
+==== compiler/mci/mci.cpp ====
+NAMESPACE: mc
+NAMESPACE: mci
+NAMESPACE: 
+FUNCTION_DECL: ParseTypeText
+   Return: int
+   Param: int text
+FUNCTION_DECL: ParseBoolField
+   Return: bool
+   Param: int text
+   Param: bool & value
+FUNCTION_DECL: EscapeText
+   Return: int
+   Param: int text
+FUNCTION_DECL: UnescapeText
+   Return: int
+   Param: int text
+FUNCTION_DECL: JoinEscaped
+   Return: int
+   Param: const int & values
+FUNCTION_DECL: AppendLengthPrefixed
+   Return: void
+   Param: int & output
+   Param: int value
+FUNCTION_DECL: ParseLengthPrefix
+   Return: int
+   Param: int & text
+FUNCTION_DECL: ConsumeLengthPrefixed
+   Return: int
+   Param: int & text
+FUNCTION_DECL: SerializeConstValue
+   Return: int
+   Param: const int & value
+FUNCTION_DECL: JoinConstValues
+   Return: int
+   Param: const int 
+FUNCTION_DECL: JoinBoolFlags
+   Return: int
+   Param: const int & values
+FUNCTION_DECL: JoinEscapedPaths
+   Return: int
+   Param: const int & values
+FUNCTION_DECL: ParseInt64
+   Return: int
+   Param: int text
+FUNCTION_DECL: ParseFloat64
+   Return: int
+   Param: int text
+FUNCTION_DECL: ParseConstValue
+   Return: int
+   Param: int text
+FUNCTION_DECL: ParseLegacyConstValue
+   Return: int
+   Param: const int & type
+   Param: int text
+FUNCTION_DECL: SplitFields
+   Return: int
+   Param: int line
+FUNCTION_DECL: ReportMciError
+   Return: void
+   Param: const int & path
+   Param: int line
+   Param: int message
+   Param: int & diagnostics
+FUNCTION_DECL: TypeKindName
+   Return: int
+   Param: int kind
+FUNCTION_DECL: ParseTypeKind
+   Return: int
+   Param: int text
+FUNCTION_DECL: ModuleKindName
+   Return: int
+   Param: int kind
+FUNCTION_DECL: ParseModuleKind
+   Return: int
+   Param: int text
+CLASS_DECL: TypeParser
+FUNCTION_DECL: ParseTypeText
+   Return: int
+   Param: int text
+FUNCTION_DECL: SerializeArtifactWithoutHashV1
+   Return: int
+   Param: const int & artifact
+FUNCTION_DECL: SerializeArtifactWithoutHash
+   Return: int
+   Param: const int & artifact
+FUNCTION_DECL: HexU64
+   Return: int
+   Param: int value
+FUNCTION_DECL: ParseBoolField
+   Return: bool
+   Param: int text
+   Param: bool & value
+FUNCTION_DECL: ComputeInterfaceHash
+   Return: int
+   Param: const int & artifact
+FUNCTION_DECL: WriteInterfaceArtifact
+   Return: bool
+   Param: const int & path
+   Param: const int & artifact
+   Param: int & diagnostics
+FUNCTION_DECL: LoadInterfaceArtifact
+   Return: int
+   Param: const int & path
+   Param: int & diagnostics
+FUNCTION_DECL: ValidateInterfaceArtifactMetadata
+   Return: bool
+   Param: const int & artifact
+   Param: const int & artifact_path
+   Param: int expected_target_identity
+   Param: int expected_package_identity
+   Param: int expected_module_name
+   Param: int expected_module_kind
+   Param: const int & expected_source_path
+   Param: int & diagnostics
+
+==== compiler/mci/mci.h ====
+
+==== compiler/mir/mir.cpp ====
+NAMESPACE: mc
+NAMESPACE: mir
+STRUCT_DECL: SpecialCallEntry
+FUNCTION_DECL: MatchesSpecialCallName
+   Return: bool
+   Param: int callee_name
+   Param: const SpecialCallEntry & entry
+FUNCTION_DECL: ClassifySpecialCall
+   Return: int
+   Param: int callee_name
+FUNCTION_DECL: IsDedicatedCallSurface
+   Return: bool
+   Param: int callee_name
+FUNCTION_DECL: HasAtomicOrderMetadata
+   Return: bool
+   Param: const int & instruction
+FUNCTION_DECL: HasCompareExchangeOrderMetadata
+   Return: bool
+   Param: const int & instruction
+FUNCTION_DECL: AtomicMetadataText
+   Return: int
+   Param: const int & instruction
+FUNCTION_DECL: MatchGenericTypePattern
+   Return: bool
+   Param: const int & module
+   Param: const int & pattern
+   Param: const int & actual
+   Param: const int & type_param_set
+   Param: int & bindings
+FUNCTION_DECL: FindMirTypeDecl
+   Return: const int *
+   Param: const int & module
+   Param: int name
+FUNCTION_DECL: FindMirGlobalDecl
+   Return: const int *
+   Param: const int & module
+   Param: int name
+FUNCTION_DECL: FindMirFieldType
+   Return: int
+   Param: const int & module
+   Param: const int & base_type
+   Param: int field_name
+FUNCTION_DECL: FindMirFunction
+   Return: const int *
+   Param: const int & module
+   Param: int name
+FUNCTION_DECL: FunctionProcedureType
+   Return: int
+   Param: const int & function
+FUNCTION_DECL: MatchesGenericFunctionType
+   Return: bool
+   Param: const int & module
+   Param: const int & function
+   Param: const int & actual_type
+FUNCTION_DECL: FindMirVariantDecl
+   Return: const int *
+   Param: const int & type_decl
+   Param: int variant_name
+FUNCTION_DECL: PrimaryTargetName
+   Return: int
+   Param: const int & instruction
+FUNCTION_DECL: CanonicalVariantDisplayName
+   Return: int
+   Param: const int & selector_type
+   Param: int variant_name
+FUNCTION_DECL: MatchesTargetDisplay
+   Return: bool
+   Param: int target
+   Param: const int & type
+
+==== compiler/mir/mir.h ====
+
+==== compiler/mir/mir_dump.cpp ====
+NAMESPACE: mc
+NAMESPACE: mir
+FUNCTION_DECL: DumpModule
+   Return: int
+   Param: const int & module
+
+==== compiler/mir/mir_internal.h ====
+
+==== compiler/mir/mir_lower.cpp ====
+NAMESPACE: mc
+NAMESPACE: mir
+CLASS_DECL: FunctionLowerer
+STRUCT_DECL: LocalBinding
+STRUCT_DECL: LoopTarget
+STRUCT_DECL: TargetMetadata
+STRUCT_DECL: DeferredCall
+STRUCT_DECL: DeferScope
+FUNCTION_DECL: LowerTypeDeclSummary
+   Return: int
+   Param: const int & summary
+FUNCTION_DECL: LowerSourceFile
+   Return: int
+   Param: const int & source_file
+   Param: const int & sema_module
+   Param: const int & file_path
+   Param: const int * imported_modules
+   Param: int & diagnostics
+FUNCTION_DECL: LowerSourceFile
+   Return: int
+   Param: const int & source_file
+   Param: const int & sema_module
+   Param: const int & file_path
+   Param: int & diagnostics
+FUNCTION_DECL: LowerFunctionDecl
+   Return: int
+   Param: const int & decl
+   Param: const int & module
+   Param: const int & file_path
+   Param: const int & sema_module
+   Param: int & diagnostics
+
+==== compiler/mir/mir_text.cpp ====
+NAMESPACE: mc
+NAMESPACE: mir
+NAMESPACE: 
+FUNCTION_DECL: RenderFieldInitName
+   Return: int
+   Param: const int & init
+FUNCTION_DECL: TypeDeclKindIndex
+   Return: int
+   Param: int kind
+FUNCTION_DECL: InstructionKindIndex
+   Return: int
+   Param: int kind
+FUNCTION_DECL: InstructionTargetKindIndex
+   Return: int
+   Param: int kind
+FUNCTION_DECL: InstructionArithmeticSemanticsIndex
+   Return: int
+   Param: int semantics
+FUNCTION_DECL: ExprKindIndex
+   Return: int
+   Param: int kind
+FUNCTION_DECL: RenderExprOrPlaceholder
+   Return: int
+   Param: const int * expr
+FUNCTION_DECL: AppendRenderedTypeArgs
+   Return: void
+   Param: int & stream
+   Param: const int 
+FUNCTION_DECL: ToString
+   Return: int
+   Param: int kind
+FUNCTION_DECL: ToString
+   Return: int
+   Param: int kind
+FUNCTION_DECL: ToString
+   Return: int
+   Param: int kind
+FUNCTION_DECL: ToString
+   Return: int
+   Param: int semantics
+FUNCTION_DECL: ToString
+   Return: int
+   Param: int kind
+FUNCTION_DECL: VariantTypeName
+   Return: int
+   Param: int variant_name
+FUNCTION_DECL: VariantLeafName
+   Return: int
+   Param: int variant_name
+FUNCTION_DECL: CombineQualifiedName
+   Return: int
+   Param: const int & expr
+FUNCTION_DECL: RenderTypeExprInline
+   Return: int
+   Param: const int & type
+FUNCTION_DECL: RenderExprInline
+   Return: int
+   Param: const int & expr
+FUNCTION_DECL: WriteIndent
+   Return: void
+   Param: int & stream
+   Param: int indent
+FUNCTION_DECL: WriteLine
+   Return: void
+   Param: int & stream
+   Param: int indent
+   Param: const int & text
+
+==== compiler/mir/mir_type_utils.cpp ====
+NAMESPACE: mc
+NAMESPACE: mir
+FUNCTION_DECL: InstantiateMirAliasedType
+   Return: int
+   Param: const int & type_decl
+   Param: const int & instantiated_type
+FUNCTION_DECL: InstantiateMirVariantDecl
+   Return: int
+   Param: const int & type_decl
+   Param: const int & instantiated_type
+   Param: int variant_name
+FUNCTION_DECL: IsAddressOfLvalueKind
+   Return: bool
+   Param: int kind
+FUNCTION_DECL: CanonicalMirType
+   Return: int
+   Param: const int & module
+   Param: const int & type
+FUNCTION_DECL: RepresentationMirType
+   Return: int
+   Param: const int & module
+   Param: const int & type
+FUNCTION_DECL: IsIntegerType
+   Return: bool
+   Param: const int & module
+   Param: const int & type
+FUNCTION_DECL: IsFloatType
+   Return: bool
+   Param: const int & module
+   Param: const int & type
+FUNCTION_DECL: IsNumericType
+   Return: bool
+   Param: const int & module
+   Param: const int & type
+FUNCTION_DECL: IsWraparoundBinaryOp
+   Return: bool
+   Param: int op
+FUNCTION_DECL: IsIntegerLikeType
+   Return: bool
+   Param: const int & module
+   Param: const int & type
+FUNCTION_DECL: IsBoolType
+   Return: bool
+   Param: const int & module
+   Param: const int & type
+FUNCTION_DECL: LeafTypeName
+   Return: int
+   Param: int name
+FUNCTION_DECL: IsNamedTypeFamily
+   Return: bool
+   Param: const int & type
+   Param: int family_name
+FUNCTION_DECL: IsMemoryOrderType
+   Return: bool
+   Param: const int & module
+   Param: const int & type
+FUNCTION_DECL: IsPointerLikeType
+   Return: bool
+   Param: const int & module
+   Param: const int & type
+FUNCTION_DECL: IsUintPtrConvertibleType
+   Return: bool
+   Param: const int & module
+   Param: const int & type
+FUNCTION_DECL: IsUintPtrType
+   Return: bool
+   Param: const int & module
+   Param: const int & type
+FUNCTION_DECL: IsBuiltinNamedNonAggregate
+   Return: bool
+   Param: const int & type
+FUNCTION_DECL: IsBuiltinNamedNonAggregate
+   Return: bool
+   Param: const int & module
+   Param: const int & type
+FUNCTION_DECL: IsUsizeCompatibleType
+   Return: bool
+   Param: const int & type
+FUNCTION_DECL: IsUsizeCompatibleType
+   Return: bool
+   Param: const int & module
+   Param: const int & type
+FUNCTION_DECL: IsAssignableCanonicalTypes
+   Return: bool
+   Param: const int & expected
+   Param: const int & actual
+FUNCTION_DECL: IsAssignableType
+   Return: bool
+   Param: const int & module
+   Param: const int & expected
+   Param: const int & actual
+FUNCTION_DECL: HasCompatibleCanonicalNumericTypes
+   Return: bool
+   Param: const int & left
+   Param: const int & right
+FUNCTION_DECL: HasCompatibleNumericTypes
+   Return: bool
+   Param: const int & module
+   Param: const int & left
+   Param: const int & right
+FUNCTION_DECL: HasCompatibleComparisonTypes
+   Return: bool
+   Param: const int & module
+   Param: const int & left
+   Param: const int & right
+FUNCTION_DECL: AreEquivalentTypes
+   Return: bool
+   Param: const int & module
+   Param: const int & left
+   Param: const int & right
+FUNCTION_DECL: RangeElementType
+   Return: int
+   Param: const int & range_type
+FUNCTION_DECL: IterableElementType
+   Return: int
+   Param: const int & iterable_type
+FUNCTION_DECL: StripMirAliasOrDistinct
+   Return: int
+   Param: const int & module
+   Param: int type
+FUNCTION_DECL: PointerPointeeType
+   Return: int
+   Param: const int & type
+FUNCTION_DECL: AtomicElementType
+   Return: int
+   Param: const int & module
+   Param: const int & pointer_type
+FUNCTION_DECL: ClassifyMirConversion
+   Return: int
+   Param: const int & module
+   Param: const int & source_type
+   Param: const int & target_type
+FUNCTION_DECL: HasSameMirRepresentation
+   Return: bool
+   Param: const int & module
+   Param: const int & source_type
+   Param: const int & target_type
+FUNCTION_DECL: ClassifyBinaryArithmeticSemantics
+   Return: int
+   Param: const int & module
+   Param: int op
+   Param: const int & result_type
+FUNCTION_DECL: ProcedureParamCount
+   Return: int
+   Param: const int & type
+FUNCTION_DECL: ProcedureParamTypes
+   Return: int
+   Param: const int & type
+FUNCTION_DECL: ProcedureReturnTypes
+   Return: int
+   Param: const int & type
+FUNCTION_DECL: ProcedureResultType
+   Return: int
+   Param: const int & type
+FUNCTION_DECL: CallReturnTypes
+   Return: int
+   Param: const int & result_type
+
+==== compiler/mir/mir_validate.cpp ====
+NAMESPACE: mc
+NAMESPACE: mir
+STRUCT_DECL: ValidationContext
+FUNCTION_DECL: ValidateStoreTargetInstruction
+   Return: void
+   Param: const int & instruction
+   Param: const ValidationContext & ctx
+FUNCTION_DECL: ValidateBinaryInstruction
+   Return: void
+   Param: const int & instruction
+   Param: const ValidationContext & ctx
+ENUM_DECL: AtomicOrderKind
+FUNCTION_DECL: ClassifyAtomicOrder
+   Return: AtomicOrderKind
+   Param: int order_name
+FUNCTION_DECL: IsConstantAtomicOrderMetadata
+   Return: bool
+   Param: int order_name
+FUNCTION_DECL: AtomicOrderAllowedForInstruction
+   Return: bool
+   Param: int kind
+   Param: int order_name
+FUNCTION_DECL: AtomicCompareExchangeFailureOrderAllowed
+   Return: bool
+   Param: int success_order_name
+   Param: int failure_order_name
+FUNCTION_DECL: ValidateAtomicInstruction
+   Return: void
+   Param: const int & instruction
+   Param: const ValidationContext & ctx
+FUNCTION_DECL: ValidateModule
+   Return: bool
+   Param: const int & module
+   Param: const int & file_path
+   Param: int & diagnostics
+
+==== compiler/mir/mir_validate_flow.cpp ====
+NAMESPACE: mc
+NAMESPACE: mir
+FUNCTION_DECL: ValidateFunctionStructure
+   Return: bool
+   Param: const int & function
+   Param: const int & report
+   Param: int & blocks_by_label
+   Param: int & reachable_blocks
+FUNCTION_DECL: ValidateFunctionDominance
+   Return: void
+   Param: const int & function
+   Param: const int & blocks_by_label
+   Param: const int & reachable_blocks
+   Param: const int & report
+
+==== compiler/mir/mir_validate_internal.h ====
+
+==== compiler/parse/parser.cpp ====
+NAMESPACE: mc
+NAMESPACE: parse
+FUNCTION_DECL: Parse
+   Return: int
+   Param: const int & lexed_module
+   Param: const int & file_path
+   Param: int & diagnostics
+
+==== compiler/parse/parser.h ====
+
+==== compiler/parse/parser_decls.cpp ====
+NAMESPACE: mc
+NAMESPACE: parse
+
+==== compiler/parse/parser_expr.cpp ====
+NAMESPACE: mc
+NAMESPACE: parse
+NAMESPACE: 
+FUNCTION_DECL: IsBuiltinIntegerTypeName
+   Return: bool
+   Param: int name
+
+==== compiler/parse/parser_internal.h ====
+
+==== compiler/parse/parser_statements.cpp ====
+NAMESPACE: mc
+NAMESPACE: parse
+
+==== compiler/sema/check.cpp ====
+NAMESPACE: mc
+NAMESPACE: sema
+NAMESPACE: 
+STRUCT_DECL: ExprTypeValue
+ENUM_DECL: VisitState
+STRUCT_DECL: ResolvedImportPath
+FUNCTION_DECL: JoinPaths
+   Return: int
+   Param: const int & paths
+FUNCTION_DECL: IsInternalModulePath
+   Return: bool
+   Param: const int & path
+FUNCTION_DECL: HasPrivateAttribute
+   Return: bool
+   Param: const int & attributes
+FUNCTION_DECL: DeclDisplayName
+   Return: int
+   Param: const int & decl
+FUNCTION_DECL: ResolveImportPathForCheck
+   Return: int
+   Param: const int & importer_path
+   Param: int module_name
+   Param: const int & import_roots
+   Param: const int & importer_package_identity
+   Param: const int (const int &) 
+FUNCTION_DECL: ProcedureParamCount
+   Return: int
+   Param: const int & type
+FUNCTION_DECL: CombineQualifiedName
+   Return: int
+   Param: const int & expr
+FUNCTION_DECL: FlattenQualifiedBaseExpr
+   Return: int
+   Param: const int & expr
+FUNCTION_DECL: ToString
+   Return: int
+   Param: int kind
+FUNCTION_DECL: JoinFieldPath
+   Return: int
+   Param: const int & path
+FUNCTION_DECL: HasFieldPathPrefix
+   Return: bool
+   Param: const int & lhs
+   Param: const int & rhs
+FUNCTION_DECL: WriteIndent
+   Return: void
+   Param: int & stream
+   Param: int indent
+FUNCTION_DECL: WriteLine
+   Return: void
+   Param: int & stream
+   Param: int indent
+   Param: const int & text
+CLASS_DECL: Checker
+STRUCT_DECL: TopLevelBindingDeclRef
+FUNCTION_DECL: ParseFile
+   Return: int
+   Param: const int & path
+   Param: int & diagnostics
+FUNCTION_DECL: CheckProgramInternal
+   Return: int
+   Param: const int & source_file
+   Param: const int & file_path
+   Param: const int & options
+   Param: int & diagnostics
+   Param: int & visible_cache
+   Param: int & visit_state
+FUNCTION_DECL: CheckProgram
+   Return: int
+   Param: const int & source_file
+   Param: const int & file_path
+   Param: const int & options
+   Param: int & diagnostics
+FUNCTION_DECL: CheckProgram
+   Return: int
+   Param: const int & source_file
+   Param: const int & file_path
+   Param: int & diagnostics
+FUNCTION_DECL: CheckSourceFile
+   Return: int
+   Param: const int & source_file
+   Param: const int & file_path
+   Param: int & diagnostics
+FUNCTION_DECL: FindFunctionSignature
+   Return: const int *
+   Param: const int & module
+   Param: int name
+FUNCTION_DECL: FindTypeDecl
+   Return: const int *
+   Param: const int & module
+   Param: int name
+FUNCTION_DECL: FindGlobalSummary
+   Return: const int *
+   Param: const int & module
+   Param: int name
+FUNCTION_DECL: FindExprType
+   Return: const int *
+   Param: const int & module
+   Param: const int & expr
+FUNCTION_DECL: FindForInFact
+   Return: const int *
+   Param: const int & module
+   Param: const int & stmt
+FUNCTION_DECL: BuildModuleLookupMaps
+   Return: void
+   Param: int & module
+FUNCTION_DECL: DumpModule
+   Return: int
+   Param: const int & module
+FUNCTION_DECL: EvalConstExprFromModule
+   Return: int
+   Param: const int * expr
+   Param: const int & module
+   Param: const int * imported_modules
+FUNCTION_DECL: EvalArrayLengthFromModule
+   Return: int
+   Param: const int * length_expr
+   Param: const int & module
+   Param: const int * imported_modules
+FUNCTION_DECL: ResolveTypeFromAst
+   Return: int
+   Param: const int * type_expr
+   Param: const int & module
+   Param: const int * imported_modules
+
+==== compiler/sema/check.h ====
+
+==== compiler/sema/check_const_eval.cpp ====
+NAMESPACE: mc
+NAMESPACE: sema
+
+==== compiler/sema/check_internal.h ====
+
+==== compiler/sema/check_summary.cpp ====
+NAMESPACE: mc
+NAMESPACE: sema
+
+==== compiler/sema/const_eval.cpp ====
+NAMESPACE: mc
+NAMESPACE: sema
+NAMESPACE: 
+FUNCTION_DECL: WrapAddInt64
+   Return: int
+   Param: int lhs
+   Param: int rhs
+FUNCTION_DECL: WrapSubInt64
+   Return: int
+   Param: int lhs
+   Param: int rhs
+FUNCTION_DECL: WrapMulInt64
+   Return: int
+   Param: int lhs
+   Param: int rhs
+FUNCTION_DECL: CheckedNegateInt64
+   Return: int
+   Param: int value
+FUNCTION_DECL: CheckedDivideInt64
+   Return: int
+   Param: int lhs
+   Param: int rhs
+FUNCTION_DECL: CheckedRemainderInt64
+   Return: int
+   Param: int lhs
+   Param: int rhs
+FUNCTION_DECL: CheckedShiftLeftInt64
+   Return: int
+   Param: int lhs
+   Param: int rhs
+FUNCTION_DECL: CheckedShiftRightInt64
+   Return: int
+   Param: int lhs
+   Param: int rhs
+FUNCTION_DECL: BitwiseAndInt64
+   Return: int
+   Param: int lhs
+   Param: int rhs
+FUNCTION_DECL: BitwiseOrInt64
+   Return: int
+   Param: int lhs
+   Param: int rhs
+FUNCTION_DECL: BitwiseXorInt64
+   Return: int
+   Param: int lhs
+   Param: int rhs
+FUNCTION_DECL: WrapAddInt64Checked
+   Return: int
+   Param: int lhs
+   Param: int rhs
+FUNCTION_DECL: WrapSubInt64Checked
+   Return: int
+   Param: int lhs
+   Param: int rhs
+FUNCTION_DECL: WrapMulInt64Checked
+   Return: int
+   Param: int lhs
+   Param: int rhs
+STRUCT_DECL: IntBinaryOpEntry
+FUNCTION_DECL: FindConstIntegerBinaryOp
+   Return: int
+   Param: int op
+FUNCTION_DECL: IsConstComparisonOp
+   Return: bool
+   Param: int op
+FUNCTION_DECL: EvaluateOrderedComparison
+   Return: bool
+   Param: int op
+   Param: double lhs
+   Param: double rhs
+FUNCTION_DECL: EvaluateOrderedComparison
+   Return: bool
+   Param: int op
+   Param: int lhs
+   Param: int rhs
+FUNCTION_DECL: ConstValuesEqual
+   Return: bool
+   Param: const int & left
+   Param: const int & right
+FUNCTION_DECL: EvaluateConstComparison
+   Return: int
+   Param: int op
+   Param: const int & left
+   Param: const int & right
+FUNCTION_DECL: EvaluateConstLogicalBinary
+   Return: int
+   Param: int op
+   Param: const int & left
+   Param: const int & right
+FUNCTION_DECL: EvaluateConstFloatBinary
+   Return: int
+   Param: int op
+   Param: double lhs
+   Param: double rhs
+FUNCTION_DECL: RenderConstValue
+   Return: int
+   Param: const int & value
+FUNCTION_DECL: MakeConstValue
+   Return: int
+   Param: bool value
+FUNCTION_DECL: MakeConstValue
+   Return: int
+   Param: int value
+FUNCTION_DECL: MakeConstValue
+   Return: int
+   Param: double value
+FUNCTION_DECL: MakeProcedureConstValue
+   Return: int
+   Param: int procedure_name
+FUNCTION_DECL: MakeEnumConstValue
+   Return: int
+   Param: int enum_type
+   Param: int variant_name
+   Param: int variant_tag
+   Param: int field_names
+   Param: int elements
+FUNCTION_DECL: ParseLiteralConstValue
+   Return: int
+   Param: const int & expr
+FUNCTION_DECL: EvaluateConstUnaryOp
+   Return: int
+   Param: int op
+   Param: int value
+FUNCTION_DECL: EvaluateConstBinaryOp
+   Return: int
+   Param: int op
+   Param: const int & left
+   Param: const int & right
+FUNCTION_DECL: ParseGlobalConstValue
+   Return: int
+   Param: const int & global
+   Param: int name
+
+==== compiler/sema/const_eval.h ====
+
+==== compiler/sema/layout.cpp ====
+NAMESPACE: mc
+NAMESPACE: sema
+NAMESPACE: 
+FUNCTION_DECL: AlignTo
+   Return: int
+   Param: int value
+   Param: int alignment
+FUNCTION_DECL: FindMutableTypeDecl
+   Return: int *
+   Param: int & module
+   Param: int name
+CLASS_DECL: LayoutComputer
+FUNCTION_DECL: ComputeTypeLayout
+   Return: int
+   Param: int & module
+   Param: const int & type
+   Param: const int & span
+   Param: const int & report
+FUNCTION_DECL: ComputeTypeLayouts
+   Return: void
+   Param: int & module
+   Param: const int & span
+   Param: const int & report
+
+==== compiler/sema/layout.h ====
+
+==== compiler/sema/module_resolver.cpp ====
+NAMESPACE: mc
+NAMESPACE: sema
+NAMESPACE: 
+FUNCTION_DECL: DeclHasPrivateAttribute
+   Return: bool
+   Param: const int & decl
+FUNCTION_DECL: RecordHiddenDeclNames
+   Return: void
+   Param: const int & decl
+   Param: int & module
+FUNCTION_DECL: RewriteImportedTypeNames
+   Return: int
+   Param: int type
+   Param: int module_name
+   Param: const int & local_type_names
+   Param: const int & type_params
+FUNCTION_DECL: RewriteImportedConstValue
+   Return: int
+   Param: int value
+   Param: int module_name
+   Param: const int & local_type_names
+   Param: const int & type_params
+FUNCTION_DECL: EquivalentLayoutInfo
+   Return: bool
+   Param: const int & left
+   Param: const int & right
+FUNCTION_DECL: EquivalentVariantSummary
+   Return: bool
+   Param: const int & left
+   Param: const int & right
+FUNCTION_DECL: QualifyImportedName
+   Return: int
+   Param: int module_name
+   Param: int name
+FUNCTION_DECL: RewriteImportedTypeDecl
+   Return: int
+   Param: const int & type_decl
+   Param: int module_name
+   Param: const int & local_type_names
+FUNCTION_DECL: EquivalentTypeDeclSummary
+   Return: bool
+   Param: const int & left
+   Param: const int & right
+FUNCTION_DECL: BuildImportVisibleModuleSurface
+   Return: int
+   Param: const int & module
+   Param: const int & source_file
+FUNCTION_DECL: RewriteImportedModuleSurfaceTypes
+   Return: int
+   Param: const int & module
+   Param: int module_name
+
+==== compiler/sema/module_resolver.h ====
+
+==== compiler/sema/type.cpp ====
+NAMESPACE: mc
+NAMESPACE: sema
+NAMESPACE: 
+FUNCTION_DECL: IsStringBuiltinName
+   Return: bool
+   Param: int name
+FUNCTION_DECL: RenderExprInline
+   Return: int
+   Param: const int & expr
+FUNCTION_DECL: RenderTypeInline
+   Return: int
+   Param: const int & type
+NAMESPACE: 
+FUNCTION_DECL: RenderFieldInitName
+   Return: int
+   Param: const int & init
+FUNCTION_DECL: RenderExprInline
+   Return: int
+   Param: const int & expr
+FUNCTION_DECL: operator==
+   Return: bool
+   Param: const int & left
+   Param: const int & right
+FUNCTION_DECL: operator!=
+   Return: bool
+   Param: const int & left
+   Param: const int & right
+FUNCTION_DECL: UnknownType
+   Return: int
+FUNCTION_DECL: VoidType
+   Return: int
+FUNCTION_DECL: BoolType
+   Return: int
+FUNCTION_DECL: StringType
+   Return: int
+FUNCTION_DECL: NilType
+   Return: int
+FUNCTION_DECL: IntLiteralType
+   Return: int
+FUNCTION_DECL: FloatLiteralType
+   Return: int
+FUNCTION_DECL: NamedType
+   Return: int
+   Param: int name
+FUNCTION_DECL: PointerType
+   Return: int
+   Param: int pointee
+FUNCTION_DECL: ConstType
+   Return: int
+   Param: int inner
+FUNCTION_DECL: ArrayType
+   Return: int
+   Param: int inner
+   Param: int length_text
+FUNCTION_DECL: RangeType
+   Return: int
+   Param: int element
+FUNCTION_DECL: NamedOrBuiltinType
+   Return: int
+   Param: int name
+FUNCTION_DECL: CanonicalizeBuiltinType
+   Return: int
+   Param: int type
+FUNCTION_DECL: TypeToAst
+   Return: int
+   Param: const int & raw_type
+FUNCTION_DECL: TypeFromAst
+   Return: int
+   Param: const int * type_expr
+FUNCTION_DECL: FormatType
+   Return: int
+   Param: const int & type
+FUNCTION_DECL: IsUnknown
+   Return: bool
+   Param: const int & type
+
+==== compiler/sema/type.h ====
+
+==== compiler/sema/type_predicates.h ====
+
+==== compiler/sema/type_utils.cpp ====
+NAMESPACE: mc
+NAMESPACE: sema
+NAMESPACE: 
+FUNCTION_DECL: InferSliceElementType
+   Return: int
+   Param: const int & type
+FUNCTION_DECL: HasSuffix
+   Return: bool
+   Param: int text
+   Param: int suffix
+FUNCTION_DECL: ShouldStripTypeDeclKind
+   Return: bool
+   Param: int kind
+   Param: int mode
+FUNCTION_DECL: StripTypeInternal
+   Return: int
+   Param: int type
+   Param: const int & module
+   Param: int mode
+   Param: int & active_names
+FUNCTION_DECL: IsNumericTypeWithModule
+   Return: bool
+   Param: const int & type
+   Param: const int & module
+FUNCTION_DECL: IsIntegerLikeTypeWithModule
+   Return: bool
+   Param: const int & type
+   Param: const int & module
+FUNCTION_DECL: IsBoolTypeWithModule
+   Return: bool
+   Param: const int & type
+   Param: const int & module
+FUNCTION_DECL: IsPointerLikeTypeWithModule
+   Return: bool
+   Param: const int & type
+   Param: const int & module
+FUNCTION_DECL: IsUintPtrConvertibleTypeWithModule
+   Return: bool
+   Param: const int & type
+   Param: const int & module
+FUNCTION_DECL: IsUintPtrTypeWithModule
+   Return: bool
+   Param: const int & type
+   Param: const int & module
+FUNCTION_DECL: IsNumericType
+   Return: bool
+   Param: const int & type
+   Param: const int & module
+FUNCTION_DECL: IsIntegerLikeType
+   Return: bool
+   Param: const int & type
+   Param: const int & module
+FUNCTION_DECL: IsBoolType
+   Return: bool
+   Param: const int & type
+   Param: const int & module
+FUNCTION_DECL: IsPointerLikeType
+   Return: bool
+   Param: const int & type
+   Param: const int & module
+FUNCTION_DECL: IsUintPtrConvertibleType
+   Return: bool
+   Param: const int & type
+   Param: const int & module
+FUNCTION_DECL: IsUintPtrType
+   Return: bool
+   Param: const int & type
+   Param: const int & module
+FUNCTION_DECL: SubstituteTypeParams
+   Return: int
+   Param: int type
+   Param: const int & type_params
+   Param: const int & type_args
+FUNCTION_DECL: IsBuiltinNamedType
+   Return: bool
+   Param: int name
+FUNCTION_DECL: InstantiateTypeDeclAliasedType
+   Return: int
+   Param: const int & type_decl
+   Param: const int & instantiated_type
+FUNCTION_DECL: InstantiateVariantSummary
+   Return: int
+   Param: const int & variant
+   Param: const int & type_decl
+   Param: const int & instantiated_type
+FUNCTION_DECL: StripType
+   Return: int
+   Param: int type
+   Param: const int & module
+   Param: int mode
+FUNCTION_DECL: ResolveCallableShell
+   Return: int
+   Param: int type
+   Param: const int & module
+FUNCTION_DECL: IsNoAliasEligibleType
+   Return: bool
+   Param: int type
+   Param: const int & module
+FUNCTION_DECL: IsErrorType
+   Return: bool
+   Param: int type
+   Param: const int & module
+FUNCTION_DECL: IsAddressableExpr
+   Return: bool
+   Param: const int & expr
+FUNCTION_DECL: IsValidDistinctBaseType
+   Return: bool
+   Param: const int & type
+   Param: const int & module
+FUNCTION_DECL: InferExplicitConversionTarget
+   Return: int
+   Param: int target
+   Param: const int & actual
+   Param: const int & module
+FUNCTION_DECL: IsExplicitlyConvertible
+   Return: bool
+   Param: const int & expected
+   Param: const int & actual
+   Param: const int & module
+FUNCTION_DECL: InferLiteralType
+   Return: int
+   Param: const int & expr
+FUNCTION_DECL: MergeNumericTypes
+   Return: int
+   Param: const int & left
+   Param: const int & right
+   Param: const int & module
+FUNCTION_DECL: IsAssignable
+   Return: bool
+   Param: const int & expected
+   Param: const int & actual
+   Param: const int & module
+
+==== compiler/sema/type_utils.h ====
+
+==== compiler/support/assert.h ====
+
+==== compiler/support/diagnostics.cpp ====
+NAMESPACE: 
+FUNCTION_DECL: JoinPaths
+   Return: int
+   Param: const int & paths
+NAMESPACE: mc
+NAMESPACE: support
+FUNCTION_DECL: ResolveImportPathFromRoots
+   Return: int
+   Param: const int & diagnostic_path
+   Param: int module_name
+   Param: const int & search_roots
+   Param: int & diagnostics
+   Param: const int & span
+FUNCTION_DECL: ToString
+   Return: int
+   Param: int severity
+FUNCTION_DECL: ParseArrayLength
+   Return: int
+   Param: int text
+FUNCTION_DECL: ResolveImportPath
+   Return: int
+   Param: const int & importer_path
+   Param: int module_name
+   Param: const int & import_roots
+   Param: int & diagnostics
+   Param: const int & span
+FUNCTION_DECL: FormatDiagnostic
+   Return: int
+   Param: const int & diagnostic
+
+==== compiler/support/diagnostics.h ====
+
+==== compiler/support/dump_paths.cpp ====
+NAMESPACE: mc
+NAMESPACE: support
+NAMESPACE: 
+FUNCTION_DECL: SanitizeArtifactStemText
+   Return: int
+   Param: int text
+FUNCTION_DECL: SanitizeArtifactStem
+   Return: int
+   Param: const int & source_path
+FUNCTION_DECL: ComputeDumpTargets
+   Return: int
+   Param: const int & source_path
+   Param: const int & build_dir
+FUNCTION_DECL: ComputeLogicalDumpTargets
+   Return: int
+   Param: int artifact_key
+   Param: const int & build_dir
+FUNCTION_DECL: ComputeBuildArtifactTargets
+   Return: int
+   Param: const int & source_path
+   Param: const int & build_dir
+FUNCTION_DECL: ComputeLogicalBuildArtifactTargets
+   Return: int
+   Param: int artifact_key
+   Param: const int & build_dir
+
+==== compiler/support/dump_paths.h ====
+
+==== compiler/support/module_paths.h ====
+
+==== compiler/support/source_manager.cpp ====
+NAMESPACE: mc
+NAMESPACE: support
+
+==== compiler/support/source_manager.h ====
+
+==== compiler/support/source_span.h ====
+
+==== compiler/support/target.h ====
+

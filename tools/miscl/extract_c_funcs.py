@@ -3,6 +3,7 @@ import re
 import sys
 
 SOURCE_EXTS = ['.mc']
+SOURCE_DIRS = ['kernel/src']
 
 # fixed output dir and file
 OUTPUT_DIR = 'tools/miscl/extracted_c_funcs'
@@ -236,6 +237,21 @@ def scan_dir(dir_path):
     return sorted(files)
 
 
+def discover_source_dirs(root_dir):
+    subdirs = []
+    with os.scandir(root_dir) as entries:
+        for entry in entries:
+            if entry.is_dir():
+                subdirs.append(entry.path)
+
+    return sorted(subdirs)
+
+
+def output_file_name(source_dir):
+    dir_name = os.path.basename(os.path.normpath(source_dir))
+    return f"{dir_name}_extracted_funcs.txt"
+
+
 def write_output(results, output_file):
     os.makedirs(OUTPUT_DIR, exist_ok=True)
     out_path = os.path.join(OUTPUT_DIR, output_file)
@@ -260,29 +276,26 @@ def write_output(results, output_file):
     print(f"Wrote output to {out_path}")
 
 
-def output_file_name(source_dir):
-    dir_name = os.path.basename(os.path.normpath(source_dir))
-    return f"{dir_name}_extracted_funcs.txt"
-
-
 def main():
-    if len(sys.argv) != 2:
-        print('Usage: python extract_c_funcs.py <source_dir>')
+    if len(sys.argv) != 1:
+        print('Usage: python extract_c_funcs.py')
         return
 
-    source_dir = sys.argv[1]
-    if not os.path.isdir(source_dir):
-        print(f'Error: {source_dir} is not a valid directory')
-        return
+    outputs = {}
 
-    files = scan_dir(source_dir)
-    results = {}
-    output_file = output_file_name(source_dir)
+    for source_dir in SOURCE_DIRS:
+        if not os.path.isdir(source_dir):
+            print(f'Error: {source_dir} is not a valid directory')
+            return
 
-    for file_path in files:
-        results[file_path] = extract_declarations_from_file(file_path)
+        for child_dir in discover_source_dirs(source_dir):
+            results = {}
+            for file_path in scan_dir(child_dir):
+                results[file_path] = extract_declarations_from_file(file_path)
+            outputs[output_file_name(child_dir)] = results
 
-    write_output(results, output_file)
+    for output_file, results in outputs.items():
+        write_output(results, output_file)
 
 
 if __name__ == '__main__':

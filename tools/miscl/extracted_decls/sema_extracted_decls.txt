@@ -1,0 +1,573 @@
+==== compiler/sema/check.cpp ====
+NAMESPACE: mc
+NAMESPACE: sema
+NAMESPACE: 
+STRUCT_DECL: ExprTypeValue
+ENUM_DECL: VisitState
+STRUCT_DECL: ResolvedImportPath
+FUNCTION_DECL: JoinPaths
+   Return: int
+   Param: const int & paths
+FUNCTION_DECL: IsInternalModulePath
+   Return: bool
+   Param: const int & path
+FUNCTION_DECL: HasPrivateAttribute
+   Return: bool
+   Param: const int & attributes
+FUNCTION_DECL: DeclDisplayName
+   Return: int
+   Param: const int & decl
+FUNCTION_DECL: ResolveImportPathForCheck
+   Return: int
+   Param: const int & importer_path
+   Param: int module_name
+   Param: const int & import_roots
+   Param: const int & importer_package_identity
+   Param: const int (const int &) 
+FUNCTION_DECL: ProcedureParamCount
+   Return: int
+   Param: const int & type
+FUNCTION_DECL: CombineQualifiedName
+   Return: int
+   Param: const int & expr
+FUNCTION_DECL: FlattenQualifiedBaseExpr
+   Return: int
+   Param: const int & expr
+FUNCTION_DECL: ToString
+   Return: int
+   Param: int kind
+FUNCTION_DECL: JoinFieldPath
+   Return: int
+   Param: const int & path
+FUNCTION_DECL: HasFieldPathPrefix
+   Return: bool
+   Param: const int & lhs
+   Param: const int & rhs
+FUNCTION_DECL: WriteIndent
+   Return: void
+   Param: int & stream
+   Param: int indent
+FUNCTION_DECL: WriteLine
+   Return: void
+   Param: int & stream
+   Param: int indent
+   Param: const int & text
+CLASS_DECL: Checker
+STRUCT_DECL: TopLevelBindingDeclRef
+FUNCTION_DECL: ParseFile
+   Return: int
+   Param: const int & path
+   Param: int & diagnostics
+FUNCTION_DECL: CheckProgramInternal
+   Return: int
+   Param: const int & source_file
+   Param: const int & file_path
+   Param: const int & options
+   Param: int & diagnostics
+   Param: int & visible_cache
+   Param: int & visit_state
+FUNCTION_DECL: CheckProgram
+   Return: int
+   Param: const int & source_file
+   Param: const int & file_path
+   Param: const int & options
+   Param: int & diagnostics
+FUNCTION_DECL: CheckProgram
+   Return: int
+   Param: const int & source_file
+   Param: const int & file_path
+   Param: int & diagnostics
+FUNCTION_DECL: CheckSourceFile
+   Return: int
+   Param: const int & source_file
+   Param: const int & file_path
+   Param: int & diagnostics
+FUNCTION_DECL: FindFunctionSignature
+   Return: const int *
+   Param: const int & module
+   Param: int name
+FUNCTION_DECL: FindTypeDecl
+   Return: const int *
+   Param: const int & module
+   Param: int name
+FUNCTION_DECL: FindGlobalSummary
+   Return: const int *
+   Param: const int & module
+   Param: int name
+FUNCTION_DECL: FindExprType
+   Return: const int *
+   Param: const int & module
+   Param: const int & expr
+FUNCTION_DECL: FindForInFact
+   Return: const int *
+   Param: const int & module
+   Param: const int & stmt
+FUNCTION_DECL: BuildModuleLookupMaps
+   Return: void
+   Param: int & module
+FUNCTION_DECL: DumpModule
+   Return: int
+   Param: const int & module
+FUNCTION_DECL: EvalConstExprFromModule
+   Return: int
+   Param: const int * expr
+   Param: const int & module
+   Param: const int * imported_modules
+FUNCTION_DECL: EvalArrayLengthFromModule
+   Return: int
+   Param: const int * length_expr
+   Param: const int & module
+   Param: const int * imported_modules
+FUNCTION_DECL: ResolveTypeFromAst
+   Return: int
+   Param: const int * type_expr
+   Param: const int & module
+   Param: const int * imported_modules
+
+==== compiler/sema/check.h ====
+
+==== compiler/sema/check_const_eval.cpp ====
+NAMESPACE: mc
+NAMESPACE: sema
+
+==== compiler/sema/check_internal.h ====
+
+==== compiler/sema/check_summary.cpp ====
+NAMESPACE: mc
+NAMESPACE: sema
+
+==== compiler/sema/const_eval.cpp ====
+NAMESPACE: mc
+NAMESPACE: sema
+NAMESPACE: 
+FUNCTION_DECL: WrapAddInt64
+   Return: int
+   Param: int lhs
+   Param: int rhs
+FUNCTION_DECL: WrapSubInt64
+   Return: int
+   Param: int lhs
+   Param: int rhs
+FUNCTION_DECL: WrapMulInt64
+   Return: int
+   Param: int lhs
+   Param: int rhs
+FUNCTION_DECL: CheckedNegateInt64
+   Return: int
+   Param: int value
+FUNCTION_DECL: CheckedDivideInt64
+   Return: int
+   Param: int lhs
+   Param: int rhs
+FUNCTION_DECL: CheckedRemainderInt64
+   Return: int
+   Param: int lhs
+   Param: int rhs
+FUNCTION_DECL: CheckedShiftLeftInt64
+   Return: int
+   Param: int lhs
+   Param: int rhs
+FUNCTION_DECL: CheckedShiftRightInt64
+   Return: int
+   Param: int lhs
+   Param: int rhs
+FUNCTION_DECL: BitwiseAndInt64
+   Return: int
+   Param: int lhs
+   Param: int rhs
+FUNCTION_DECL: BitwiseOrInt64
+   Return: int
+   Param: int lhs
+   Param: int rhs
+FUNCTION_DECL: BitwiseXorInt64
+   Return: int
+   Param: int lhs
+   Param: int rhs
+FUNCTION_DECL: WrapAddInt64Checked
+   Return: int
+   Param: int lhs
+   Param: int rhs
+FUNCTION_DECL: WrapSubInt64Checked
+   Return: int
+   Param: int lhs
+   Param: int rhs
+FUNCTION_DECL: WrapMulInt64Checked
+   Return: int
+   Param: int lhs
+   Param: int rhs
+STRUCT_DECL: IntBinaryOpEntry
+FUNCTION_DECL: FindConstIntegerBinaryOp
+   Return: int
+   Param: int op
+FUNCTION_DECL: IsConstComparisonOp
+   Return: bool
+   Param: int op
+FUNCTION_DECL: EvaluateOrderedComparison
+   Return: bool
+   Param: int op
+   Param: double lhs
+   Param: double rhs
+FUNCTION_DECL: EvaluateOrderedComparison
+   Return: bool
+   Param: int op
+   Param: int lhs
+   Param: int rhs
+FUNCTION_DECL: ConstValuesEqual
+   Return: bool
+   Param: const int & left
+   Param: const int & right
+FUNCTION_DECL: EvaluateConstComparison
+   Return: int
+   Param: int op
+   Param: const int & left
+   Param: const int & right
+FUNCTION_DECL: EvaluateConstLogicalBinary
+   Return: int
+   Param: int op
+   Param: const int & left
+   Param: const int & right
+FUNCTION_DECL: EvaluateConstFloatBinary
+   Return: int
+   Param: int op
+   Param: double lhs
+   Param: double rhs
+FUNCTION_DECL: RenderConstValue
+   Return: int
+   Param: const int & value
+FUNCTION_DECL: MakeConstValue
+   Return: int
+   Param: bool value
+FUNCTION_DECL: MakeConstValue
+   Return: int
+   Param: int value
+FUNCTION_DECL: MakeConstValue
+   Return: int
+   Param: double value
+FUNCTION_DECL: MakeProcedureConstValue
+   Return: int
+   Param: int procedure_name
+FUNCTION_DECL: MakeEnumConstValue
+   Return: int
+   Param: int enum_type
+   Param: int variant_name
+   Param: int variant_tag
+   Param: int field_names
+   Param: int elements
+FUNCTION_DECL: ParseLiteralConstValue
+   Return: int
+   Param: const int & expr
+FUNCTION_DECL: EvaluateConstUnaryOp
+   Return: int
+   Param: int op
+   Param: int value
+FUNCTION_DECL: EvaluateConstBinaryOp
+   Return: int
+   Param: int op
+   Param: const int & left
+   Param: const int & right
+FUNCTION_DECL: ParseGlobalConstValue
+   Return: int
+   Param: const int & global
+   Param: int name
+
+==== compiler/sema/const_eval.h ====
+
+==== compiler/sema/layout.cpp ====
+NAMESPACE: mc
+NAMESPACE: sema
+NAMESPACE: 
+FUNCTION_DECL: AlignTo
+   Return: int
+   Param: int value
+   Param: int alignment
+FUNCTION_DECL: FindMutableTypeDecl
+   Return: int *
+   Param: int & module
+   Param: int name
+CLASS_DECL: LayoutComputer
+FUNCTION_DECL: ComputeTypeLayout
+   Return: int
+   Param: int & module
+   Param: const int & type
+   Param: const int & span
+   Param: const int & report
+FUNCTION_DECL: ComputeTypeLayouts
+   Return: void
+   Param: int & module
+   Param: const int & span
+   Param: const int & report
+
+==== compiler/sema/layout.h ====
+
+==== compiler/sema/module_resolver.cpp ====
+NAMESPACE: mc
+NAMESPACE: sema
+NAMESPACE: 
+FUNCTION_DECL: DeclHasPrivateAttribute
+   Return: bool
+   Param: const int & decl
+FUNCTION_DECL: RecordHiddenDeclNames
+   Return: void
+   Param: const int & decl
+   Param: int & module
+FUNCTION_DECL: RewriteImportedTypeNames
+   Return: int
+   Param: int type
+   Param: int module_name
+   Param: const int & local_type_names
+   Param: const int & type_params
+FUNCTION_DECL: RewriteImportedConstValue
+   Return: int
+   Param: int value
+   Param: int module_name
+   Param: const int & local_type_names
+   Param: const int & type_params
+FUNCTION_DECL: EquivalentLayoutInfo
+   Return: bool
+   Param: const int & left
+   Param: const int & right
+FUNCTION_DECL: EquivalentVariantSummary
+   Return: bool
+   Param: const int & left
+   Param: const int & right
+FUNCTION_DECL: QualifyImportedName
+   Return: int
+   Param: int module_name
+   Param: int name
+FUNCTION_DECL: RewriteImportedTypeDecl
+   Return: int
+   Param: const int & type_decl
+   Param: int module_name
+   Param: const int & local_type_names
+FUNCTION_DECL: EquivalentTypeDeclSummary
+   Return: bool
+   Param: const int & left
+   Param: const int & right
+FUNCTION_DECL: BuildImportVisibleModuleSurface
+   Return: int
+   Param: const int & module
+   Param: const int & source_file
+FUNCTION_DECL: RewriteImportedModuleSurfaceTypes
+   Return: int
+   Param: const int & module
+   Param: int module_name
+
+==== compiler/sema/module_resolver.h ====
+
+==== compiler/sema/type.cpp ====
+NAMESPACE: mc
+NAMESPACE: sema
+NAMESPACE: 
+FUNCTION_DECL: IsStringBuiltinName
+   Return: bool
+   Param: int name
+FUNCTION_DECL: RenderExprInline
+   Return: int
+   Param: const int & expr
+FUNCTION_DECL: RenderTypeInline
+   Return: int
+   Param: const int & type
+NAMESPACE: 
+FUNCTION_DECL: RenderFieldInitName
+   Return: int
+   Param: const int & init
+FUNCTION_DECL: RenderExprInline
+   Return: int
+   Param: const int & expr
+FUNCTION_DECL: operator==
+   Return: bool
+   Param: const int & left
+   Param: const int & right
+FUNCTION_DECL: operator!=
+   Return: bool
+   Param: const int & left
+   Param: const int & right
+FUNCTION_DECL: UnknownType
+   Return: int
+FUNCTION_DECL: VoidType
+   Return: int
+FUNCTION_DECL: BoolType
+   Return: int
+FUNCTION_DECL: StringType
+   Return: int
+FUNCTION_DECL: NilType
+   Return: int
+FUNCTION_DECL: IntLiteralType
+   Return: int
+FUNCTION_DECL: FloatLiteralType
+   Return: int
+FUNCTION_DECL: NamedType
+   Return: int
+   Param: int name
+FUNCTION_DECL: PointerType
+   Return: int
+   Param: int pointee
+FUNCTION_DECL: ConstType
+   Return: int
+   Param: int inner
+FUNCTION_DECL: ArrayType
+   Return: int
+   Param: int inner
+   Param: int length_text
+FUNCTION_DECL: RangeType
+   Return: int
+   Param: int element
+FUNCTION_DECL: NamedOrBuiltinType
+   Return: int
+   Param: int name
+FUNCTION_DECL: CanonicalizeBuiltinType
+   Return: int
+   Param: int type
+FUNCTION_DECL: TypeToAst
+   Return: int
+   Param: const int & raw_type
+FUNCTION_DECL: TypeFromAst
+   Return: int
+   Param: const int * type_expr
+FUNCTION_DECL: FormatType
+   Return: int
+   Param: const int & type
+FUNCTION_DECL: IsUnknown
+   Return: bool
+   Param: const int & type
+
+==== compiler/sema/type.h ====
+
+==== compiler/sema/type_predicates.h ====
+
+==== compiler/sema/type_utils.cpp ====
+NAMESPACE: mc
+NAMESPACE: sema
+NAMESPACE: 
+FUNCTION_DECL: InferSliceElementType
+   Return: int
+   Param: const int & type
+FUNCTION_DECL: HasSuffix
+   Return: bool
+   Param: int text
+   Param: int suffix
+FUNCTION_DECL: ShouldStripTypeDeclKind
+   Return: bool
+   Param: int kind
+   Param: int mode
+FUNCTION_DECL: StripTypeInternal
+   Return: int
+   Param: int type
+   Param: const int & module
+   Param: int mode
+   Param: int & active_names
+FUNCTION_DECL: IsNumericTypeWithModule
+   Return: bool
+   Param: const int & type
+   Param: const int & module
+FUNCTION_DECL: IsIntegerLikeTypeWithModule
+   Return: bool
+   Param: const int & type
+   Param: const int & module
+FUNCTION_DECL: IsBoolTypeWithModule
+   Return: bool
+   Param: const int & type
+   Param: const int & module
+FUNCTION_DECL: IsPointerLikeTypeWithModule
+   Return: bool
+   Param: const int & type
+   Param: const int & module
+FUNCTION_DECL: IsUintPtrConvertibleTypeWithModule
+   Return: bool
+   Param: const int & type
+   Param: const int & module
+FUNCTION_DECL: IsUintPtrTypeWithModule
+   Return: bool
+   Param: const int & type
+   Param: const int & module
+FUNCTION_DECL: IsNumericType
+   Return: bool
+   Param: const int & type
+   Param: const int & module
+FUNCTION_DECL: IsIntegerLikeType
+   Return: bool
+   Param: const int & type
+   Param: const int & module
+FUNCTION_DECL: IsBoolType
+   Return: bool
+   Param: const int & type
+   Param: const int & module
+FUNCTION_DECL: IsPointerLikeType
+   Return: bool
+   Param: const int & type
+   Param: const int & module
+FUNCTION_DECL: IsUintPtrConvertibleType
+   Return: bool
+   Param: const int & type
+   Param: const int & module
+FUNCTION_DECL: IsUintPtrType
+   Return: bool
+   Param: const int & type
+   Param: const int & module
+FUNCTION_DECL: SubstituteTypeParams
+   Return: int
+   Param: int type
+   Param: const int & type_params
+   Param: const int & type_args
+FUNCTION_DECL: IsBuiltinNamedType
+   Return: bool
+   Param: int name
+FUNCTION_DECL: InstantiateTypeDeclAliasedType
+   Return: int
+   Param: const int & type_decl
+   Param: const int & instantiated_type
+FUNCTION_DECL: InstantiateVariantSummary
+   Return: int
+   Param: const int & variant
+   Param: const int & type_decl
+   Param: const int & instantiated_type
+FUNCTION_DECL: StripType
+   Return: int
+   Param: int type
+   Param: const int & module
+   Param: int mode
+FUNCTION_DECL: ResolveCallableShell
+   Return: int
+   Param: int type
+   Param: const int & module
+FUNCTION_DECL: IsNoAliasEligibleType
+   Return: bool
+   Param: int type
+   Param: const int & module
+FUNCTION_DECL: IsErrorType
+   Return: bool
+   Param: int type
+   Param: const int & module
+FUNCTION_DECL: IsAddressableExpr
+   Return: bool
+   Param: const int & expr
+FUNCTION_DECL: IsValidDistinctBaseType
+   Return: bool
+   Param: const int & type
+   Param: const int & module
+FUNCTION_DECL: InferExplicitConversionTarget
+   Return: int
+   Param: int target
+   Param: const int & actual
+   Param: const int & module
+FUNCTION_DECL: IsExplicitlyConvertible
+   Return: bool
+   Param: const int & expected
+   Param: const int & actual
+   Param: const int & module
+FUNCTION_DECL: InferLiteralType
+   Return: int
+   Param: const int & expr
+FUNCTION_DECL: MergeNumericTypes
+   Return: int
+   Param: const int & left
+   Param: const int & right
+   Param: const int & module
+FUNCTION_DECL: IsAssignable
+   Return: bool
+   Param: const int & expected
+   Param: const int & actual
+   Param: const int & module
+
+==== compiler/sema/type_utils.h ====
+

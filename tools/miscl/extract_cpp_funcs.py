@@ -1,8 +1,8 @@
 import os
-import sys
 from clang.cindex import Config, CursorKind, Index
 
 SOURCE_EXTS = ['.c', '.cpp', '.h', '.hpp']
+SOURCE_DIRS = ['compiler']
 LIBCLANG_CANDIDATES = [
     os.environ.get('LIBCLANG_FILE'),
     '/opt/homebrew/Cellar/llvm@21/21.1.8/lib/libclang.dylib',
@@ -13,6 +13,7 @@ LIBCLANG_CANDIDATES = [
 
 # fixed output dir and file
 OUTPUT_DIR = 'tools/miscl/extracted_decls'
+OUTPUT_FILE = 'compiler_extracted_decls.txt'
 DECL_KINDS = {
     CursorKind.FUNCTION_DECL,
     CursorKind.NAMESPACE,
@@ -91,31 +92,20 @@ def write_output(results, output_file):
 
     print(f"Wrote output to {out_path}")
 
-
-def output_file_name(source_dir):
-    dir_name = os.path.basename(os.path.normpath(source_dir))
-    return f"{dir_name}_extracted_decls.txt"
-
 def main():
-    if len(sys.argv) != 2:
-        print("Usage: python extract_cpp_funcs.py <source_dir>")
-        return
-
     configure_libclang()
-    
-    source_dir = sys.argv[1]
-    if not os.path.isdir(source_dir):
-        print(f"Error: {source_dir} is not a valid directory")
-        return
-    
-    files = scan_dir(source_dir)
+
     results = {}
-    output_file = output_file_name(source_dir)
-    
-    for f in files:
-        results[f] = extract_declarations_from_file(f)
-    
-    write_output(results, output_file)
+
+    for source_dir in SOURCE_DIRS:
+        if not os.path.isdir(source_dir):
+            print(f"Error: {source_dir} is not a valid directory")
+            return
+
+        for file_path in scan_dir(source_dir):
+            results[file_path] = extract_declarations_from_file(file_path)
+
+    write_output(results, OUTPUT_FILE)
 
 if __name__ == "__main__":    
     main()
