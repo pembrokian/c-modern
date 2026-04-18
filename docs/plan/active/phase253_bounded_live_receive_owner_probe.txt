@@ -168,6 +168,17 @@ Relevant file-local invariants
 - Narrow validation should stay on one dedicated live-input fixture before any
   broader kernel workflow pass.
 
+Relevant test surfaces
+- primary owning test family: `tests/system/` when the change is direct
+  runtime behavior, or the grouped reset-lane tool suite when the live source
+  is exercised through the hosted workflow path
+- narrowest expected first executable validation target: one deterministic
+  live-input system fixture, then the narrowest reset-lane workflow case that
+  spends the new source
+- fixture or output-layout rule: keep generated outputs under the active build
+  tree such as `build/debug/probes/...` or `build/debug/tool/...`, and do not
+  reintroduce top-level `build/debug/phase*` trees
+
 Test obligations
 ----------------
 - `Build debug`

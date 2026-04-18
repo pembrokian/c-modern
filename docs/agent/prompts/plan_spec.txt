@@ -16,6 +16,7 @@ requiring each phase plan to state:
 - the required and forbidden surface changes
 - the main files, navigations, patterns, and owner-local invariants that will
 	reduce implementation search time
+- the relevant test surfaces that should be used for narrow validation
 - the test obligations and acceptance criteria
 - the expected future follow-up
 
@@ -299,11 +300,12 @@ accelerators while the problem is still being framed.
 This section MUST stay implementation-facing rather than contractual. It does
 not replace `Invariants`, `Required surface changes`, or `Acceptance criteria`.
 
-It MUST include three parts:
+It MUST include four parts:
 
 1. `Main files and navigations`
 2. `Relevant cookbook patterns`
 3. `Relevant file-local invariants`
+4. `Relevant test surfaces`
 
 Main files and navigations
 ~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -360,6 +362,30 @@ shorter phase-local form.
 This subsection MUST NOT duplicate the entire contents of a file-invariants
 document. It should extract only the invariants relevant to the current phase.
 
+Relevant test surfaces
+~~~~~~~~~~~~~~~~~~~~~~
+This subsection is REQUIRED.
+
+It MUST identify the smallest honest validation surface an implementer should
+start with for the phase.
+
+It MUST name:
+
+- the primary owning test directory or grouped suite family
+- the narrowest expected first executable validation target
+- any fixture convention or output-layout rule that materially affects how the
+	phase should be tested
+
+It SHOULD also point to the repository testing prompt when that reduces search
+time, for example:
+
+- `docs/agent/prompts/test_overview.txt`
+
+This subsection SHOULD explain whether the phase is primarily a compiler,
+tool, workflow, smoke, system, or hosted reset-lane validation problem.
+
+This subsection MUST stay selective. It is not a full test inventory.
+
 Recommended accelerator extraction workflow
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 When developing a new phase plan, authors SHOULD extract this section in the
@@ -380,15 +406,20 @@ than leaving it to the coding pass.
 	`docs/agent/prompts/compiler_file_invariants.txt` or
 	`docs/agent/prompts/kernel_file_invariants.txt` and extract only the local
 	truths that matter for this phase slice.
-5. Use declaration summaries only to reduce search, not to define ownership.
+5. Identify the owning test surface.
+	Consult `docs/agent/prompts/test_overview.txt`, the nearest checked-in
+	fixtures, and the active grouped suite owners to record the narrowest honest
+	validation target plus any fixture or output-layout rule that matters.
+6. Use declaration summaries only to reduce search, not to define ownership.
 	`tools/miscl/extracted_c_funcs/` and `tools/miscl/extracted_decls/` are
 	navigation aids for discovering nearby files, declarations, and helper
 	families. They MUST NOT override the ownership defined by code and
 	architecture docs.
-6. Compress the result into the plan.
+7. Compress the result into the plan.
 	The final accelerator content should be short, selective, and executable by
 	a future implementer. It should answer where to start, what to read next,
-	which pattern applies, and which local truths must be preserved.
+	which pattern applies, which local truths must be preserved, and which test
+	surface should be run first.
 
 Authors SHOULD prefer extraction over restatement. If an existing prompt or
 repo-local helper already captures the truth well, the plan should point to it
@@ -606,6 +637,11 @@ Relevant file-local invariants
 - owner-local truth ...
 - must not move ...
 - usual narrow validation ...
+
+Relevant test surfaces
+- owning test family ...
+- first executable validation target ...
+- fixture or output-layout rule ...
 
 Test obligations
 ----------------

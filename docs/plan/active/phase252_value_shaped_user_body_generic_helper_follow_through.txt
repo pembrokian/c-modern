@@ -166,6 +166,17 @@ Relevant file-local invariants
 - Narrow validation should run MIR first, then executable codegen, before any
   broader workflow build.
 
+Relevant test surfaces
+- primary owning test family: `tests/compiler/mir/` first, then
+  `tests/compiler/codegen/` for executable follow-through
+- narrowest expected first executable validation target: the focused MIR
+  fixture for the admitted helper family, then the narrowest grouped codegen
+  executable test that spends the same shape
+- fixture or output-layout rule: MIR and backend dump fixtures use adjacent
+  `.mir.txt` or `.backend.txt` expectations, while the phase should keep any
+  repository-owned spend site in the normal compiler fixture tree rather than
+  a tool workflow tree
+
 Test obligations
 ----------------
 - `Build debug`

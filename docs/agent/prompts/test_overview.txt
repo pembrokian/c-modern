@@ -1,0 +1,216 @@
+Testing Overview
+================
+
+Purpose
+-------
+This prompt is the fast routing guide for the repository test framework.
+
+Use it when a task needs validation routing and you do not want to rediscover
+the test tree, fixture conventions, grouped suites, or output-layout rules
+from scratch.
+
+This document is a navigation aid. It does not replace AGENTS.md, plan docs,
+or owner-local invariant prompts.
+
+Top-level test split
+--------------------
+The repository has two broad testing roles and they should stay separate.
+
+- compiler-validation tests for parser, sema, MIR, codegen, and tool internals
+- behavior or system tests for hosted kernel, shell, service, and end-to-end
+  runtime behavior
+
+When choosing a validation surface, start with the owner that decides the
+behavior you changed, not with the broadest suite that happens to cover it.
+
+Directory map
+-------------
+
+Compiler-validation owners
+~~~~~~~~~~~~~~~~~~~~~~~~~~
+- `tests/compiler/parser/`: parser success dumps and parse-fail diagnostics
+- `tests/compiler/sema/`: semantic module dumps, semantic-fail diagnostics,
+  import fixtures, and package-shape checks
+- `tests/compiler/mir/`: MIR dumps, lowering-fail diagnostics, and canonical
+  example sync checks
+- `tests/compiler/codegen/`: backend dump fixtures and executable behavior
+  tests
+- `tests/stdlib/`: checked-in stdlib proof programs used as compiler inputs
+- `tests/cases/`: small shared direct-source smoke fixtures used by compiler
+  and tool tests
+
+Behavior and OS-facing owners
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+- `tests/smoke/`: tiny pass-fail checks such as build, hello, IPC round trip,
+  serial basic flow, and shell boot
+- `tests/system/`: direct service and multi-service behavior such as serial
+  ingress, IPC composition, echo, log, and key-value flows
+
+Tool and workflow owners
+~~~~~~~~~~~~~~~~~~~~~~~~
+- `tests/tool/`: `mc` driver, manifest, rebuild, grouped workflow, hosted
+  reset-lane, and real-project validation
+- `tests/cmake/`: repository-owned CTest audit helpers
+- `tests/support/`: reusable harness utilities, process helpers, sockets,
+  timeouts, and temporary-file helpers
+
+Owner-first routing
+-------------------
+Use the narrowest owning test family that matches the layer you changed.
+
+- parser syntax or recovery work: start in `tests/compiler/parser/`
+- semantic meaning, type checking, imports, layout, or semantic dump truth:
+  start in `tests/compiler/sema/`
+- lowering shape, MIR instruction contracts, or MIR dump truth: start in
+  `tests/compiler/mir/`
+- backend text, executable lowering, or binary behavior: start in
+  `tests/compiler/codegen/`
+- CLI parsing, project workflows, build-state reuse, or reset-lane
+  orchestration: start in `tests/tool/`
+- hosted kernel, shell, or service runtime behavior: start in `tests/system/`
+  or the owning grouped reset-lane tool suite depending on whether the change
+  is direct runtime behavior or tool-driven workflow coverage
+
+Compiler fixture conventions
+----------------------------
+Adjacent expectation files use stable suffixes.
+
+- `<name>.mc`: source fixture
+- `<name>.ast.txt`: expected AST dump
+- `<name>.sema.txt`: expected semantic module dump
+- `<name>.mir.txt`: expected MIR dump
+- `<name>.backend.txt`: expected backend dump
+- `<name>.errors.txt`: expected diagnostic substrings, one per line
+
+Diagnostic rules
+----------------
+- `.errors.txt` lines are matched as substrings, not full formatted lines
+- this keeps fixtures stable across path or formatting churn
+- lex failures may still surface through parser runners, so parser fixture
+  paths can own lexer diagnostics too
+
+Fixture discovery rules
+-----------------------
+- parser fixtures are usually autodiscovered from adjacent `.ast.txt` or
+  `.errors.txt`
+- backend dump fixtures are usually autodiscovered from adjacent
+  `.backend.txt`
+- sema and MIR use a hybrid model: routine adjacent `.sema.txt`, `.mir.txt`,
+  and `.errors.txt` are autodiscovered, while import roots, imported modules,
+  canonical sync, and package overrides stay explicit in the runner metadata
+
+Rule of thumb:
+- ordinary parser, sema, MIR, or backend dump fixtures usually only need new
+  adjacent files
+- if a fixture needs import roots, helper modules, or package metadata, keep
+  that metadata explicit instead of hiding it behind discovery magic
+
+Grouped tool and workflow layout
+--------------------------------
+The active grouped tool suites live under `tests/tool/` and are split by
+behavior family rather than one large monolith.
+
+- `tests/tool/tool_workflow_tests.cpp`: workflow validation driver
+- `tests/tool/tool_workflow_orchestrator.cpp`: thin workflow entry that routes
+  to behavior-owned workflow families
+- `tests/tool/tool_help_suite.cpp`: help text, mode selection, and direct-source
+  versus project workflow checks
+- `tests/tool/tool_test_command_suite.cpp`: ordinary test and `mc test`
+  workflows
+- `tests/tool/tool_project_validation_suite.cpp`: target selection,
+  import-root, duplicate-root, and project-graph validation
+- `tests/tool/tool_multifile_module_suite.cpp`: module-set and multi-file
+  module validation
+- `tests/tool/tool_kernel_reset_lane_suite.cpp`: reset-lane kernel workflow
+  validation and table-driven fixture runs
+- `tests/tool/tool_build_state_tests.cpp` and
+  `tests/tool/tool_build_state_suite.cpp`: build-state, imported-artifact, and
+  incremental rebuild validation
+- `tests/tool/tool_real_project_tests.cpp` and
+  `tests/tool/tool_real_project_suite.cpp`: real-project workflow validation
+- `tests/tool/tool_suite_tests.cpp` and `tests/tool/phase7_tool_tests.cpp`:
+  compatibility runners only, not active implementation owners
+
+Common grouped CTest targets
+----------------------------
+- `mc_sema_fixture_unit`
+- `mc_mir_fixture_unit`
+- `mc_tool_workflow_(help|test_command|project_validation|multifile_module|kernel_reset_lane)_unit`
+- `mc_tool_workflow_kernel_reset_lane_full_unit`
+- `mc_tool_build_state_unit`
+- `mc_tool_real_project_.*_unit`
+
+Codegen executable grouping
+---------------------------
+Executable backend behavior is grouped by family rather than one giant target.
+
+- `tests/compiler/codegen/codegen_executable_tests.cpp` is the shared grouped
+  implementation owner
+- grouped outputs live under semantic build roots such as
+  `build/debug/codegen/executable/core/...`,
+  `build/debug/codegen/executable/stdlib/...`, and
+  `build/debug/codegen/executable/project/...`
+
+Reset-lane and OS validation guidance
+-------------------------------------
+Reset-lane kernel and workflow coverage is intentionally maintained on the
+active hosted tool path rather than the retired freestanding archive.
+
+- use the grouped reset-lane tool suites for tool-driven kernel workflow work
+- use `tests/system/` or `tests/smoke/` for direct behavior-first probes when
+  the change is about runtime behavior rather than tool orchestration
+- the full reset-lane coverage surface is one maintained CTest target:
+  `mc_tool_workflow_kernel_reset_lane_full_unit`
+- do not recreate retired freestanding proof harnesses or fresh top-level
+  `build/debug/phase*` regression trees for repository-owned tests
+
+Build output rules
+------------------
+Checked-in files under `tests/` are inputs and expectations only.
+
+Generated outputs belong under the active build tree.
+
+- repository-owned audit runs: `build/debug/audit/...`
+- manual probes: `build/debug/probes/...`
+- short-lived scratch runs: `build/debug/tmp/...`
+- grouped tool runs: `build/debug/tool/...`
+- grouped codegen executable runs: `build/debug/codegen/executable/...`
+
+Do not place generated executables, object files, or command-local build trees
+under `tests/`.
+
+Local iteration guidance
+------------------------
+- prefer the narrowest owning target first
+- use `make select-tests` or `tools/select_tests.py` for changed-path routing
+  before widening to broader suites
+- when editing workflow build reuse or grouped build-state paths, run the
+  owning target twice when practical: first for correctness, second for reuse
+  behavior
+- if reset-lane or grouped workflow time jumps, inspect per-scenario
+  `cache=hit` or `cache=miss` summaries before changing suite shape
+
+Hosted assumptions
+------------------
+Some grouped tool and executable suites currently assume a hosted POSIX-like
+environment.
+
+- fork/exec child-process control
+- loopback sockets for networked fixtures
+- temporary project trees under the active build directory
+
+If host portability work begins, make that gating explicit in the owning suite
+instead of assuming wider portability.
+
+Common mistakes to avoid
+------------------------
+- do not start with the full suite when one owner-specific target exists
+- do not add new maintenance shard targets when the owned grouped suite can be
+  fixed directly
+- do not treat `tests/tool/tool_suite_tests.cpp` as the active owner for new
+  tool behavior
+- do not hide import or package metadata inside discovery magic for sema or MIR
+  fixtures
+- do not create new top-level `build/debug/phase*` output trees for checked-in
+  repository-owned validation
+- do not recreate the retired freestanding proof lane
