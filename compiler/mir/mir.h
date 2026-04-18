@@ -219,6 +219,11 @@ bool ValidateModule(const Module& module,
                     const std::filesystem::path& file_path,
                     support::DiagnosticSink& diagnostics);
 
+bool SpecializeExecutableGenericFunctions(const Module& module,
+                                          const std::filesystem::path& file_path,
+                                          support::DiagnosticSink& diagnostics,
+                                          Module& specialized_module);
+
 std::string DumpModule(const Module& module);
 
 }  // namespace mc::mir

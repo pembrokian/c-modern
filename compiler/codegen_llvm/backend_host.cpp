@@ -177,15 +177,20 @@ ObjectBuildResult BuildObjectFile(const mir::Module& module,
                                   const std::filesystem::path& source_path,
                                   const ObjectBuildOptions& options,
                                   support::DiagnosticSink& diagnostics) {
+    mir::Module executable_module;
+    if (!mir::SpecializeExecutableGenericFunctions(module, source_path, diagnostics, executable_module)) {
+        return {};
+    }
+
     if (!ValidateBootstrapTarget(options.target, source_path, diagnostics)) {
         return {};
     }
-    if (!ValidateExecutableBackendCapabilities(module, options.target, source_path, diagnostics)) {
+    if (!ValidateExecutableBackendCapabilities(executable_module, options.target, source_path, diagnostics)) {
         return {};
     }
 
     std::string llvm_ir;
-    if (!RenderLlvmModule(module, options.target, source_path, options.wrap_hosted_main, diagnostics, llvm_ir)) {
+    if (!RenderLlvmModule(executable_module, options.target, source_path, options.wrap_hosted_main, diagnostics, llvm_ir)) {
         return {};
     }
 

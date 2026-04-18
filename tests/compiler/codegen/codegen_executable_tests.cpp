@@ -1048,6 +1048,28 @@ void RunCodegenExecutableCoreSuite(const std::filesystem::path& source_root,
                                        {" = load i8, ptr ", " = select i1 "},
                                        {"enum.compare.chunk"});
 
+    const std::filesystem::path value_shaped_generic_helper_source = work_root / "value_shaped_generic_helper.mc";
+    WriteFile(value_shaped_generic_helper_source,
+              "struct Box<T> {\n"
+              "    value: T\n"
+              "}\n"
+              "\n"
+              "func box_with<T>(value: T) Box<T> {\n"
+              "    return Box<T>{ value: value }\n"
+              "}\n"
+              "\n"
+              "func main() i32 {\n"
+              "    box := box_with<i32>(7)\n"
+              "    return box.value\n"
+              "}\n");
+    RunBuiltFixtureWithIrSnippetChecks(mc_path,
+                                       value_shaped_generic_helper_source,
+                                       work_root / "value_shaped_generic_helper_build",
+                                       7,
+                                       {},
+                                       {"define {i32} @box_with$inst$i32(", "call {i32} @box_with$inst$i32(i32 7)"},
+                                       {"@box_with("});
+
     const std::filesystem::path hosted_args_source = work_root / "hosted_main_args.mc";
     WriteFile(hosted_args_source,
               "func main(args: Slice<cstr>) i32 {\n"

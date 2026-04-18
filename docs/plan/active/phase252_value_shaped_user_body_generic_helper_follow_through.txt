@@ -3,7 +3,7 @@ Phase 252 -- Value-Shaped User-Body Generic Helper Follow-Through
 
 Status
 ------
-PROPOSED
+COMPLETED
 
 Purpose
 -------

@@ -3,9 +3,14 @@
 #include "compiler/mir/mir_internal.h"
 
 #include <cassert>
+#include <cctype>
 #include <optional>
+#include <queue>
+#include <sstream>
 #include <string_view>
 #include <unordered_map>
+
+#include "compiler/sema/type_utils.h"
 
 namespace mc::mir {
 
@@ -256,6 +261,251 @@ std::string_view PrimaryTargetName(const Instruction& instruction) {
     return instruction.target_name;
 }
 
+namespace {
+
+bool IsBuiltinExecutableErasedNamedType(std::string_view name) {
+    return name == "bool" || name == "i8" || name == "u8" || name == "i16" || name == "u16" || name == "i32" ||
+           name == "u32" || name == "i64" || name == "u64" || name == "isize" || name == "usize" ||
+           name == "uintptr" || name == "f32" || name == "f64" || name == "str" || name == "string" ||
+           name == "cstr" || name == "Slice" || name == "Buffer";
+}
+
+bool TypeContainsTypeParams(const sema::Type& type,
+                           const std::unordered_map<std::string, bool>& type_param_set) {
+    if (type.kind == sema::Type::Kind::kNamed && type_param_set.contains(type.name)) {
+        return true;
+    }
+
+    for (const auto& subtype : type.subtypes) {
+        if (TypeContainsTypeParams(subtype, type_param_set)) {
+            return true;
+        }
+    }
+    return false;
+}
+
+bool TypeNeedsExecutableSpecialization(const Module& module,
+                                       const sema::Type& raw_type,
+                                       const std::unordered_map<std::string, bool>& type_param_set) {
+    const sema::Type type = sema::CanonicalizeBuiltinType(raw_type);
+    switch (type.kind) {
+        case sema::Type::Kind::kUnknown:
+        case sema::Type::Kind::kVoid:
+        case sema::Type::Kind::kBool:
+        case sema::Type::Kind::kString:
+        case sema::Type::Kind::kNil:
+        case sema::Type::Kind::kIntLiteral:
+        case sema::Type::Kind::kFloatLiteral:
+        case sema::Type::Kind::kPointer:
+        case sema::Type::Kind::kProcedure:
+            return false;
+        case sema::Type::Kind::kConst:
+        case sema::Type::Kind::kArray:
+        case sema::Type::Kind::kRange:
+            return !type.subtypes.empty() && TypeNeedsExecutableSpecialization(module, type.subtypes.front(), type_param_set);
+        case sema::Type::Kind::kTuple:
+            for (const auto& subtype : type.subtypes) {
+                if (TypeNeedsExecutableSpecialization(module, subtype, type_param_set)) {
+                    return true;
+                }
+            }
+            return false;
+        case sema::Type::Kind::kNamed:
+            if (type_param_set.contains(type.name)) {
+                return true;
+            }
+            if (IsBuiltinExecutableErasedNamedType(type.name)) {
+                return false;
+            }
+            if (const auto* type_decl = FindMirTypeDecl(module, type.name)) {
+                if (type_decl->kind == TypeDecl::Kind::kAlias || type_decl->kind == TypeDecl::Kind::kDistinct) {
+                    return TypeNeedsExecutableSpecialization(module, InstantiateMirAliasedType(*type_decl, type), type_param_set);
+                }
+                if (type_decl->kind == TypeDecl::Kind::kStruct) {
+                    const auto fields = InstantiateMirFields(*type_decl, type);
+                    for (const auto& field : fields) {
+                        if (TypeNeedsExecutableSpecialization(module, field.second, type_param_set)) {
+                            return true;
+                        }
+                    }
+                    return false;
+                }
+                if (type_decl->kind == TypeDecl::Kind::kEnum) {
+                    for (const auto& variant : type_decl->variants) {
+                        const auto instantiated = InstantiateMirVariantDecl(*type_decl, type, variant.name);
+                        if (!instantiated.has_value()) {
+                            continue;
+                        }
+                        for (const auto& payload_field : instantiated->payload_fields) {
+                            if (TypeNeedsExecutableSpecialization(module, payload_field.second, type_param_set)) {
+                                return true;
+                            }
+                        }
+                    }
+                    return false;
+                }
+            }
+            return true;
+    }
+    return true;
+}
+
+bool FunctionNeedsExecutableSpecialization(const Module& module,
+                                           const Function& function) {
+    if (function.type_params.empty()) {
+        return false;
+    }
+
+    std::unordered_map<std::string, bool> type_param_set;
+    for (const auto& type_param : function.type_params) {
+        type_param_set.emplace(type_param, true);
+    }
+
+    for (const auto& local : function.locals) {
+        if (TypeNeedsExecutableSpecialization(module, local.type, type_param_set)) {
+            return true;
+        }
+    }
+    for (const auto& return_type : function.return_types) {
+        if (TypeNeedsExecutableSpecialization(module, return_type, type_param_set)) {
+            return true;
+        }
+    }
+    for (const auto& block : function.blocks) {
+        for (const auto& instruction : block.instructions) {
+            if (TypeNeedsExecutableSpecialization(module, instruction.type, type_param_set) ||
+                TypeNeedsExecutableSpecialization(module, instruction.target_base_type, type_param_set)) {
+                return true;
+            }
+            for (const auto& aux_type : instruction.target_aux_types) {
+                if (TypeNeedsExecutableSpecialization(module, aux_type, type_param_set)) {
+                    return true;
+                }
+            }
+        }
+    }
+
+    return false;
+}
+
+std::optional<std::vector<sema::Type>> InferGenericFunctionTypeArgs(const Module& module,
+                                                                    const Function& function,
+                                                                    const sema::Type& actual_type) {
+    if (function.type_params.empty()) {
+        return std::vector<sema::Type> {};
+    }
+
+    const sema::Type canonical_actual = CanonicalMirType(module, actual_type);
+    if (canonical_actual.kind != sema::Type::Kind::kProcedure) {
+        return std::nullopt;
+    }
+
+    std::unordered_map<std::string, bool> type_param_set;
+    for (const auto& type_param : function.type_params) {
+        type_param_set.emplace(type_param, true);
+    }
+
+    std::unordered_map<std::string, sema::Type> bindings;
+    if (!MatchGenericTypePattern(module, FunctionProcedureType(function), canonical_actual, type_param_set, bindings)) {
+        return std::nullopt;
+    }
+
+    std::vector<sema::Type> type_args;
+    type_args.reserve(function.type_params.size());
+    for (const auto& type_param : function.type_params) {
+        const auto found = bindings.find(type_param);
+        if (found == bindings.end()) {
+            return std::nullopt;
+        }
+        type_args.push_back(found->second);
+    }
+    return type_args;
+}
+
+std::string SanitizeSpecializationNamePart(std::string_view text) {
+    std::ostringstream sanitized;
+    for (const unsigned char ch : text) {
+        if (std::isalnum(ch) || ch == '_' || ch == '.') {
+            sanitized << static_cast<char>(ch);
+            continue;
+        }
+
+        constexpr char kHex[] = "0123456789ABCDEF";
+        sanitized << '_'
+                  << kHex[(ch >> 4) & 0xF]
+                  << kHex[ch & 0xF]
+                  << '_';
+    }
+    return sanitized.str();
+}
+
+std::string SpecializationName(const Function& function,
+                               const std::vector<sema::Type>& type_args) {
+    std::ostringstream name;
+    name << function.name << "$inst";
+    for (const auto& type_arg : type_args) {
+        name << '$' << SanitizeSpecializationNamePart(sema::FormatType(type_arg));
+    }
+    return name.str();
+}
+
+Function CloneFunctionSpecialization(const Function& function,
+                                     const std::vector<sema::Type>& type_args,
+                                     const std::string& specialized_name) {
+    Function specialized = function;
+    specialized.name = specialized_name;
+    specialized.type_params.clear();
+
+    for (auto& local : specialized.locals) {
+        local.type = sema::SubstituteTypeParams(std::move(local.type), function.type_params, type_args);
+    }
+    for (auto& return_type : specialized.return_types) {
+        return_type = sema::SubstituteTypeParams(std::move(return_type), function.type_params, type_args);
+    }
+    for (std::size_t block_index = 0; block_index < specialized.blocks.size(); ++block_index) {
+        for (std::size_t instruction_index = 0; instruction_index < specialized.blocks[block_index].instructions.size(); ++instruction_index) {
+            auto& instruction = specialized.blocks[block_index].instructions[instruction_index];
+            const sema::Type original_type = instruction.type;
+            instruction.type = sema::SubstituteTypeParams(std::move(instruction.type), function.type_params, type_args);
+            instruction.target_base_type =
+                sema::SubstituteTypeParams(std::move(instruction.target_base_type), function.type_params, type_args);
+            for (auto& aux_type : instruction.target_aux_types) {
+                aux_type = sema::SubstituteTypeParams(std::move(aux_type), function.type_params, type_args);
+            }
+            if (!instruction.target.empty() && MatchesTargetDisplay(instruction.target, original_type)) {
+                instruction.target = sema::FormatType(instruction.type);
+            }
+        }
+    }
+
+    return specialized;
+}
+
+std::unordered_map<std::string, sema::Type> BuildInstructionValueTypes(const Function& function) {
+    std::unordered_map<std::string, sema::Type> value_types;
+    for (const auto& block : function.blocks) {
+        for (const auto& instruction : block.instructions) {
+            if (!instruction.result.empty()) {
+                value_types.emplace(instruction.result, instruction.type);
+            }
+        }
+    }
+    return value_types;
+}
+
+void ReportExecutableGenericSpecializationError(const std::filesystem::path& file_path,
+                                                support::DiagnosticSink& diagnostics,
+                                                const std::string& message) {
+    diagnostics.Report({
+        .file_path = file_path,
+        .span = {{1, 1}, {1, 1}},
+        .severity = support::DiagnosticSeverity::kError,
+        .message = message,
+    });
+}
+
+}  // namespace
+
 std::string CanonicalVariantDisplayName(const sema::Type& selector_type, std::string_view variant_name) {
     if (variant_name.find('.') != std::string_view::npos) {
         return std::string(variant_name);
@@ -278,6 +528,118 @@ bool MatchesTargetDisplay(std::string_view target, const sema::Type& type) {
         }
     }
     return false;
+}
+
+bool SpecializeExecutableGenericFunctions(const Module& module,
+                                          const std::filesystem::path& file_path,
+                                          support::DiagnosticSink& diagnostics,
+                                          Module& specialized_module) {
+    specialized_module = module;
+    specialized_module.functions.clear();
+
+    std::unordered_map<std::string, std::size_t> function_indices;
+    function_indices.reserve(module.functions.size());
+    std::queue<std::size_t> rewrite_queue;
+
+    const auto append_function = [&](Function function) {
+        const std::size_t index = specialized_module.functions.size();
+        function_indices[function.name] = index;
+        specialized_module.functions.push_back(std::move(function));
+        rewrite_queue.push(index);
+    };
+
+    for (const auto& function : module.functions) {
+        if (function.type_params.empty() || !FunctionNeedsExecutableSpecialization(module, function)) {
+            append_function(function);
+        }
+    }
+
+    const auto ensure_specialization = [&](const Function& function,
+                                           const std::vector<sema::Type>& type_args) -> std::string {
+        const std::string specialized_name = SpecializationName(function, type_args);
+        if (!function_indices.contains(specialized_name)) {
+            append_function(CloneFunctionSpecialization(function, type_args, specialized_name));
+        }
+        return specialized_name;
+    };
+
+    while (!rewrite_queue.empty()) {
+        const std::size_t function_index = rewrite_queue.front();
+        rewrite_queue.pop();
+
+        Function& function = specialized_module.functions[function_index];
+        const std::unordered_map<std::string, sema::Type> value_types = BuildInstructionValueTypes(function);
+        std::unordered_map<std::string, bool> owner_type_param_set;
+        for (const auto& type_param : function.type_params) {
+            owner_type_param_set.emplace(type_param, true);
+        }
+
+        for (auto& block : function.blocks) {
+            for (auto& instruction : block.instructions) {
+                if (instruction.target_kind != Instruction::TargetKind::kFunction || instruction.target_name.empty()) {
+                    continue;
+                }
+
+                const Function* callee = FindMirFunction(module, instruction.target_name);
+                if (callee == nullptr || callee->type_params.empty() || !FunctionNeedsExecutableSpecialization(module, *callee)) {
+                    continue;
+                }
+
+                sema::Type actual_procedure_type = sema::UnknownType();
+                if (instruction.kind == Instruction::Kind::kSymbolRef) {
+                    actual_procedure_type = instruction.type;
+                } else if (!instruction.operands.empty()) {
+                    const auto found = value_types.find(instruction.operands.front());
+                    if (found != value_types.end()) {
+                        actual_procedure_type = found->second;
+                    }
+                }
+
+                if (sema::IsUnknown(actual_procedure_type)) {
+                    ReportExecutableGenericSpecializationError(
+                        file_path,
+                        diagnostics,
+                        "executable generic specialization requires concrete procedure metadata for generic helper '" +
+                            callee->name + "'");
+                    return false;
+                }
+
+                const auto type_args = InferGenericFunctionTypeArgs(module, *callee, actual_procedure_type);
+                if (!type_args.has_value()) {
+                    ReportExecutableGenericSpecializationError(
+                        file_path,
+                        diagnostics,
+                        "executable generic specialization could not infer concrete type arguments for generic helper '" +
+                            callee->name + "' from procedure type '" + sema::FormatType(actual_procedure_type) + "'");
+                    return false;
+                }
+
+                bool concrete_type_args = true;
+                for (const auto& type_arg : *type_args) {
+                    if (TypeContainsTypeParams(type_arg, owner_type_param_set)) {
+                        concrete_type_args = false;
+                        break;
+                    }
+                }
+                if (!concrete_type_args) {
+                    ReportExecutableGenericSpecializationError(
+                        file_path,
+                        diagnostics,
+                        "executable generic specialization requires concrete type arguments for generic helper '" +
+                            callee->name + "'; got '" + sema::FormatType(actual_procedure_type) + "'");
+                    return false;
+                }
+
+                const std::string specialized_name = ensure_specialization(*callee, *type_args);
+                instruction.target_name = specialized_name;
+                if (instruction.target == callee->name) {
+                    instruction.target = specialized_name;
+                }
+            }
+        }
+    }
+
+    return true;
 }
 
 }  // namespace mc::mir

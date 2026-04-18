@@ -331,6 +331,56 @@ void TestKnownSymbolRefsAreTyped() {
     }
 }
 
+void TestExecutableGenericSpecializationClonesValueShapedHelper() {
+    mc::support::DiagnosticSink diagnostics;
+    const auto lowered = Lower(
+        "struct Box<T> {\n"
+        "    value: T\n"
+        "}\n"
+        "\n"
+        "func box_with<T>(value: T) Box<T> {\n"
+        "    return Box<T>{ value: value }\n"
+        "}\n"
+        "\n"
+        "func read(box: Box<i32>) i32 {\n"
+        "    return box.value\n"
+        "}\n"
+        "\n"
+        "func main() i32 {\n"
+        "    return read(box_with<i32>(7))\n"
+        "}\n",
+        diagnostics);
+
+    if (!lowered.ok) {
+        Fail("value-shaped generic helper source should lower:\n" + diagnostics.Render());
+    }
+    if (!mc::mir::ValidateModule(*lowered.module, "<mir-test>", diagnostics)) {
+        Fail("raw lowered module should validate before executable specialization:\n" + diagnostics.Render());
+    }
+
+    mc::mir::Module specialized_module;
+    if (!mc::mir::SpecializeExecutableGenericFunctions(*lowered.module, "<mir-test>", diagnostics, specialized_module)) {
+        Fail("executable generic specialization should succeed:\n" + diagnostics.Render());
+    }
+    if (!mc::mir::ValidateModule(specialized_module, "<mir-test>", diagnostics)) {
+        Fail("specialized executable module should validate:\n" + diagnostics.Render());
+    }
+
+    const auto dump = mc::mir::DumpModule(specialized_module);
+    if (dump.find("Function name=box_with$inst$i32 returns=[Box<i32>]") == std::string::npos) {
+        Fail("specialized module should include a concrete clone for the value-shaped helper");
+    }
+    if (dump.find("Function name=box_with returns=[Box<T>]") != std::string::npos) {
+        Fail("specialized module should not keep the unspecialized value-shaped helper body");
+    }
+    if (dump.find("target=box_with$inst$i32 target_kind=function target_name=box_with$inst$i32") == std::string::npos) {
+        Fail("specialized module should retarget helper symbol refs and calls to the concrete clone");
+    }
+    if (dump.find("aggregate_init %v") == std::string::npos || dump.find("target=Box<i32>") == std::string::npos) {
+        Fail("specialized helper body should substitute value-shaped aggregate metadata");
+    }
+}
+
 void TestImportedModuleSurfaceLowersQualifiedTypesAndTargets() {
     mc::support::DiagnosticSink diagnostics;
 
@@ -3203,6 +3253,7 @@ int main() {
     TestForEachAndDeferLoweringSucceed();
     TestForRangeUsesSemaRangeElementType();
     TestKnownSymbolRefsAreTyped();
+    TestExecutableGenericSpecializationClonesValueShapedHelper();
     TestImportedModuleSurfaceLowersQualifiedTypesAndTargets();
     TestImportedModuleVariantMatchLowersQualifiedVariants();
     TestImportedAtomicBoundaryValidationAcceptsQualifiedTypes();
