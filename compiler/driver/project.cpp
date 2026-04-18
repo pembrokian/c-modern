@@ -285,9 +285,9 @@ void ReportTargetSelectionNotes(const ProjectFile& project,
     });
 }
 
-void ReportBootstrapTargetNotes(const ProjectFile& project,
-                                std::string_view target_name,
-                                support::DiagnosticSink& diagnostics) {
+void ReportBootstrapTargetNotesImpl(const ProjectFile& project,
+                                    std::string_view target_name,
+                                    support::DiagnosticSink& diagnostics) {
     const auto config = mc::codegen_llvm::BootstrapTargetConfig();
     diagnostics.Report({
         .file_path = project.path,
@@ -559,6 +559,12 @@ ProjectModuleSet* LookupTargetModuleSet(ProjectTarget& target,
 }
 
 }  // namespace
+
+void ReportBootstrapTargetNotes(const ProjectFile& project,
+                                std::string_view target_name,
+                                support::DiagnosticSink& diagnostics) {
+    ReportBootstrapTargetNotesImpl(project, target_name, diagnostics);
+}
 
 std::optional<ProjectFile> LoadProjectFile(const std::filesystem::path& path,
                                           support::DiagnosticSink& diagnostics) {

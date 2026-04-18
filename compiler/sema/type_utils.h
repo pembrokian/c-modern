@@ -28,6 +28,12 @@ VariantSummary InstantiateVariantSummary(const VariantSummary& variant,
                                          const Type& instantiated_type);
 Type StripType(Type type, const Module& module, TypeStripMode mode);
 Type ResolveCallableShell(Type type, const Module& module);
+bool IsNumericType(const Type& type, const Module& module);
+bool IsIntegerLikeType(const Type& type, const Module& module);
+bool IsBoolType(const Type& type, const Module& module);
+bool IsPointerLikeType(const Type& type, const Module& module);
+bool IsUintPtrConvertibleType(const Type& type, const Module& module);
+bool IsUintPtrType(const Type& type, const Module& module);
 bool IsNoAliasEligibleType(Type type, const Module& module);
 bool IsErrorType(Type type, const Module& module);
 bool IsAddressableExpr(const ast::Expr& expr);

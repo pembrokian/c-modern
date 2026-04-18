@@ -1,3 +1,267 @@
+==== compiler/driver/build_graph.cpp ====
+NAMESPACE: mc
+NAMESPACE: driver
+NAMESPACE: 
+FUNCTION_DECL: IsInternalModulePath
+   Return: bool
+   Param: const int & path
+FUNCTION_DECL: ResolveDirectSourcePackageIdentity
+   Return: int
+   Param: const int & source_path
+   Param: const int & import_roots
+FUNCTION_DECL: ResolveExternalSourcePackageIdentity
+   Return: int
+   Param: const int & source_path
+   Param: const int & import_roots
+FUNCTION_DECL: JoinPaths
+   Return: int
+   Param: const int & paths
+FUNCTION_DECL: JoinBootstrapTargetChoices
+   Return: int
+   Param: const int & config
+FUNCTION_DECL: ReportBootstrapTargetNotes
+   Return: void
+   Param: const int & project
+   Param: const int & target
+   Param: const int & config
+   Param: int & diagnostics
+FUNCTION_DECL: OffsetSpan
+   Return: void
+   Param: int & span
+   Param: int line_offset
+FUNCTION_DECL: OffsetTypeExprSpans
+   Return: void
+   Param: int * type_expr
+   Param: int line_offset
+FUNCTION_DECL: OffsetExprSpans
+   Return: void
+   Param: int * expr
+   Param: int line_offset
+FUNCTION_DECL: OffsetStmtSpans
+   Return: void
+   Param: int * stmt
+   Param: int line_offset
+FUNCTION_DECL: OffsetNamePatternSpans
+   Return: void
+   Param: int & pattern
+   Param: int line_offset
+FUNCTION_DECL: OffsetAttributeArgSpans
+   Return: void
+   Param: int & arg
+   Param: int line_offset
+FUNCTION_DECL: OffsetAttributeSpans
+   Return: void
+   Param: int & attribute
+   Param: int line_offset
+FUNCTION_DECL: OffsetFieldDeclSpans
+   Return: void
+   Param: int & field_decl
+   Param: int line_offset
+FUNCTION_DECL: OffsetEnumVariantDeclSpans
+   Return: void
+   Param: int & variant_decl
+   Param: int line_offset
+FUNCTION_DECL: OffsetParamDeclSpans
+   Return: void
+   Param: int & param_decl
+   Param: int line_offset
+FUNCTION_DECL: OffsetFieldInitSpans
+   Return: void
+   Param: int & field_init
+   Param: int line_offset
+FUNCTION_DECL: OffsetCasePatternSpans
+   Return: void
+   Param: int & pattern
+   Param: int line_offset
+FUNCTION_DECL: OffsetSwitchCaseSpans
+   Return: void
+   Param: int & switch_case
+   Param: int line_offset
+FUNCTION_DECL: OffsetDefaultCaseSpans
+   Return: void
+   Param: int & default_case
+   Param: int line_offset
+FUNCTION_DECL: OffsetTypeExprSpans
+   Return: void
+   Param: int * type_expr
+   Param: int line_offset
+FUNCTION_DECL: OffsetExprSpans
+   Return: void
+   Param: int * expr
+   Param: int line_offset
+FUNCTION_DECL: OffsetStmtSpans
+   Return: void
+   Param: int * stmt
+   Param: int line_offset
+FUNCTION_DECL: OffsetDeclSpans
+   Return: void
+   Param: int & decl
+   Param: int line_offset
+FUNCTION_DECL: OffsetSourceFileSpans
+   Return: void
+   Param: int & source_file
+   Param: int line_offset
+FUNCTION_DECL: MakeModuleArtifactKey
+   Return: int
+   Param: int package_identity
+   Param: int module_name
+STRUCT_DECL: ResolvedModuleSource
+FUNCTION_DECL: ResolveImportPathWithPackageRules
+   Return: int
+   Param: const int & importer_path
+   Param: int module_name
+   Param: const int & search_roots
+   Param: const int & importer_package_identity
+   Param: const int (const int &) 
+FUNCTION_DECL: CanonicalizeModuleSourcePaths
+   Return: int
+   Param: const int & source_paths
+FUNCTION_DECL: ParseLogicalModuleSources
+   Return: int
+   Param: const int & source_paths
+   Param: int & diagnostics
+FUNCTION_DECL: ResolveProjectTargetConfig
+   Return: int
+   Param: const int & project
+   Param: const int & target
+   Param: int & diagnostics
+FUNCTION_DECL: CollectOwnedSourcePathsForLink
+   Return: void
+   Param: const int & graph
+   Param: int owner_name
+   Param: int & owned_paths
+   Param: int & owners
+   Param: const int & consumer_target
+   Param: const int & project
+   Param: int & diagnostics
+FUNCTION_DECL: LookupKnownProjectModuleSources
+   Return: int
+   Param: const int & target
+   Param: const int & linked_targets
+   Param: int module_name
+FUNCTION_DECL: DiscoverModuleGraphRecursive
+   Return: bool
+   Param: const ResolvedModuleSource & module_source
+   Param: const int & import_roots
+   Param: const int (const int &) 
+FUNCTION_DECL: LoadSelectedProject
+   Return: int
+   Param: const int & options
+   Param: int & diagnostics
+FUNCTION_DECL: SupportsBootstrapTarget
+   Return: bool
+   Param: const int & target
+   Param: const int & project
+   Param: int & diagnostics
+FUNCTION_DECL: DiscoverModuleGraph
+   Return: int
+   Param: const int & entry_source_path
+   Param: const int & import_roots
+   Param: const int (const int &) 
+FUNCTION_DECL: AssertCompileGraphTopologicalOrder
+   Return: void
+   Param: const int & graph
+FUNCTION_DECL: BuildResolvedTargetGraph
+   Return: int
+   Param: const int & project
+   Param: const int & target
+   Param: const int & cli_import_roots
+   Param: int & diagnostics
+   Param: int & visiting_targets
+FUNCTION_DECL: BuildTargetGraph
+   Return: int
+   Param: const int & options
+   Param: int & diagnostics
+
+==== compiler/driver/build_support.cpp ====
+NAMESPACE: mc
+NAMESPACE: driver
+NAMESPACE: 
+FUNCTION_DECL: IsPathWithinRoot
+   Return: bool
+   Param: const int & path
+   Param: const int & root
+FUNCTION_DECL: DiscoverRepositoryRoot
+   Return: int
+   Param: const int & start_path
+FUNCTION_DECL: DiscoverHostedRuntimeSupportSource
+   Return: int
+   Param: const int & source_path
+FUNCTION_DECL: DiscoverRuntimeSupportSource
+   Return: int
+   Param: int env
+   Param: int startup
+   Param: const int & source_path
+FUNCTION_DECL: ComputeEffectiveImportRoots
+   Return: int
+   Param: const int & source_path
+   Param: const int & import_roots
+FUNCTION_DECL: ReadSourceText
+   Return: int
+   Param: const int & path
+   Param: int & diagnostics
+FUNCTION_DECL: ParseSourcePath
+   Return: int
+   Param: const int & path
+   Param: int & diagnostics
+FUNCTION_DECL: DefaultProjectPath
+   Return: int
+FUNCTION_DECL: BootstrapTargetIdentity
+   Return: int
+FUNCTION_DECL: IsSupportedMode
+   Return: bool
+   Param: int mode
+FUNCTION_DECL: IsSupportedEnv
+   Return: bool
+   Param: int env
+FUNCTION_DECL: IsExecutableTargetKind
+   Return: bool
+   Param: int kind
+FUNCTION_DECL: IsStaticLibraryTargetKind
+   Return: bool
+   Param: int kind
+FUNCTION_DECL: HexU64
+   Return: int
+   Param: int value
+FUNCTION_DECL: HashText
+   Return: int
+   Param: int text
+FUNCTION_DECL: ComputeModuleStatePath
+   Return: int
+   Param: const int & source_path
+   Param: const int & build_dir
+FUNCTION_DECL: ComputeLogicalModuleStatePath
+   Return: int
+   Param: int artifact_key
+   Param: const int & build_dir
+FUNCTION_DECL: ComputeRuntimeObjectPath
+   Return: int
+   Param: const int & entry_source_path
+   Param: const int & build_dir
+   Param: int env
+   Param: int startup
+FUNCTION_DECL: ComputeLogicalRuntimeObjectPath
+   Return: int
+   Param: int artifact_key
+   Param: const int & build_dir
+   Param: int env
+   Param: int startup
+FUNCTION_DECL: LoadModuleBuildState
+   Return: int
+   Param: const int & path
+   Param: int & diagnostics
+FUNCTION_DECL: WriteModuleBuildState
+   Return: bool
+   Param: const int & path
+   Param: const int & state
+   Param: int & diagnostics
+FUNCTION_DECL: ShouldReuseModuleObject
+   Return: bool
+   Param: const int & state
+   Param: const int & current
+   Param: const int & object_path
+   Param: const int & mci_path
+
 ==== compiler/driver/builder.cpp ====
 NAMESPACE: mc
 NAMESPACE: driver
@@ -5,10 +269,6 @@ NAMESPACE:
 FUNCTION_DECL: IsInternalModulePath
    Return: bool
    Param: const int & path
-FUNCTION_DECL: IsPathWithinRoot
-   Return: bool
-   Param: const int & path
-   Param: const int & root
 FUNCTION_DECL: ResolveDirectSourcePackageIdentity
    Return: int
    Param: const int & source_path
@@ -128,9 +388,6 @@ FUNCTION_DECL: ReadLogicalModuleSourceText
    Return: int
    Param: const int & source_paths
    Param: int & diagnostics
-FUNCTION_DECL: DiscoverRepositoryRoot
-   Return: int
-   Param: const int & start_path
 FUNCTION_DECL: ResolveProjectTargetConfig
    Return: int
    Param: const int & project
@@ -240,116 +497,6 @@ FUNCTION_DECL: ShouldArchiveProjectStaticLibrary
    Return: bool
    Param: const int & archive_path
    Param: const int & units
-FUNCTION_DECL: DiscoverHostedRuntimeSupportSource
-   Return: int
-   Param: const int & source_path
-FUNCTION_DECL: DiscoverRuntimeSupportSource
-   Return: int
-   Param: int env
-   Param: int startup
-   Param: const int & source_path
-FUNCTION_DECL: ComputeEffectiveImportRoots
-   Return: int
-   Param: const int & source_path
-   Param: const int & import_roots
-FUNCTION_DECL: ReadSourceText
-   Return: int
-   Param: const int & path
-   Param: int & diagnostics
-FUNCTION_DECL: ParseSourcePath
-   Return: int
-   Param: const int & path
-   Param: int & diagnostics
-FUNCTION_DECL: DefaultProjectPath
-   Return: int
-FUNCTION_DECL: BootstrapTargetIdentity
-   Return: int
-FUNCTION_DECL: IsSupportedMode
-   Return: bool
-   Param: int mode
-FUNCTION_DECL: IsSupportedEnv
-   Return: bool
-   Param: int env
-FUNCTION_DECL: IsExecutableTargetKind
-   Return: bool
-   Param: int kind
-FUNCTION_DECL: IsStaticLibraryTargetKind
-   Return: bool
-   Param: int kind
-FUNCTION_DECL: HexU64
-   Return: int
-   Param: int value
-FUNCTION_DECL: HashText
-   Return: int
-   Param: int text
-FUNCTION_DECL: ComputeModuleStatePath
-   Return: int
-   Param: const int & source_path
-   Param: const int & build_dir
-FUNCTION_DECL: ComputeLogicalModuleStatePath
-   Return: int
-   Param: int artifact_key
-   Param: const int & build_dir
-FUNCTION_DECL: ComputeRuntimeObjectPath
-   Return: int
-   Param: const int & entry_source_path
-   Param: const int & build_dir
-   Param: int env
-   Param: int startup
-FUNCTION_DECL: ComputeLogicalRuntimeObjectPath
-   Return: int
-   Param: int artifact_key
-   Param: const int & build_dir
-   Param: int env
-   Param: int startup
-FUNCTION_DECL: LoadModuleBuildState
-   Return: int
-   Param: const int & path
-   Param: int & diagnostics
-FUNCTION_DECL: WriteModuleBuildState
-   Return: bool
-   Param: const int & path
-   Param: const int & state
-   Param: int & diagnostics
-FUNCTION_DECL: ShouldReuseModuleObject
-   Return: bool
-   Param: const int & state
-   Param: const int & current
-   Param: const int & object_path
-   Param: const int & mci_path
-FUNCTION_DECL: LoadSelectedProject
-   Return: int
-   Param: const int & options
-   Param: int & diagnostics
-FUNCTION_DECL: SupportsBootstrapTarget
-   Return: bool
-   Param: const int & target
-   Param: const int & project
-   Param: int & diagnostics
-FUNCTION_DECL: DiscoverModuleGraphRecursive
-   Return: bool
-   Param: const ResolvedModuleSource & module_source
-   Param: const int & import_roots
-   Param: const int (const int &) 
-FUNCTION_DECL: DiscoverModuleGraph
-   Return: int
-   Param: const int & entry_source_path
-   Param: const int & import_roots
-   Param: const int (const int &) 
-FUNCTION_DECL: AssertCompileGraphTopologicalOrder
-   Return: void
-   Param: const int & graph
-FUNCTION_DECL: BuildResolvedTargetGraph
-   Return: int
-   Param: const int & project
-   Param: const int & target
-   Param: const int & cli_import_roots
-   Param: int & diagnostics
-   Param: int & visiting_targets
-FUNCTION_DECL: BuildTargetGraph
-   Return: int
-   Param: const int & options
-   Param: int & diagnostics
 FUNCTION_DECL: CompileToMir
    Return: int
    Param: const int & options
@@ -406,32 +553,69 @@ FUNCTION_DECL: PrintArtifactTargets
    Param: const int & dump_targets
    Param: const int & build_targets
    Param: int & stream
-STRUCT_DECL: DirectSourceBuildResult
 FUNCTION_DECL: BuildDirectSource
    Return: int
    Param: const int & options
    Param: int & diagnostics
 FUNCTION_DECL: PrintDirectSourceBuildSummary
    Return: void
-   Param: const DirectSourceBuildResult & build_result
+   Param: const int & build_result
    Param: bool emit_dump_paths
 FUNCTION_DECL: MergeRenderedDiagnostics
    Return: int
    Param: int primary
    Param: int secondary
+NAMESPACE: 
 FUNCTION_DECL: MergeBuildUnits
    Return: int
    Param: const int & units
    Param: const int & entry_module
    Param: const int & entry_source_path
    Param: int & diagnostics
+FUNCTION_DECL: RunBuild
+   Return: int
+   Param: const int & options
+FUNCTION_DECL: RunCheck
+   Return: int
+   Param: const int & options
+NAMESPACE: 
+FUNCTION_DECL: CollectAllGraphSourcePaths
+   Return: bool
+   Param: const int & graph
+   Param: int cutoff
+FUNCTION_DECL: IsProjectBuildFreshForDump
+   Return: bool
+   Param: const int & graph
+FUNCTION_DECL: RunBuild
+   Return: int
+   Param: const int & options
+FUNCTION_DECL: RunRun
+   Return: int
+   Param: const int & options
+FUNCTION_DECL: RunDumpPaths
+   Return: int
+   Param: const int & options
+FUNCTION_DECL: Run
+   Return: int
+   Param: int argc
+   Param: const char *[] argv
+
+==== compiler/driver/driver.h ====
+
+==== compiler/driver/driver_test.cpp ====
+NAMESPACE: mc
+NAMESPACE: driver
+NAMESPACE: 
+FUNCTION_DECL: JoinNames
+   Return: int
+   Param: const int & names
+FUNCTION_DECL: CollectEnabledTestTargetNames
+   Return: int
+   Param: const int & project
 STRUCT_DECL: OrdinaryTestCase
 ENUM_DECL: CompilerRegressionKind
 STRUCT_DECL: CompilerRegressionCase
 STRUCT_DECL: DiscoveredTargetTests
-FUNCTION_DECL: RunBuild
-   Return: int
-   Param: const int & options
 FUNCTION_DECL: TrimWhitespace
    Return: int
    Param: int text
@@ -477,9 +661,6 @@ FUNCTION_DECL: ReadExpectedLines
    Return: int
    Param: const int & path
    Param: int & diagnostics
-FUNCTION_DECL: DiscoverRepositoryRoot
-   Return: int
-   Param: const int & start_path
 FUNCTION_DECL: BuildOrdinaryRunnerSource
    Return: int
    Param: const int & ordinary_tests
@@ -527,35 +708,9 @@ FUNCTION_DECL: SelectTestTargets
    Param: const int & project
    Param: const int & explicit_target
    Param: int & diagnostics
-FUNCTION_DECL: RunCheck
+FUNCTION_DECL: RunTestCommand
    Return: int
    Param: const int & options
-NAMESPACE: 
-FUNCTION_DECL: CollectAllGraphSourcePaths
-   Return: bool
-   Param: const int & graph
-   Param: int cutoff
-FUNCTION_DECL: IsProjectBuildFreshForDump
-   Return: bool
-   Param: const int & graph
-FUNCTION_DECL: RunBuild
-   Return: int
-   Param: const int & options
-FUNCTION_DECL: RunRun
-   Return: int
-   Param: const int & options
-FUNCTION_DECL: RunTest
-   Return: int
-   Param: const int & options
-FUNCTION_DECL: RunDumpPaths
-   Return: int
-   Param: const int & options
-FUNCTION_DECL: Run
-   Return: int
-   Param: int argc
-   Param: const char *[] argv
-
-==== compiler/driver/driver.h ====
 
 ==== compiler/driver/internal.h ====
 
@@ -598,9 +753,6 @@ NAMESPACE: mc
 NAMESPACE: driver
 NAMESPACE: 
 FUNCTION_DECL: IsSupportedBootstrapTargetKind
-   Return: bool
-   Param: int kind
-FUNCTION_DECL: IsExecutableTargetKind
    Return: bool
    Param: int kind
 FUNCTION_DECL: IsSupportedBootstrapEnv
@@ -654,10 +806,6 @@ FUNCTION_DECL: ReportDuplicateConfiguredPaths
    Param: int label
    Param: const int & paths
    Param: int & diagnostics
-FUNCTION_DECL: IsPathWithinRoot
-   Return: bool
-   Param: const int & path
-   Param: const int & root
 FUNCTION_DECL: StripComment
    Return: int
    Param: int line
@@ -701,9 +849,6 @@ FUNCTION_DECL: LookupTargetModuleSet
    Return: int *
    Param: int & target
    Param: int module_name
-FUNCTION_DECL: IsSupportedMode
-   Return: bool
-   Param: int mode
 FUNCTION_DECL: LoadProjectFile
    Return: int
    Param: const int & path

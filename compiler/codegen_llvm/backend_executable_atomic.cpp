@@ -5,38 +5,6 @@
 namespace mc::codegen_llvm {
 namespace {
 
-std::string_view LeafTypeName(std::string_view name) {
-    const std::size_t separator = name.rfind('.');
-    if (separator == std::string_view::npos) {
-        return name;
-    }
-    return name.substr(separator + 1);
-}
-
-bool IsNamedTypeFamily(const sema::Type& type, std::string_view family_name) {
-    return type.kind == sema::Type::Kind::kNamed && LeafTypeName(type.name) == family_name;
-}
-
-std::optional<sema::Type> PointerPointeeType(const sema::Type& type) {
-    if (type.kind != sema::Type::Kind::kPointer || type.subtypes.empty()) {
-        return std::nullopt;
-    }
-    return type.subtypes.front();
-}
-
-std::optional<sema::Type> AtomicElementType(const mir::Module& module, const sema::Type& pointer_type) {
-    const auto pointee = PointerPointeeType(StripMirAliasOrDistinct(module, pointer_type));
-    if (!pointee.has_value()) {
-        return std::nullopt;
-    }
-    const sema::Type stripped_pointee = StripMirAliasOrDistinct(module, *pointee);
-    if (stripped_pointee.kind != sema::Type::Kind::kNamed || !IsNamedTypeFamily(stripped_pointee, "Atomic") ||
-        stripped_pointee.subtypes.empty()) {
-        return std::nullopt;
-    }
-    return stripped_pointee.subtypes.front();
-}
-
 std::optional<sema::Type> FindFunctionValueType(const mir::Module& module,
                                                 const mir::Function& function,
                                                 std::string_view value_name) {
@@ -80,7 +48,7 @@ bool ResolveAtomicElementBackendType(const mir::Module& module,
                            diagnostics);
         return false;
     }
-    const auto atomic_element_type = AtomicElementType(module, *ptr_type);
+    const auto atomic_element_type = mir::AtomicElementType(module, *ptr_type);
     if (!atomic_element_type.has_value()) {
         ReportBackendError(source_path,
                            std::string("LLVM bootstrap executable emission requires *Atomic<T> pointer for '") +
@@ -94,23 +62,6 @@ bool ResolveAtomicElementBackendType(const mir::Module& module,
                                 diagnostics,
                                 std::string(context) + " atomic element",
                                 element_type);
-}
-
-bool AtomicOrderAllowedForInstruction(mir::Instruction::Kind kind,
-                                      std::string_view order_name) {
-    const std::string leaf = VariantLeafName(order_name);
-    switch (kind) {
-        case mir::Instruction::Kind::kAtomicLoad:
-            return leaf == "Relaxed" || leaf == "Acquire" || leaf == "SeqCst";
-        case mir::Instruction::Kind::kAtomicStore:
-            return leaf == "Relaxed" || leaf == "Release" || leaf == "SeqCst";
-        case mir::Instruction::Kind::kAtomicExchange:
-        case mir::Instruction::Kind::kAtomicFetchAdd:
-            return leaf == "Relaxed" || leaf == "Acquire" || leaf == "Release" || leaf == "AcqRel" ||
-                   leaf == "SeqCst";
-        default:
-            return false;
-    }
 }
 
 bool RequireAtomicInstructionResult(const mir::Instruction& instruction,
@@ -179,7 +130,7 @@ bool RenderAtomicInstruction(const mir::Instruction& instruction,
                 return false;
             }
             const auto order = LLVMAtomicOrderKeyword(instruction.atomic_order);
-            if (!order.has_value() || !AtomicOrderAllowedForInstruction(instruction.kind, instruction.atomic_order)) {
+            if (!order.has_value() || !mir::AtomicOrderAllowedForInstruction(instruction.kind, instruction.atomic_order)) {
                 ReportBackendError(source_path,
                                    "LLVM bootstrap executable emission requires supported constant MemoryOrder metadata for 'atomic_load' in function '" +
                                        state.function->name + "' block '" + block.label + "'",
@@ -226,7 +177,7 @@ bool RenderAtomicInstruction(const mir::Instruction& instruction,
                 return false;
             }
             const auto order = LLVMAtomicOrderKeyword(instruction.atomic_order);
-            if (!order.has_value() || !AtomicOrderAllowedForInstruction(instruction.kind, instruction.atomic_order)) {
+            if (!order.has_value() || !mir::AtomicOrderAllowedForInstruction(instruction.kind, instruction.atomic_order)) {
                 ReportBackendError(source_path,
                                    "LLVM bootstrap executable emission requires supported constant MemoryOrder metadata for 'atomic_store' in function '" +
                                        state.function->name + "' block '" + block.label + "'",
@@ -299,7 +250,7 @@ bool RenderAtomicInstruction(const mir::Instruction& instruction,
                 return false;
             }
             const auto order = LLVMAtomicOrderKeyword(instruction.atomic_order);
-            if (!order.has_value() || !AtomicOrderAllowedForInstruction(instruction.kind, instruction.atomic_order)) {
+            if (!order.has_value() || !mir::AtomicOrderAllowedForInstruction(instruction.kind, instruction.atomic_order)) {
                 ReportBackendError(source_path,
                                    "LLVM bootstrap executable emission requires supported constant MemoryOrder metadata for '" +
                                        std::string(ToString(instruction.kind)) + "' in function '" + state.function->name +

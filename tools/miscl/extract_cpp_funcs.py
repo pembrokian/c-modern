@@ -98,7 +98,7 @@ def output_file_name(source_dir):
 
 def main():
     if len(sys.argv) != 2:
-        print("Usage: python extract_funcs.py <source_dir>")
+        print("Usage: python extract_cpp_funcs.py <source_dir>")
         return
 
     configure_libclang()

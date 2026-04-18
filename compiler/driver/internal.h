@@ -3,6 +3,8 @@
 
 #include <cstdint>
 #include <filesystem>
+#include <functional>
+#include <memory>
 #include <optional>
 #include <string>
 #include <string_view>
@@ -15,6 +17,7 @@
 #include "compiler/ast/ast.h"
 #include "compiler/codegen_llvm/backend.h"
 #include "compiler/driver/project.h"
+#include "compiler/mci/mci.h"
 #include "compiler/mir/mir.h"
 #include "compiler/parse/parser.h"
 #include "compiler/sema/check.h"
@@ -141,6 +144,7 @@ enum class WaitForChildResult {
 };
 
 constexpr int kModuleBuildStateFormatVersion = 2;
+constexpr std::size_t kMergedModulePartLineStride = 1000000;
 
 std::optional<std::filesystem::path> DiscoverHostedRuntimeSupportSource(const std::filesystem::path& source_path);
 std::optional<std::filesystem::path> DiscoverRuntimeSupportSource(std::string_view env,
@@ -159,9 +163,14 @@ bool IsSupportedMode(std::string_view mode);
 bool IsSupportedEnv(std::string_view env);
 bool IsExecutableTargetKind(std::string_view kind);
 bool IsStaticLibraryTargetKind(std::string_view kind);
+bool IsInternalModulePath(const std::filesystem::path& path);
 bool IsPathWithinRoot(const std::filesystem::path& path,
                       const std::filesystem::path& root);
 std::optional<std::filesystem::path> DiscoverRepositoryRoot(const std::filesystem::path& start_path);
+std::optional<std::string> ResolveDirectSourcePackageIdentity(const std::filesystem::path& source_path,
+                                                              const std::vector<std::filesystem::path>& import_roots);
+std::optional<std::string> ResolveExternalSourcePackageIdentity(const std::filesystem::path& source_path,
+                                                                const std::vector<std::filesystem::path>& import_roots);
 
 std::string HexU64(std::uint64_t value);
 std::string HashText(std::string_view text);
@@ -205,6 +214,35 @@ std::optional<ProjectFile> LoadSelectedProject(const CommandOptions& options,
 bool SupportsBootstrapTarget(const ProjectTarget& target,
                              const ProjectFile& project,
                              support::DiagnosticSink& diagnostics);
+
+std::string MakeModuleArtifactKey(std::string_view package_identity,
+                                  std::string_view module_name);
+std::vector<std::filesystem::path> CanonicalizeModuleSourcePaths(const std::vector<std::filesystem::path>& source_paths);
+std::optional<mc::parse::ParseResult> ParseLogicalModuleSources(const std::vector<std::filesystem::path>& source_paths,
+                                                                support::DiagnosticSink& diagnostics);
+std::optional<std::string> ReadLogicalModuleSourceText(const std::vector<std::filesystem::path>& source_paths,
+                                                       support::DiagnosticSink& diagnostics);
+mc::mci::InterfaceArtifact MakeModuleInterfaceArtifact(const std::filesystem::path& source_path,
+                                                       std::string_view module_name,
+                                                       const ast::SourceFile& source_file,
+                                                       const sema::Module& checked_module,
+                                                       std::string target_identity);
+bool WriteModuleInterface(std::string_view artifact_key,
+                          const mc::mci::InterfaceArtifact& artifact,
+                          const std::filesystem::path& build_dir,
+                          support::DiagnosticSink& diagnostics);
+std::optional<ImportedInterfaceData> LoadImportedInterfaces(const CompileNode& node,
+                                                            std::string_view target_identity,
+                                                            const std::filesystem::path& build_dir,
+                                                            support::DiagnosticSink& diagnostics);
+void NamespaceImportedBuildUnit(mc::mir::Module& module,
+                                std::string_view module_name);
+void AddImportedExternDeclarations(mc::mir::Module& module,
+                                   const std::unordered_map<std::string, mc::sema::Module>& imported_modules);
+std::unique_ptr<mc::mir::Module> MergeBuildUnits(const std::vector<BuildUnit>& units,
+                                                 const mc::mir::Module& entry_module,
+                                                 const std::filesystem::path& entry_source_path,
+                                                 support::DiagnosticSink& diagnostics);
 
 std::optional<CompileGraph> DiscoverModuleGraph(const std::filesystem::path& entry_source_path,
                                                 const std::vector<std::filesystem::path>& import_roots,

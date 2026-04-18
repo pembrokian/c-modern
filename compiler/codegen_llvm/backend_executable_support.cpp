@@ -166,7 +166,7 @@ bool RenderLLVMEnumConstValue(const mir::Module& module,
 
     sema::Type rendered_enum_type = value.enum_type;
     if (rendered_enum_type != enum_type && rendered_enum_type.kind == sema::Type::Kind::kNamed &&
-        rendered_enum_type.subtypes == enum_type.subtypes && VariantLeafName(rendered_enum_type.name) == VariantLeafName(enum_type.name)) {
+        rendered_enum_type.subtypes == enum_type.subtypes && mir::VariantLeafName(rendered_enum_type.name) == mir::VariantLeafName(enum_type.name)) {
         rendered_enum_type.name = enum_type.name;
     }
 
@@ -247,7 +247,7 @@ bool RenderLLVMGlobalConstValue(const mir::Module& module,
     }
 
     if (value.kind == sema::ConstValue::Kind::kProcedure) {
-        const sema::Type canonical_type = StripMirAliasOrDistinct(module, std::move(type));
+        const sema::Type canonical_type = mir::StripMirAliasOrDistinct(module, std::move(type));
         if (canonical_type.kind != sema::Type::Kind::kProcedure) {
             ReportBackendError(source_path,
                                "LLVM bootstrap backend requires procedure-typed global constant for named procedure reference",
@@ -258,7 +258,7 @@ bool RenderLLVMGlobalConstValue(const mir::Module& module,
         return true;
     }
 
-    const sema::Type canonical_type = StripMirAliasOrDistinct(module, std::move(type));
+    const sema::Type canonical_type = mir::StripMirAliasOrDistinct(module, std::move(type));
     const auto lowered_type = LowerTypeInfo(module, canonical_type);
     if (!lowered_type.has_value()) {
         ReportBackendError(source_path,
@@ -408,25 +408,6 @@ std::size_t IntegerBitWidth(const BackendTypeInfo& type_info) {
         return 0;
     }
     return static_cast<std::size_t>(std::stoul(std::string(digits)));
-}
-
-sema::Type StripMirAliasOrDistinct(const mir::Module& module,
-                                   sema::Type type) {
-    std::unordered_set<std::string> visited;
-    while (type.kind == sema::Type::Kind::kNamed) {
-        const mir::TypeDecl* type_decl = FindTypeDecl(module, type.name);
-        if (type_decl == nullptr) {
-            break;
-        }
-        if (type_decl->kind != mir::TypeDecl::Kind::kDistinct && type_decl->kind != mir::TypeDecl::Kind::kAlias) {
-            break;
-        }
-        if (!visited.insert(type.name).second) {
-            break;
-        }
-        type = InstantiateAliasedType(*type_decl, type);
-    }
-    return type;
 }
 
 bool ResolveExecutableValue(const ExecutableFunctionState& state,

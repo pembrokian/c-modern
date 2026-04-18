@@ -256,18 +256,10 @@ const mir::TypeDecl* FindTypeDecl(const mir::Module& module,
     return nullptr;
 }
 
-std::string VariantLeafName(std::string_view variant_name) {
-    const std::size_t separator = variant_name.rfind('.');
-    if (separator == std::string_view::npos) {
-        return std::string(variant_name);
-    }
-    return std::string(variant_name.substr(separator + 1));
-}
-
 const mir::VariantDecl* FindVariantDecl(const mir::TypeDecl& type_decl,
                                         std::string_view variant_name,
                                         std::size_t* variant_index) {
-    const std::string leaf_name = VariantLeafName(variant_name);
+    const std::string leaf_name = mir::VariantLeafName(variant_name);
     for (std::size_t index = 0; index < type_decl.variants.size(); ++index) {
         if (type_decl.variants[index].name == leaf_name) {
             if (variant_index != nullptr) {

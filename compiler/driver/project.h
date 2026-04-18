@@ -72,6 +72,10 @@ const ProjectModuleSet* FindProjectModuleSetForSource(const ProjectTarget& targe
 std::optional<std::string> ResolveTargetPackageIdentity(const ProjectTarget& target,
                                                         const std::filesystem::path& source_path);
 
+void ReportBootstrapTargetNotes(const ProjectFile& project,
+                                std::string_view target_name,
+                                support::DiagnosticSink& diagnostics);
+
 }  // namespace mc::driver
 
 #endif  // C_MODERN_COMPILER_DRIVER_PROJECT_H_

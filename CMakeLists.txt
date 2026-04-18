@@ -52,6 +52,8 @@ target_link_libraries(mc_frontend_stub PUBLIC mc_support)
 
 add_library(mc_sema_bootstrap STATIC
     compiler/sema/check.cpp
+    compiler/sema/check_const_eval.cpp
+    compiler/sema/check_summary.cpp
     compiler/sema/const_eval.cpp
     compiler/sema/layout.cpp
     compiler/sema/module_resolver.cpp
@@ -104,6 +106,7 @@ add_executable(mc
     compiler/driver/build_support.cpp
     compiler/driver/build_graph.cpp
     compiler/driver/builder.cpp
+    compiler/driver/builder_merge.cpp
     compiler/driver/project.cpp
     compiler/driver/driver.cpp
     compiler/driver/driver_test.cpp

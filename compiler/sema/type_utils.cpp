@@ -66,6 +66,11 @@ bool IsIntegerLikeTypeWithModule(const Type& type, const Module& module) {
     return mc::sema::IsIntegerLikeType(stripped);
 }
 
+bool IsBoolTypeWithModule(const Type& type, const Module& module) {
+    const Type stripped = CanonicalizeBuiltinType(StripType(type, module, TypeStripMode::kAliasesOnly));
+    return mc::sema::IsBoolType(stripped);
+}
+
 bool IsPointerLikeTypeWithModule(const Type& type, const Module& module) {
     return mc::sema::IsPointerLikeType(StripType(type, module, TypeStripMode::kAliasesOnly));
 }
@@ -80,6 +85,30 @@ bool IsUintPtrTypeWithModule(const Type& type, const Module& module) {
 }
 
 }  // namespace
+
+bool IsNumericType(const Type& type, const Module& module) {
+    return IsNumericTypeWithModule(type, module);
+}
+
+bool IsIntegerLikeType(const Type& type, const Module& module) {
+    return IsIntegerLikeTypeWithModule(type, module);
+}
+
+bool IsBoolType(const Type& type, const Module& module) {
+    return IsBoolTypeWithModule(type, module);
+}
+
+bool IsPointerLikeType(const Type& type, const Module& module) {
+    return IsPointerLikeTypeWithModule(type, module);
+}
+
+bool IsUintPtrConvertibleType(const Type& type, const Module& module) {
+    return IsUintPtrConvertibleTypeWithModule(type, module);
+}
+
+bool IsUintPtrType(const Type& type, const Module& module) {
+    return IsUintPtrTypeWithModule(type, module);
+}
 
 Type SubstituteTypeParams(Type type, const std::vector<std::string>& type_params, const std::vector<Type>& type_args) {
     for (auto& subtype : type.subtypes) {
@@ -247,12 +276,12 @@ bool IsExplicitlyConvertible(const Type& expected, const Type& actual, const Mod
         }
     }
 
-    if ((IsUintPtrConvertibleTypeWithModule(stripped_expected, module) && IsUintPtrTypeWithModule(stripped_actual, module)) ||
-        (IsUintPtrTypeWithModule(stripped_expected, module) && IsUintPtrConvertibleTypeWithModule(stripped_actual, module))) {
+    if ((IsUintPtrConvertibleType(stripped_expected, module) && IsUintPtrType(stripped_actual, module)) ||
+        (IsUintPtrType(stripped_expected, module) && IsUintPtrConvertibleType(stripped_actual, module))) {
         return true;
     }
 
-    return IsNumericTypeWithModule(stripped_expected, module) && IsNumericTypeWithModule(stripped_actual, module);
+    return IsNumericType(stripped_expected, module) && IsNumericType(stripped_actual, module);
 }
 
 Type InferLiteralType(const ast::Expr& expr) {
@@ -322,7 +351,7 @@ bool IsAssignable(const Type& expected, const Type& actual, const Module& module
         IsFloatTypeName(canonical_expected.name)) {
         return true;
     }
-    if (IsPointerLikeTypeWithModule(canonical_expected, module) && canonical_actual.kind == Type::Kind::kNil) {
+    if (IsPointerLikeType(canonical_expected, module) && canonical_actual.kind == Type::Kind::kNil) {
         return true;
     }
     return false;

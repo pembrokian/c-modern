@@ -111,8 +111,6 @@ std::vector<std::pair<std::string, sema::Type>> InstantiateFields(
 
 bool IsAggregateType(const BackendTypeInfo& type_info);
 
-std::string VariantLeafName(std::string_view variant_name);
-
 const mir::VariantDecl* FindVariantDecl(const mir::TypeDecl& type_decl,
                                         std::string_view variant_name,
                                         std::size_t* variant_index = nullptr);
@@ -147,9 +145,6 @@ bool LowerInstructionType(const mir::Module& module,
                           support::DiagnosticSink& diagnostics,
                           const std::string& context,
                           BackendTypeInfo& type_info);
-
-sema::Type StripMirAliasOrDistinct(const mir::Module& module,
-                                   sema::Type type);
 
 std::string BackendFunctionName(const std::string& source_name);
 std::string BackendGlobalName(const std::string& source_name);
@@ -625,7 +620,7 @@ inline bool IsAtomicScalarType(const BackendTypeInfo& type_info) {
 }
 
 inline std::optional<std::string> LLVMAtomicOrderKeyword(std::string_view order_name) {
-    const std::string leaf = VariantLeafName(order_name);
+    const std::string leaf = mir::VariantLeafName(order_name);
     if (leaf == "Relaxed") {
         return "monotonic";
     }

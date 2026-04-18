@@ -219,9 +219,9 @@ std::optional<EnumCompareInfo> ResolveEnumCompareInfo(const mir::Module& module,
         return std::nullopt;
     }
 
-    sema::Type source_type = StripMirAliasOrDistinct(module, *value.source_type);
+    sema::Type source_type = mir::StripMirAliasOrDistinct(module, *value.source_type);
     while (source_type.kind == sema::Type::Kind::kConst && !source_type.subtypes.empty()) {
-        source_type = StripMirAliasOrDistinct(module, source_type.subtypes.front());
+        source_type = mir::StripMirAliasOrDistinct(module, source_type.subtypes.front());
     }
 
     if (source_type.kind != sema::Type::Kind::kNamed) {
@@ -346,7 +346,7 @@ bool EmitOrderedEnumFieldComparison(const mir::Module& module,
                                     std::string& eq_result,
                                     std::string& lt_result,
                                     std::string& gt_result) {
-    const sema::Type stripped_type = StripMirAliasOrDistinct(module, field_type);
+    const sema::Type stripped_type = mir::StripMirAliasOrDistinct(module, field_type);
     ExecutableValue lhs_value{.text = lhs_text, .type = backend_type, .source_type = stripped_type};
     ExecutableValue rhs_value{.text = rhs_text, .type = backend_type, .source_type = stripped_type};
 

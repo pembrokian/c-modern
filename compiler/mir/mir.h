@@ -6,6 +6,7 @@
 #include <memory>
 #include <optional>
 #include <string>
+#include <string_view>
 #include <unordered_map>
 #include <vector>
 
@@ -193,6 +194,17 @@ LowerResult LowerSourceFile(const ast::SourceFile& source_file,
                             const sema::Module& sema_module,
                             const std::filesystem::path& file_path,
                             support::DiagnosticSink& diagnostics);
+
+std::string VariantLeafName(std::string_view variant_name);
+std::string_view LeafTypeName(std::string_view name);
+bool IsNamedTypeFamily(const sema::Type& type, std::string_view family_name);
+sema::Type StripMirAliasOrDistinct(const Module& module, sema::Type type);
+std::optional<sema::Type> PointerPointeeType(const sema::Type& type);
+std::optional<sema::Type> AtomicElementType(const Module& module, const sema::Type& pointer_type);
+bool IsConstantAtomicOrderMetadata(std::string_view order_name);
+bool AtomicOrderAllowedForInstruction(Instruction::Kind kind, std::string_view order_name);
+bool AtomicCompareExchangeFailureOrderAllowed(std::string_view success_order_name,
+                                              std::string_view failure_order_name);
 
 // Lower a single sema-checked function declaration into a MIR Function.
 // This is the unit-testable entry point for the function lowerer.

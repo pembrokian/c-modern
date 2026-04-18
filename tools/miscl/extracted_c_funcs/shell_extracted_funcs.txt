@@ -1,0 +1,759 @@
+==== kernel/src/shell/serial_protocol.mc ====
+FUNCTION_DECL: encode_no_args
+   Return: [4]u8
+   Param: u8 cmd0
+   Param: u8 cmd1
+FUNCTION_DECL: encode_one_arg
+   Return: [4]u8
+   Param: u8 cmd0
+   Param: u8 cmd1
+   Param: u8 arg0
+FUNCTION_DECL: encode_two_args
+   Return: [4]u8
+   Param: u8 cmd0
+   Param: u8 cmd1
+   Param: u8 arg0
+   Param: u8 arg1
+FUNCTION_DECL: encode_echo
+   Return: [4]u8
+   Param: u8 left
+   Param: u8 right
+FUNCTION_DECL: encode_log_append
+   Return: [4]u8
+   Param: u8 value
+FUNCTION_DECL: encode_log_tail
+   Return: [4]u8
+FUNCTION_DECL: encode_kv_set
+   Return: [4]u8
+   Param: u8 key
+   Param: u8 value
+FUNCTION_DECL: encode_kv_get
+   Return: [4]u8
+   Param: u8 key
+FUNCTION_DECL: encode_kv_count
+   Return: [4]u8
+FUNCTION_DECL: encode_lifecycle_query
+   Return: [4]u8
+   Param: u8 target
+FUNCTION_DECL: encode_lifecycle_authority
+   Return: [4]u8
+   Param: u8 target
+FUNCTION_DECL: encode_lifecycle_state
+   Return: [4]u8
+   Param: u8 target
+FUNCTION_DECL: encode_lifecycle_durability
+   Return: [4]u8
+   Param: u8 target
+FUNCTION_DECL: encode_lifecycle_identity
+   Return: [4]u8
+   Param: u8 target
+FUNCTION_DECL: encode_lifecycle_policy
+   Return: [4]u8
+   Param: u8 target
+FUNCTION_DECL: encode_lifecycle_summary
+   Return: [4]u8
+   Param: u8 target
+FUNCTION_DECL: encode_lifecycle_compare
+   Return: [4]u8
+   Param: u8 target
+FUNCTION_DECL: encode_lifecycle_restart
+   Return: [4]u8
+   Param: u8 target
+FUNCTION_DECL: encode_queue_enqueue
+   Return: [4]u8
+   Param: u8 value
+FUNCTION_DECL: encode_queue_dequeue
+   Return: [4]u8
+FUNCTION_DECL: encode_queue_count
+   Return: [4]u8
+FUNCTION_DECL: encode_queue_peek
+   Return: [4]u8
+FUNCTION_DECL: encode_queue_stall_count
+   Return: [4]u8
+FUNCTION_DECL: encode_ticket_issue
+   Return: [4]u8
+FUNCTION_DECL: encode_ticket_use
+   Return: [4]u8
+   Param: u8 epoch
+   Param: u8 id
+FUNCTION_DECL: encode_file_create
+   Return: [4]u8
+   Param: u8 name
+FUNCTION_DECL: encode_file_write
+   Return: [4]u8
+   Param: u8 name
+   Param: u8 val
+FUNCTION_DECL: encode_file_read
+   Return: [4]u8
+   Param: u8 name
+FUNCTION_DECL: encode_file_count
+   Return: [4]u8
+FUNCTION_DECL: encode_object_create
+   Return: [4]u8
+   Param: u8 name
+   Param: u8 value
+FUNCTION_DECL: encode_object_read
+   Return: [4]u8
+   Param: u8 name
+FUNCTION_DECL: encode_object_replace
+   Return: [4]u8
+   Param: u8 name
+   Param: u8 value
+FUNCTION_DECL: encode_update_stage
+   Return: [4]u8
+   Param: u8 value
+FUNCTION_DECL: encode_update_clear
+   Return: [4]u8
+FUNCTION_DECL: encode_update_query
+   Return: [4]u8
+FUNCTION_DECL: encode_update_manifest
+   Return: [4]u8
+   Param: u8 version
+   Param: u8 expected_len
+FUNCTION_DECL: encode_timer_create
+   Return: [4]u8
+   Param: u8 id
+   Param: u8 due
+FUNCTION_DECL: encode_timer_cancel
+   Return: [4]u8
+   Param: u8 id
+FUNCTION_DECL: encode_timer_query
+   Return: [4]u8
+   Param: u8 id
+FUNCTION_DECL: encode_timer_expired
+   Return: [4]u8
+   Param: u8 window
+FUNCTION_DECL: encode_task_submit
+   Return: [4]u8
+   Param: u8 opcode
+FUNCTION_DECL: encode_task_query
+   Return: [4]u8
+   Param: u8 id
+FUNCTION_DECL: encode_task_cancel
+   Return: [4]u8
+   Param: u8 id
+FUNCTION_DECL: encode_task_complete
+   Return: [4]u8
+   Param: u8 id
+FUNCTION_DECL: encode_task_list
+   Return: [4]u8
+   Param: u8 window
+FUNCTION_DECL: encode_journal_append
+   Return: [4]u8
+   Param: u8 name
+   Param: u8 value
+FUNCTION_DECL: encode_journal_replay
+   Return: [4]u8
+   Param: u8 name
+FUNCTION_DECL: encode_journal_clear
+   Return: [4]u8
+   Param: u8 name
+FUNCTION_DECL: encode_workflow_schedule
+   Return: [4]u8
+   Param: u8 id
+   Param: u8 due
+FUNCTION_DECL: encode_workflow_update
+   Return: [4]u8
+   Param: u8 name
+   Param: u8 value
+FUNCTION_DECL: encode_workflow_apply_update
+   Return: [4]u8
+FUNCTION_DECL: encode_workflow_apply_update_lease
+   Return: [4]u8
+   Param: u8 id
+FUNCTION_DECL: encode_workflow_query
+   Return: [4]u8
+   Param: u8 id
+FUNCTION_DECL: encode_workflow_cancel
+   Return: [4]u8
+   Param: u8 id
+FUNCTION_DECL: encode_lease_issue
+   Return: [4]u8
+   Param: u8 workflow
+FUNCTION_DECL: encode_lease_issue_installer_apply
+   Return: [4]u8
+FUNCTION_DECL: encode_lease_consume
+   Return: [4]u8
+   Param: u8 id
+   Param: u8 workflow
+FUNCTION_DECL: encode_lease_issue_object_update
+   Return: [4]u8
+   Param: u8 name
+   Param: u8 value
+FUNCTION_DECL: encode_lease_issue_external_ticket
+   Return: [4]u8
+   Param: u8 epoch
+   Param: u8 id
+FUNCTION_DECL: encode_lease_consume_object_update
+   Return: [4]u8
+   Param: u8 id
+FUNCTION_DECL: encode_completion_fetch
+   Return: [4]u8
+FUNCTION_DECL: encode_completion_ack
+   Return: [4]u8
+FUNCTION_DECL: encode_completion_count
+   Return: [4]u8
+FUNCTION_DECL: encode_connection_open
+   Return: [4]u8
+   Param: u8 slot
+   Param: u8 budget
+FUNCTION_DECL: encode_connection_receive
+   Return: [4]u8
+   Param: u8 slot
+   Param: u8 value
+FUNCTION_DECL: encode_connection_send
+   Return: [4]u8
+   Param: u8 slot
+   Param: u8 value
+FUNCTION_DECL: encode_connection_close
+   Return: [4]u8
+   Param: u8 slot
+   Param: u8 reason
+FUNCTION_DECL: encode_connection_execute
+   Return: [4]u8
+   Param: u8 slot
+
+==== kernel/src/shell/serial_service.mc ====
+STRUCT_DECL: SerialServiceState
+FUNCTION_DECL: serial_init
+   Return: SerialServiceState
+   Param: u32 pid
+   Param: u32 slot
+FUNCTION_DECL: serialwith
+   Return: SerialServiceState
+   Param: SerialServiceState s
+   Param: [SERIAL_BUFFER_CAPACITY]u8 buf
+   Param: usize blen
+   Param: syscall.SyscallStatus rs
+   Param: usize rlen
+   Param: [4]u8 rp
+FUNCTION_DECL: serial_clear_reply
+   Return: SerialServiceState
+   Param: SerialServiceState s
+FUNCTION_DECL: serial_reply_status
+   Return: syscall.SyscallStatus
+   Param: SerialServiceState s
+FUNCTION_DECL: serial_reply_len
+   Return: usize
+   Param: SerialServiceState s
+FUNCTION_DECL: serial_reply_payload
+   Return: [4]u8
+   Param: SerialServiceState s
+FUNCTION_DECL: serial_has_pending_reply
+   Return: u32
+   Param: SerialServiceState s
+FUNCTION_DECL: serial_forwarded
+   Return: u32
+   Param: SerialServiceState s
+FUNCTION_DECL: serial_on_receive
+   Return: SerialServiceState
+   Param: SerialServiceState s
+   Param: syscall.ReceiveObservation obs
+FUNCTION_DECL: serial_forward_request_len
+   Return: usize
+   Param: SerialServiceState s
+FUNCTION_DECL: serial_forward_request_payload
+   Return: [4]u8
+   Param: SerialServiceState s
+FUNCTION_DECL: serial_clear
+   Return: SerialServiceState
+   Param: SerialServiceState s
+FUNCTION_DECL: serial_on_reply
+   Return: SerialServiceState
+   Param: SerialServiceState s
+   Param: syscall.ReceiveObservation obs
+
+==== kernel/src/shell/serial_shell_event_log.mc ====
+STRUCT_DECL: SerialShellEventLog
+FUNCTION_DECL: event_log_init
+   Return: SerialShellEventLog
+FUNCTION_DECL: normalize_slot_index
+   Return: usize
+   Param: usize raw_index
+FUNCTION_DECL: with_slot
+   Return: SerialShellEventLog
+   Param: SerialShellEventLog log
+   Param: usize slot_index
+   Param: u32 event_code
+FUNCTION_DECL: event_log_push
+   Return: SerialShellEventLog
+   Param: SerialShellEventLog log
+   Param: u32 event_code
+FUNCTION_DECL: event_log_len
+   Return: usize
+   Param: SerialShellEventLog log
+FUNCTION_DECL: event_log_entry
+   Return: u32
+   Param: SerialShellEventLog log
+   Param: usize logical_index
+FUNCTION_DECL: append_effect_events
+   Return: SerialShellEventLog
+   Param: SerialShellEventLog log
+   Param: service_effect.Effect effect
+
+==== kernel/src/shell/serial_shell_path.mc ====
+STRUCT_DECL: SerialShellPathState
+FUNCTION_DECL: path_init
+   Return: SerialShellPathState
+   Param: serial_service.SerialServiceState serial_state
+   Param: shell_service.ShellServiceState shell_state
+   Param: u32 shell_endpoint_id
+FUNCTION_DECL: pathwith
+   Return: SerialShellPathState
+   Param: SerialShellPathState p
+   Param: serial_service.SerialServiceState serial
+   Param: shell_service.ShellServiceState shell
+FUNCTION_DECL: build_reply_observation
+   Return: syscall.ReceiveObservation
+   Param: shell_service.ShellServiceState shell_state
+   Param: u32 shell_endpoint_id
+   Param: service_effect.Effect effect
+FUNCTION_DECL: serial_shell_step
+   Return: service_effect.Effect
+   Param: *serial_service.SerialServiceState serial
+   Param: *shell_service.ShellServiceState shell
+   Param: u32 shell_endpoint_id
+   Param: syscall.ReceiveObservation obs
+FUNCTION_DECL: path_step
+   Return: service_effect.Effect
+   Param: *SerialShellPathState path
+   Param: syscall.ReceiveObservation obs
+FUNCTION_DECL: path_serial_reply_status
+   Return: syscall.SyscallStatus
+   Param: SerialShellPathState path
+FUNCTION_DECL: path_serial_reply_len
+   Return: usize
+   Param: SerialShellPathState path
+FUNCTION_DECL: path_serial_reply_payload
+   Return: [4]u8
+   Param: SerialShellPathState path
+FUNCTION_DECL: path_serial_buffer_len
+   Return: usize
+   Param: SerialShellPathState path
+FUNCTION_DECL: path_receive_reply
+   Return: SerialShellPathState
+   Param: SerialShellPathState path
+   Param: service_effect.Effect effect
+FUNCTION_DECL: path_commit_reply
+   Return: SerialShellPathState
+   Param: SerialShellPathState path
+   Param: service_effect.Effect inner_effect
+
+==== kernel/src/shell/shell_service.mc ====
+STRUCT_DECL: LifecycleControl
+STRUCT_DECL: ShellServiceState
+STRUCT_DECL: OpHandler
+FUNCTION_DECL: shell_init
+   Return: ShellServiceState
+   Param: u32 pid
+   Param: u32 slot
+FUNCTION_DECL: invalid_effect
+   Return: service_effect.Effect
+   Param: u8 kind
+FUNCTION_DECL: forward_payload
+   Return: service_effect.Effect
+   Param: ShellServiceState s
+   Param: u32 endpoint
+   Param: usize send_len
+   Param: [4]u8 payload
+FUNCTION_DECL: forward_empty
+   Return: service_effect.Effect
+   Param: ShellServiceState s
+   Param: u32 endpoint
+FUNCTION_DECL: forward_one
+   Return: service_effect.Effect
+   Param: ShellServiceState s
+   Param: u32 endpoint
+   Param: u8 value0
+FUNCTION_DECL: forward_two
+   Return: service_effect.Effect
+   Param: ShellServiceState s
+   Param: u32 endpoint
+   Param: u8 value0
+   Param: u8 value1
+FUNCTION_DECL: forward_three
+   Return: service_effect.Effect
+   Param: ShellServiceState s
+   Param: u32 endpoint
+   Param: u8 value0
+   Param: u8 value1
+   Param: u8 value2
+FUNCTION_DECL: shell_ready
+   Return: bool
+   Param: ShellServiceState s
+FUNCTION_DECL: bang3
+   Return: bool
+   Param: service_effect.Message m
+FUNCTION_DECL: bang23
+   Return: bool
+   Param: service_effect.Message m
+FUNCTION_DECL: anymsg
+   Return: bool
+   Param: service_effect.Message m
+FUNCTION_DECL: invalid_route
+   Return: service_effect.Effect
+   Param: ShellServiceState s
+   Param: service_effect.Message m
+FUNCTION_DECL: lifecycle_op_supported
+   Return: bool
+   Param: u8 op
+FUNCTION_DECL: lifecycle_control
+   Return: LifecycleControl
+   Param: service_effect.Message m
+FUNCTION_DECL: lifecycle_invalid_kind
+   Return: u8
+   Param: service_effect.Message m
+FUNCTION_DECL: lifecycle_target_endpoint
+   Return: u32
+   Param: u8 target
+FUNCTION_DECL: lifecycle_mode
+   Return: u8
+   Param: u32 endpoint
+FUNCTION_DECL: lifecycle_effect
+   Return: service_effect.Effect
+   Param: syscall.SyscallStatus status
+   Param: u8 target
+   Param: u8 mode
+FUNCTION_DECL: lifecycle_forward
+   Return: service_effect.Effect
+   Param: ShellServiceState s
+   Param: service_effect.Message m
+FUNCTION_DECL: lifecycle_identity_effect
+   Return: service_effect.Effect
+   Param: syscall.SyscallStatus status
+   Param: [4]u8 generation_payload
+FUNCTION_DECL: lifecycle_authority_effect
+   Return: service_effect.Effect
+   Param: syscall.SyscallStatus status
+   Param: [4]u8 payload
+FUNCTION_DECL: lifecycle_state_effect
+   Return: service_effect.Effect
+   Param: syscall.SyscallStatus status
+   Param: [4]u8 payload
+FUNCTION_DECL: lifecycle_durability_effect
+   Return: service_effect.Effect
+   Param: syscall.SyscallStatus status
+   Param: [4]u8 payload
+FUNCTION_DECL: lifecycle_policy_effect
+   Return: service_effect.Effect
+   Param: syscall.SyscallStatus status
+   Param: [4]u8 payload
+FUNCTION_DECL: lifecycle_summary_effect
+   Return: service_effect.Effect
+   Param: syscall.SyscallStatus status
+   Param: [4]u8 payload
+FUNCTION_DECL: dispatch
+   Return: service_effect.Effect
+   Param: [5]OpHandler routes
+   Param: ShellServiceState s
+   Param: service_effect.Message m
+   Param: u8 op
+FUNCTION_DECL: lifecycle_validate_target
+   Return: bool
+   Param: u8 target
+   Param: bool require_restart
+FUNCTION_DECL: route_lifecycle
+   Return: service_effect.Effect
+   Param: ShellServiceState s
+   Param: service_effect.Message m
+   Param: u8 op
+FUNCTION_DECL: route_echo
+   Return: service_effect.Effect
+   Param: ShellServiceState s
+   Param: service_effect.Message m
+   Param: u8 op
+FUNCTION_DECL: log_append
+   Return: service_effect.Effect
+   Param: ShellServiceState s
+   Param: service_effect.Message m
+FUNCTION_DECL: log_tail
+   Return: service_effect.Effect
+   Param: ShellServiceState s
+   Param: service_effect.Message m
+FUNCTION_DECL: route_log
+   Return: service_effect.Effect
+   Param: ShellServiceState s
+   Param: service_effect.Message m
+   Param: u8 op
+FUNCTION_DECL: kv_set
+   Return: service_effect.Effect
+   Param: ShellServiceState s
+   Param: service_effect.Message m
+FUNCTION_DECL: kv_get
+   Return: service_effect.Effect
+   Param: ShellServiceState s
+   Param: service_effect.Message m
+FUNCTION_DECL: kv_count
+   Return: service_effect.Effect
+   Param: ShellServiceState s
+   Param: service_effect.Message m
+FUNCTION_DECL: route_kv
+   Return: service_effect.Effect
+   Param: ShellServiceState s
+   Param: service_effect.Message m
+   Param: u8 op
+FUNCTION_DECL: queue_push
+   Return: service_effect.Effect
+   Param: ShellServiceState s
+   Param: service_effect.Message m
+FUNCTION_DECL: queue_dequeue
+   Return: service_effect.Effect
+   Param: ShellServiceState s
+   Param: service_effect.Message m
+FUNCTION_DECL: queue_count
+   Return: service_effect.Effect
+   Param: ShellServiceState s
+   Param: service_effect.Message m
+FUNCTION_DECL: queue_peek
+   Return: service_effect.Effect
+   Param: ShellServiceState s
+   Param: service_effect.Message m
+FUNCTION_DECL: queue_wait
+   Return: service_effect.Effect
+   Param: ShellServiceState s
+   Param: service_effect.Message m
+FUNCTION_DECL: route_queue
+   Return: service_effect.Effect
+   Param: ShellServiceState s
+   Param: service_effect.Message m
+   Param: u8 op
+FUNCTION_DECL: file_create
+   Return: service_effect.Effect
+   Param: ShellServiceState s
+   Param: service_effect.Message m
+FUNCTION_DECL: file_write
+   Return: service_effect.Effect
+   Param: ShellServiceState s
+   Param: service_effect.Message m
+FUNCTION_DECL: file_read
+   Return: service_effect.Effect
+   Param: ShellServiceState s
+   Param: service_effect.Message m
+FUNCTION_DECL: file_list
+   Return: service_effect.Effect
+   Param: ShellServiceState s
+   Param: service_effect.Message m
+FUNCTION_DECL: route_file
+   Return: service_effect.Effect
+   Param: ShellServiceState s
+   Param: service_effect.Message m
+   Param: u8 op
+FUNCTION_DECL: object_create
+   Return: service_effect.Effect
+   Param: ShellServiceState s
+   Param: service_effect.Message m
+FUNCTION_DECL: object_read
+   Return: service_effect.Effect
+   Param: ShellServiceState s
+   Param: service_effect.Message m
+FUNCTION_DECL: object_replace
+   Return: service_effect.Effect
+   Param: ShellServiceState s
+   Param: service_effect.Message m
+FUNCTION_DECL: route_object_store
+   Return: service_effect.Effect
+   Param: ShellServiceState s
+   Param: service_effect.Message m
+   Param: u8 op
+FUNCTION_DECL: update_stage
+   Return: service_effect.Effect
+   Param: ShellServiceState s
+   Param: service_effect.Message m
+FUNCTION_DECL: update_clear
+   Return: service_effect.Effect
+   Param: ShellServiceState s
+   Param: service_effect.Message m
+FUNCTION_DECL: update_query
+   Return: service_effect.Effect
+   Param: ShellServiceState s
+   Param: service_effect.Message m
+FUNCTION_DECL: update_manifest
+   Return: service_effect.Effect
+   Param: ShellServiceState s
+   Param: service_effect.Message m
+FUNCTION_DECL: route_update_store
+   Return: service_effect.Effect
+   Param: ShellServiceState s
+   Param: service_effect.Message m
+   Param: u8 op
+FUNCTION_DECL: timer_create
+   Return: service_effect.Effect
+   Param: ShellServiceState s
+   Param: service_effect.Message m
+FUNCTION_DECL: timer_cancel
+   Return: service_effect.Effect
+   Param: ShellServiceState s
+   Param: service_effect.Message m
+FUNCTION_DECL: timer_query
+   Return: service_effect.Effect
+   Param: ShellServiceState s
+   Param: service_effect.Message m
+FUNCTION_DECL: timer_expired
+   Return: service_effect.Effect
+   Param: ShellServiceState s
+   Param: service_effect.Message m
+FUNCTION_DECL: route_timer
+   Return: service_effect.Effect
+   Param: ShellServiceState s
+   Param: service_effect.Message m
+   Param: u8 op
+FUNCTION_DECL: journal_append
+   Return: service_effect.Effect
+   Param: ShellServiceState s
+   Param: service_effect.Message m
+FUNCTION_DECL: journal_read
+   Return: service_effect.Effect
+   Param: ShellServiceState s
+   Param: service_effect.Message m
+FUNCTION_DECL: journal_clear
+   Return: service_effect.Effect
+   Param: ShellServiceState s
+   Param: service_effect.Message m
+FUNCTION_DECL: route_journal
+   Return: service_effect.Effect
+   Param: ShellServiceState s
+   Param: service_effect.Message m
+   Param: u8 op
+FUNCTION_DECL: task_submit
+   Return: service_effect.Effect
+   Param: ShellServiceState s
+   Param: service_effect.Message m
+FUNCTION_DECL: task_query
+   Return: service_effect.Effect
+   Param: ShellServiceState s
+   Param: service_effect.Message m
+FUNCTION_DECL: task_cancel
+   Return: service_effect.Effect
+   Param: ShellServiceState s
+   Param: service_effect.Message m
+FUNCTION_DECL: task_done
+   Return: service_effect.Effect
+   Param: ShellServiceState s
+   Param: service_effect.Message m
+FUNCTION_DECL: task_list
+   Return: service_effect.Effect
+   Param: ShellServiceState s
+   Param: service_effect.Message m
+FUNCTION_DECL: route_task
+   Return: service_effect.Effect
+   Param: ShellServiceState s
+   Param: service_effect.Message m
+   Param: u8 op
+FUNCTION_DECL: workflow_schedule
+   Return: service_effect.Effect
+   Param: ShellServiceState s
+   Param: service_effect.Message m
+FUNCTION_DECL: workflow_update
+   Return: service_effect.Effect
+   Param: ShellServiceState s
+   Param: service_effect.Message m
+FUNCTION_DECL: workflow_apply_update
+   Return: service_effect.Effect
+   Param: ShellServiceState s
+   Param: service_effect.Message m
+FUNCTION_DECL: workflow_apply_update_lease
+   Return: service_effect.Effect
+   Param: ShellServiceState s
+   Param: service_effect.Message m
+FUNCTION_DECL: workflow_query
+   Return: service_effect.Effect
+   Param: ShellServiceState s
+   Param: service_effect.Message m
+FUNCTION_DECL: workflow_cancel
+   Return: service_effect.Effect
+   Param: ShellServiceState s
+   Param: service_effect.Message m
+FUNCTION_DECL: route_workflow
+   Return: service_effect.Effect
+   Param: ShellServiceState s
+   Param: service_effect.Message m
+   Param: u8 op
+FUNCTION_DECL: completion_fetch
+   Return: service_effect.Effect
+   Param: ShellServiceState s
+   Param: service_effect.Message m
+FUNCTION_DECL: completion_ack
+   Return: service_effect.Effect
+   Param: ShellServiceState s
+   Param: service_effect.Message m
+FUNCTION_DECL: completion_count
+   Return: service_effect.Effect
+   Param: ShellServiceState s
+   Param: service_effect.Message m
+FUNCTION_DECL: route_completion
+   Return: service_effect.Effect
+   Param: ShellServiceState s
+   Param: service_effect.Message m
+   Param: u8 op
+FUNCTION_DECL: connection_open
+   Return: service_effect.Effect
+   Param: ShellServiceState s
+   Param: service_effect.Message m
+FUNCTION_DECL: connection_receive
+   Return: service_effect.Effect
+   Param: ShellServiceState s
+   Param: service_effect.Message m
+FUNCTION_DECL: connection_send
+   Return: service_effect.Effect
+   Param: ShellServiceState s
+   Param: service_effect.Message m
+FUNCTION_DECL: connection_close
+   Return: service_effect.Effect
+   Param: ShellServiceState s
+   Param: service_effect.Message m
+FUNCTION_DECL: connection_execute
+   Return: service_effect.Effect
+   Param: ShellServiceState s
+   Param: service_effect.Message m
+FUNCTION_DECL: route_connection
+   Return: service_effect.Effect
+   Param: ShellServiceState s
+   Param: service_effect.Message m
+   Param: u8 op
+FUNCTION_DECL: lease_issue
+   Return: service_effect.Effect
+   Param: ShellServiceState s
+   Param: service_effect.Message m
+FUNCTION_DECL: lease_issue_installer_apply
+   Return: service_effect.Effect
+   Param: ShellServiceState s
+   Param: service_effect.Message m
+FUNCTION_DECL: lease_consume
+   Return: service_effect.Effect
+   Param: ShellServiceState s
+   Param: service_effect.Message m
+FUNCTION_DECL: lease_issue_object_update
+   Return: service_effect.Effect
+   Param: ShellServiceState s
+   Param: service_effect.Message m
+FUNCTION_DECL: lease_issue_external_ticket
+   Return: service_effect.Effect
+   Param: ShellServiceState s
+   Param: service_effect.Message m
+FUNCTION_DECL: lease_consume_object_update
+   Return: service_effect.Effect
+   Param: ShellServiceState s
+   Param: service_effect.Message m
+FUNCTION_DECL: route_lease
+   Return: service_effect.Effect
+   Param: ShellServiceState s
+   Param: service_effect.Message m
+   Param: u8 op
+FUNCTION_DECL: ticket_issue
+   Return: service_effect.Effect
+   Param: ShellServiceState s
+   Param: service_effect.Message m
+FUNCTION_DECL: ticket_use
+   Return: service_effect.Effect
+   Param: ShellServiceState s
+   Param: service_effect.Message m
+FUNCTION_DECL: route_ticket
+   Return: service_effect.Effect
+   Param: ShellServiceState s
+   Param: service_effect.Message m
+   Param: u8 op
+FUNCTION_DECL: handle
+   Return: service_effect.Effect
+   Param: ShellServiceState s
+   Param: service_effect.Message m
+

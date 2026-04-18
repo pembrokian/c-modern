@@ -13,6 +13,7 @@
 #include "compiler/codegen_llvm/backend.h"
 #include "compiler/lex/lexer.h"
 #include "compiler/support/dump_paths.h"
+#include "compiler/support/module_paths.h"
 
 namespace mc::driver {
 namespace {
@@ -21,6 +22,10 @@ constexpr std::string_view kHostedRuntimeSupportRelativePath = "runtime/hosted/m
 constexpr std::string_view kFreestandingRuntimeDirectoryRelativePath = "runtime/freestanding";
 
 }  // namespace
+
+bool IsInternalModulePath(const std::filesystem::path& path) {
+    return mc::support::IsInternalModulePath(path);
+}
 
 bool IsPathWithinRoot(const std::filesystem::path& path,
                       const std::filesystem::path& root) {
@@ -54,6 +59,52 @@ std::optional<std::filesystem::path> DiscoverRepositoryRoot(const std::filesyste
     }
 
     return std::nullopt;
+}
+
+std::optional<std::string> ResolveDirectSourcePackageIdentity(const std::filesystem::path& source_path,
+                                                              const std::vector<std::filesystem::path>& import_roots) {
+    std::optional<std::filesystem::path> best_root;
+    std::size_t best_depth = 0;
+    for (const auto& root : import_roots) {
+        if (!IsPathWithinRoot(source_path, root)) {
+            continue;
+        }
+        const auto normalized_root = std::filesystem::absolute(root).lexically_normal();
+        const std::size_t depth = static_cast<std::size_t>(std::distance(normalized_root.begin(), normalized_root.end()));
+        if (!best_root.has_value() || depth > best_depth) {
+            best_root = normalized_root;
+            best_depth = depth;
+        }
+    }
+
+    if (best_root.has_value()) {
+        return "direct:" + best_root->generic_string();
+    }
+
+    return "direct:" + std::filesystem::absolute(source_path).lexically_normal().parent_path().generic_string();
+}
+
+std::optional<std::string> ResolveExternalSourcePackageIdentity(const std::filesystem::path& source_path,
+                                                                const std::vector<std::filesystem::path>& import_roots) {
+    std::optional<std::filesystem::path> best_root;
+    std::size_t best_depth = 0;
+    for (const auto& root : import_roots) {
+        if (!IsPathWithinRoot(source_path, root)) {
+            continue;
+        }
+        const auto normalized_root = std::filesystem::absolute(root).lexically_normal();
+        const std::size_t depth = static_cast<std::size_t>(std::distance(normalized_root.begin(), normalized_root.end()));
+        if (!best_root.has_value() || depth > best_depth) {
+            best_root = normalized_root;
+            best_depth = depth;
+        }
+    }
+
+    if (best_root.has_value()) {
+        return "external:" + best_root->generic_string();
+    }
+
+    return "external:" + std::filesystem::absolute(source_path).lexically_normal().parent_path().generic_string();
 }
 
 std::optional<std::filesystem::path> DiscoverHostedRuntimeSupportSource(const std::filesystem::path& source_path) {
