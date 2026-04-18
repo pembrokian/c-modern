@@ -1,8 +1,8 @@
 import boot
-import scenarios
+import kernel_entry
 
-func main() i32 {
+func main(args: Slice<cstr>) i32 {
     state := boot.kernel_init()
-    return scenarios.run(&state)
+    return kernel_entry.run(&state, args)
 }
 

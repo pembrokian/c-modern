@@ -171,17 +171,6 @@ Relevant file-local invariants
 - Narrow validation should start on the delegated object path before any wider
   durable or workflow suite.
 
-Relevant test surfaces
-- primary owning test family: `tests/system/` or the delegated object workflow
-  fixture family, with the grouped reset-lane tool suite as the surrounding
-  validation owner when the path is kernel-workflow driven
-- narrowest expected first executable validation target: the delegated
-  durable-mutation scenario that proves object-version mismatch or conflict,
-  then the reset-lane fixture that spends the same path
-- fixture or output-layout rule: keep repo-owned outputs under the active
-  build tree, and use the existing grouped workflow or system fixture roots
-  rather than creating a new top-level output lane
-
 Test obligations
 ----------------
 - `Build debug`

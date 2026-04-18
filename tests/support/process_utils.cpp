@@ -204,6 +204,74 @@ std::pair<CommandOutcome, std::string> RunCommandCaptureInDir(
     return {outcome, output};
 }
 
+std::pair<CommandOutcome, std::string> RunCommandCaptureInDirWithInput(
+    const std::vector<std::string>& args,
+    const std::filesystem::path& working_dir,
+    const std::filesystem::path& output_path,
+    std::string_view input,
+    const std::string& context) {
+    std::filesystem::create_directories(output_path.parent_path());
+
+    const int output_fd = open(output_path.c_str(), O_CREAT | O_WRONLY | O_TRUNC, 0644);
+    if (output_fd < 0) {
+        const int saved_errno = errno;
+        Fail(context + ": failed to open output capture file: errno=" + std::to_string(saved_errno));
+    }
+
+    int input_pipe[2] = {-1, -1};
+    if (pipe(input_pipe) != 0) {
+        const int saved_errno = errno;
+        CloseFd(output_fd);
+        Fail(context + ": failed to create input pipe: errno=" + std::to_string(saved_errno));
+    }
+
+    pid_t pid = fork();
+    if (pid < 0) {
+        const int saved_errno = errno;
+        CloseFd(output_fd);
+        CloseFd(input_pipe[0]);
+        CloseFd(input_pipe[1]);
+        Fail(context + ": fork failed: errno=" + std::to_string(saved_errno));
+    }
+
+    if (pid == 0) {
+        CloseFd(input_pipe[1]);
+        if (chdir(working_dir.c_str()) != 0) {
+            _exit(127);
+        }
+        if (dup2(input_pipe[0], STDIN_FILENO) < 0) {
+            _exit(127);
+        }
+        if (dup2(output_fd, STDOUT_FILENO) < 0 || dup2(output_fd, STDERR_FILENO) < 0) {
+            _exit(127);
+        }
+        CloseFd(input_pipe[0]);
+        CloseFd(output_fd);
+        ExecCommand(args);
+    }
+
+    CloseFd(input_pipe[0]);
+    CloseFd(output_fd);
+
+    size_t offset = 0;
+    while (offset < input.size()) {
+        const ssize_t written = write(input_pipe[1], input.data() + offset, input.size() - offset);
+        if (written < 0) {
+            const int saved_errno = errno;
+            CloseFd(input_pipe[1]);
+            kill(pid, SIGKILL);
+            waitpid(pid, nullptr, 0);
+            Fail(context + ": failed writing command input: errno=" + std::to_string(saved_errno));
+        }
+        offset += static_cast<size_t>(written);
+    }
+    CloseFd(input_pipe[1]);
+
+    const CommandOutcome outcome = WaitForCommandExit(pid, context);
+    const std::string output = ReadFile(output_path);
+    return {outcome, output};
+}
+
 void ExpectCommandSuccess(const std::vector<std::string>& args,
                           const std::string& context) {
     const CommandOutcome outcome = RunCommand(args, context);

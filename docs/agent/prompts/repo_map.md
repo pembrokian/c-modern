@@ -7,7 +7,7 @@ This file is a fast orientation map for agents working in this repository.
 - `CMakeLists.txt`: canonical build graph and CTest registration
 - `Makefile`: convenience wrapper around the CMake workflow
 - `README.md`: current repository summary and common commands
-- `kernel/`: repository-owned Veya kernel bring-up tree; currently at the Phase 245 update recovery and completion reporting pressure slice over the hosted reset-lane workflow surface
+- `kernel/`: repository-owned Veya kernel bring-up tree; currently through the Phase 253 bounded live receive slice over the hosted reset-lane workflow surface
 - `docs/agent/prompts/plan_spec.txt`: normative spec for the required structure of new per-phase plan documents
 - `docs/plan/admin/canopus_repo_layout_and_test_policy.txt`: current repository policy for Veya source, build, and test placement
 - `docs/plan/plan.txt`: authoritative multi-phase implementation plan
@@ -33,7 +33,9 @@ This file is a fast orientation map for agents working in this repository.
   - repository-owned Veya kernel sources rather than disposable proof-only fixtures
   - `docs/arch/veya/kernel_style_guide.txt`: required style guide for kernel/src/ service modules and kernel main.mc orchestration
   - `build.toml`: hosted reset-lane manifest used by the active workflow suite and the maintained reset-lane tool regressions
-  - `src/main.mc`: explicit architecture entry plus thin root orchestration over the landed bounded service graph, including the durable journal owner, durable object-store owner, durable update-store owner, retained workflow owner, retained completion mailbox owner, bounded delegation lease owner, bounded connection ingress owner, connection-backed workflow execution path, delegated external ticket-use follow-through, the restart-safe update-apply workflow lane, the delegated installer-authority apply path, and the mailbox-pressured restart-resumed update-reporting path
+  - `src/main.mc`: explicit architecture entry that initializes boot state and delegates immediately to `kernel_entry`
+  - `src/kernel_entry.mc`: thin reset-lane entry router that preserves scripted scenarios as the default path and admits one explicit `live` stdin-backed mode without turning `main.mc` into a policy owner
+  - `src/live_receive.mc`: bounded hosted live receive owner that polls one real input fd, assembles one four-byte shell frame at a time, and feeds the existing serial or shell dispatch path without duplicating shell decode or routing logic
   - `src/services/object_store_service.mc`: bounded durable named-object owner with fixed-capacity create/read/replace semantics, one owner-local workflow-facing update step, owner-local artifact persistence, and explicit reload-on-restart follow-through
   - `src/services/update_store_service.mc`: bounded durable staged-update owner with one fixed artifact slot, one compact manifest record, one owner-local applied target, one owner-local classification and apply step, one owner-local artifact persistence, and explicit reload-on-restart follow-through
   - `src/sched.mc`: scheduler-owned lifecycle validation for bounded spawn, wait, sleep, and wake follow-through
@@ -193,6 +195,7 @@ This file is a fast orientation map for agents working in this repository.
 - Phase 248 now also normalizes imported qualified constant extents in downstream MIR type reconstruction, so local annotations such as `[helper_extents.WIDTH + 1]T` lower with the same fixed-array identity as their checked extent values.
 - Phase 249 admits `[]` only in existing expected-type owners and only for `[0]T` and `Slice<T>`; standalone `[]`, non-zero arrays, and owning `Buffer<T>` targets remain rejected so the phase does not widen into collection inference or hidden allocation policy.
 - Phase 251 makes hosted executable top-level `const str` lower honestly through one dedicated string-global backing-data seam in `compiler/codegen_llvm`; the repair is now spent in `kernel/src/services/journal_service.mc`, while broader top-level global-constant families remain explicit follow-on work.
+- Phase 253 adds one explicit live stdin-backed ingress path through `kernel/src/live_receive.mc` and `kernel/src/kernel_entry.mc` while preserving `scenarios.run(...)` as the default reset-lane path and keeping shell decode, dispatch, and service ownership unchanged.
 
 ## Where To Change Things
 

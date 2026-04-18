@@ -20,6 +20,7 @@ namespace {
 using mc::test_support::Fail;
 using mc::test_support::ReadFile;
 using mc::test_support::RunCommandCapture;
+using mc::test_support::RunCommandCaptureInDirWithInput;
 using mc::test_support::WriteFile;
 using mc::tool_tests::BuildProjectTargetAndCapture;
 
@@ -459,7 +460,49 @@ ResetLaneScenarioTiming RunKernelResetLaneScenario(const std::filesystem::path& 
     };
 }
 
-constexpr std::array<ResetLaneScenario, 62> kResetLaneScenarios = {{
+void RunKernelRepoLiveReceiveScenario(const std::filesystem::path& source_root,
+                                      const std::filesystem::path& binary_root,
+                                      const std::filesystem::path& mc_path) {
+    const ResetLaneScenario scenario{
+        .label = "repo live receive",
+        .scenario_key = "repo_live_receive",
+        .context_label = "repo live receive",
+        .target_name = "kernel",
+        .build_warn_ms = 2000,
+    };
+
+    const std::filesystem::path project_root = source_root / "kernel";
+    const std::filesystem::path project_path = project_root / "build.toml";
+    const std::filesystem::path build_dir = binary_root / ResetLaneBuildDirName(scenario);
+    const std::string build_output = BuildProjectTargetAndCapture(mc_path,
+                                                                  project_path,
+                                                                  build_dir,
+                                                                  scenario.target_name,
+                                                                  ResetLaneBuildOutputName(scenario),
+                                                                  ResetLaneBuildContext(scenario));
+    const std::filesystem::path executable_path = ParseBuiltExecutablePath(build_output,
+                                                                           ResetLaneBuildContext(scenario));
+
+    const std::vector<std::string> command = {
+        executable_path.generic_string(),
+        "live",
+    };
+
+    const auto [run_outcome, run_output] = RunCommandCaptureInDirWithInput(command,
+                                                                           build_dir,
+                                                                           build_dir / ResetLaneRunOutputName(scenario),
+                                                                           "ECAB",
+                                                                           ResetLaneRunContext(scenario));
+    if (!run_outcome.exited || run_outcome.exit_code != 0) {
+        Fail("kernel reset lane repo live receive project should return 0, got:\n" + run_output);
+    }
+    if (run_output != "AB") {
+        Fail("kernel reset lane repo live receive project should echo reply bytes 'AB', got output length " +
+             std::to_string(run_output.size()));
+    }
+}
+
+constexpr std::array<ResetLaneScenario, 63> kResetLaneScenarios = {{
     {.label = "repo project", .scenario_key = "repo", .target_name = "kernel", .include_in_fast = true, .build_warn_ms = 2000},
     {.label = "smoke", .fixture_relative_path = "tests/smoke/kernel_reset_lane_serial_round_trip", .scenario_key = "smoke", .target_name = "app", .include_in_fast = true},
     {.label = "retained state", .fixture_relative_path = "tests/system/kernel_reset_lane_retained_log", .scenario_key = "retained_state", .context_label = "retained-state", .target_name = "app", .include_in_fast = true},
@@ -522,6 +565,7 @@ constexpr std::array<ResetLaneScenario, 62> kResetLaneScenarios = {{
     {.label = "restart-safe update apply workflow", .fixture_relative_path = "tests/system/kernel_reset_lane_phase243_update_apply_workflow", .scenario_key = "phase243_update_apply_workflow", .context_label = "phase 243 restart-safe update apply workflow", .target_name = "app", .include_in_fast = true, .build_warn_ms = 1000},
     {.label = "delegated installer authority", .fixture_relative_path = "tests/system/kernel_reset_lane_phase244_delegated_installer_authority", .scenario_key = "phase244_delegated_installer_authority", .context_label = "phase 244 delegated installer authority", .target_name = "app", .include_in_fast = true, .build_warn_ms = 1000},
     {.label = "update recovery and reporting pressure", .fixture_relative_path = "tests/system/kernel_reset_lane_phase245_update_recovery_completion_pressure", .scenario_key = "phase245_update_recovery_completion_pressure", .context_label = "phase 245 update recovery and reporting pressure", .target_name = "app", .include_in_fast = true, .build_warn_ms = 1000},
+    {.label = "live receive", .fixture_relative_path = "tests/system/kernel_reset_lane_phase253_live_receive", .scenario_key = "phase253_live_receive", .context_label = "phase 253 live receive", .target_name = "app", .include_in_fast = true, .build_warn_ms = 1000, .requires_clean_build = true},
 }};
 
 std::vector<const ResetLaneScenario*> SelectResetLaneScenarios(ResetLaneMode mode) {
@@ -585,6 +629,8 @@ void RunWorkflowKernelResetLaneSuiteImpl(const std::filesystem::path& source_roo
     ValidateResetLaneScenarioCoverage(source_root);
     const auto coverage_end = std::chrono::steady_clock::now();
     const auto execution_start = std::chrono::steady_clock::now();
+
+    RunKernelRepoLiveReceiveScenario(source_root, binary_root, mc_path);
 
     const std::vector<const ResetLaneScenario*> selected = SelectResetLaneScenarios(mode);
     const std::size_t jobs = DetermineResetLaneParallelism(selected.size());

@@ -3,7 +3,7 @@ Phase 253 -- Bounded Live Receive Owner Probe
 
 Status
 ------
-PROPOSED
+COMPLETED
 
 Purpose
 -------
@@ -20,18 +20,30 @@ subsystem.
 
 Repository status note
 ----------------------
-- The backlog still explicitly keeps the reset-lane entry on the scripted event
-  loop until a live receive owner is justified.
-- `kernel/src/main.mc` is already intentionally thin, and
-  `kernel/src/scenarios/scenarios.mc` currently owns repo-owned scripted probe
-  sequencing.
-- `kernel/src/shell/serial_service.mc`,
-  `kernel/src/shell/shell_service.mc`, and
-  `kernel/src/shell/serial_shell_path.mc` already own the live serial framing,
-  shell decode, and one-step composition path for bounded ingress once an
-  actual event source exists.
-- The repository still lacks one admitted runtime owner that turns live hosted
-  input into the observation or step stream those existing owners can consume.
+- The backlog pressure that kept the reset-lane entry scripted until a live
+  owner was justified is now resolved by an explicit opt-in live ingress path.
+- `kernel/src/main.mc` stays intentionally thin and now delegates to
+  `kernel/src/kernel_entry.mc` for mode selection.
+- `kernel/src/live_receive.mc` is the new bounded hosted live receive owner;
+  it turns stdin-backed four-byte frames into one-step observations without
+  moving shell decode or dispatch policy into the entry path.
+- `kernel/src/scenarios/scenarios.mc` remains the default repo-owned scripted
+  integration owner, and the grouped reset-lane workflow suite now covers both
+  the explicit live path and the preserved scripted path.
+
+Landed shape
+------------
+- Add one bounded `live_receive` owner that opens a hosted poller on an input
+  fd, buffers up to one four-byte frame, and reports only `NoInput`, `Closed`,
+  `Received`, or `Failed` step kinds.
+- Keep `kernel/src/kernel_entry.mc` as the thin router: no args preserve the
+  scripted scenario lane, and one `live` arg runs the explicit stdin-backed
+  live path.
+- Reuse `kernel_dispatch.kernel_dispatch_step(...)` and the existing serial
+  reply contract rather than adding a second dispatch layer or shell wrapper.
+- Validate the landing through one focused live-receive reset-lane fixture,
+  one repo-project live-mode workflow check, and the owning
+  `mc_tool_workflow_kernel_reset_lane_unit` grouped target.
 
 Problem being solved
 --------------------
@@ -167,17 +179,6 @@ Relevant file-local invariants
   entry contract.
 - Narrow validation should stay on one dedicated live-input fixture before any
   broader kernel workflow pass.
-
-Relevant test surfaces
-- primary owning test family: `tests/system/` when the change is direct
-  runtime behavior, or the grouped reset-lane tool suite when the live source
-  is exercised through the hosted workflow path
-- narrowest expected first executable validation target: one deterministic
-  live-input system fixture, then the narrowest reset-lane workflow case that
-  spends the new source
-- fixture or output-layout rule: keep generated outputs under the active build
-  tree such as `build/debug/probes/...` or `build/debug/tool/...`, and do not
-  reintroduce top-level `build/debug/phase*` trees
 
 Test obligations
 ----------------
