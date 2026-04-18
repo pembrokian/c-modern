@@ -192,6 +192,7 @@ This file is a fast orientation map for agents working in this repository.
 - Phase 248 normalizes module-local compile-time integer array extents through sema and downstream local-annotation reconstruction, so `[CAP + 1]T` and `[5]T` now share one semantic fixed-array type when the extent evaluates to `5`.
 - Phase 248 now also normalizes imported qualified constant extents in downstream MIR type reconstruction, so local annotations such as `[helper_extents.WIDTH + 1]T` lower with the same fixed-array identity as their checked extent values.
 - Phase 249 admits `[]` only in existing expected-type owners and only for `[0]T` and `Slice<T>`; standalone `[]`, non-zero arrays, and owning `Buffer<T>` targets remain rejected so the phase does not widen into collection inference or hidden allocation policy.
+- Phase 251 makes hosted executable top-level `const str` lower honestly through one dedicated string-global backing-data seam in `compiler/codegen_llvm`; the repair is now spent in `kernel/src/services/journal_service.mc`, while broader top-level global-constant families remain explicit follow-on work.
 
 ## Where To Change Things
 

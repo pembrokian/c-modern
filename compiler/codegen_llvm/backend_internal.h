@@ -61,6 +61,15 @@ bool RenderLLVMGlobalConstValue(const mir::Module& module,
                                 support::DiagnosticSink& diagnostics,
                                 std::string& rendered);
 
+bool RenderLLVMGlobalStringConstValue(const mir::Module& module,
+                                      sema::Type type,
+                                      const sema::ConstValue& value,
+                                      std::string_view backing_global_name,
+                                      const std::filesystem::path& source_path,
+                                      support::DiagnosticSink& diagnostics,
+                                      std::ostringstream& prelude,
+                                      std::string& rendered);
+
 std::string FunctionBlockContext(std::string_view operation,
                                  std::string_view function_name,
                                  const mir::BasicBlock& block);

@@ -559,6 +559,24 @@ void RunCodegenExecutableCoreSuite(const std::filesystem::path& source_root,
                     12,
                     {});
 
+    const std::filesystem::path top_level_string_source = work_root / "top_level_string_constant.mc";
+    WriteFile(top_level_string_source,
+              "const PATH: str = \"phase251.txt\"\n"
+              "\n"
+              "func main() i32 {\n"
+              "    if PATH.len != 12 {\n"
+              "        return 1\n"
+              "    }\n"
+              "    return 0\n"
+              "}\n");
+    RunBuiltFixtureWithIrSnippets(mc_path,
+                                  top_level_string_source,
+                                  work_root / "top_level_string_constant_build",
+                                  0,
+                                  {},
+                                  {"@global.PATH.bytes = private unnamed_addr constant [13 x i8] c\"phase251.txt\\00\", align 1",
+                                   "@global.PATH = constant {ptr, i64} {ptr getelementptr inbounds ([13 x i8], ptr @global.PATH.bytes, i64 0, i64 0), i64 12}, align 8"});
+
     const std::filesystem::path aggregate_source = work_root / "aggregate_pair.mc";
     WriteFile(aggregate_source,
               "struct Pair {\n"

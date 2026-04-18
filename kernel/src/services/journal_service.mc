@@ -11,6 +11,7 @@ const JOURNAL_OP_CLEAR: u8 = 67
 const JOURNAL_OP_REPLAY: u8 = 82
 const JOURNAL_LANE_A: u8 = 65
 const JOURNAL_LANE_B: u8 = 66
+const JOURNAL_ARTIFACT_PATH: str = "mc_journal_service.bin"
 
 struct JournalLane {
     name: u8
@@ -102,13 +103,13 @@ func journal_artifact_bytes(s: JournalServiceState) [JOURNAL_ARTIFACT_SIZE]u8 {
 
 func journal_persist(s: JournalServiceState) bool {
     bytes := journal_artifact_bytes(s)
-    return fs.write_all("mc_journal_service.bin", (Slice<u8>)(bytes))
+    return fs.write_all(JOURNAL_ARTIFACT_PATH, (Slice<u8>)(bytes))
 }
 
 func journal_load(pid: u32, slot: u32) JournalServiceState {
     state := journal_init(pid, slot)
     bytes: [JOURNAL_ARTIFACT_SIZE]u8
-    if !fs.read_exact("mc_journal_service.bin", (Slice<u8>)(bytes)) {
+    if !fs.read_exact(JOURNAL_ARTIFACT_PATH, (Slice<u8>)(bytes)) {
         return state
     }
 

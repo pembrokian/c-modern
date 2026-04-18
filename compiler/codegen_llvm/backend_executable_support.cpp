@@ -385,6 +385,43 @@ bool RenderLLVMGlobalConstValue(const mir::Module& module,
     return true;
 }
 
+bool RenderLLVMGlobalStringConstValue(const mir::Module& module,
+                                      sema::Type type,
+                                      const sema::ConstValue& value,
+                                      std::string_view backing_global_name,
+                                      const std::filesystem::path& source_path,
+                                      support::DiagnosticSink& diagnostics,
+                                      std::ostringstream& prelude,
+                                      std::string& rendered) {
+    const sema::Type canonical_type = sema::CanonicalizeBuiltinType(mir::StripMirAliasOrDistinct(module, std::move(type)));
+    if (canonical_type.kind != sema::Type::Kind::kString || value.kind != sema::ConstValue::Kind::kString) {
+        ReportBackendError(source_path,
+                           "LLVM bootstrap backend requires string-typed global constant for dedicated string lowering",
+                           diagnostics);
+        return false;
+    }
+
+    const auto lowered_type = LowerTypeInfo(module, canonical_type);
+    if (!lowered_type.has_value() || lowered_type->backend_name != "{ptr, i64}") {
+        ReportBackendError(source_path,
+                           "LLVM bootstrap backend could not lower hosted string global constant type " +
+                               sema::FormatType(canonical_type),
+                           diagnostics);
+        return false;
+    }
+
+    const std::string decoded = DecodeStringLiteral(value.text);
+    const std::string array_type = "[" + std::to_string(decoded.size() + 1) + " x i8]";
+    prelude << backing_global_name << " = private unnamed_addr constant " << array_type << " c\""
+            << EncodeLLVMStringBytes(decoded) << "\", align 1\n";
+
+    std::ostringstream stream;
+    stream << "{ptr getelementptr inbounds (" << array_type << ", ptr " << backing_global_name
+           << ", i64 0, i64 0), i64 " << decoded.size() << '}';
+    rendered = stream.str();
+    return true;
+}
+
 bool IsSignedSourceType(std::string_view source_name) {
     return source_name == "i8" || source_name == "i16" || source_name == "i32" || source_name == "i64" ||
            source_name == "isize" || source_name == "int_literal";

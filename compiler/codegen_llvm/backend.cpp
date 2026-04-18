@@ -1148,8 +1148,8 @@ bool RenderLlvmModuleImpl(const mir::Module& module,
         }
         for (std::size_t index = 0; index < global.names.size(); ++index) {
             const auto& name = global.names[index];
-            stream << LLVMGlobalName(name) << " = ";
             if (global.is_extern) {
+                stream << LLVMGlobalName(name) << " = ";
                 stream << "external " << (global.is_const ? "constant " : "global ")
                        << global_type.backend_name << ", align " << global_type.alignment << "\n";
                 continue;
@@ -1157,18 +1157,34 @@ bool RenderLlvmModuleImpl(const mir::Module& module,
 
             std::string init_value = LLVMStructInsertBase(global_type);
             if (index < global.constant_values.size() && global.constant_values[index].has_value()) {
-                if (!RenderLLVMGlobalConstValue(module,
-                                                global.type,
-                                                *global.constant_values[index],
-                                                wrap_hosted_main,
-                                                source_path,
-                                                diagnostics,
-                                                init_value)) {
+                const sema::Type canonical_type = sema::CanonicalizeBuiltinType(mir::StripMirAliasOrDistinct(module, global.type));
+                if (canonical_type.kind == sema::Type::Kind::kString &&
+                    global.constant_values[index]->kind == sema::ConstValue::Kind::kString) {
+                    std::ostringstream prelude;
+                    if (!RenderLLVMGlobalStringConstValue(module,
+                                                          global.type,
+                                                          *global.constant_values[index],
+                                                          LLVMGlobalName(name) + ".bytes",
+                                                          source_path,
+                                                          diagnostics,
+                                                          prelude,
+                                                          init_value)) {
+                        return false;
+                    }
+                    stream << prelude.str();
+                } else if (!RenderLLVMGlobalConstValue(module,
+                                                       global.type,
+                                                       *global.constant_values[index],
+                                                       wrap_hosted_main,
+                                                       source_path,
+                                                       diagnostics,
+                                                       init_value)) {
                     return false;
                 }
             } else if (index < global.initializers.size()) {
                 init_value = FormatLLVMLiteral(global_type, global.initializers[index]);
             }
+            stream << LLVMGlobalName(name) << " = ";
             stream << (global.is_const ? "constant " : "global ")
                    << global_type.backend_name << " " << init_value << ", align " << global_type.alignment << "\n";
         }

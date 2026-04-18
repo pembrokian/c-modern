@@ -3,7 +3,7 @@ Phase 251 -- Hosted Executable Top-Level String Constant Lowering
 
 Status
 ------
-PROPOSED
+COMPLETED
 
 Purpose
 -------
