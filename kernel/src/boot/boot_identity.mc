@@ -19,42 +19,19 @@ import update_store_service
 import workflow_core
 import workflow_service
 
-// Named ServiceRef accessors for the four boot-wired services.
+// Named ServiceRef constants for the boot-wired services.
 // These refs are stable across restart -- the endpoint_id never changes after
 // kernel_init() assigns it. Callers that hold one of these refs may resume
 // sending after a service restart without reacquiring the ref.
 
-func boot_serial_ref() service_identity.ServiceRef {
-    return service_identity.service_ref(service_topology.SERIAL_ENDPOINT_ID)
-}
-
-func boot_shell_ref() service_identity.ServiceRef {
-    return service_identity.service_ref(service_topology.SHELL_ENDPOINT_ID)
-}
-
-func boot_log_ref() service_identity.ServiceRef {
-    return service_identity.service_ref(service_topology.LOG_ENDPOINT_ID)
-}
-
-func boot_kv_ref() service_identity.ServiceRef {
-    return service_identity.service_ref(service_topology.KV_ENDPOINT_ID)
-}
-
-func boot_echo_ref() service_identity.ServiceRef {
-    return service_identity.service_ref(service_topology.ECHO_ENDPOINT_ID)
-}
-
-func boot_queue_ref() service_identity.ServiceRef {
-    return service_identity.service_ref(service_topology.QUEUE_ENDPOINT_ID)
-}
-
-func boot_transfer_ref() service_identity.ServiceRef {
-    return service_identity.service_ref(service_topology.TRANSFER_ENDPOINT_ID)
-}
-
-func boot_ticket_ref() service_identity.ServiceRef {
-    return service_identity.service_ref(service_topology.TICKET_ENDPOINT_ID)
-}
+const BOOT_SERIAL_REF: service_identity.ServiceRef = { endpoint_id: service_topology.SERIAL_ENDPOINT_ID }
+const BOOT_SHELL_REF: service_identity.ServiceRef = { endpoint_id: service_topology.SHELL_ENDPOINT_ID }
+const BOOT_LOG_REF: service_identity.ServiceRef = { endpoint_id: service_topology.LOG_ENDPOINT_ID }
+const BOOT_KV_REF: service_identity.ServiceRef = { endpoint_id: service_topology.KV_ENDPOINT_ID }
+const BOOT_ECHO_REF: service_identity.ServiceRef = { endpoint_id: service_topology.ECHO_ENDPOINT_ID }
+const BOOT_QUEUE_REF: service_identity.ServiceRef = { endpoint_id: service_topology.QUEUE_ENDPOINT_ID }
+const BOOT_TRANSFER_REF: service_identity.ServiceRef = { endpoint_id: service_topology.TRANSFER_ENDPOINT_ID }
+const BOOT_TICKET_REF: service_identity.ServiceRef = { endpoint_id: service_topology.TICKET_ENDPOINT_ID }
 
 func boot_log_mark(s: KernelBootState) service_identity.ServiceMark {
     return service_identity.service_mark(service_topology.LOG_ENDPOINT_ID, s.log.state.pid, s.log.generation)

@@ -1,0 +1,424 @@
+==== kernel/src/boot/boot.mc ====
+STRUCT_DECL: ServiceCell
+STRUCT_DECL: KernelBootState
+FUNCTION_DECL: kernel_init
+   Return: KernelBootState
+FUNCTION_DECL: debug_boot_routed
+   Return: u32
+   Param: service_effect.Effect effect
+
+==== kernel/src/boot/boot_identity.mc ====
+FUNCTION_DECL: boot_serial_ref
+   Return: service_identity.ServiceRef
+FUNCTION_DECL: boot_shell_ref
+   Return: service_identity.ServiceRef
+FUNCTION_DECL: boot_log_ref
+   Return: service_identity.ServiceRef
+FUNCTION_DECL: boot_kv_ref
+   Return: service_identity.ServiceRef
+FUNCTION_DECL: boot_echo_ref
+   Return: service_identity.ServiceRef
+FUNCTION_DECL: boot_queue_ref
+   Return: service_identity.ServiceRef
+FUNCTION_DECL: boot_transfer_ref
+   Return: service_identity.ServiceRef
+FUNCTION_DECL: boot_ticket_ref
+   Return: service_identity.ServiceRef
+FUNCTION_DECL: boot_log_mark
+   Return: service_identity.ServiceMark
+   Param: KernelBootState s
+FUNCTION_DECL: boot_kv_mark
+   Return: service_identity.ServiceMark
+   Param: KernelBootState s
+FUNCTION_DECL: boot_queue_mark
+   Return: service_identity.ServiceMark
+   Param: KernelBootState s
+FUNCTION_DECL: boot_workset_generation
+   Return: u32
+   Param: KernelBootState s
+FUNCTION_DECL: boot_audit_generation
+   Return: u32
+   Param: KernelBootState s
+FUNCTION_DECL: boot_workset_generation_payload
+   Return: [4]u8
+   Param: KernelBootState s
+FUNCTION_DECL: bootstate_metadata_for_target
+   Return: u8
+   Param: KernelBootState s
+   Param: u8 target
+FUNCTION_DECL: bootstate_generation_marker_for_target
+   Return: u8
+   Param: KernelBootState s
+   Param: u8 target
+FUNCTION_DECL: bootgeneration_payload_for_target
+   Return: [4]u8
+   Param: KernelBootState s
+   Param: u8 target
+FUNCTION_DECL: summary_participation_code
+   Return: u8
+   Param: RetainedSummaryParticipation participation
+FUNCTION_DECL: summary_outcome_code
+   Return: u8
+   Param: RestartOutcome outcome
+FUNCTION_DECL: summary_payload
+   Return: [4]u8
+   Param: RetainedSummaryParticipation participation
+   Param: RestartOutcome outcome
+   Param: u32 generation
+FUNCTION_DECL: bootrestart_outcome_for_endpoint
+   Return: RestartOutcome
+   Param: KernelBootState s
+   Param: u32 endpoint
+FUNCTION_DECL: bootsummary_payload_for_endpoint
+   Return: [4]u8
+   Param: KernelBootState s
+   Param: u32 endpoint
+FUNCTION_DECL: bootsummary_payload_for_target
+   Return: [4]u8
+   Param: KernelBootState s
+   Param: u8 target
+FUNCTION_DECL: bootcomparison_payload_for_target
+   Return: [4]u8
+   Param: KernelBootState s
+   Param: u8 target
+FUNCTION_DECL: boot_echo_mark
+   Return: service_identity.ServiceMark
+   Param: KernelBootState s
+FUNCTION_DECL: boot_transfer_mark
+   Return: service_identity.ServiceMark
+   Param: KernelBootState s
+FUNCTION_DECL: boot_ticket_mark
+   Return: service_identity.ServiceMark
+   Param: KernelBootState s
+FUNCTION_DECL: boot_file_mark
+   Return: service_identity.ServiceMark
+   Param: KernelBootState s
+FUNCTION_DECL: boot_timer_mark
+   Return: service_identity.ServiceMark
+   Param: KernelBootState s
+FUNCTION_DECL: boot_task_mark
+   Return: service_identity.ServiceMark
+   Param: KernelBootState s
+FUNCTION_DECL: boot_connection_mark
+   Return: service_identity.ServiceMark
+   Param: KernelBootState s
+FUNCTION_DECL: boot_journal_mark
+   Return: service_identity.ServiceMark
+   Param: KernelBootState s
+FUNCTION_DECL: boot_workflow_mark
+   Return: service_identity.ServiceMark
+   Param: KernelBootState s
+FUNCTION_DECL: boot_lease_mark
+   Return: service_identity.ServiceMark
+   Param: KernelBootState s
+FUNCTION_DECL: boot_completion_mark
+   Return: service_identity.ServiceMark
+   Param: KernelBootState s
+FUNCTION_DECL: boot_object_store_mark
+   Return: service_identity.ServiceMark
+   Param: KernelBootState s
+FUNCTION_DECL: boot_update_store_mark
+   Return: service_identity.ServiceMark
+   Param: KernelBootState s
+FUNCTION_DECL: bootmark_for_endpoint
+   Return: service_identity.ServiceMark
+   Param: KernelBootState s
+   Param: u32 endpoint
+
+==== kernel/src/boot/boot_update.mc ====
+FUNCTION_DECL: bootwith_log
+   Return: KernelBootState
+   Param: KernelBootState s
+   Param: log_service.LogServiceState log
+FUNCTION_DECL: bootwith_path
+   Return: KernelBootState
+   Param: KernelBootState s
+   Param: serial_shell_path.SerialShellPathState path
+FUNCTION_DECL: bootwith_kv
+   Return: KernelBootState
+   Param: KernelBootState s
+   Param: kv_service.KvServiceState kv
+FUNCTION_DECL: bootwith_queue
+   Return: KernelBootState
+   Param: KernelBootState s
+   Param: queue_service.QueueServiceState queue
+FUNCTION_DECL: bootwith_workset_generation
+   Return: KernelBootState
+   Param: KernelBootState s
+   Param: u32 generation
+FUNCTION_DECL: bootwith_audit_generation
+   Return: KernelBootState
+   Param: KernelBootState s
+   Param: u32 generation
+FUNCTION_DECL: bootwith_log_restart_outcome
+   Return: KernelBootState
+   Param: KernelBootState s
+   Param: RestartOutcome outcome
+FUNCTION_DECL: bootwith_kv_restart_outcome
+   Return: KernelBootState
+   Param: KernelBootState s
+   Param: RestartOutcome outcome
+FUNCTION_DECL: bootwith_queue_restart_outcome
+   Return: KernelBootState
+   Param: KernelBootState s
+   Param: RestartOutcome outcome
+FUNCTION_DECL: bootwith_workset_restart_outcome
+   Return: KernelBootState
+   Param: KernelBootState s
+   Param: RestartOutcome outcome
+FUNCTION_DECL: bootwith_audit_restart_outcome
+   Return: KernelBootState
+   Param: KernelBootState s
+   Param: RestartOutcome outcome
+FUNCTION_DECL: bootwith_echo
+   Return: KernelBootState
+   Param: KernelBootState s
+   Param: echo_service.EchoServiceState echo
+FUNCTION_DECL: bootwith_echo_restart_outcome
+   Return: KernelBootState
+   Param: KernelBootState s
+   Param: RestartOutcome outcome
+FUNCTION_DECL: bootwith_transfer
+   Return: KernelBootState
+   Param: KernelBootState s
+   Param: transfer_service.TransferServiceState transfer
+FUNCTION_DECL: bootwith_transfer_restart_outcome
+   Return: KernelBootState
+   Param: KernelBootState s
+   Param: RestartOutcome outcome
+FUNCTION_DECL: bootwith_ticket
+   Return: KernelBootState
+   Param: KernelBootState s
+   Param: ticket_service.TicketServiceState ticket
+FUNCTION_DECL: bootwith_ticket_restart_outcome
+   Return: KernelBootState
+   Param: KernelBootState s
+   Param: RestartOutcome outcome
+FUNCTION_DECL: bootwith_grants
+   Return: KernelBootState
+   Param: KernelBootState s
+   Param: transfer_grant.GrantTable grants
+FUNCTION_DECL: bootrestart_log
+   Return: KernelBootState
+   Param: KernelBootState s
+   Param: log_service.LogServiceState log
+FUNCTION_DECL: bootrestart_kv
+   Return: KernelBootState
+   Param: KernelBootState s
+   Param: kv_service.KvServiceState kv
+FUNCTION_DECL: bootrestart_queue
+   Return: KernelBootState
+   Param: KernelBootState s
+   Param: queue_service.QueueServiceState queue
+FUNCTION_DECL: bootrestart_workset_generation
+   Return: KernelBootState
+   Param: KernelBootState s
+FUNCTION_DECL: bootrestart_audit_generation
+   Return: KernelBootState
+   Param: KernelBootState s
+FUNCTION_DECL: bootrestart_echo
+   Return: KernelBootState
+   Param: KernelBootState s
+   Param: echo_service.EchoServiceState echo
+FUNCTION_DECL: bootrestart_transfer
+   Return: KernelBootState
+   Param: KernelBootState s
+   Param: transfer_service.TransferServiceState transfer
+FUNCTION_DECL: bootrestart_ticket
+   Return: KernelBootState
+   Param: KernelBootState s
+   Param: ticket_service.TicketServiceState ticket
+FUNCTION_DECL: bootwith_file
+   Return: KernelBootState
+   Param: KernelBootState s
+   Param: file_service.FileServiceState file
+FUNCTION_DECL: bootwith_file_restart_outcome
+   Return: KernelBootState
+   Param: KernelBootState s
+   Param: RestartOutcome outcome
+FUNCTION_DECL: bootrestart_file
+   Return: KernelBootState
+   Param: KernelBootState s
+   Param: file_service.FileServiceState file
+FUNCTION_DECL: bootwith_timer
+   Return: KernelBootState
+   Param: KernelBootState s
+   Param: timer_service.TimerServiceState timer
+FUNCTION_DECL: bootwith_timer_restart_outcome
+   Return: KernelBootState
+   Param: KernelBootState s
+   Param: RestartOutcome outcome
+FUNCTION_DECL: bootrestart_timer
+   Return: KernelBootState
+   Param: KernelBootState s
+   Param: timer_service.TimerServiceState timer
+FUNCTION_DECL: bootwith_task
+   Return: KernelBootState
+   Param: KernelBootState s
+   Param: task_service.TaskServiceState task
+FUNCTION_DECL: bootwith_task_restart_outcome
+   Return: KernelBootState
+   Param: KernelBootState s
+   Param: RestartOutcome outcome
+FUNCTION_DECL: bootwith_connection
+   Return: KernelBootState
+   Param: KernelBootState s
+   Param: connection_service.ConnectionServiceState connection
+FUNCTION_DECL: bootwith_connection_restart_outcome
+   Return: KernelBootState
+   Param: KernelBootState s
+   Param: RestartOutcome outcome
+FUNCTION_DECL: bootrestart_connection
+   Return: KernelBootState
+   Param: KernelBootState s
+   Param: connection_service.ConnectionServiceState connection
+FUNCTION_DECL: bootrestart_task
+   Return: KernelBootState
+   Param: KernelBootState s
+   Param: task_service.TaskServiceState task
+FUNCTION_DECL: bootwith_journal
+   Return: KernelBootState
+   Param: KernelBootState s
+   Param: journal_service.JournalServiceState journal
+FUNCTION_DECL: bootwith_journal_restart_outcome
+   Return: KernelBootState
+   Param: KernelBootState s
+   Param: RestartOutcome outcome
+FUNCTION_DECL: bootrestart_journal
+   Return: KernelBootState
+   Param: KernelBootState s
+   Param: journal_service.JournalServiceState journal
+FUNCTION_DECL: bootwith_workflow
+   Return: KernelBootState
+   Param: KernelBootState s
+   Param: workflow_core.WorkflowServiceState workflow
+FUNCTION_DECL: bootwith_lease
+   Return: KernelBootState
+   Param: KernelBootState s
+   Param: lease_service.LeaseServiceState lease
+FUNCTION_DECL: bootwith_lease_restart_outcome
+   Return: KernelBootState
+   Param: KernelBootState s
+   Param: RestartOutcome outcome
+FUNCTION_DECL: bootwith_completion
+   Return: KernelBootState
+   Param: KernelBootState s
+   Param: completion_mailbox_service.CompletionMailboxServiceState completion
+FUNCTION_DECL: bootwith_completion_restart_outcome
+   Return: KernelBootState
+   Param: KernelBootState s
+   Param: RestartOutcome outcome
+FUNCTION_DECL: bootwith_object_store
+   Return: KernelBootState
+   Param: KernelBootState s
+   Param: object_store_service.ObjectStoreServiceState object_store
+FUNCTION_DECL: bootwith_object_store_restart_outcome
+   Return: KernelBootState
+   Param: KernelBootState s
+   Param: RestartOutcome outcome
+FUNCTION_DECL: bootwith_update_store
+   Return: KernelBootState
+   Param: KernelBootState s
+   Param: update_store_service.UpdateStoreServiceState update_store
+FUNCTION_DECL: bootwith_update_store_restart_outcome
+   Return: KernelBootState
+   Param: KernelBootState s
+   Param: RestartOutcome outcome
+FUNCTION_DECL: bootrestart_workflow
+   Return: KernelBootState
+   Param: KernelBootState s
+   Param: workflow_core.WorkflowServiceState workflow
+FUNCTION_DECL: bootrestart_lease
+   Return: KernelBootState
+   Param: KernelBootState s
+   Param: lease_service.LeaseServiceState lease
+FUNCTION_DECL: bootrestart_completion
+   Return: KernelBootState
+   Param: KernelBootState s
+   Param: completion_mailbox_service.CompletionMailboxServiceState completion
+FUNCTION_DECL: bootrestart_object_store
+   Return: KernelBootState
+   Param: KernelBootState s
+   Param: object_store_service.ObjectStoreServiceState object_store
+FUNCTION_DECL: bootrestart_update_store
+   Return: KernelBootState
+   Param: KernelBootState s
+   Param: update_store_service.UpdateStoreServiceState update_store
+
+==== kernel/src/boot/init.mc ====
+STRUCT_DECL: RestartPolicyInfo
+FUNCTION_DECL: restart_policy_single
+   Return: RestartPolicyInfo
+   Param: u8 target
+   Param: u8 policy
+FUNCTION_DECL: restart_policy_pair
+   Return: RestartPolicyInfo
+   Param: u8 target
+   Param: u8 owner0
+   Param: u8 owner1
+   Param: u8 policy
+FUNCTION_DECL: restart_policy_for_target
+   Return: RestartPolicyInfo
+   Param: u8 target
+FUNCTION_DECL: restart_policy_payload
+   Return: [4]u8
+   Param: u8 target
+FUNCTION_DECL: restart
+   Return: boot.KernelBootState
+   Param: boot.KernelBootState state
+   Param: u32 endpoint
+FUNCTION_DECL: restart_log
+   Return: boot.KernelBootState
+   Param: boot.KernelBootState state
+FUNCTION_DECL: restart_kv
+   Return: boot.KernelBootState
+   Param: boot.KernelBootState state
+FUNCTION_DECL: restart_queue
+   Return: boot.KernelBootState
+   Param: boot.KernelBootState state
+FUNCTION_DECL: restart_retained_workset
+   Return: boot.KernelBootState
+   Param: boot.KernelBootState state
+FUNCTION_DECL: restart_retained_audit_lane
+   Return: boot.KernelBootState
+   Param: boot.KernelBootState state
+FUNCTION_DECL: restart_echo
+   Return: boot.KernelBootState
+   Param: boot.KernelBootState state
+FUNCTION_DECL: restart_transfer
+   Return: boot.KernelBootState
+   Param: boot.KernelBootState state
+FUNCTION_DECL: restart_ticket
+   Return: boot.KernelBootState
+   Param: boot.KernelBootState state
+FUNCTION_DECL: restart_file
+   Return: boot.KernelBootState
+   Param: boot.KernelBootState state
+FUNCTION_DECL: restart_timer
+   Return: boot.KernelBootState
+   Param: boot.KernelBootState state
+FUNCTION_DECL: restart_task
+   Return: boot.KernelBootState
+   Param: boot.KernelBootState state
+FUNCTION_DECL: restart_connection
+   Return: boot.KernelBootState
+   Param: boot.KernelBootState state
+FUNCTION_DECL: restart_journal
+   Return: boot.KernelBootState
+   Param: boot.KernelBootState state
+FUNCTION_DECL: restart_workflow
+   Return: boot.KernelBootState
+   Param: boot.KernelBootState state
+FUNCTION_DECL: restart_lease
+   Return: boot.KernelBootState
+   Param: boot.KernelBootState state
+FUNCTION_DECL: restart_completion_mailbox
+   Return: boot.KernelBootState
+   Param: boot.KernelBootState state
+FUNCTION_DECL: restart_object_store
+   Return: boot.KernelBootState
+   Param: boot.KernelBootState state
+FUNCTION_DECL: restart_update_store
+   Return: boot.KernelBootState
+   Param: boot.KernelBootState state
+

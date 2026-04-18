@@ -104,7 +104,7 @@ func lifecycle_policy_code(target: u8) u8 {
 
 func lifecycle_authority_reply(state: *boot.KernelBootState, target: u8) service_effect.Effect {
     if lifecycle_is_lane_target(target) {
-        return shell_service.lifecycle_authority_effect(
+        return shell_service.lifecycle_payload_effect(
             syscall.SyscallStatus.Ok,
             authority_payload(
                 target,
@@ -137,7 +137,7 @@ func lifecycle_authority_reply(state: *boot.KernelBootState, target: u8) service
         scope = serial_protocol.AUTHORITY_SCOPE_DURABLE
     }
 
-    return shell_service.lifecycle_authority_effect(
+    return shell_service.lifecycle_payload_effect(
         syscall.SyscallStatus.Ok,
         authority_payload(target, class_code, transfer, scope))
 }
@@ -165,7 +165,7 @@ func lifecycle_state_reply(state: *boot.KernelBootState, target: u8) service_eff
         lifecycle_policy_code(target),
         boot.bootstate_metadata_for_target(*state, target),
         boot.bootstate_generation_marker_for_target(*state, target))
-    return shell_service.lifecycle_state_effect(syscall.SyscallStatus.Ok, payload)
+    return shell_service.lifecycle_payload_effect(syscall.SyscallStatus.Ok, payload)
 }
 
 func lifecycle_durability_reply(state: *boot.KernelBootState, target: u8) service_effect.Effect {
@@ -175,7 +175,7 @@ func lifecycle_durability_reply(state: *boot.KernelBootState, target: u8) servic
             return shell_service.invalid_effect(shell_service.SHELL_INVALID_COMMAND)
         }
     }
-    return shell_service.lifecycle_durability_effect(syscall.SyscallStatus.Ok, service_state.state_durability_payload(target))
+    return shell_service.lifecycle_payload_effect(syscall.SyscallStatus.Ok, service_state.state_durability_payload(target))
 }
 
 func lifecycle_identity_reply(state: *boot.KernelBootState, target: u8) service_effect.Effect {
@@ -189,7 +189,7 @@ func lifecycle_identity_reply(state: *boot.KernelBootState, target: u8) service_
         }
     }
     payload: [4]u8 = boot.bootgeneration_payload_for_target(*state, target)
-    return shell_service.lifecycle_identity_effect(syscall.SyscallStatus.Ok, payload)
+    return shell_service.lifecycle_payload_effect(syscall.SyscallStatus.Ok, payload)
 }
 
 func lifecycle_policy_reply(state: *boot.KernelBootState, target: u8) service_effect.Effect {
@@ -197,29 +197,29 @@ func lifecycle_policy_reply(state: *boot.KernelBootState, target: u8) service_ef
     if payload[0] == 0 {
         return shell_service.invalid_effect(shell_service.SHELL_INVALID_COMMAND)
     }
-    return shell_service.lifecycle_policy_effect(syscall.SyscallStatus.Ok, payload)
+    return shell_service.lifecycle_payload_effect(syscall.SyscallStatus.Ok, payload)
 }
 
 func lifecycle_summary_reply(state: *boot.KernelBootState, target: u8) service_effect.Effect {
     if lifecycle_is_lane_target(target) {
-        return shell_service.lifecycle_summary_effect(syscall.SyscallStatus.Ok, boot.bootsummary_payload_for_target(*state, target))
+        return shell_service.lifecycle_payload_effect(syscall.SyscallStatus.Ok, boot.bootsummary_payload_for_target(*state, target))
     }
     summary_endpoint: u32 = lifecycle_target_endpoint(target)
     if summary_endpoint == 0 || !service_topology.service_can_restart(summary_endpoint) {
         return shell_service.invalid_effect(shell_service.SHELL_INVALID_COMMAND)
     }
-    return shell_service.lifecycle_summary_effect(syscall.SyscallStatus.Ok, boot.bootsummary_payload_for_endpoint(*state, summary_endpoint))
+    return shell_service.lifecycle_payload_effect(syscall.SyscallStatus.Ok, boot.bootsummary_payload_for_endpoint(*state, summary_endpoint))
 }
 
 func lifecycle_compare_reply(state: *boot.KernelBootState, target: u8) service_effect.Effect {
     if lifecycle_is_lane_target(target) {
-        return shell_service.lifecycle_summary_effect(syscall.SyscallStatus.Ok, boot.bootcomparison_payload_for_target(*state, target))
+        return shell_service.lifecycle_payload_effect(syscall.SyscallStatus.Ok, boot.bootcomparison_payload_for_target(*state, target))
     }
     compare_endpoint: u32 = lifecycle_target_endpoint(target)
     if compare_endpoint == 0 || !service_topology.service_can_restart(compare_endpoint) {
         return shell_service.invalid_effect(shell_service.SHELL_INVALID_COMMAND)
     }
-    return shell_service.lifecycle_summary_effect(syscall.SyscallStatus.Ok, boot.bootcomparison_payload_for_target(*state, target))
+    return shell_service.lifecycle_payload_effect(syscall.SyscallStatus.Ok, boot.bootcomparison_payload_for_target(*state, target))
 }
 
 func lifecycle_restart_reply(state: *boot.KernelBootState, target: u8) service_effect.Effect {

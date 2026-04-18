@@ -29,7 +29,7 @@ func check_handle_metadata_rejected_before_restart() bool {
 
 func check_stale_handle_metadata_rejected_after_restart() bool {
     state: boot.KernelBootState = boot.kernel_init()
-    log_ref: service_identity.ServiceRef = boot.boot_log_ref()
+    log_ref: service_identity.ServiceRef = boot.BOOT_LOG_REF
     state = init.restart(state, service_identity.ref_endpoint(log_ref))
 
     effect: service_effect.Effect = kernel_dispatch.kernel_dispatch_step(&state, obs_for(service_identity.ref_endpoint(log_ref), 7, 1))
@@ -38,7 +38,7 @@ func check_stale_handle_metadata_rejected_after_restart() bool {
 
 func check_plain_named_traffic_survives_restart() bool {
     state: boot.KernelBootState = boot.kernel_init()
-    log_ref: service_identity.ServiceRef = boot.boot_log_ref()
+    log_ref: service_identity.ServiceRef = boot.BOOT_LOG_REF
     state = init.restart(state, service_identity.ref_endpoint(log_ref))
 
     effect: service_effect.Effect = kernel_dispatch.kernel_dispatch_step(&state, obs_for(service_identity.ref_endpoint(log_ref), 0, 0))

@@ -18,10 +18,10 @@ func build_serial_cmd(b0: u8, b1: u8, b2: u8, b3: u8) syscall.ReceiveObservation
 
 // Boot-wired service refs are non-zero and mutually distinct.
 func smoke_boot_refs_are_valid_and_distinct() bool {
-    serial_ref: service_identity.ServiceRef = boot.boot_serial_ref()
-    shell_ref: service_identity.ServiceRef = boot.boot_shell_ref()
-    log_ref: service_identity.ServiceRef = boot.boot_log_ref()
-    kv_ref: service_identity.ServiceRef = boot.boot_kv_ref()
+    serial_ref: service_identity.ServiceRef = boot.BOOT_SERIAL_REF
+    shell_ref: service_identity.ServiceRef = boot.BOOT_SHELL_REF
+    log_ref: service_identity.ServiceRef = boot.BOOT_LOG_REF
+    kv_ref: service_identity.ServiceRef = boot.BOOT_KV_REF
 
     if !service_identity.ref_is_valid(serial_ref) {
         return false
@@ -61,7 +61,7 @@ func smoke_boot_refs_are_valid_and_distinct() bool {
 // Retained state may still survive when init reloads it explicitly.
 func smoke_restart_keeps_route_and_replaces_instance() bool {
     state: boot.KernelBootState = boot.kernel_init()
-    log_ref: service_identity.ServiceRef = boot.boot_log_ref()
+    log_ref: service_identity.ServiceRef = boot.BOOT_LOG_REF
     before: service_identity.ServiceMark = boot.boot_log_mark(state)
     append_effect: service_effect.Effect = kernel_dispatch.kernel_dispatch_step(&state, build_serial_cmd(76, 65, 55, 33))
     if service_effect.effect_reply_status(append_effect) != syscall.SyscallStatus.Ok {
@@ -108,8 +108,8 @@ func smoke_restart_keeps_route_and_replaces_instance() bool {
 // This confirms there is no "fresh ref" concept; clients never need to
 // re-discover the service after restart.
 func smoke_ref_is_idempotent() bool {
-    first: service_identity.ServiceRef = boot.boot_log_ref()
-    second: service_identity.ServiceRef = boot.boot_log_ref()
+    first: service_identity.ServiceRef = boot.BOOT_LOG_REF
+    second: service_identity.ServiceRef = boot.BOOT_LOG_REF
     return service_identity.refs_equal(first, second)
 }
 
@@ -117,7 +117,7 @@ func smoke_ref_is_idempotent() bool {
 // in the ref matches what the kernel dispatcher expects.
 func smoke_serial_ref_endpoint_routes_correctly() bool {
     state: boot.KernelBootState = boot.kernel_init()
-    serial_ref: service_identity.ServiceRef = boot.boot_serial_ref()
+    serial_ref: service_identity.ServiceRef = boot.BOOT_SERIAL_REF
 
     obs: syscall.ReceiveObservation = build_serial_cmd(76, 65, 55, 33)
     if service_identity.ref_endpoint(serial_ref) != obs.endpoint_id {

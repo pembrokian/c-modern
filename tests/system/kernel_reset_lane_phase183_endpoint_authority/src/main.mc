@@ -84,10 +84,10 @@ func check_known_endpoint_publicly_addressable() bool {
 // The ref is a naming surface: it holds a public name, not a capability.
 // Any valid ServiceRef names a boot-wired endpoint.
 func check_service_ref_names_boot_wired_endpoint() bool {
-    log_ref: service_identity.ServiceRef = boot.boot_log_ref()
-    kv_ref: service_identity.ServiceRef = boot.boot_kv_ref()
-    echo_ref: service_identity.ServiceRef = boot.boot_echo_ref()
-    transfer_ref: service_identity.ServiceRef = boot.boot_transfer_ref()
+    log_ref: service_identity.ServiceRef = boot.BOOT_LOG_REF
+    kv_ref: service_identity.ServiceRef = boot.BOOT_KV_REF
+    echo_ref: service_identity.ServiceRef = boot.BOOT_ECHO_REF
+    transfer_ref: service_identity.ServiceRef = boot.BOOT_TRANSFER_REF
 
     if service_identity.ref_endpoint(log_ref) != service_topology.LOG_ENDPOINT_ID {
         return false
