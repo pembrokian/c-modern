@@ -4,8 +4,8 @@ import service_effect
 import syscall
 
 const UPDATE_ARTIFACT_CAPACITY: usize = 4
-const UPDATE_STORE_FORMAT_VERSION: u8 = 1
-const UPDATE_STORE_ARTIFACT_SIZE: usize = 9
+const UPDATE_STORE_FORMAT_VERSION: u8 = 2
+const UPDATE_STORE_ARTIFACT_SIZE: usize = 16
 const UPDATE_OP_STAGE: u8 = 65
 const UPDATE_OP_CLEAR: u8 = 67
 const UPDATE_OP_QUERY: u8 = 81
@@ -23,12 +23,20 @@ struct UpdateManifest {
     expected_len: usize
 }
 
+struct AppliedUpdateTarget {
+    present: bool
+    version: u8
+    len: usize
+    data: [UPDATE_ARTIFACT_CAPACITY]u8
+}
+
 struct UpdateStoreServiceState {
     pid: u32
     slot: u32
     len: usize
     data: [UPDATE_ARTIFACT_CAPACITY]u8
     manifest: UpdateManifest
+    applied: AppliedUpdateTarget
 }
 
 struct UpdateStoreResult {
@@ -40,12 +48,16 @@ func update_manifest_init() UpdateManifest {
     return UpdateManifest{ present: false, version: 0, expected_len: 0 }
 }
 
-func update_store_init(pid: u32, slot: u32) UpdateStoreServiceState {
-    return UpdateStoreServiceState{ pid: pid, slot: slot, len: 0, data: primitives.zero_payload(), manifest: update_manifest_init() }
+func update_applied_init() AppliedUpdateTarget {
+    return AppliedUpdateTarget{ present: false, version: 0, len: 0, data: primitives.zero_payload() }
 }
 
-func update_storewith(s: UpdateStoreServiceState, len: usize, data: [UPDATE_ARTIFACT_CAPACITY]u8, manifest: UpdateManifest) UpdateStoreServiceState {
-    return UpdateStoreServiceState{ pid: s.pid, slot: s.slot, len: len, data: data, manifest: manifest }
+func update_store_init(pid: u32, slot: u32) UpdateStoreServiceState {
+    return UpdateStoreServiceState{ pid: pid, slot: slot, len: 0, data: primitives.zero_payload(), manifest: update_manifest_init(), applied: update_applied_init() }
+}
+
+func update_storewith(s: UpdateStoreServiceState, len: usize, data: [UPDATE_ARTIFACT_CAPACITY]u8, manifest: UpdateManifest, applied: AppliedUpdateTarget) UpdateStoreServiceState {
+    return UpdateStoreServiceState{ pid: s.pid, slot: s.slot, len: len, data: data, manifest: manifest, applied: applied }
 }
 
 func update_manifest_equal(left: UpdateManifest, right: UpdateManifest) bool {
@@ -61,11 +73,32 @@ func update_manifest_equal(left: UpdateManifest, right: UpdateManifest) bool {
     return true
 }
 
+func update_applied_equal(left: AppliedUpdateTarget, right: AppliedUpdateTarget) bool {
+    if left.present != right.present {
+        return false
+    }
+    if left.version != right.version {
+        return false
+    }
+    if left.len != right.len {
+        return false
+    }
+    for i in 0..UPDATE_ARTIFACT_CAPACITY {
+        if left.data[i] != right.data[i] {
+            return false
+        }
+    }
+    return true
+}
+
 func update_store_changed(before: UpdateStoreServiceState, after: UpdateStoreServiceState) bool {
     if before.len != after.len {
         return true
     }
     if !update_manifest_equal(before.manifest, after.manifest) {
+        return true
+    }
+    if !update_applied_equal(before.applied, after.applied) {
         return true
     }
     for i in 0..UPDATE_ARTIFACT_CAPACITY {
@@ -74,6 +107,25 @@ func update_store_changed(before: UpdateStoreServiceState, after: UpdateStoreSer
         }
     }
     return false
+}
+
+func update_applied_present(s: UpdateStoreServiceState) bool {
+    return s.applied.present
+}
+
+func update_applied_version(s: UpdateStoreServiceState) u8 {
+    return s.applied.version
+}
+
+func update_applied_len(s: UpdateStoreServiceState) usize {
+    return s.applied.len
+}
+
+func update_applied_byte(s: UpdateStoreServiceState, idx: usize) u8 {
+    if idx >= UPDATE_ARTIFACT_CAPACITY {
+        return 0
+    }
+    return s.applied.data[idx]
 }
 
 func update_manifest_classification(s: UpdateStoreServiceState) u8 {
@@ -110,6 +162,16 @@ func update_store_artifact_bytes(s: UpdateStoreServiceState) [UPDATE_STORE_ARTIF
     for i in 0..UPDATE_ARTIFACT_CAPACITY {
         bytes[5 + i] = s.data[i]
     }
+    if s.applied.present {
+        bytes[9] = 1
+    } else {
+        bytes[9] = 0
+    }
+    bytes[10] = s.applied.version
+    bytes[11] = u8(s.applied.len)
+    for i in 0..UPDATE_ARTIFACT_CAPACITY {
+        bytes[12 + i] = s.applied.data[i]
+    }
     return bytes
 }
 
@@ -128,7 +190,7 @@ func update_store_load(pid: u32, slot: u32) UpdateStoreServiceState {
     if bytes[0] != UPDATE_STORE_FORMAT_VERSION {
         return state
     }
-    if usize(bytes[1]) > UPDATE_ARTIFACT_CAPACITY || usize(bytes[4]) > UPDATE_ARTIFACT_CAPACITY {
+    if usize(bytes[1]) > UPDATE_ARTIFACT_CAPACITY || usize(bytes[4]) > UPDATE_ARTIFACT_CAPACITY || usize(bytes[11]) > UPDATE_ARTIFACT_CAPACITY {
         return state
     }
 
@@ -137,7 +199,12 @@ func update_store_load(pid: u32, slot: u32) UpdateStoreServiceState {
         data[i] = bytes[5 + i]
     }
     manifest := UpdateManifest{ present: bytes[2] == 1, version: bytes[3], expected_len: usize(bytes[4]) }
-    return UpdateStoreServiceState{ pid: pid, slot: slot, len: usize(bytes[1]), data: data, manifest: manifest }
+    applied_data: [UPDATE_ARTIFACT_CAPACITY]u8 = primitives.zero_payload()
+    for i in 0..UPDATE_ARTIFACT_CAPACITY {
+        applied_data[i] = bytes[12 + i]
+    }
+    applied := AppliedUpdateTarget{ present: bytes[9] == 1, version: bytes[10], len: usize(bytes[11]), data: applied_data }
+    return UpdateStoreServiceState{ pid: pid, slot: slot, len: usize(bytes[1]), data: data, manifest: manifest, applied: applied }
 }
 
 func update_stage(s: UpdateStoreServiceState, value: u8) UpdateStoreResult {
@@ -146,7 +213,7 @@ func update_stage(s: UpdateStoreServiceState, value: u8) UpdateStoreResult {
     }
     data := s.data
     data[s.len] = value
-    return UpdateStoreResult{ state: update_storewith(s, s.len + 1, data, s.manifest), effect: service_effect.effect_reply(syscall.SyscallStatus.Ok, 0, primitives.zero_payload()) }
+    return UpdateStoreResult{ state: update_storewith(s, s.len + 1, data, s.manifest, s.applied), effect: service_effect.effect_reply(syscall.SyscallStatus.Ok, 0, primitives.zero_payload()) }
 }
 
 func update_record_manifest(s: UpdateStoreServiceState, version: u8, expected_len: u8) UpdateStoreResult {
@@ -154,7 +221,18 @@ func update_record_manifest(s: UpdateStoreServiceState, version: u8, expected_le
         return UpdateStoreResult{ state: s, effect: service_effect.effect_reply(syscall.SyscallStatus.InvalidArgument, 0, primitives.zero_payload()) }
     }
     manifest := UpdateManifest{ present: true, version: version, expected_len: usize(expected_len) }
-    return UpdateStoreResult{ state: update_storewith(s, s.len, s.data, manifest), effect: service_effect.effect_reply(syscall.SyscallStatus.Ok, 0, primitives.zero_payload()) }
+    return UpdateStoreResult{ state: update_storewith(s, s.len, s.data, manifest, s.applied), effect: service_effect.effect_reply(syscall.SyscallStatus.Ok, 0, primitives.zero_payload()) }
+}
+
+func update_apply(s: UpdateStoreServiceState) UpdateStoreResult {
+    if update_manifest_classification(s) != UPDATE_CLASS_READY {
+        return UpdateStoreResult{ state: s, effect: service_effect.effect_reply(syscall.SyscallStatus.InvalidArgument, 0, primitives.zero_payload()) }
+    }
+    applied := AppliedUpdateTarget{ present: true, version: s.manifest.version, len: s.len, data: s.data }
+    if update_applied_equal(s.applied, applied) {
+        return UpdateStoreResult{ state: s, effect: service_effect.effect_reply(syscall.SyscallStatus.Ok, 0, primitives.zero_payload()) }
+    }
+    return UpdateStoreResult{ state: update_storewith(s, s.len, s.data, s.manifest, applied), effect: service_effect.effect_reply(syscall.SyscallStatus.Ok, 0, primitives.zero_payload()) }
 }
 
 func update_query(s: UpdateStoreServiceState) UpdateStoreResult {
@@ -167,7 +245,8 @@ func update_query(s: UpdateStoreServiceState) UpdateStoreResult {
 }
 
 func update_clear(s: UpdateStoreServiceState) UpdateStoreResult {
-    return UpdateStoreResult{ state: update_store_init(s.pid, s.slot), effect: service_effect.effect_reply(syscall.SyscallStatus.Ok, 0, primitives.zero_payload()) }
+    cleared := update_store_init(s.pid, s.slot)
+    return UpdateStoreResult{ state: update_storewith(cleared, cleared.len, cleared.data, cleared.manifest, s.applied), effect: service_effect.effect_reply(syscall.SyscallStatus.Ok, 0, primitives.zero_payload()) }
 }
 
 func handle(s: UpdateStoreServiceState, m: service_effect.Message) UpdateStoreResult {

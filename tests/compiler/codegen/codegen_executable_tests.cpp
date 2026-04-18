@@ -22,9 +22,9 @@ using mc::test_support::ExpectExecutableOutput;
 using mc::test_support::Fail;
 using mc::test_support::ReadExactFromSocket;
 using mc::test_support::ReadFile;
-using mc::test_support::ReserveLoopbackPort;
 using mc::test_support::RunCommandCapture;
 using mc::test_support::SpawnBackgroundExecutable;
+using mc::test_support::SpawnBackgroundExecutableWithInheritedLoopbackListener;
 using mc::test_support::WriteAllToSocket;
 using mc::test_support::WriteFile;
 
@@ -55,12 +55,13 @@ void RunBuiltNetworkEchoServerFixture(const std::filesystem::path& mc_path,
                          "mc build " + source_path.generic_string());
 
     const auto artifacts = mc::support::ComputeBuildArtifactTargets(source_path, build_dir);
-    const uint16_t port = ReserveLoopbackPort();
-    const BackgroundProcess process = SpawnBackgroundExecutable(
+    uint16_t port = 0;
+    const BackgroundProcess process = SpawnBackgroundExecutableWithInheritedLoopbackListener(
         artifacts.executable,
-        {std::to_string(port)},
+        {},
         build_dir / "server_output.txt",
-        "spawn background network echo server");
+        "spawn background network echo server",
+        &port);
 
     const int client_fd = ConnectLoopbackWithRetry(port, 2000, "connect to built network echo server");
     WriteAllToSocket(client_fd, request, "write request to built network echo server");
@@ -91,12 +92,13 @@ void RunBuiltPartialWriteServerFixture(const std::filesystem::path& mc_path,
                          "mc build " + source_path.generic_string());
 
     const auto artifacts = mc::support::ComputeBuildArtifactTargets(source_path, build_dir);
-    const uint16_t port = ReserveLoopbackPort();
-    const BackgroundProcess process = SpawnBackgroundExecutable(
+    uint16_t port = 0;
+    const BackgroundProcess process = SpawnBackgroundExecutableWithInheritedLoopbackListener(
         artifacts.executable,
-        {std::to_string(port)},
+        {},
         build_dir / "partial_write_server_output.txt",
-        "spawn background partial-write server");
+        "spawn background partial-write server",
+        &port);
 
     const int client_fd = ConnectLoopbackWithRetry(port, 2000, "connect to built partial-write server");
     WriteAllToSocket(client_fd, request, "write request to built partial-write server");
@@ -440,12 +442,13 @@ void RunBuiltProjectNetworkEchoFixture(const std::filesystem::path& mc_path,
                          "mc build --project " + project_path.generic_string());
 
     const auto artifacts = mc::support::ComputeBuildArtifactTargets(root_source_path, build_dir);
-    const uint16_t port = ReserveLoopbackPort();
-    const BackgroundProcess process = SpawnBackgroundExecutable(
+    uint16_t port = 0;
+    const BackgroundProcess process = SpawnBackgroundExecutableWithInheritedLoopbackListener(
         artifacts.executable,
-        {std::to_string(port)},
+        {},
         build_dir / "project_server_output.txt",
-        "spawn built project network echo server");
+        "spawn built project network echo server",
+        &port);
 
     const int client_fd = ConnectLoopbackWithRetry(port, 2000, "connect to built project network echo server");
     WriteAllToSocket(client_fd, request, "write request to built project network echo server");
@@ -478,12 +481,13 @@ void RunBuiltProjectPartialWriteFixture(const std::filesystem::path& mc_path,
                          "mc build --project " + project_path.generic_string());
 
     const auto artifacts = mc::support::ComputeBuildArtifactTargets(root_source_path, build_dir);
-    const uint16_t port = ReserveLoopbackPort();
-    const BackgroundProcess process = SpawnBackgroundExecutable(
+    uint16_t port = 0;
+    const BackgroundProcess process = SpawnBackgroundExecutableWithInheritedLoopbackListener(
         artifacts.executable,
-        {std::to_string(port)},
+        {},
         build_dir / "project_partial_write_output.txt",
-        "spawn built project partial-write server");
+        "spawn built project partial-write server",
+        &port);
 
     const int client_fd = ConnectLoopbackWithRetry(port, 2000, "connect to built project partial-write server");
     WriteAllToSocket(client_fd, request, "write request to built project partial-write server");

@@ -3,7 +3,7 @@ Phase 243 -- Restart-Safe Update Apply Workflow
 
 Status
 ------
-PROPOSED
+COMPLETED
 
 Purpose
 -------
@@ -25,6 +25,20 @@ Repository status note
 - The repository still lacks one workflow whose terminal outcome means an
   applied update rather than a generic durable-object mutation or external
   request completion.
+
+Implementation summary
+----------------------
+- Added one dedicated update-apply workflow kind to `workflow_service` rather
+  than widening the named-object update lane.
+- Kept staged and applied update truth in `update_store_service` by adding one
+  owner-local `update_apply(...)` step plus one durable applied-target record.
+- Reused the existing timer, journal restart reload, and completion mailbox
+  owners instead of adding installer orchestration, rollback logic, or
+  transport widening.
+- Added one focused scenario in
+  `kernel/src/scenarios/scenario_update_apply_workflow.mc` and one focused
+  reset-lane fixture in
+  `tests/system/kernel_reset_lane_phase243_update_apply_workflow`.
 
 Problem being solved
 --------------------
@@ -125,6 +139,43 @@ Acceptance criteria
 - terminal outcomes are delivered through the existing completion mailbox
 - no installer, rollback, or dependency framework is introduced
 - the update milestone now has one real restart-safe apply path
+
+Validation
+----------
+- `Build debug`
+- `ctest --test-dir build/debug -R mc_tool_workflow_kernel_reset_lane_unit --output-on-failure`
+
+Results
+-------
+- `workflow_service` now carries one additive update-apply lane with explicit
+  waiting, applied, rejected, and restart-cancelled terminal outcomes.
+- `update_store_service` now owns both staged update truth and one durable
+  applied target, so update consequence state stays owner-local instead of
+  drifting into workflow or boot logic.
+- Restart during the waiting window resumes honestly through the existing
+  journal-backed workflow reload path, and restart after workset-generation
+  change cancels explicitly rather than silently applying stale work.
+- The owning reset-lane workflow suite now includes one focused Phase 243
+  fixture.
+
+Decisions and non-decisions
+---------------------------
+- Decision: add a second durable workflow kind instead of teaching the named-
+  object update lane to impersonate update application.
+- Decision: keep the applied target in `update_store_service` so product-
+  shaped update truth remains separate from generic object state.
+- Non-decision: this phase does not add rollback, dependency resolution,
+  package queues, or installer policy.
+- Non-decision: this phase does not widen the four-byte shell transport or add
+  a general update framework.
+
+Deferred follow-up
+------------------
+- Delegated authority for apply remains the next likely pressure once the
+  bounded restart-safe apply path is proven.
+- Richer manifest truth should remain deferred until a real admitted apply path
+  needs more than one staged slot, one applied target, and one compact
+  version/length contract.
 
 Future follow-up
 ----------------

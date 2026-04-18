@@ -2,12 +2,16 @@ import errors
 import io
 import net
 import partial_write_core
+import strings
 
 const REQUEST_LEN: usize = 4
 const RESPONSE_LEN: usize = 1536
 const STATE_READ_REQUEST: i32 = 0
 const STATE_WRITE_RESPONSE: i32 = 1
 const STATE_READ_ACK: i32 = 2
+const ASCII_ZERO: u8 = 48
+const ASCII_NINE: u8 = 57
+const ERR_INVALID_LISTENER_FD: usize = 2
 
 func close_ignored(file: io.File) {
     if errors.is_err(io.close(file)) {
@@ -25,26 +29,69 @@ func loopback(port: u16) net.IpEndpoint {
     return net.IpEndpoint{ addr: net.Ipv4Addr{ a: 127, b: 0, c: 0, d: 1 }, port: port }
 }
 
+func parse_listener_fd(text: str) (io.File, errors.Error) {
+    if text.len < 4 {
+        return 0, errors.fail_io(ERR_INVALID_LISTENER_FD)
+    }
+
+    bytes: Slice<u8> = strings.bytes(text)
+    if bytes[0] != 102 {
+        return 0, errors.fail_io(ERR_INVALID_LISTENER_FD)
+    }
+    if bytes[1] != 100 {
+        return 0, errors.fail_io(ERR_INVALID_LISTENER_FD)
+    }
+    if bytes[2] != 58 {
+        return 0, errors.fail_io(ERR_INVALID_LISTENER_FD)
+    }
+
+    value: i32 = 0
+    index: usize = 3
+    while index < bytes.len {
+        ch: u8 = bytes[index]
+        if ch < ASCII_ZERO {
+            return 0, errors.fail_io(ERR_INVALID_LISTENER_FD)
+        }
+        if ch > ASCII_NINE {
+            return 0, errors.fail_io(ERR_INVALID_LISTENER_FD)
+        }
+        value = value * 10 + (i32)(ch - ASCII_ZERO)
+        index = index + 1
+    }
+
+    if value <= 0 {
+        return 0, errors.fail_io(ERR_INVALID_LISTENER_FD)
+    }
+    return value, errors.ok()
+}
+
 func main(args: Slice<cstr>) i32 {
     if args.len != 2 {
-        if io.write_line("usage: evented-partial-write <port>") != 0 {
+        if io.write_line("usage: evented-partial-write <port|fd:N>") != 0 {
             return 1
         }
         return 80
     }
 
-    port: u16
-    parse_err: errors.Error
-    port, parse_err = net.parse_port(args[1])
-    if errors.is_err(parse_err) {
-        return 81
-    }
-
     listener: io.File
     err: errors.Error
-    listener, err = net.tcp_listen(loopback(port))
-    if !errors.is_ok(err) {
-        return 82
+    if args[1].len >= 3 && strings.eq(args[1][0:3], "fd:") {
+        listener, err = parse_listener_fd(args[1])
+        if errors.is_err(err) {
+            return 81
+        }
+    } else {
+        port: u16
+        parse_err: errors.Error
+        port, parse_err = net.parse_port(args[1])
+        if errors.is_err(parse_err) {
+            return 81
+        }
+
+        listener, err = net.tcp_listen(loopback(port))
+        if !errors.is_ok(err) {
+            return 82
+        }
     }
     defer close_ignored(listener)
 

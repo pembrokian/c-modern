@@ -162,6 +162,13 @@ bool CollectCompletedResetLaneScenario(std::vector<ResetLaneScenarioTiming>* tim
     return false;
 }
 
+void WaitForAnyCompletedResetLaneScenario(std::vector<ResetLaneScenarioTiming>* timings,
+                                         std::vector<struct InFlightScenario>* in_flight) {
+    while (!CollectCompletedResetLaneScenario(timings, in_flight)) {
+        std::this_thread::sleep_for(std::chrono::milliseconds(1));
+    }
+}
+
 int ResetLaneWallWarnMs(ResetLaneMode mode) {
     if (mode == ResetLaneMode::fast) {
         return ParsePositiveEnvOrDefault("MC_RESET_LANE_FAST_WARN_MS", 12000);
@@ -327,7 +334,6 @@ void RemoveExtraneousFixtureProjectEntries(const std::filesystem::path& fixture_
     std::sort(stale_entries.begin(), stale_entries.end(), [](const auto& lhs, const auto& rhs) {
         return lhs.generic_string().size() > rhs.generic_string().size();
     });
-    stale_entries.erase(std::unique(stale_entries.begin(), stale_entries.end()), stale_entries.end());
     for (const auto& stale_entry : stale_entries) {
         std::filesystem::remove_all(stale_entry);
     }
@@ -452,7 +458,7 @@ ResetLaneScenarioTiming RunKernelResetLaneScenario(const std::filesystem::path& 
     };
 }
 
-constexpr std::array<ResetLaneScenario, 59> kResetLaneScenarios = {{
+constexpr std::array<ResetLaneScenario, 60> kResetLaneScenarios = {{
     {.label = "repo project", .scenario_key = "repo", .target_name = "kernel", .include_in_fast = true, .build_warn_ms = 2000},
     {.label = "smoke", .fixture_relative_path = "tests/smoke/kernel_reset_lane_serial_round_trip", .scenario_key = "smoke", .target_name = "app", .include_in_fast = true},
     {.label = "retained state", .fixture_relative_path = "tests/system/kernel_reset_lane_retained_log", .scenario_key = "retained_state", .context_label = "retained-state", .target_name = "app", .include_in_fast = true},
@@ -512,6 +518,7 @@ constexpr std::array<ResetLaneScenario, 59> kResetLaneScenarios = {{
     {.label = "external ingress completion pressure", .fixture_relative_path = "tests/system/kernel_reset_lane_phase240_external_ingress_completion_pressure", .scenario_key = "phase240_external_ingress_completion_pressure", .context_label = "phase 240 external ingress completion pressure", .target_name = "app", .include_in_fast = true, .build_warn_ms = 1000},
     {.label = "delegated external request handling", .fixture_relative_path = "tests/system/kernel_reset_lane_phase241_delegated_external_request_handling", .scenario_key = "phase241_delegated_external_request_handling", .context_label = "phase 241 delegated external request handling", .target_name = "app", .include_in_fast = true, .build_warn_ms = 1000},
     {.label = "update manifest and staged artifact store", .fixture_relative_path = "tests/system/kernel_reset_lane_phase242_update_store", .scenario_key = "phase242_update_store", .context_label = "phase 242 update manifest and staged artifact store", .target_name = "app", .include_in_fast = true, .build_warn_ms = 1000},
+    {.label = "restart-safe update apply workflow", .fixture_relative_path = "tests/system/kernel_reset_lane_phase243_update_apply_workflow", .scenario_key = "phase243_update_apply_workflow", .context_label = "phase 243 restart-safe update apply workflow", .target_name = "app", .include_in_fast = true, .build_warn_ms = 1000},
 }};
 
 std::vector<const ResetLaneScenario*> SelectResetLaneScenarios(ResetLaneMode mode) {
@@ -592,12 +599,7 @@ void RunWorkflowKernelResetLaneSuiteImpl(const std::filesystem::path& source_roo
     for (std::size_t index = 0; index < selected.size(); ++index) {
         const ResetLaneScenario scenario = *selected[index];
         if (in_flight.size() >= jobs) {
-            if (!CollectCompletedResetLaneScenario(&timings, &in_flight)) {
-                InFlightScenario current = std::move(in_flight.front());
-                current.future.wait();
-                timings[current.index] = current.future.get();
-                in_flight.erase(in_flight.begin());
-            }
+            WaitForAnyCompletedResetLaneScenario(&timings, &in_flight);
         }
         in_flight.push_back(InFlightScenario{
             .index = index,
@@ -609,13 +611,7 @@ void RunWorkflowKernelResetLaneSuiteImpl(const std::filesystem::path& source_roo
     }
 
     while (!in_flight.empty()) {
-        if (CollectCompletedResetLaneScenario(&timings, &in_flight)) {
-            continue;
-        }
-        InFlightScenario current = std::move(in_flight.front());
-        current.future.wait();
-        timings[current.index] = current.future.get();
-        in_flight.erase(in_flight.begin());
+        WaitForAnyCompletedResetLaneScenario(&timings, &in_flight);
     }
 
     for (std::size_t index = 0; index < selected.size(); ++index) {

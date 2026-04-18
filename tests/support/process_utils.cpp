@@ -6,7 +6,6 @@
 #include <filesystem>
 #include <fstream>
 #include <poll.h>
-#include <sstream>
 #include <thread>
 
 #include <arpa/inet.h>
@@ -23,20 +22,7 @@ namespace mc::test_support {
 
 namespace {
 
-std::string QuoteShellArg(std::string_view argument) {
-    std::string quoted;
-    quoted.reserve(argument.size() + 2);
-    quoted.push_back('\'');
-    for (const char ch : argument) {
-        if (ch == '\'') {
-            quoted += "'\\''";
-            continue;
-        }
-        quoted.push_back(ch);
-    }
-    quoted.push_back('\'');
-    return quoted;
-}
+constexpr int kInheritedLoopbackListenerFd = 3;
 
 std::filesystem::path TimestampTickProbePath() {
     return std::filesystem::current_path() / ".mc_timestamp_tick_probe";
@@ -56,23 +42,11 @@ std::filesystem::file_time_type TouchTimestampTickProbe(const std::filesystem::p
     return std::filesystem::last_write_time(probe_path);
 }
 
-std::string JoinCommand(const std::vector<std::string>& args) {
-    std::string command;
-    for (std::size_t index = 0; index < args.size(); ++index) {
-        if (index > 0) {
-            command.push_back(' ');
-        }
-        command += QuoteShellArg(args[index]);
-    }
-    return command;
-}
-
 std::string SummarizeTextForFailure(std::string_view text) {
-    constexpr std::size_t kMaxPreview = 320;
     constexpr std::size_t kHeadPreview = 200;
     constexpr std::size_t kTailPreview = 80;
 
-    if (text.size() <= kMaxPreview) {
+    if (text.size() <= kHeadPreview + kTailPreview) {
         return std::string(text);
     }
 
@@ -93,6 +67,85 @@ void SetSocketTimeout(int fd,
         const int saved_errno = errno;
         Fail(context + ": unable to configure socket timeout: errno=" + std::to_string(saved_errno));
     }
+}
+
+std::vector<char*> BuildArgv(std::vector<std::string>* argv_storage) {
+    std::vector<char*> argv_ptrs;
+    argv_ptrs.reserve(argv_storage->size() + 1);
+    for (std::string& value : *argv_storage) {
+        argv_ptrs.push_back(const_cast<char*>(value.c_str()));
+    }
+    argv_ptrs.push_back(nullptr);
+    return argv_ptrs;
+}
+
+[[noreturn]] void ExecCommand(std::vector<std::string> argv_storage) {
+    std::vector<char*> argv_ptrs = BuildArgv(&argv_storage);
+    execvp(argv_storage[0].c_str(), argv_ptrs.data());
+    _exit(127);
+}
+
+CommandOutcome DecodeWaitStatus(int status,
+                                const std::string& context) {
+#ifdef WIFEXITED
+    if (WIFEXITED(status)) {
+        return {
+            .exited = true,
+            .exit_code = WEXITSTATUS(status),
+        };
+    }
+#endif
+#ifdef WIFSIGNALED
+    if (WIFSIGNALED(status)) {
+        return {
+            .signaled = true,
+            .signal_number = WTERMSIG(status),
+        };
+    }
+#endif
+    Fail(context + ": child exited with unknown status");
+    return {};
+}
+
+CommandOutcome WaitForCommandExit(pid_t pid,
+                                  const std::string& context) {
+    int status = 0;
+    const pid_t result = waitpid(pid, &status, 0);
+    if (result != pid) {
+        if (result < 0) {
+            const int saved_errno = errno;
+            Fail(context + ": waitpid failed: errno=" + std::to_string(saved_errno));
+        }
+        Fail(context + ": waitpid returned unexpected pid " + std::to_string(result));
+    }
+    return DecodeWaitStatus(status, context);
+}
+
+CommandOutcome RunCommandDirect(const std::vector<std::string>& args,
+                                int stdout_fd,
+                                int stderr_fd,
+                                const std::string& context) {
+    if (args.empty()) {
+        Fail(context + ": expected command arguments");
+    }
+
+    pid_t pid = fork();
+    if (pid < 0) {
+        const int saved_errno = errno;
+        Fail(context + ": fork failed: errno=" + std::to_string(saved_errno));
+    }
+
+    if (pid == 0) {
+        if (stdout_fd >= 0 && dup2(stdout_fd, STDOUT_FILENO) < 0) {
+            _exit(127);
+        }
+        if (stderr_fd >= 0 && dup2(stderr_fd, STDERR_FILENO) < 0) {
+            _exit(127);
+        }
+        ExecCommand(args);
+    }
+
+    return WaitForCommandExit(pid, context);
 }
 
 }  // namespace
@@ -120,27 +173,7 @@ void CopyDirectoryTree(const std::filesystem::path& source,
 
 CommandOutcome RunCommand(const std::vector<std::string>& args,
                           const std::string& context) {
-    const std::string command = JoinCommand(args);
-    const int raw_status = std::system(command.c_str());
-#ifdef WIFEXITED
-    if (WIFEXITED(raw_status)) {
-        return {
-            .exited = true,
-            .exit_code = WEXITSTATUS(raw_status),
-        };
-    }
-#endif
-#ifdef WIFSIGNALED
-    if (WIFSIGNALED(raw_status)) {
-        return {
-            .signaled = true,
-            .signal_number = WTERMSIG(raw_status),
-        };
-    }
-#endif
-    Fail(context + ": command failed to execute cleanly: " + command + " (raw_status=" +
-         std::to_string(raw_status) + ")");
-    return {};
+    return RunCommandDirect(args, -1, -1, context);
 }
 
 std::pair<CommandOutcome, std::string> RunCommandCapture(
@@ -148,30 +181,15 @@ std::pair<CommandOutcome, std::string> RunCommandCapture(
     const std::filesystem::path& output_path,
     const std::string& context) {
     std::filesystem::create_directories(output_path.parent_path());
-    const std::string command = JoinCommand(args) + " >" + QuoteShellArg(output_path.generic_string()) + " 2>&1";
-    const int raw_status = std::system(command.c_str());
+    const int output_fd = open(output_path.c_str(), O_CREAT | O_WRONLY | O_TRUNC, 0644);
+    if (output_fd < 0) {
+        const int saved_errno = errno;
+        Fail(context + ": failed to open output capture file: errno=" + std::to_string(saved_errno));
+    }
+    const CommandOutcome outcome = RunCommandDirect(args, output_fd, output_fd, context);
+    CloseFd(output_fd);
     const std::string output = ReadFile(output_path);
-#ifdef WIFEXITED
-    if (WIFEXITED(raw_status)) {
-        return {{
-                    .exited = true,
-                    .exit_code = WEXITSTATUS(raw_status),
-                },
-                output};
-    }
-#endif
-#ifdef WIFSIGNALED
-    if (WIFSIGNALED(raw_status)) {
-        return {{
-                    .signaled = true,
-                    .signal_number = WTERMSIG(raw_status),
-                },
-                output};
-    }
-#endif
-    Fail(context + ": command failed to execute cleanly: " + command + " (raw_status=" +
-         std::to_string(raw_status) + ")");
-    return {};
+    return {outcome, output};
 }
 
 void ExpectCommandSuccess(const std::vector<std::string>& args,
@@ -296,16 +314,7 @@ BackgroundProcess SpawnBackgroundCommand(const std::vector<std::string>& args,
             _exit(127);
         }
         close(output_fd);
-
-        std::vector<std::string> argv_storage = args;
-        std::vector<char*> argv_ptrs;
-        argv_ptrs.reserve(argv_storage.size() + 1);
-        for (std::string& value : argv_storage) {
-            argv_ptrs.push_back(value.data());
-        }
-        argv_ptrs.push_back(nullptr);
-        execv(argv_storage[0].c_str(), argv_ptrs.data());
-        _exit(127);
+        ExecCommand(args);
     }
 
     return {.pid = pid, .output_path = output_path};
@@ -322,6 +331,64 @@ BackgroundProcess SpawnBackgroundExecutable(const std::filesystem::path& executa
     return SpawnBackgroundCommand(command, output_path, context);
 }
 
+BackgroundProcess SpawnBackgroundCommandWithInheritedLoopbackListener(
+    const std::vector<std::string>& args,
+    const std::filesystem::path& output_path,
+    const std::string& context,
+    uint16_t* out_port) {
+    if (args.empty()) {
+        Fail(context + ": expected command arguments");
+    }
+
+    const int listener_fd = CreateLoopbackListener(out_port);
+    std::filesystem::create_directories(output_path.parent_path());
+    pid_t pid = fork();
+    if (pid < 0) {
+        const int saved_errno = errno;
+        CloseFd(listener_fd);
+        Fail(context + ": fork failed: errno=" + std::to_string(saved_errno));
+    }
+
+    if (pid == 0) {
+        if (listener_fd != kInheritedLoopbackListenerFd) {
+            if (dup2(listener_fd, kInheritedLoopbackListenerFd) < 0) {
+                _exit(127);
+            }
+            close(listener_fd);
+        }
+
+        const int output_fd = open(output_path.c_str(), O_CREAT | O_WRONLY | O_TRUNC, 0644);
+        if (output_fd < 0) {
+            _exit(127);
+        }
+        if (dup2(output_fd, STDOUT_FILENO) < 0 || dup2(output_fd, STDERR_FILENO) < 0) {
+            close(output_fd);
+            _exit(127);
+        }
+        close(output_fd);
+
+        std::vector<std::string> command = args;
+        command.push_back("fd:" + std::to_string(kInheritedLoopbackListenerFd));
+        ExecCommand(command);
+    }
+
+    CloseFd(listener_fd);
+    return {.pid = pid, .output_path = output_path};
+}
+
+BackgroundProcess SpawnBackgroundExecutableWithInheritedLoopbackListener(
+    const std::filesystem::path& executable,
+    const std::vector<std::string>& args,
+    const std::filesystem::path& output_path,
+    const std::string& context,
+    uint16_t* out_port) {
+    std::vector<std::string> command;
+    command.reserve(args.size() + 1);
+    command.push_back(executable.generic_string());
+    command.insert(command.end(), args.begin(), args.end());
+    return SpawnBackgroundCommandWithInheritedLoopbackListener(command, output_path, context, out_port);
+}
+
 CommandOutcome WaitForProcessExit(pid_t pid,
                                   int timeout_ms,
                                   const std::string& context) {
@@ -330,20 +397,14 @@ CommandOutcome WaitForProcessExit(pid_t pid,
         int status = 0;
         const pid_t result = waitpid(pid, &status, WNOHANG);
         if (result == pid) {
-#ifdef WIFEXITED
-            if (WIFEXITED(status)) {
-                return {.exited = true, .exit_code = WEXITSTATUS(status)};
-            }
-#endif
-#ifdef WIFSIGNALED
-            if (WIFSIGNALED(status)) {
-                return {.signaled = true, .signal_number = WTERMSIG(status)};
-            }
-#endif
-            Fail(context + ": child exited with unknown status");
+            return DecodeWaitStatus(status, context);
         }
         if (result < 0) {
-            Fail(context + ": waitpid failed");
+            const int saved_errno = errno;
+            Fail(context + ": waitpid failed: errno=" + std::to_string(saved_errno));
+        }
+        if (result != 0) {
+            Fail(context + ": waitpid returned unexpected pid " + std::to_string(result));
         }
         if (std::chrono::steady_clock::now() >= deadline) {
             kill(pid, SIGKILL);
@@ -363,38 +424,6 @@ void ExpectBackgroundProcessSuccess(const BackgroundProcess& process,
         Fail(context + ": child exited with code " + std::to_string(outcome.exit_code) +
              ", output='" + output + "'");
     }
-}
-
-uint16_t ReserveLoopbackPort() {
-    const int fd = socket(AF_INET, SOCK_STREAM, 0);
-    if (fd < 0) {
-        Fail("unable to create loopback probe socket");
-    }
-
-    const int enabled = 1;
-    setsockopt(fd, SOL_SOCKET, SO_REUSEADDR, &enabled, sizeof(enabled));
-
-    sockaddr_in addr {};
-    addr.sin_family = AF_INET;
-    addr.sin_port = htons(0);
-    addr.sin_addr.s_addr = htonl(INADDR_LOOPBACK);
-    if (bind(fd, reinterpret_cast<const sockaddr*>(&addr), sizeof(addr)) != 0) {
-        const int saved_errno = errno;
-        CloseFd(fd);
-        Fail("unable to reserve loopback port: errno=" + std::to_string(saved_errno));
-    }
-
-    sockaddr_in bound_addr {};
-    socklen_t bound_len = sizeof(bound_addr);
-    if (getsockname(fd, reinterpret_cast<sockaddr*>(&bound_addr), &bound_len) != 0) {
-        const int saved_errno = errno;
-        CloseFd(fd);
-        Fail("unable to read reserved loopback port: errno=" + std::to_string(saved_errno));
-    }
-
-    const uint16_t port = ntohs(bound_addr.sin_port);
-    CloseFd(fd);
-    return port;
 }
 
 int CreateLoopbackListener(uint16_t* out_port) {
@@ -469,7 +498,11 @@ int AcceptLoopbackClient(int listener_fd,
     poll_entry.fd = listener_fd;
     poll_entry.events = POLLIN;
     const int ready = poll(&poll_entry, 1, timeout_ms);
-    if (ready <= 0) {
+    if (ready < 0) {
+        const int saved_errno = errno;
+        Fail(context + ": poll failed: errno=" + std::to_string(saved_errno));
+    }
+    if (ready == 0) {
         Fail(context + ": timed out waiting for client connection");
     }
 

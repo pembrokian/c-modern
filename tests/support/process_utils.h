@@ -80,6 +80,19 @@ BackgroundProcess SpawnBackgroundExecutable(const std::filesystem::path& executa
                                             const std::filesystem::path& output_path,
                                             const std::string& context);
 
+BackgroundProcess SpawnBackgroundCommandWithInheritedLoopbackListener(
+    const std::vector<std::string>& args,
+    const std::filesystem::path& output_path,
+    const std::string& context,
+    uint16_t* out_port);
+
+BackgroundProcess SpawnBackgroundExecutableWithInheritedLoopbackListener(
+    const std::filesystem::path& executable,
+    const std::vector<std::string>& args,
+    const std::filesystem::path& output_path,
+    const std::string& context,
+    uint16_t* out_port);
+
 CommandOutcome WaitForProcessExit(pid_t pid,
                                   int timeout_ms,
                                   const std::string& context);
@@ -87,8 +100,6 @@ CommandOutcome WaitForProcessExit(pid_t pid,
 void ExpectBackgroundProcessSuccess(const BackgroundProcess& process,
                                     int timeout_ms,
                                     const std::string& context);
-
-uint16_t ReserveLoopbackPort();
 
 int CreateLoopbackListener(uint16_t* out_port);
 

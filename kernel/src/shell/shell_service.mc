@@ -568,6 +568,10 @@ func workflow_update(s: ShellServiceState, m: service_effect.Message) service_ef
     return forward_three(s, service_topology.WORKFLOW_ENDPOINT_ID, serial_protocol.CMD_W, m.payload[2], m.payload[3])
 }
 
+func workflow_apply_update(s: ShellServiceState, m: service_effect.Message) service_effect.Effect {
+    return forward_one(s, service_topology.WORKFLOW_ENDPOINT_ID, serial_protocol.CMD_A)
+}
+
 func workflow_query(s: ShellServiceState, m: service_effect.Message) service_effect.Effect {
     return forward_two(s, service_topology.WORKFLOW_ENDPOINT_ID, serial_protocol.CMD_Q, m.payload[2])
 }
@@ -577,11 +581,11 @@ func workflow_cancel(s: ShellServiceState, m: service_effect.Message) service_ef
 }
 
 const WORKFLOW_ROUTES: [5]OpHandler = [5]OpHandler{
+    OpHandler{ op: serial_protocol.CMD_A, check: bang23, run: workflow_apply_update },
     OpHandler{ op: serial_protocol.CMD_S, check: anymsg, run: workflow_schedule },
     OpHandler{ op: serial_protocol.CMD_W, check: anymsg, run: workflow_update },
     OpHandler{ op: serial_protocol.CMD_Q, check: bang3, run: workflow_query },
-    OpHandler{ op: serial_protocol.CMD_C, check: bang3, run: workflow_cancel },
-    UNUSED_ROUTE
+    OpHandler{ op: serial_protocol.CMD_C, check: bang3, run: workflow_cancel }
 }
 
 func route_workflow(s: ShellServiceState, m: service_effect.Message, op: u8) service_effect.Effect {

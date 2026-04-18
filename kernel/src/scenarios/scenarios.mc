@@ -27,6 +27,7 @@ import scenario_timer_task_service
 import scenario_workflow_service
 import scenario_steps
 import scenario_transfer
+import scenario_update_apply_workflow
 import scenario_update_store_service
 import scenario_workset_identity
 
@@ -120,6 +121,10 @@ func run(state: *boot.KernelBootState) i32 {
         return result
     }
     result = scenario_update_store_service.run_update_store_service_probe()
+    if result != 0 {
+        return result
+    }
+    result = scenario_update_apply_workflow.run_update_apply_workflow_probe()
     if result != 0 {
         return result
     }

@@ -1,10 +1,15 @@
 import errors
 import io
 import net
+import strings
+
+const ASCII_ZERO: u8 = 48
+const ASCII_NINE: u8 = 57
+const ERR_INVALID_LISTENER_FD: usize = 2
 
 func main(args: Slice<cstr>) i32 {
     if args.len != 2 {
-        if io.write_line("usage: evented-echo <port>") != 0 {
+        if io.write_line("usage: evented-echo <port|fd:N>") != 0 {
             return 1
         }
         return 64
@@ -27,20 +32,62 @@ func poller_remove_ignored(poller: *io.Poller, file: io.File) {
     }
 }
 
-func run(port_text: str) i32 {
-    port: u16
-    parse_err: errors.Error
-    port, parse_err = net.parse_port(port_text)
-    if errors.is_err(parse_err) {
-        return 10
+func parse_listener_fd(text: str) (io.File, errors.Error) {
+    if text.len < 4 {
+        return 0, errors.fail_io(ERR_INVALID_LISTENER_FD)
     }
 
-    bind: net.IpEndpoint = net.IpEndpoint{ addr: net.Ipv4Addr{ a: 127, b: 0, c: 0, d: 1 }, port: port }
+    bytes: Slice<u8> = strings.bytes(text)
+    if bytes[0] != 102 {
+        return 0, errors.fail_io(ERR_INVALID_LISTENER_FD)
+    }
+    if bytes[1] != 100 {
+        return 0, errors.fail_io(ERR_INVALID_LISTENER_FD)
+    }
+    if bytes[2] != 58 {
+        return 0, errors.fail_io(ERR_INVALID_LISTENER_FD)
+    }
+
+    value: i32 = 0
+    index: usize = 3
+    while index < bytes.len {
+        ch: u8 = bytes[index]
+        if ch < ASCII_ZERO {
+            return 0, errors.fail_io(ERR_INVALID_LISTENER_FD)
+        }
+        if ch > ASCII_NINE {
+            return 0, errors.fail_io(ERR_INVALID_LISTENER_FD)
+        }
+        value = value * 10 + (i32)(ch - ASCII_ZERO)
+        index = index + 1
+    }
+
+    if value <= 0 {
+        return 0, errors.fail_io(ERR_INVALID_LISTENER_FD)
+    }
+    return value, errors.ok()
+}
+
+func run(port_text: str) i32 {
     listener: io.File
     err: errors.Error
-    listener, err = net.tcp_listen(bind)
-    if !errors.is_ok(err) {
-        return 11
+    if port_text.len >= 3 && strings.eq(port_text[0:3], "fd:") {
+        listener, err = parse_listener_fd(port_text)
+        if errors.is_err(err) {
+            return 10
+        }
+    } else {
+        port: u16
+        port, err = net.parse_port(port_text)
+        if errors.is_err(err) {
+            return 10
+        }
+
+        bind: net.IpEndpoint = net.IpEndpoint{ addr: net.Ipv4Addr{ a: 127, b: 0, c: 0, d: 1 }, port: port }
+        listener, err = net.tcp_listen(bind)
+        if !errors.is_ok(err) {
+            return 11
+        }
     }
     defer close_ignored(listener)
 

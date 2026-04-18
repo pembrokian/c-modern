@@ -17,8 +17,7 @@ using mc::test_support::ExpectBackgroundProcessSuccess;
 using mc::test_support::ExpectOutputContains;
 using mc::test_support::Fail;
 using mc::test_support::ReadExactFromSocket;
-using mc::test_support::ReserveLoopbackPort;
-using mc::test_support::SpawnBackgroundCommand;
+using mc::test_support::SpawnBackgroundCommandWithInheritedLoopbackListener;
 using mc::test_support::WriteAllToSocket;
 using mc::tool_tests::RunProjectTestAndExpectSuccess;
 
@@ -36,19 +35,20 @@ std::string BuildPartialWriteResponse(size_t size) {
 void ExerciseEventedEchoRoundTrip(const std::filesystem::path& mc_path,
                                   const std::filesystem::path& project_path,
                                   const std::filesystem::path& build_dir,
-                                  uint16_t port,
                                   std::string_view output_name,
                                   const std::string& context) {
-    const BackgroundProcess run_process = SpawnBackgroundCommand({mc_path.generic_string(),
-                                                                  "run",
-                                                                  "--project",
-                                                                  project_path.generic_string(),
-                                                                  "--build-dir",
-                                                                  build_dir.generic_string(),
-                                                                  "--",
-                                                                  std::to_string(port)},
-                                                                 build_dir / std::string(output_name),
-                                                                 context);
+    uint16_t port = 0;
+    const BackgroundProcess run_process = SpawnBackgroundCommandWithInheritedLoopbackListener(
+        {mc_path.generic_string(),
+         "run",
+         "--project",
+         project_path.generic_string(),
+         "--build-dir",
+         build_dir.generic_string(),
+         "--"},
+        build_dir / std::string(output_name),
+        context,
+        &port);
 
     const std::string request = "phase13-echo";
     const int client_fd = ConnectLoopbackWithRetry(port, 3000, "connect to " + context);
@@ -67,19 +67,20 @@ void ExerciseEventedEchoRoundTrip(const std::filesystem::path& mc_path,
 void ExercisePartialWriteRoundTrip(const std::filesystem::path& mc_path,
                                    const std::filesystem::path& project_path,
                                    const std::filesystem::path& build_dir,
-                                   uint16_t port,
                                    std::string_view output_name,
                                    const std::string& context) {
-    const BackgroundProcess run_process = SpawnBackgroundCommand({mc_path.generic_string(),
-                                                                  "run",
-                                                                  "--project",
-                                                                  project_path.generic_string(),
-                                                                  "--build-dir",
-                                                                  build_dir.generic_string(),
-                                                                  "--",
-                                                                  std::to_string(port)},
-                                                                 build_dir / std::string(output_name),
-                                                                 context);
+    uint16_t port = 0;
+    const BackgroundProcess run_process = SpawnBackgroundCommandWithInheritedLoopbackListener(
+        {mc_path.generic_string(),
+         "run",
+         "--project",
+         project_path.generic_string(),
+         "--build-dir",
+         build_dir.generic_string(),
+         "--"},
+        build_dir / std::string(output_name),
+        context,
+        &port);
 
     const int client_fd = ConnectLoopbackWithRetry(port, 3000, "connect to " + context);
     WriteAllToSocket(client_fd, "push", "write request to " + context);
@@ -153,26 +154,26 @@ void ExpectPartialWriteTestOutput(std::string_view output,
 void ExerciseProjectRunTestRerunSequence(const std::filesystem::path& mc_path,
                                          const std::filesystem::path& project_path,
                                          const std::filesystem::path& build_dir,
-                                         const std::function<void(uint16_t, std::string_view, const std::string&)>& run_round_trip,
+                                         const std::function<void(std::string_view, const std::string&)>& run_round_trip,
                                          const std::function<void(std::string_view, const std::string&)>& verify_test_output,
                                          std::string_view first_run_output_name,
                                          std::string_view test_output_name,
                                          std::string_view second_run_output_name,
                                          const std::string& context_prefix) {
-    run_round_trip(ReserveLoopbackPort(), first_run_output_name, context_prefix + " run before tests");
+    run_round_trip(first_run_output_name, context_prefix + " run before tests");
     const std::string test_output = RunProjectTestAndExpectSuccess(mc_path,
                                                                    project_path,
                                                                    build_dir,
                                                                    test_output_name,
                                                                    context_prefix + " test after run");
     verify_test_output(test_output, context_prefix + " test after run");
-    run_round_trip(ReserveLoopbackPort(), second_run_output_name, context_prefix + " rerun after tests");
+    run_round_trip(second_run_output_name, context_prefix + " rerun after tests");
 }
 
 void ExerciseProjectTestRunRerunSequence(const std::filesystem::path& mc_path,
                                          const std::filesystem::path& project_path,
                                          const std::filesystem::path& build_dir,
-                                         const std::function<void(uint16_t, std::string_view, const std::string&)>& run_round_trip,
+                                         const std::function<void(std::string_view, const std::string&)>& run_round_trip,
                                          const std::function<void(std::string_view, const std::string&)>& verify_test_output,
                                          std::string_view first_test_output_name,
                                          std::string_view run_output_name,
@@ -184,7 +185,7 @@ void ExerciseProjectTestRunRerunSequence(const std::filesystem::path& mc_path,
                                                                          first_test_output_name,
                                                                          context_prefix + " initial test");
     verify_test_output(first_test_output, context_prefix + " initial test");
-    run_round_trip(ReserveLoopbackPort(), run_output_name, context_prefix + " run after tests");
+    run_round_trip(run_output_name, context_prefix + " run after tests");
     const std::string second_test_output = RunProjectTestAndExpectSuccess(mc_path,
                                                                           project_path,
                                                                           build_dir,
@@ -206,11 +207,10 @@ void TestRealEventedEchoProject(const std::filesystem::path& source_root,
     ExerciseProjectRunTestRerunSequence(mc_path,
                                         project_path,
                                         run_test_rerun_build_dir,
-                                        [&](uint16_t port, std::string_view output_name, const std::string& context) {
+                                        [&](std::string_view output_name, const std::string& context) {
                                             ExerciseEventedEchoRoundTrip(mc_path,
                                                                          project_path,
                                                                          run_test_rerun_build_dir,
-                                                                         port,
                                                                          output_name,
                                                                          context);
                                         },
@@ -225,11 +225,10 @@ void TestRealEventedEchoProject(const std::filesystem::path& source_root,
     ExerciseProjectTestRunRerunSequence(mc_path,
                                         project_path,
                                         test_run_rerun_build_dir,
-                                        [&](uint16_t port, std::string_view output_name, const std::string& context) {
+                                        [&](std::string_view output_name, const std::string& context) {
                                             ExerciseEventedEchoRoundTrip(mc_path,
                                                                          project_path,
                                                                          test_run_rerun_build_dir,
-                                                                         port,
                                                                          output_name,
                                                                          context);
                                         },
@@ -245,11 +244,10 @@ void TestRealEventedEchoProject(const std::filesystem::path& source_root,
     ExerciseProjectRunTestRerunSequence(mc_path,
                                         partial_write_project_path,
                                         partial_write_run_test_rerun_build_dir,
-                                        [&](uint16_t port, std::string_view output_name, const std::string& context) {
+                                        [&](std::string_view output_name, const std::string& context) {
                                             ExercisePartialWriteRoundTrip(mc_path,
                                                                           partial_write_project_path,
                                                                           partial_write_run_test_rerun_build_dir,
-                                                                          port,
                                                                           output_name,
                                                                           context);
                                         },
@@ -264,11 +262,10 @@ void TestRealEventedEchoProject(const std::filesystem::path& source_root,
     ExerciseProjectTestRunRerunSequence(mc_path,
                                         partial_write_project_path,
                                         partial_write_test_run_rerun_build_dir,
-                                        [&](uint16_t port, std::string_view output_name, const std::string& context) {
+                                        [&](std::string_view output_name, const std::string& context) {
                                             ExercisePartialWriteRoundTrip(mc_path,
                                                                           partial_write_project_path,
                                                                           partial_write_test_run_rerun_build_dir,
-                                                                          port,
                                                                           output_name,
                                                                           context);
                                         },
