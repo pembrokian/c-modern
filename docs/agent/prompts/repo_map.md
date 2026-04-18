@@ -182,6 +182,7 @@ This file is a fast orientation map for agents working in this repository.
 - Phase 243 adds one restart-safe update-apply workflow lane so staged update data now produces one explicit durable applied-target consequence through the existing workflow and completion owners.
 - Phase 244 adds one delegated installer-authority path so a bounded installer-apply lease now gates one retained update-apply workflow and yields explicit applied, stale, invalid, and already-consumed outcomes.
 - Phase 245 adds one composed mailbox-pressure and restart-resumed reporting path so delegated update apply now proves deferred completion delivery without widening the completion or installer owners.
+- Phase 246 admits same-name local bindings in disjoint sibling branches and admits `_` as a discard target in local binding and assignment positions while keeping `_` unreadable and storage-free; MIR lowering now preserves that local-target truth through scoped visible-local mapping instead of assuming function-wide source-name uniqueness.
 
 ## Where To Change Things
 

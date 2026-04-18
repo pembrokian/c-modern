@@ -51,6 +51,8 @@ std::string_view ToString(Expr::Kind kind) {
     switch (kind) {
         case Expr::Kind::kName:
             return "NameExpr";
+        case Expr::Kind::kDiscard:
+            return "DiscardExpr";
         case Expr::Kind::kQualifiedName:
             return "QualifiedNameExpr";
         case Expr::Kind::kLiteral:
@@ -172,6 +174,8 @@ std::string_view SecondaryTextLabel(const Expr& expr) {
     switch (expr.kind) {
         case Expr::Kind::kName:
             return " secondary=";
+        case Expr::Kind::kDiscard:
+            return " secondary=";
         case Expr::Kind::kQualifiedName:
             return " member=";
         case Expr::Kind::kLiteral:
@@ -225,7 +229,18 @@ void DumpPattern(const NamePattern& pattern, std::ostringstream& stream, Indent 
         }
         stream << pattern.names[index];
     }
-    stream << "]\n";
+    stream << "]";
+    if (pattern.HasDiscardTarget()) {
+        stream << " discards=[";
+        for (std::size_t index = 0; index < pattern.names.size(); ++index) {
+            if (index > 0) {
+                stream << ", ";
+            }
+            stream << (pattern.IsDiscard(index) ? "true" : "false");
+        }
+        stream << "]";
+    }
+    stream << '\n';
 }
 
 void DumpField(const FieldDecl& field, std::ostringstream& stream, Indent indent) {

@@ -310,6 +310,7 @@ std::unique_ptr<Stmt> Parser::ParseBindingStmt(Stmt::Kind kind,
     stmt->span.begin = start;
     auto binding = ParseBindingTail(allow_storage_without_initializer,
                                     kind == Stmt::Kind::kBinding,
+                                    true,
                                     kind == Stmt::Kind::kConst ? "const statement requires initializer"
                                                                : "binding requires either a type or initializer");
     stmt->pattern = std::move(binding.pattern);
@@ -327,7 +328,7 @@ std::unique_ptr<Stmt> Parser::ParseAssignOrExprStmt() {
         auto stmt = std::make_unique<Stmt>();
         stmt->kind = Stmt::Kind::kAssign;
         stmt->span.begin = start;
-        stmt->assign_targets.push_back(std::move(first));
+        stmt->assign_targets.push_back(NormalizeAssignmentTarget(std::move(first)));
         stmt->assign_values = ParseExprList();
         stmt->span.end = Previous().span.end;
         return stmt;
@@ -338,6 +339,7 @@ std::unique_ptr<Stmt> Parser::ParseAssignOrExprStmt() {
         stmt->kind = Stmt::Kind::kAssign;
         stmt->span.begin = start;
 
+        first = NormalizeAssignmentTarget(std::move(first));
         if (!IsAssignmentTarget(*first)) {
             diagnostics_.Report({
                 .file_path = file_path_,

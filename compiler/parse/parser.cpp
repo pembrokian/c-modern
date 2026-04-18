@@ -221,9 +221,10 @@ bool Parser::IsBareNameExpr(const Expr& expr) const {
 
 Parser::ParsedBindingTail Parser::ParseBindingTail(bool allow_storage_without_initializer,
                                                    bool allow_inferred_initializer_syntax,
+                                                   bool allow_discard_targets,
                                                    const char* missing_initializer_message) {
     ParsedBindingTail binding;
-    binding.pattern = ParseBindingPattern();
+    binding.pattern = ParseBindingPattern(allow_discard_targets);
 
     if (Match(TokenKind::kColonAssign)) {
         if (!allow_inferred_initializer_syntax) {
@@ -250,6 +251,7 @@ Parser::ParsedBindingTail Parser::ParseBindingTail(bool allow_storage_without_in
 
 bool Parser::IsAssignmentTarget(const Expr& expr) const {
     switch (expr.kind) {
+        case Expr::Kind::kDiscard:
         case Expr::Kind::kName:
         case Expr::Kind::kQualifiedName:
         case Expr::Kind::kField:
@@ -261,6 +263,15 @@ bool Parser::IsAssignmentTarget(const Expr& expr) const {
         default:
             return false;
     }
+}
+
+std::unique_ptr<Expr> Parser::NormalizeAssignmentTarget(std::unique_ptr<Expr> target) {
+    if (target != nullptr && target->kind == Expr::Kind::kName && target->text == "_") {
+        target->kind = Expr::Kind::kDiscard;
+        target->text.clear();
+        target->secondary_text.clear();
+    }
+    return target;
 }
 
 bool Parser::IsCaseBoundary() const {

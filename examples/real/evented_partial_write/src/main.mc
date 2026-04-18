@@ -14,15 +14,11 @@ const ASCII_NINE: u8 = 57
 const ERR_INVALID_LISTENER_FD: usize = 2
 
 func close_ignored(file: io.File) {
-    if errors.is_err(io.close(file)) {
-    }
+    _ = io.close(file)
 }
 
 func poller_remove_ignored(poller: *io.Poller, file: io.File) {
-    ignored: errors.Error = io.poller_remove(poller, file)
-    if !errors.is_ok(ignored) {
-        return
-    }
+    _ = io.poller_remove(poller, file)
 }
 
 func loopback(port: u16) net.IpEndpoint {

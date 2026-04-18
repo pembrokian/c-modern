@@ -68,6 +68,8 @@ class FunctionLowerer {
         assert(decl_.kind == Decl::Kind::kFunc && "FunctionLowerer only lowers non-extern function declarations");
         assert(decl_.body != nullptr && "FunctionLowerer expects sema-checked function bodies");
 
+        PushLocalScope();
+
         const sema::FunctionSignature* signature = sema::FindFunctionSignature(sema_module_, decl_.name);
         for (std::size_t index = 0; index < decl_.params.size(); ++index) {
             const sema::Type type =
@@ -82,6 +84,8 @@ class FunctionLowerer {
                 .is_mutable = false,
             });
             local_types_[decl_.params[index].name] = type;
+            local_scopes_.back()[decl_.params[index].name] = decl_.params[index].name;
+            visible_local_counts_[decl_.params[index].name] = 1;
         }
 
         current_block_ = CreateBlock("entry");
@@ -99,6 +103,11 @@ class FunctionLowerer {
     }
 
   private:
+        struct LocalBinding {
+                std::string storage_name;
+                sema::Type type;
+        };
+
     struct LoopTarget {
         std::string break_target;
         std::string continue_target;
@@ -153,6 +162,71 @@ class FunctionLowerer {
         return "%hidden." + prefix + std::to_string(next_hidden_local_id_++);
     }
 
+    void PushLocalScope() {
+        local_scopes_.push_back({});
+    }
+
+    void PopLocalScope() {
+        if (!local_scopes_.empty()) {
+            local_scopes_.pop_back();
+        }
+    }
+
+    std::optional<LocalBinding> LookupVisibleLocal(std::string_view name) const {
+        for (auto it = local_scopes_.rbegin(); it != local_scopes_.rend(); ++it) {
+            const auto found = it->find(std::string(name));
+            if (found == it->end()) {
+                continue;
+            }
+            const auto found_type = local_types_.find(found->second);
+            return LocalBinding{
+                .storage_name = found->second,
+                .type = found_type != local_types_.end() ? found_type->second : sema::UnknownType(),
+            };
+        }
+        return std::nullopt;
+    }
+
+    bool CurrentScopeContainsLocal(std::string_view name) const {
+        return !local_scopes_.empty() && local_scopes_.back().contains(std::string(name));
+    }
+
+    std::string NewVisibleLocalStorageName(std::string_view source_name) {
+        const std::string source(source_name);
+        auto [it, inserted] = visible_local_counts_.try_emplace(source, 0);
+        if (it->second == 0 && !local_types_.contains(source)) {
+            it->second = 1;
+            return source;
+        }
+        const std::string storage = "%local." + source + std::to_string(it->second);
+        ++it->second;
+        return storage;
+    }
+
+    std::string BindVisibleLocal(const std::string& source_name,
+                                 const sema::Type& type,
+                                 bool is_mutable,
+                                 const mc::support::SourceSpan& span) {
+        if (CurrentScopeContainsLocal(source_name)) {
+            Report(span, "MIR lowering cannot rebind existing local in the same scope: " + source_name);
+            return source_name;
+        }
+        const std::string storage_name = NewVisibleLocalStorageName(source_name);
+        EnsureLocal(storage_name, type, is_mutable);
+        local_scopes_.back()[source_name] = storage_name;
+        return storage_name;
+    }
+
+    void ExposeVisibleLocal(const std::string& source_name,
+                            const std::string& storage_name,
+                            const mc::support::SourceSpan& span) {
+        if (CurrentScopeContainsLocal(source_name)) {
+            Report(span, "MIR lowering cannot rebind existing local in the same scope: " + source_name);
+            return;
+        }
+        local_scopes_.back()[source_name] = storage_name;
+    }
+
     std::vector<sema::Type> ExpandReturnTypes(const sema::Type& type) const {
         if (type.kind == sema::Type::Kind::kVoid) {
             return {};
@@ -194,16 +268,18 @@ class FunctionLowerer {
             case Expr::Kind::kRecordUpdate:
                 return expr.left != nullptr ? ExprTypeOrUnknown(*expr.left) : sema::UnknownType();
             case Expr::Kind::kName:
-                if (local_types_.contains(expr.text)) {
-                    return local_types_.at(expr.text);
+                if (const auto binding = LookupVisibleLocal(expr.text); binding.has_value()) {
+                    return binding->type;
                 }
                 if (const auto* global = sema::FindGlobalSummary(sema_module_, expr.text); global != nullptr) {
                     return global->type;
                 }
                 return sema::UnknownType();
+            case Expr::Kind::kDiscard:
+                return sema::UnknownType();
             case Expr::Kind::kQualifiedName: {
-                if (local_types_.contains(expr.text)) {
-                    const sema::Type base_type = local_types_.at(expr.text);
+                if (const auto binding = LookupVisibleLocal(expr.text); binding.has_value()) {
+                    const sema::Type base_type = binding->type;
                     if (const auto field_type = FindMirFieldType(module_, base_type, expr.secondary_text); field_type.has_value()) {
                         return *field_type;
                     }
@@ -391,9 +467,13 @@ class FunctionLowerer {
         sema::Type selector_type = sema::UnknownType();
         std::string variant_name;
 
-        if (expr.left->kind == Expr::Kind::kQualifiedName && local_types_.contains(expr.left->text)) {
-            selector = LoadLocalValue(expr.left->text);
-            selector_type = StripMirAliasOrDistinct(module_, local_types_.at(expr.left->text));
+        if (expr.left->kind == Expr::Kind::kQualifiedName) {
+            const auto binding = LookupVisibleLocal(expr.left->text);
+            if (!binding.has_value()) {
+                return false;
+            }
+            selector = LoadLocalValue(binding->storage_name);
+            selector_type = StripMirAliasOrDistinct(module_, binding->type);
             variant_name = expr.left->secondary_text;
         } else if (expr.left->kind == Expr::Kind::kField && expr.left->left != nullptr) {
             selector = LowerExpr(*expr.left->left);
@@ -506,6 +586,15 @@ class FunctionLowerer {
 
         if (const auto expanded = ExpandFlattenedQualifiedValueExpr(expr); expanded.has_value()) {
             return StoreBaseMetadataForExpr(*expanded);
+        }
+
+        if (!expr.text.empty()) {
+            if (const auto binding = LookupVisibleLocal(expr.text); binding.has_value()) {
+                return {
+                    .kind = Instruction::StorageBaseKind::kLocal,
+                    .name = binding->storage_name,
+                };
+            }
         }
 
         if (!expr.text.empty() && local_types_.contains(expr.text)) {
@@ -849,8 +938,8 @@ class FunctionLowerer {
 
     ValueInfo LowerCalleeExpr(const Expr& expr) {
         if (expr.kind == Expr::Kind::kName) {
-            if (local_types_.contains(expr.text)) {
-                return LoadLocalValue(expr.text);
+            if (const auto binding = LookupVisibleLocal(expr.text); binding.has_value()) {
+                return LoadLocalValue(binding->storage_name);
             }
             const std::string value = NewValue();
             const sema::Type type = KnownTypeOrError(ExprTypeOrUnknown(expr), expr.span, "callee type for " + expr.text);
@@ -1339,8 +1428,8 @@ class FunctionLowerer {
     ValueInfo LowerExpr(const Expr& expr) {
         switch (expr.kind) {
             case Expr::Kind::kName: {
-                if (local_types_.contains(expr.text)) {
-                    return LoadLocalValue(expr.text);
+                if (const auto binding = LookupVisibleLocal(expr.text); binding.has_value()) {
+                    return LoadLocalValue(binding->storage_name);
                 }
                 const std::string value = NewValue();
                 const sema::Type type = KnownTypeOrError(ExprTypeOrUnknown(expr), expr.span, "symbol reference type for " + expr.text);
@@ -1355,9 +1444,12 @@ class FunctionLowerer {
                 });
                 return {value, type};
             }
+            case Expr::Kind::kDiscard:
+                Report(expr.span, "discard target '_' is not a value expression in MIR lowering");
+                return EmitLiteralValue("0", sema::UnknownType());
             case Expr::Kind::kQualifiedName: {
-                if (local_types_.contains(expr.text)) {
-                    const auto base = LoadLocalValue(expr.text);
+                if (const auto binding = LookupVisibleLocal(expr.text); binding.has_value()) {
+                    const auto base = LoadLocalValue(binding->storage_name);
                     const std::string value = NewValue();
                     const sema::Type type = KnownTypeOrError(ExprTypeOrUnknown(expr), expr.span, "qualified field expression type");
                     const std::string target_display = CombineQualifiedName(expr);
@@ -1425,6 +1517,19 @@ class FunctionLowerer {
                 if (expr.text == "&" && expr.left != nullptr) {
                     const Expr& address_target = UnwrapParenExpr(*expr.left);
                     const sema::Type type = KnownTypeOrError(ExprTypeOrUnknown(expr), expr.span, "address-of expression type");
+                    if (address_target.kind == Expr::Kind::kName) {
+                        if (const auto binding = LookupVisibleLocal(address_target.text); binding.has_value()) {
+                            const std::string value = NewValue();
+                            Emit({
+                                .kind = Instruction::Kind::kLocalAddr,
+                                .result = value,
+                                .type = type,
+                                .target = binding->storage_name,
+                            });
+                            return {value, type};
+                        }
+                    }
+
                     if (address_target.kind == Expr::Kind::kName && local_types_.contains(address_target.text)) {
                         const std::string value = NewValue();
                         Emit({
@@ -1454,12 +1559,12 @@ class FunctionLowerer {
                     if (address_target.kind == Expr::Kind::kQualifiedName) {
                         StoreBaseMetadata base_storage;
                         sema::Type base_type = sema::UnknownType();
-                        if (local_types_.contains(address_target.text)) {
+                        if (const auto binding = LookupVisibleLocal(address_target.text); binding.has_value()) {
                             base_storage = {
                                 .kind = Instruction::StorageBaseKind::kLocal,
-                                .name = address_target.text,
+                                .name = binding->storage_name,
                             };
-                            base_type = local_types_.at(address_target.text);
+                            base_type = binding->type;
                         } else if (const auto* global = sema::FindGlobalSummary(sema_module_, address_target.text); global != nullptr) {
                             base_storage = {
                                 .kind = Instruction::StorageBaseKind::kGlobal,
@@ -1800,26 +1905,22 @@ class FunctionLowerer {
                    const sema::Type& type,
                    bool is_mutable,
                    const mc::support::SourceSpan& span) {
-        if (local_types_.contains(name)) {
-            Report(span, "MIR lowering cannot rebind existing local: " + name);
-            return;
-        }
-        const sema::Type local_type = EnsureLocal(name, type, is_mutable);
+        const std::string storage_name = BindVisibleLocal(name, type, is_mutable, span);
+        const sema::Type local_type = EnsureLocal(storage_name, type, is_mutable);
         Emit({
             .kind = Instruction::Kind::kStoreLocal,
             .type = local_type,
-            .target = name,
+            .target = storage_name,
             .operands = {value},
         });
     }
 
     void AssignNamedTarget(const std::string& name, const ValueInfo& value, const mc::support::SourceSpan& span) {
-        const auto found_local = local_types_.find(name);
-        if (found_local != local_types_.end()) {
+        if (const auto binding = LookupVisibleLocal(name); binding.has_value()) {
             Emit({
                 .kind = Instruction::Kind::kStoreLocal,
-                .type = found_local->second,
-                .target = name,
+                .type = binding->type,
+                .target = binding->storage_name,
                 .operands = {value.value},
             });
             return;
@@ -1967,12 +2068,11 @@ class FunctionLowerer {
     void LowerBindingLike(const Stmt& stmt, bool is_mutable) {
         const sema::Type declared_type = sema::ResolveTypeFromAst(stmt.type_ann.get(), sema_module_);
         if (!stmt.has_initializer) {
-            for (const auto& name : stmt.pattern.names) {
-                if (local_types_.contains(name)) {
-                    Report(stmt.span, "MIR lowering cannot rebind existing local: " + name);
-                    return;
+            for (std::size_t index = 0; index < stmt.pattern.names.size(); ++index) {
+                if (stmt.pattern.IsDiscard(index)) {
+                    continue;
                 }
-                EnsureLocal(name, declared_type, is_mutable);
+                static_cast<void>(BindVisibleLocal(stmt.pattern.names[index], declared_type, is_mutable, stmt.span));
             }
             return;
         }
@@ -1986,6 +2086,9 @@ class FunctionLowerer {
         }
 
         for (std::size_t index = 0; index < stmt.pattern.names.size(); ++index) {
+            if (stmt.pattern.IsDiscard(index)) {
+                continue;
+            }
             BindLocal(stmt.pattern.names[index],
                       (*values)[index].value.value,
                       sema::IsUnknown(declared_type) ? (*values)[index].value.type : declared_type,
@@ -2005,6 +2108,9 @@ class FunctionLowerer {
 
         for (std::size_t index = 0; index < stmt.assign_targets.size(); ++index) {
             const Expr& target = *stmt.assign_targets[index];
+            if (target.kind == Expr::Kind::kDiscard) {
+                continue;
+            }
             if (target.kind == Expr::Kind::kName) {
                 AssignNamedTarget(target.text, (*values)[index].value, target.span);
                 continue;
@@ -2038,6 +2144,8 @@ class FunctionLowerer {
     support::DiagnosticSink& diagnostics_;
     Function function_;
     std::unordered_map<std::string, sema::Type> local_types_;
+    std::vector<std::unordered_map<std::string, std::string>> local_scopes_;
+    std::unordered_map<std::string, std::size_t> visible_local_counts_;
     std::optional<std::size_t> current_block_;
     std::vector<LoopTarget> loop_stack_;
     std::vector<DeferScope> defer_scopes_;

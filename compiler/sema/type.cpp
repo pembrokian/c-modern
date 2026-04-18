@@ -89,8 +89,11 @@ std::string RenderFieldInitName(const ast::FieldInit& init) {
 std::string RenderExprInline(const ast::Expr& expr) {
     switch (expr.kind) {
         case ast::Expr::Kind::kName:
+        case ast::Expr::Kind::kDiscard:
         case ast::Expr::Kind::kQualifiedName: {
-            const std::string base = expr.kind == ast::Expr::Kind::kQualifiedName ? expr.text + "." + expr.secondary_text : expr.text;
+            const std::string base = expr.kind == ast::Expr::Kind::kDiscard
+                                         ? std::string("_")
+                                         : (expr.kind == ast::Expr::Kind::kQualifiedName ? expr.text + "." + expr.secondary_text : expr.text);
             if (expr.type_args.empty()) {
                 return base;
             }

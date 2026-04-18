@@ -55,6 +55,20 @@ struct TypeExpr : Node {
 
 struct NamePattern : Node {
     std::vector<std::string> names;
+    std::vector<bool> discards;
+
+    bool IsDiscard(std::size_t index) const {
+        return index < discards.size() ? discards[index] : false;
+    }
+
+    bool HasDiscardTarget() const {
+        for (bool discard : discards) {
+            if (discard) {
+                return true;
+            }
+        }
+        return false;
+    }
 };
 
 struct FieldDecl : Node {
@@ -141,6 +155,7 @@ struct DefaultCase : Node {
 struct Expr : Node {
     enum class Kind {
         kName,
+        kDiscard,
         kQualifiedName,
         kLiteral,
         kUnary,

@@ -360,6 +360,7 @@ std::optional<Decl> Parser::ParseBindingDecl(std::vector<Attribute> attributes,
     decl.span.begin = start;
     auto binding = ParseBindingTail(allow_storage_without_initializer,
                                     false,
+                                    false,
                                     kind == Decl::Kind::kConst ? "const declaration requires initializer"
                                                                : "var declaration requires either a type or initializer");
     decl.pattern = std::move(binding.pattern);
@@ -415,17 +416,25 @@ FieldDecl Parser::ParseVariantField() {
     return field;
 }
 
-NamePattern Parser::ParseBindingPattern() {
+NamePattern Parser::ParseBindingPattern(bool allow_discard_targets) {
     NamePattern pattern;
     pattern.span.begin = Current().span.begin;
     const auto first = ParseIdentifier("expected binding name");
     if (first.has_value()) {
+        if (*first == "_" && !allow_discard_targets) {
+            ReportError(Previous(), "discard target '_' is only allowed in local bindings");
+        }
         pattern.names.push_back(*first);
+        pattern.discards.push_back(allow_discard_targets && *first == "_");
     }
     while (Match(TokenKind::kComma)) {
         const auto next = ParseIdentifier("expected binding name after ','");
         if (next.has_value()) {
+            if (*next == "_" && !allow_discard_targets) {
+                ReportError(Previous(), "discard target '_' is only allowed in local bindings");
+            }
             pattern.names.push_back(*next);
+            pattern.discards.push_back(allow_discard_targets && *next == "_");
         }
     }
     pattern.span.end = Previous().span.end;

@@ -184,6 +184,8 @@ bool IsAddressableExpr(const ast::Expr& expr) {
         case ast::Expr::Kind::kDerefField:
         case ast::Expr::Kind::kIndex:
             return true;
+        case ast::Expr::Kind::kDiscard:
+            return false;
         case ast::Expr::Kind::kParen:
             return expr.left != nullptr && IsAddressableExpr(*expr.left);
         default:

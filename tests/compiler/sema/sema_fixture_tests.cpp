@@ -217,6 +217,87 @@ void TestColonAssignBindingParsesAsBinding() {
     }
 }
 
+void TestSiblingBranchBindingsMayReuseName() {
+    mc::support::DiagnosticSink diagnostics;
+    const auto checked = CheckText(
+        "func demo(flag: bool) i32 {\n"
+        "    if flag {\n"
+        "        value := 1\n"
+        "        return value\n"
+        "    } else {\n"
+        "        value := 2\n"
+        "        return value\n"
+        "    }\n"
+        "}\n",
+        "<sibling-branch-binding-reuse>",
+        diagnostics);
+
+    if (!checked.ok) {
+        mc::test_support::Fail("disjoint sibling branches should be allowed to reuse a local name:\n" + diagnostics.Render());
+    }
+}
+
+void TestDiscardTargetsWorkInBindingAndAssignment() {
+    mc::support::DiagnosticSink diagnostics;
+    const auto checked = CheckText(
+        "func pair(value: i32) (i32, i32) {\n"
+        "    return value, value + 1\n"
+        "}\n"
+        "\n"
+        "func demo() i32 {\n"
+        "    kept: i32 = 0\n"
+        "    _, kept = pair(7)\n"
+        "    _ = kept + 1\n"
+        "    {\n"
+        "        _, branch := pair(kept)\n"
+        "        kept = branch\n"
+        "    }\n"
+        "    return kept\n"
+        "}\n",
+        "<discard-target-binding-and-assignment>",
+        diagnostics);
+
+    if (!checked.ok) {
+        mc::test_support::Fail("discard targets should work in direct and multi-result local target positions:\n" + diagnostics.Render());
+    }
+}
+
+void TestDiscardTargetCannotBeReadOrStoredWithoutInitializer() {
+    {
+        mc::support::DiagnosticSink diagnostics;
+        const auto checked = CheckText(
+            "func demo() i32 {\n"
+            "    _: i32\n"
+            "    return 0\n"
+            "}\n",
+            "<discard-target-without-initializer>",
+            diagnostics);
+        if (checked.ok) {
+            mc::test_support::Fail("discard targets without an initializer should fail semantic checking");
+        }
+        if (diagnostics.Render().find("discard target '_' requires an initializer") == std::string::npos) {
+            mc::test_support::Fail("discard targets without an initializer should report the discard-only initializer rule");
+        }
+    }
+
+    {
+        mc::support::DiagnosticSink diagnostics;
+        const auto checked = CheckText(
+            "func demo() i32 {\n"
+            "    value: i32 = _\n"
+            "    return value\n"
+            "}\n",
+            "<discard-target-read>",
+            diagnostics);
+        if (checked.ok) {
+            mc::test_support::Fail("reading '_' should fail semantic checking");
+        }
+        if (diagnostics.Render().find("discard target '_' cannot be used as a value") == std::string::npos) {
+            mc::test_support::Fail("reading '_' should report the discard-only value diagnostic");
+        }
+    }
+}
+
 void TestFloatToIntConstConversionHonorsInt64Bounds() {
     mc::support::DiagnosticSink diagnostics;
     const auto checked = CheckText(
@@ -363,6 +444,9 @@ int main(int argc, char** argv) {
     TestImportedModuleSurfaceQualifiesNamedTypes();
     TestBareAssignmentDoesNotCreateLocalBindings();
     TestColonAssignBindingParsesAsBinding();
+    TestSiblingBranchBindingsMayReuseName();
+    TestDiscardTargetsWorkInBindingAndAssignment();
+    TestDiscardTargetCannotBeReadOrStoredWithoutInitializer();
     TestFloatToIntConstConversionHonorsInt64Bounds();
     TestImportedMutableGlobalDoesNotFoldAsConst();
     TestMalformedAggregateGlobalDoesNotStoreEmptyConstValue();

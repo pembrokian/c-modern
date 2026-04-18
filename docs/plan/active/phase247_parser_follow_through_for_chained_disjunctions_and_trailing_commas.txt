@@ -1,0 +1,165 @@
+Phase 247 -- Parser Follow-Through For Chained Disjunctions And Trailing Commas
+================================================================================
+
+Status
+------
+PROPOSED
+
+Purpose
+-------
+Admit one bounded parser follow-through phase that repairs two repeated source
+shapes the language already wants to read naturally: chained ordinary `||`
+disjunctions and trailing commas in ordinary comma-delimited expression or
+aggregate lists.
+
+This phase exists now because the repository already treats both surfaces as
+reasonable source forms in planning, grammar, or nearby deferrals, but the
+current parser still makes callers flatten simple disjunctions or hand-edit
+comma lists more rigidly than the language needs. The next honest move is to
+align the parser with that admitted source contract before opening deeper type
+or literal waves.
+
+Repository status note
+----------------------
+- `docs/arch/c-lang/language/syntax/grammar_spec.txt` already defines
+  `logical_or_expr = logical_and_expr { "||" logical_and_expr }`, so chained
+  disjunction is part of the concrete grammar contract rather than a new
+  precedence design.
+- `docs/plan/backlog.txt` records a real parser limitation where direct
+  `a || b || c` conditions still produced statement-boundary parse errors in a
+  Phase 242 scenario.
+- Phase 192 deliberately left trailing commas in aggregate literals
+  unsupported even after admitting expected-type brace aggregates.
+- The repository still lacks one bounded parser phase whose primary purpose is
+  to make repeated operator and list parsing match the admitted grammar more
+  honestly.
+
+Problem being solved
+--------------------
+- Ordinary boolean guards become noisier than they should be when callers must
+  split a direct disjunction chain into multiple statements solely because the
+  parser mishandles repeated `||`.
+- Ordinary list editing becomes more brittle when callers cannot leave a final
+  comma in already comma-delimited expression or aggregate lists.
+- Both defects are parser-owned. They do not require new control-flow meaning,
+  new type rules, or new runtime behavior; they require the concrete grammar
+  and parser implementation to agree.
+
+Non-goals
+---------
+- no new boolean operators or precedence redesign
+- no change to short-circuit semantics
+- no trailing separator admission in newline-separated statement blocks
+- no hidden semicolon insertion
+- no standalone empty collection literal syntax
+- no broader aggregate-literal inference work
+
+Invariants
+----------
+- `||` keeps its current precedence relative to `&&`, bitwise operators, and
+  range expressions.
+- Logical disjunction remains short-circuiting and must keep the existing MIR
+  lowering shape rather than degrading to plain binary eager evaluation.
+- Trailing commas are admitted only in list forms that are already comma-
+  delimited.
+- Newline-separated statement and block boundaries remain explicit and
+  unchanged.
+- Parser determinism and diagnostic locality must remain intact.
+
+Required surface changes
+------------------------
+1. Make parser handling of `logical_or_expr` accept direct chains such as
+   `a || b || c` in ordinary condition and expression positions.
+2. Admit trailing commas in the comma-delimited expression and aggregate list
+   forms that the current grammar already owns, including aggregate-init field
+   lists and ordinary expression-list owners such as calls, returns, bindings,
+   and assignments.
+3. Keep diagnostics explicit when a comma or disjunction is still malformed;
+   do not trade honest parse errors for silent token skipping.
+4. Add focused regressions for chained `||` parsing plus short-circuit
+   follow-through and for trailing commas in the admitted list positions.
+5. Spend the repaired source forms in at least one real repository-owned file
+   or fixture that currently carries avoidable parser workarounds.
+
+Forbidden changes
+-----------------
+- do not widen into new operator classes, associativity redesign, or boolean
+  algebra features beyond repeated `||`
+- do not admit trailing commas in statement sequences, switch case groups, or
+  other newline-owned separators that are not already comma lists
+- do not paper over parser defects by restructuring owner code instead of
+  fixing the parser
+- do not change MIR short-circuit lowering contracts merely to accommodate the
+  parse repair
+
+Phase role in the larger sequence
+---------------------------------
+- This phase follows the local-target ergonomics work by repairing the next
+  narrowest parser-owned source distortions.
+- It consumes one grammar or backlog mismatch around repeated disjunction and
+  one long-deferred list-editing gap from the aggregate-literal line.
+- It should leave later array-type and empty-literal phases working over a
+  parser that already handles ordinary repeated operator and comma-list forms
+  honestly.
+
+Relevant backlog items this phase intentionally brings under pressure
+--------------------------------------------------------------------
+- consider reliable parsing of chained boolean `||` disjunctions in ordinary
+  condition expressions
+- aggregate literal list editing pressure that still lacks trailing commas
+  after Phase 192
+
+Questions this phase must answer
+--------------------------------
+1. Where is the exact parser control path that still truncates or mis-binds a
+   repeated `||` chain despite the grammar contract already admitting it?
+2. Which comma-delimited list owners can share one trailing-comma repair
+   without reopening statement-boundary or newline-separator rules?
+3. Does chained `||` need any AST or MIR follow-through beyond the parse fix,
+   or is the controlling defect entirely in parser construction?
+4. Can the repository spend both repairs immediately in one or two real caller
+   shapes instead of keeping them as synthetic grammar-only wins?
+
+Preferred implementation shape
+------------------------------
+- Keep the controlling ownership in `compiler/parse` and its nearby AST shape.
+- Reuse the existing precedence ladder and repeated-list parsing helpers where
+  practical rather than adding special one-off branches.
+- Keep trailing-comma support explicit per list owner so the admitted surface
+  stays reviewable.
+- Reuse the existing logical short-circuit lowering contract once parser and
+  AST construction preserve the full chained disjunction shape.
+- Update the concrete grammar documents if the admitted list surface changes
+  beyond the currently written aggregate-init form.
+
+Test obligations
+----------------
+- `Build debug`
+- one focused parser or sema regression for chained `a || b || c`
+- one focused MIR or executable regression proving chained `||` keeps honest
+  short-circuit behavior through lowering
+- focused parser regressions for trailing commas in admitted comma-delimited
+  list forms
+- the narrowest owning parser, sema, and MIR or executable test targets for
+  the touched source forms
+
+Acceptance criteria
+-------------------
+- direct chained `||` expressions parse and lower without statement-boundary
+  failures or eager-evaluation regressions
+- trailing commas work in the admitted comma-delimited list positions and do
+  not leak into newline-owned statement separators
+- the landing stays parser-scoped rather than widening into unrelated type,
+  literal, or control-flow redesign
+- at least one real repository-owned caller or fixture becomes simpler because
+  the parser now accepts the natural source form directly
+
+Future follow-up
+----------------
+- If later list-editing pressure reaches other punctuation families, treat
+  those as separate parser phases rather than smuggling them into this one.
+- If a later phase needs standalone empty-literal syntax, keep that work in an
+  expected-type literal phase rather than coupling it back to trailing commas.
+- If chained boolean pressure later reaches `&&` and `||` diagnostics or AST
+  formatting quality, record that as bounded follow-through after this repair
+  lands.

@@ -1,0 +1,182 @@
+Phase 246 -- Local Binding And Discard Target Follow-Through
+============================================================
+
+Status
+------
+LANDED
+
+Purpose
+-------
+Admit one bounded language-ergonomics phase over local target positions: let
+disjoint sibling branches reuse the same obvious local name, and let `_`
+appear as an explicit discard target where the programmer intends to evaluate
+for effect and ignore the value.
+
+This phase exists now because the repository has accumulated repeated
+owner-local pressure from flat service and workflow code that wants clearer
+branch-local naming and direct ignore-the-value spellings. The next honest move
+is to repair local target semantics directly rather than keep paying that cost
+through renamed temporaries and other source noise.
+
+Repository status note
+----------------------
+- `docs/plan/backlog.txt` already records both same-name sibling-branch local
+  reuse and underscore discard targets as parked compiler follow-through.
+- Phase 245 explicitly notes that scenario code had to keep distinct locals
+  because the current language still lacks sibling-branch rebinding support.
+- Canonical programs and real-project-style examples already want direct `_`
+  ignore targets such as `_, err = ...`, but the admitted compiler still does
+  not carry that target shape honestly.
+- The repository still lacks one bounded compiler phase whose primary purpose
+  is to tighten local target ergonomics without widening into mutation,
+  wildcard binding, or broader scope redesign.
+
+Problem being solved
+--------------------
+- Current local target rules distort otherwise flat owner-local code in two
+  repeated ways: obvious names such as `endpoint` or `delivered` cannot be
+  reused in disjoint sibling branches, and intentionally ignored results still
+  need noisier workarounds than a direct discard target.
+- Those limits are compiler-owned rather than service-owned. The motivating
+  code is small, direct, and already consistent with the repository style.
+- Leaving both gaps unresolved keeps rediscovering the same naming and discard
+  ceremony across kernel, stdlib, and real-project code, which makes local
+  control flow harder to read without buying architectural safety.
+
+Non-goals
+---------
+- no general same-scope rebinding outside disjoint sibling branches
+- no hidden mutation or declaration merging
+- no wildcard pattern system
+- no `_` value expression, readable binding, or stored name
+- no closure, capture, or lifetime-model redesign
+- no tuple destructuring redesign beyond the admitted discard target shape
+
+Invariants
+----------
+- Name-resolution truth remains in sema rather than being repaired in MIR or
+  code generation.
+- Disjoint sibling-branch reuse must stay lexically explicit; it must not turn
+  into implicit whole-block shadowing or sequential rebinding inside one live
+  local scope.
+- `_` remains a discard-only target spelling, not a readable variable.
+- Multi-result binding and assignment keep their existing left-to-right target
+  and expression structure.
+- Lowering remains deterministic and must not rely on textual local-name
+  uniqueness for correctness.
+
+Required surface changes
+------------------------
+1. Admit same-name local bindings in disjoint sibling branches of one function
+   body when their live scopes do not overlap.
+2. Admit `_` as an explicit discard target in local binding and assignment
+   target positions where an ordinary identifier target is currently allowed.
+3. Reject any attempt to read `_` as a value or to treat it as an ordinary
+   binding with storage, address, or identity.
+4. Add focused regressions covering branch-local same-name reuse and discard
+   targets in both single-result and multi-result owner code.
+5. Spend the feature in at least one real repository-owned caller shape that
+   currently carries avoidable local-target noise.
+
+Forbidden changes
+-----------------
+- do not admit general same-block or sequential rebinding by convenience
+- do not turn `_` into a wildcard that binds and can later be referenced
+- do not solve branch-local reuse by making MIR or backend layers ignore sema
+  name collisions that sema itself still considers illegal
+- do not widen into pattern matching, destructuring syntax, or inferred tuple
+  unpacking policy
+
+Phase role in the larger sequence
+---------------------------------
+- This phase starts the language-expansion sequence with one bounded repair to
+  local source ergonomics.
+- It consumes two already-documented backlog pressures that both sit in the
+  local binding and assignment-target owner path.
+- It should leave later parser, array-type, and literal phases free to focus
+  on their own controlling layers rather than carrying local-target noise as a
+  confounding factor.
+
+Relevant backlog items this phase intentionally brings under pressure
+--------------------------------------------------------------------
+- consider allowing same-name local bindings in disjoint sibling branches of
+  one function body
+- consider admitting explicit underscore discard targets for intentionally
+  ignored values
+
+Landed outcome
+--------------
+- The admitted source surface stays narrow: `_` is accepted only in local
+  binding targets and assignment targets, not in parameter lists, loop
+  headers, or broader pattern positions.
+- `_` is modeled as discard-only. It does not declare readable storage, it
+  cannot be used as a value, and local discard bindings still require an
+  initializer so the right-hand side is evaluated explicitly.
+- Disjoint sibling-branch same-name locals now survive the full compiler path
+  honestly. Sema continues to treat them as distinct branch-scoped bindings,
+  and MIR lowering now preserves that truth through scoped visible-local
+  mapping plus deterministic per-binding storage names instead of assuming
+  function-wide source-name uniqueness.
+- The phase is spent in repository-owned code through
+  `examples/real/evented_partial_write/src/main.mc`, which now uses direct
+  discard assignment for intentionally ignored results.
+- Focused parser, sema, and full compiler-path executable regressions cover
+  the landed slice.
+
+Questions this phase must answer
+--------------------------------
+1. What is the narrowest sema-visible rule that lets same-name locals exist in
+   sibling branches without admitting broader rebinding?
+2. Which target positions should admit `_` while keeping it discard-only and
+   non-readable?
+3. Does lowering need any explicit hidden-name or slot-stability adjustment
+   once local source names are no longer globally unique inside a function?
+4. Can one real repository-owned caller spend both repairs immediately without
+   widening the phase beyond local target semantics?
+
+Preferred implementation shape
+------------------------------
+- Keep the ownership in parser plus sema for target-position admission and
+  scope legality.
+- Model sibling-branch same-name locals as distinct branch-scoped bindings,
+  not as one mutable symbol that spans both branches.
+- Model `_` as a dedicated discard target category rather than as a special
+  normal identifier.
+- Keep MIR and backend changes limited to whatever is required to preserve
+  deterministic lowering once sema has admitted the new local-target shapes.
+- Spend the feature in one kernel, stdlib, or example call site that already
+  demonstrates the pressure plainly.
+
+Test obligations
+----------------
+- `Build debug`
+- one focused sema regression for same-name locals in disjoint sibling
+  branches
+- one focused sema or MIR regression for `_` in both direct discard assignment
+  and multi-result target lists
+- one focused executable or tool-facing regression proving the admitted source
+  shape survives the full compiler path
+- the narrowest owning compiler test targets for the touched parser, sema, and
+  lowering surfaces
+
+Acceptance criteria
+-------------------
+- disjoint sibling branches may reuse the same local name without compiler
+  rejection
+- `_` works as an explicit discard target in the admitted target positions and
+  remains illegal as an ordinary readable name
+- the landing does not admit broader rebinding, wildcard patterns, or hidden
+  mutation semantics
+- at least one real repository-owned caller becomes simpler because the
+  compiler, not the caller, now carries the intended local-target truth
+
+Future follow-up
+----------------
+- If later work exposes pressure for broader pattern targets or sequential
+  rebinding, record that separately rather than widening this phase after the
+  fact.
+- If `_` pressure later appears in parameter lists, loops, or switch patterns,
+  treat that as a new bounded target-position phase rather than as implied by
+  this landing.
+- The next adjacent language phases should move to parser follow-through and
+  array or literal work rather than reopen local target semantics immediately.

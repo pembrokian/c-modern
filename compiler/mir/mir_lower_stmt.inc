@@ -4,6 +4,16 @@
         }
     }
 
+    void PushStmtScope() {
+        PushLocalScope();
+        PushDeferScope();
+    }
+
+    void PopStmtScope() {
+        PopDeferScope();
+        PopLocalScope();
+    }
+
     void PushDeferScope() {
         defer_scopes_.push_back({});
     }
@@ -31,15 +41,15 @@
     }
 
     void LowerBlock(const Stmt& stmt) {
-        PushDeferScope();
+        PushStmtScope();
         LowerStmtList(stmt.statements);
-        PopDeferScope();
+        PopStmtScope();
     }
 
     void LowerScopedStmtList(const std::vector<std::unique_ptr<Stmt>>& statements) {
-        PushDeferScope();
+        PushStmtScope();
         LowerStmtList(statements);
-        PopDeferScope();
+        PopStmtScope();
     }
 
     void LowerStmt(const Stmt& stmt) {
@@ -221,21 +231,28 @@
 
             current_block_ = *case_body_blocks[index];
             if (switch_case.pattern.kind == mc::ast::CasePattern::Kind::kVariant) {
+                PushStmtScope();
                 for (std::size_t binding_index = 0; binding_index < switch_case.pattern.bindings.size(); ++binding_index) {
                     const std::string& binding_name = switch_case.pattern.bindings[binding_index];
-                    if (local_types_.contains(binding_name)) {
+                    if (LookupVisibleLocal(binding_name).has_value()) {
                         Report(switch_case.pattern.span, "bootstrap MIR variant binding would shadow an existing local");
+                        PopStmtScope();
                         return;
                     }
-                    SnapshotValueToLocal(binding_name,
-                                         EmitVariantExtractValue(selector,
-                                                                 selector_type,
-                                                                 switch_case.pattern.span,
-                                                                 switch_case.pattern.variant_name,
-                                                                 binding_index));
+                    const auto binding_value = EmitVariantExtractValue(selector,
+                                                                      selector_type,
+                                                                      switch_case.pattern.span,
+                                                                      switch_case.pattern.variant_name,
+                                                                      binding_index);
+                    const std::string storage_name =
+                        BindVisibleLocal(binding_name, binding_value.type, true, switch_case.pattern.span);
+                    SnapshotValueToLocal(storage_name, binding_value);
                 }
+                LowerStmtList(switch_case.statements);
+                PopStmtScope();
+            } else {
+                LowerScopedStmtList(switch_case.statements);
             }
-            LowerScopedStmtList(switch_case.statements);
             if (current_block_.has_value() && function_.blocks[*current_block_].terminator.kind == Terminator::Kind::kNone) {
                 function_.blocks[*current_block_].terminator.kind = Terminator::Kind::kBranch;
                 function_.blocks[*current_block_].terminator.true_target = function_.blocks[merge_block].label;
@@ -322,7 +339,9 @@
         if (end.type != loop_type) {
             end = EmitConvertValue(end, loop_type);
         }
-        StoreLocal(stmt.loop_name, start.value, loop_type, true);
+        const std::string loop_storage = NewVisibleLocalStorageName(stmt.loop_name);
+        EnsureLocal(loop_storage, loop_type, true);
+        StoreLocal(loop_storage, start.value, loop_type, true);
 
         EnsureCurrentBlock();
         const std::size_t cond_block = CreateBlock("range_cond");
@@ -335,7 +354,7 @@
         incoming.terminator.true_target = function_.blocks[cond_block].label;
 
         current_block_ = cond_block;
-        const auto current_value = LoadLocalValue(stmt.loop_name);
+        const auto current_value = LoadLocalValue(loop_storage);
         const auto condition = EmitBinaryValue("<", current_value, end, sema::BoolType());
         auto& cond = function_.blocks[*current_block_];
         cond.terminator.kind = Terminator::Kind::kCondBranch;
@@ -350,17 +369,20 @@
         });
 
         current_block_ = body_block;
+        PushStmtScope();
+        ExposeVisibleLocal(stmt.loop_name, loop_storage, stmt.span);
         LowerStmt(*stmt.then_branch);
+        PopStmtScope();
         if (current_block_.has_value() && function_.blocks[*current_block_].terminator.kind == Terminator::Kind::kNone) {
             function_.blocks[*current_block_].terminator.kind = Terminator::Kind::kBranch;
             function_.blocks[*current_block_].terminator.true_target = function_.blocks[step_block].label;
         }
 
         current_block_ = step_block;
-        const auto current_index = LoadLocalValue(stmt.loop_name);
+        const auto current_index = LoadLocalValue(loop_storage);
         const auto one = EmitLiteralValue("1", loop_type);
         const auto next = EmitBinaryValue("+", current_index, one, loop_type);
-        StoreLocal(stmt.loop_name, next.value, loop_type, true);
+        StoreLocal(loop_storage, next.value, loop_type, true);
         function_.blocks[*current_block_].terminator.kind = Terminator::Kind::kBranch;
         function_.blocks[*current_block_].terminator.true_target = function_.blocks[cond_block].label;
 
@@ -383,6 +405,14 @@
         }
         const std::string iterable_name = NewHiddenLocal("iterable");
         const std::string index_name = NewHiddenLocal("index");
+        const std::string loop_storage = NewVisibleLocalStorageName(stmt.loop_name);
+        const sema::Type loop_storage_type = stmt.kind == Stmt::Kind::kForEachIndex ? sema::NamedType("usize") : element_type;
+        EnsureLocal(loop_storage, loop_storage_type, true);
+        std::string second_storage;
+        if (stmt.kind == Stmt::Kind::kForEachIndex) {
+            second_storage = NewVisibleLocalStorageName(stmt.loop_second_name);
+            EnsureLocal(second_storage, element_type, true);
+        }
         StoreLocal(iterable_name, iterable.value, iterable_type, true);
         const auto zero = EmitLiteralValue("0", sema::NamedType("usize"));
         StoreLocal(index_name, zero.value, sema::NamedType("usize"), true);
@@ -443,12 +473,18 @@
             .operands = {body_iterable.value, body_index.value},
         });
         if (stmt.kind == Stmt::Kind::kForEachIndex) {
-            StoreLocal(stmt.loop_name, body_index.value, sema::NamedType("usize"), true);
-            StoreLocal(stmt.loop_second_name, item_value, element_type, true);
+            StoreLocal(loop_storage, body_index.value, sema::NamedType("usize"), true);
+            StoreLocal(second_storage, item_value, element_type, true);
         } else {
-            StoreLocal(stmt.loop_name, item_value, element_type, true);
+            StoreLocal(loop_storage, item_value, element_type, true);
+        }
+        PushStmtScope();
+        ExposeVisibleLocal(stmt.loop_name, loop_storage, stmt.span);
+        if (stmt.kind == Stmt::Kind::kForEachIndex) {
+            ExposeVisibleLocal(stmt.loop_second_name, second_storage, stmt.span);
         }
         LowerStmt(*stmt.then_branch);
+        PopStmtScope();
         if (current_block_.has_value() && function_.blocks[*current_block_].terminator.kind == Terminator::Kind::kNone) {
             function_.blocks[*current_block_].terminator.kind = Terminator::Kind::kBranch;
             function_.blocks[*current_block_].terminator.true_target = function_.blocks[step_block].label;

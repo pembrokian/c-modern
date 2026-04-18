@@ -86,7 +86,7 @@ class Parser {
     FieldDecl ParseFieldDecl();
     EnumVariantDecl ParseEnumVariantDecl();
     FieldDecl ParseVariantField();
-    NamePattern ParseBindingPattern();
+    NamePattern ParseBindingPattern(bool allow_discard_targets);
     std::unique_ptr<TypeExpr> ParseTypeExpr();
     std::unique_ptr<TypeExpr> ParseTypeExpr(std::size_t depth);
 
@@ -140,6 +140,7 @@ class Parser {
     std::unique_ptr<Expr> ParsePostfixExpr();
     FieldInit ParseFieldInit(bool allow_dotted_name = false);
     std::unique_ptr<Expr> ParseAssignmentTarget();
+    std::unique_ptr<Expr> NormalizeAssignmentTarget(std::unique_ptr<Expr> target);
     std::unique_ptr<Expr> ParsePrimaryExpr();
 
     struct ParsedBindingTail {
@@ -153,6 +154,7 @@ class Parser {
 
     ParsedBindingTail ParseBindingTail(bool allow_storage_without_initializer,
                                        bool allow_inferred_initializer_syntax,
+                                       bool allow_discard_targets,
                                        const char* missing_initializer_message);
 
     bool LooksLikeBindingStmt() const;

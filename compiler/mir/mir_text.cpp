@@ -81,6 +81,7 @@ static_assert(sizeof(kInstructionArithmeticSemanticsNames) / sizeof(kInstruction
               kInstructionArithmeticSemanticsCount);
 
 constexpr std::string_view kExprKindNames[] = {"name",
+                                               "discard",
                                                "qualified-name",
                                                "literal",
                                                "unary",
@@ -237,8 +238,11 @@ std::string RenderTypeExprInline(const ast::TypeExpr& type) {
 std::string RenderExprInline(const Expr& expr) {
     switch (expr.kind) {
         case Expr::Kind::kName:
+        case Expr::Kind::kDiscard:
         case Expr::Kind::kQualifiedName: {
-            const std::string base = expr.kind == Expr::Kind::kQualifiedName ? CombineQualifiedName(expr) : expr.text;
+            const std::string base = expr.kind == Expr::Kind::kDiscard
+                                         ? std::string("_")
+                                         : (expr.kind == Expr::Kind::kQualifiedName ? CombineQualifiedName(expr) : expr.text);
             if (expr.type_args.empty()) {
                 return base;
             }

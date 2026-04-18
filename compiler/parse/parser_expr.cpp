@@ -701,7 +701,7 @@ FieldInit Parser::ParseFieldInit(bool allow_dotted_name) {
 
 std::unique_ptr<Expr> Parser::ParseAssignmentTarget() {
     const auto start = Current().span.begin;
-    auto target = ParsePostfixExpr();
+    auto target = NormalizeAssignmentTarget(ParsePostfixExpr());
     if (!IsAssignmentTarget(*target)) {
         diagnostics_.Report({
             .file_path = file_path_,

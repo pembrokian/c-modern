@@ -1,0 +1,165 @@
+Phase 248 -- Array Type Follow-Through For Named Extents And 2D Arrays
+======================================================================
+
+Status
+------
+PROPOSED
+
+Purpose
+-------
+Admit one bounded array-type follow-through phase that makes fixed-array type
+identity and use-sites more honest in two linked ways: named compile-time
+constant extents must normalize to the same type as their evaluated literal
+length, and nested fixed arrays must work end to end as ordinary two-
+dimensional array values.
+
+This phase exists now because both pressures sit in the same array-type owner
+path: the grammar already admits expression extents, the type model already
+states that array length is part of the type, and real repository code still
+hits avoidable distortion when named lengths and nested array shapes do not
+survive consistently through sema, layout, MIR, and backend use.
+
+Repository status note
+----------------------
+- `docs/plan/backlog.txt` records parked compiler work for both named constant
+  array extents and two-dimensional fixed arrays.
+- `docs/arch/c-lang/language/syntax/grammar_spec.txt` already defines
+  `array_type = "[" expr "]" type_expr`, so type-position extents are already
+  expression-owned syntax rather than a new parser family.
+- `docs/arch/c-lang/language/types/types_spec.txt` currently says array length
+  is part of the type and that equality includes array length text after
+  compile-time validation, which is the current pressure point for named
+  extent normalization.
+- The repository still lacks one bounded language phase whose primary purpose
+  is to make array type identity and nested fixed-array use honest across the
+  real compiler pipeline.
+
+Problem being solved
+--------------------
+- Named constant extents still act too much like source text instead of fully
+  normalized compile-time lengths, which blocks clearer type-position spelling
+  such as `[MAX]T` even when `MAX` is a verified constant `5`.
+- Nested fixed-array shapes such as `[N][M]T` are the natural semantic form
+  for small dense tables, but the repository still treats them as either
+  deferred ergonomics or structural pressure to avoid.
+- Both gaps are array-type owned. Leaving them unresolved keeps rediscovering
+  literal-extent repetition and explicit slot flattening where the language
+  should instead carry the honest fixed-array shape directly.
+
+Non-goals
+---------
+- no dependent typing
+- no general compile-time arithmetic language in types beyond the current
+  admitted constant-evaluation contract
+- no dynamic or heap-backed matrix abstraction
+- no implicit array-to-slice or array-to-pointer decay
+- no empty collection literal syntax
+- no general container or collection framework
+
+Invariants
+----------
+- Fixed arrays remain value types and array length remains part of the type.
+- Array length must still be a compile-time integer constant.
+- Named extents must normalize only after the existing constant-evaluation
+  rules prove them valid.
+- Two-dimensional arrays remain nested fixed arrays rather than a new runtime
+  matrix or view type.
+- Sema remains the owner of builtin and structural type truth; MIR and backend
+  must consume that truth rather than reconstruct array identity ad hoc.
+
+Required surface changes
+------------------------
+1. Normalize named constant extents so `[MAX]T` is type-identical to `[5]T`
+   when `MAX` constant-evaluates to `5` under the existing admitted rules.
+2. Admit nested fixed-array types such as `[N][M]T` through sema, layout, MIR,
+   and executable lowering as ordinary value types.
+3. Admit the ordinary operations needed to make 2D arrays honest on the
+   existing slice, including declaration, initialization, indexing, field or
+   local storage, and return or parameter passage where fixed arrays are
+   already admitted.
+4. Add focused regressions covering named-extent normalization and one real 2D
+   array use shape.
+5. Spend the feature in at least one real repository-owned caller that is
+   currently forced into literal repetition or flattened explicit slots.
+
+Forbidden changes
+-----------------
+- do not widen into symbolic dimension algebra or general type-level
+  expression evaluation
+- do not introduce matrix libraries, dynamic row semantics, or hidden storage
+  transformations as part of the compiler phase
+- do not weaken array identity by ignoring length after normalization
+- do not solve named extent mismatch by special-casing only one caller-owned
+  spelling in the driver or backend
+
+Phase role in the larger sequence
+---------------------------------
+- This phase follows the parser cleanup by moving to the next bounded language
+  owner: fixed-array semantic identity and lowering.
+- It consumes two parked array pressures that belong together because both are
+  about what fixed-array types mean after compile-time validation.
+- It should leave the subsequent empty-literal phase working over an array and
+  slice world whose fixed-size semantics are already internally coherent.
+
+Relevant backlog items this phase intentionally brings under pressure
+--------------------------------------------------------------------
+- consider making named constant array extents type-identical to the same
+  literal extent throughout symbol references and lowering
+- consider admitting two-dimensional fixed array types `[N][M]T`
+
+Questions this phase must answer
+--------------------------------
+1. Where should named extents normalize so type identity, imports, MIR, and
+   backend all see the same evaluated array length truth?
+2. What exact compiler stages still block honest nested fixed-array support
+   after parsing already admits nested array type syntax?
+3. Which ordinary 2D array operations must work to claim the slice honestly
+   without widening into a matrix feature wave?
+4. Can one real repository-owned caller spend both named extents and nested
+   arrays, or do they need distinct spend sites while still sharing one array-
+   type phase boundary?
+
+Preferred implementation shape
+------------------------------
+- Keep parser ownership narrow because array type syntax is already admitted.
+- Normalize named extents in sema after constant evaluation and carry the
+  normalized length through semantic type identity.
+- Represent 2D arrays as nested fixed-array semantic types and reuse existing
+  array initialization, indexing, and layout paths where possible.
+- Extend MIR and executable lowering only where they still assume one-
+  dimensional arrays or textual extent identity.
+- Spend the feature in one repository-owned caller that is currently noisy for
+  exactly these array reasons.
+
+Test obligations
+----------------
+- `Build debug`
+- one focused sema regression for named constant extent normalization
+- one focused sema or MIR regression for nested fixed-array typing and
+  indexing
+- one focused executable regression proving a 2D fixed-array value survives the
+  full compiler path
+- the narrowest owning sema, MIR, and executable test targets for the touched
+  array-type surfaces
+
+Acceptance criteria
+-------------------
+- `[MAX]T` and `[5]T` compare as the same semantic array type when `MAX`
+  constant-evaluates to `5`
+- `[N][M]T` works as an admitted nested fixed-array value type through the real
+  compiler path
+- the landing does not widen into dependent typing, matrix abstractions, or
+  implicit array decay
+- at least one real repository-owned caller becomes clearer because the
+  compiler now carries the honest fixed-array type rather than forcing literal
+  repetition or flattened slots
+
+Future follow-up
+----------------
+- If later phases need richer compile-time dimension expressions, record that
+  separately rather than widening this phase into type-level arithmetic.
+- If a later owner needs dynamic matrix views or borrowing helpers, treat that
+  as library or slice follow-through rather than as an implied compiler step
+  from 2D arrays.
+- Expected-type empty collection literals should come only after this array-
+  type normalization phase lands honestly.

@@ -1,0 +1,163 @@
+Phase 249 -- Typed Empty Collection Literals
+============================================
+
+Status
+------
+PROPOSED
+
+Purpose
+-------
+Admit one bounded expected-type literal phase that lets source spell an empty
+collection literal only when the destination collection shape is already
+explicit from the surrounding owner.
+
+This phase exists now because the repository already has expected-type
+aggregate follow-through, array and slice semantics, and a documented backlog
+pressure for `[]`-style empty literals, but still lacks one honest compiler
+surface for the simplest zero-element collection value. The next honest move is
+to admit that source form only where the target collection type is already
+visible rather than reopening general collection inference.
+
+Repository status note
+----------------------
+- `docs/plan/backlog.txt` records parked compiler work for empty collection
+  literals only in contexts with an explicit destination type.
+- Phase 192 already admitted expected-type aggregate follow-through for `{}`
+  style aggregate literals while explicitly leaving standalone or broader
+  inferred literal work deferred.
+- The language documents already distinguish fixed arrays, `Slice<T>`, and
+  `Buffer<T>` as different semantic collection families with different
+  ownership meaning.
+- The repository still lacks one bounded phase whose primary purpose is to add
+  the zero-element literal surface without implying allocation, ownership
+  transfer, or ambient collection-kind inference.
+
+Problem being solved
+--------------------
+- The language has no direct empty collection literal spelling today, so code
+  that wants the obvious zero-element value still has to spell out a more
+  structural workaround than the intent warrants.
+- That absence is tolerable only while the repository has no real pressure for
+  a direct empty literal. Once empty collection values become wanted, the
+  narrow honest answer is an expected-type literal, not a broad inference or
+  container framework.
+- Leaving the gap unresolved would keep zero-element collection code noisier
+  than necessary even when the destination type already makes the collection
+  kind and element type explicit.
+
+Non-goals
+---------
+- no standalone untyped `[]` values
+- no ambient collection-kind or element-type inference from control flow
+- no implied allocation or owned-buffer construction
+- no widening into non-empty inferred collection literals
+- no map, set, or general container-literal framework
+- no array-type identity or 2D-array work beyond depending on the prior phase
+
+Invariants
+----------
+- The destination type must remain explicit from the surrounding owner.
+- Empty collection literals must not imply allocation, ownership transfer, or
+  hidden runtime helper insertion beyond the admitted zero-value lowering.
+- Slice semantics remain borrowed and explicit.
+- Buffer ownership semantics remain explicit and must not be smuggled in via a
+  convenient empty literal.
+- Sema remains the owner of which collection families are eligible for the
+  typed empty-literal surface.
+
+Required surface changes
+------------------------
+1. Admit an empty collection literal syntax only in expected-type contexts
+   where the destination collection family and element type are already known.
+2. Define the narrow admitted target families for this phase, at minimum zero-
+   length fixed arrays and borrowed slice views whose empty value is already
+   semantically well-defined without allocation.
+3. Reject standalone `[]` expressions and any target family whose empty form
+   would imply hidden allocation or ownership policy.
+4. Add focused regressions for typed empty literals in bindings, returns,
+   assignments, call arguments, or nested aggregate fields where the expected
+   type is explicit.
+5. Spend the feature in at least one real repository-owned caller that becomes
+   clearer because the zero-element value can now be spelled directly.
+
+Forbidden changes
+-----------------
+- do not admit free-floating `[]` values without an expected type
+- do not infer collection kind from later use, overload resolution, or control
+  flow
+- do not make `Buffer<T>` or other owning collection families constructible by
+  an empty literal unless a future phase proves a fully explicit ownership
+  contract for that surface
+- do not widen this phase into non-empty inferred arrays, slices, or other
+  collection literals
+
+Phase role in the larger sequence
+---------------------------------
+- This phase follows the array-type work because expected-type empty literals
+  depend on already-honest array and slice type identity.
+- It consumes one parked literal-ergonomics pressure without reopening general
+  aggregate or collection inference.
+- It should end the current language-expansion sequence with one narrow zero-
+  element literal improvement that still respects explicit ownership and type
+  boundaries.
+
+Relevant backlog items this phase intentionally brings under pressure
+--------------------------------------------------------------------
+- consider admitting empty collection literals only in contexts with an
+  explicit destination type
+
+Questions this phase must answer
+--------------------------------
+1. Which collection families have an empty value honest enough to admit under
+   expected-type ownership without allocation or hidden policy?
+2. What exact syntax should represent the empty collection literal while
+   keeping it distinct from the already-admitted brace aggregate paths?
+3. Which expected-type owners are enough to make the destination collection
+   type explicit and reviewable?
+4. Can the repository spend the feature immediately in real code without
+   accidentally implying broader collection inference expectations?
+
+Preferred implementation shape
+------------------------------
+- Keep parsing narrow to a dedicated empty-collection literal surface rather
+  than overloading existing aggregate-init forms silently.
+- Keep the controlling ownership in sema for deciding whether the expected
+  type admits the literal and for materializing the correct zero-element value.
+- Reuse existing zero-value or aggregate-lowering machinery where the target
+  family already has a semantically honest empty representation.
+- Limit the first slice to collection families whose empty value is already
+  explicit and non-owning or zero-sized by contract.
+- Spend the feature in one repository-owned caller that presently has to spell
+  a more structural zero-element workaround.
+
+Test obligations
+----------------
+- `Build debug`
+- one focused sema regression proving typed empty literals work only in
+  explicit expected-type contexts
+- one focused regression proving standalone `[]` remains rejected
+- one focused MIR or executable regression for an admitted empty array or slice
+  literal surviving the full compiler path
+- the narrowest owning parser, sema, and MIR or executable test targets for
+  the touched literal surface
+
+Acceptance criteria
+-------------------
+- empty collection literals work only when the destination type is explicit
+- the admitted collection families have honest zero-element semantics without
+  hidden allocation or ownership transfer
+- standalone `[]` remains rejected
+- the landing does not widen into broader collection inference or general
+  container-literal frameworks
+- at least one real repository-owned caller becomes clearer because the direct
+  empty value spelling is now available
+
+Future follow-up
+----------------
+- If later work needs non-empty inferred collection literals, keep that as a
+  separate broader literal phase rather than extending this one by accident.
+- If owning collections later need direct literal support, require an explicit
+  ownership-contract phase before reopening empty literals for them.
+- If later parser work introduces additional list punctuation or aggregate
+  forms, do not treat that as implicit expansion of this expected-type literal
+  phase.

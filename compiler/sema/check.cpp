@@ -1306,6 +1306,10 @@ class Checker {
     }
 
     bool BindValue(const std::string& name, const Type& type, bool is_mutable, const mc::support::SourceSpan& span) {
+        if (name == "_") {
+            Report(span, "discard target '_' does not declare a readable binding");
+            return false;
+        }
         auto& scope = scopes_.back();
         if (scope.contains(name)) {
             Report(span, "duplicate local binding: " + name);
@@ -1903,6 +1907,10 @@ class Checker {
 
         switch (expr.kind) {
             case Expr::Kind::kName: {
+                if (expr.text == "_") {
+                    Report(expr.span, "discard target '_' cannot be used as a value");
+                    return record(UnknownType());
+                }
                 const auto binding = LookupValue(expr.text);
                 if (binding.has_value()) {
                     if (!expr.type_args.empty()) {
@@ -1924,6 +1932,9 @@ class Checker {
                 Report(expr.span, "unknown name: " + expr.text);
                 return record(UnknownType());
             }
+            case Expr::Kind::kDiscard:
+                Report(expr.span, "discard target '_' cannot be used as a value");
+                return record(UnknownType());
             case Expr::Kind::kQualifiedName:
                 if (const auto binding = LookupValue(expr.text); binding.has_value()) {
                     return record(AnalyzeQualifiedBoundValue(expr, *binding));
@@ -2329,6 +2340,9 @@ class Checker {
     }
 
     void CheckAssignableTarget(const Expr& expr, const Type& value_type) {
+        if (expr.kind == Expr::Kind::kDiscard) {
+            return;
+        }
         if (expr.kind == Expr::Kind::kName) {
             CheckAssignableNameTarget(expr.text, expr.span, value_type);
             return;
@@ -2474,6 +2488,11 @@ class Checker {
                                    current_function_ != nullptr ? current_function_->type_params
                                                 : std::vector<std::string> {});
 
+        if (!stmt.has_initializer && stmt.pattern.HasDiscardTarget()) {
+            Report(stmt.span, "discard target '_' requires an initializer");
+            return;
+        }
+
         if (stmt.has_initializer && stmt.exprs.size() == stmt.pattern.names.size() && !IsUnknown(declared_type)) {
             for (const auto& expr : stmt.exprs) {
                 ApplyExpectedAggregateType(*expr, declared_type);
@@ -2494,10 +2513,10 @@ class Checker {
                 const Type& value_type = (*values)[index].type;
                 if (!IsUnknown(declared_type) && !IsAssignable(declared_type, value_type, *module_)) {
                     Report((*values)[index].span,
-                           "binding type mismatch for " + stmt.pattern.names[index] + ": expected " +
+                           "binding type mismatch for " + std::string(stmt.pattern.IsDiscard(index) ? "_" : stmt.pattern.names[index]) + ": expected " +
                                FormatType(declared_type) + ", got " + FormatType(value_type));
                 }
-                if (IsUnknown(declared_type) && !IsConcreteInferredBindingType(value_type)) {
+                if (!stmt.pattern.IsDiscard(index) && IsUnknown(declared_type) && !IsConcreteInferredBindingType(value_type)) {
                     ReportInvalidInferredBindingType((*values)[index], stmt.pattern.names[index]);
                 }
                 value_types.push_back(value_type);
@@ -2509,6 +2528,9 @@ class Checker {
         }
 
         for (std::size_t index = 0; index < stmt.pattern.names.size(); ++index) {
+            if (stmt.pattern.IsDiscard(index)) {
+                continue;
+            }
             BindValue(stmt.pattern.names[index], IsUnknown(declared_type) ? value_types[index] : declared_type, is_mutable, stmt.span);
         }
     }
@@ -2516,6 +2538,9 @@ class Checker {
     void CheckAssign(const Stmt& stmt) {
         if (stmt.assign_values.size() == stmt.assign_targets.size()) {
             for (std::size_t index = 0; index < stmt.assign_targets.size(); ++index) {
+                if (stmt.assign_targets[index]->kind == Expr::Kind::kDiscard) {
+                    continue;
+                }
                 ApplyExpectedAggregateType(*stmt.assign_values[index], AnalyzeExpr(*stmt.assign_targets[index]));
             }
         }

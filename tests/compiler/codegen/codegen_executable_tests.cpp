@@ -1583,6 +1583,31 @@ void RunCodegenExecutableProjectSuite(const std::filesystem::path& source_root,
                     10,
                     {});
 
+    const std::filesystem::path discard_branch_source = work_root / "discard_branch_roundtrip.mc";
+    WriteFile(discard_branch_source,
+              "func pair(value: i32) (i32, i32) {\n"
+              "    return value, value + 1\n"
+              "}\n"
+              "\n"
+              "func main() i32 {\n"
+              "    total: i32 = 0\n"
+              "    if true {\n"
+              "        value := 3\n"
+              "        total = total + value\n"
+              "    } else {\n"
+              "        value := 100\n"
+              "        total = total + value\n"
+              "    }\n"
+              "    _ = total + 2\n"
+              "    _, total = pair(total)\n"
+              "    return total\n"
+              "}\n");
+    RunBuiltFixture(mc_path,
+                    discard_branch_source,
+                    work_root / "discard_branch_roundtrip_build",
+                    4,
+                    {});
+
     const std::filesystem::path range_loop_source = work_root / "range_loop_roundtrip.mc";
     WriteFile(range_loop_source,
               "func main() i32 {\n"

@@ -1,0 +1,28 @@
+SourceFile
+  ModuleKind=ordinary
+  FuncDecl name=pair
+    returns:
+      NamedType name=i32
+      NamedType name=i32
+    body:
+      BlockStmt
+        statements:
+          ReturnStmt
+            exprs:
+              LiteralExpr text=1 kind=int_lit
+              LiteralExpr text=2 kind=int_lit
+  FuncDecl name=main
+    returns:
+      NamedType name=i32
+    body:
+      BlockStmt
+        statements:
+          BindingStmt hasInitializer=true
+            NamePattern names=[_, value] discards=[true, false]
+            exprs:
+              CallExpr
+                left:
+                  NameExpr text=pair
+          ReturnStmt
+            exprs:
+              NameExpr text=value
