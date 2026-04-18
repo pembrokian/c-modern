@@ -84,15 +84,12 @@ target_link_libraries(mc_mir PUBLIC mc_sema_bootstrap mc_frontend_stub mc_suppor
 
 add_library(mc_codegen_llvm STATIC
     compiler/codegen_llvm/backend_dump.cpp
-    compiler/codegen_llvm/backend_checked_helpers.cpp
     compiler/codegen_llvm/backend_executable_atomic.cpp
     compiler/codegen_llvm/backend_executable_aggregate.cpp
     compiler/codegen_llvm/backend_executable_calls.cpp
     compiler/codegen_llvm/backend_executable_memory.cpp
     compiler/codegen_llvm/backend_executable_numeric.cpp
     compiler/codegen_llvm/backend_executable_support.cpp
-    compiler/codegen_llvm/backend_executable_values.cpp
-    compiler/codegen_llvm/backend_executable_value_support.cpp
     compiler/codegen_llvm/backend_host.cpp
     compiler/codegen_llvm/backend_inspect.cpp
     compiler/codegen_llvm/backend_names.cpp
@@ -104,9 +101,12 @@ target_include_directories(mc_codegen_llvm PUBLIC ${CMAKE_CURRENT_SOURCE_DIR})
 target_link_libraries(mc_codegen_llvm PUBLIC mc_mir mc_support)
 
 add_executable(mc
+    compiler/driver/build_support.cpp
+    compiler/driver/build_graph.cpp
     compiler/driver/builder.cpp
     compiler/driver/project.cpp
     compiler/driver/driver.cpp
+    compiler/driver/driver_test.cpp
     compiler/driver/ops.cpp
     compiler/driver/main.cpp
 )

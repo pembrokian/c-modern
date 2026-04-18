@@ -1,4 +1,4 @@
-#include "compiler/driver/project.h"
+#include "compiler/driver/internal.h"
 
 #include <algorithm>
 #include <cctype>
@@ -18,10 +18,6 @@ using mc::support::DiagnosticSeverity;
 
 bool IsSupportedBootstrapTargetKind(std::string_view kind) {
     return kind == "exe" || kind == "test" || kind == "staticlib";
-}
-
-bool IsExecutableTargetKind(std::string_view kind) {
-    return kind == "exe" || kind == "test";
 }
 
 bool IsSupportedBootstrapEnv(std::string_view env) {
@@ -213,20 +209,6 @@ bool ReportDuplicateConfiguredPaths(const std::filesystem::path& project_path,
         }
     }
     return false;
-}
-
-bool IsPathWithinRoot(const std::filesystem::path& path,
-                     const std::filesystem::path& root) {
-    const std::filesystem::path normalized_path = std::filesystem::absolute(path).lexically_normal();
-    const std::filesystem::path normalized_root = std::filesystem::absolute(root).lexically_normal();
-    auto path_it = normalized_path.begin();
-    auto root_it = normalized_root.begin();
-    for (; root_it != normalized_root.end(); ++root_it, ++path_it) {
-        if (path_it == normalized_path.end() || *path_it != *root_it) {
-            return false;
-        }
-    }
-    return true;
 }
 
 std::string StripComment(std::string_view line) {
@@ -574,10 +556,6 @@ ProjectModuleSet* LookupTargetModuleSet(ProjectTarget& target,
         it->second.module_name = it->first;
     }
     return &it->second;
-}
-
-bool IsSupportedMode(std::string_view mode) {
-    return mode == "debug" || mode == "release" || mode == "checked";
 }
 
 }  // namespace

@@ -5,23 +5,119 @@
 namespace mc::codegen_llvm {
 namespace {
 
-sema::Type StripMirAliasOrDistinct(const mir::Module& module,
-                                   sema::Type type) {
-    std::unordered_set<std::string> visited;
-    while (type.kind == sema::Type::Kind::kNamed) {
-        const mir::TypeDecl* type_decl = FindTypeDecl(module, type.name);
-        if (type_decl == nullptr) {
-            break;
-        }
-        if (type_decl->kind != mir::TypeDecl::Kind::kDistinct && type_decl->kind != mir::TypeDecl::Kind::kAlias) {
-            break;
-        }
-        if (!visited.insert(type.name).second) {
-            break;
-        }
-        type = InstantiateAliasedType(*type_decl, type);
+struct CheckedHelperAnalysisContext {
+    const mir::Module& module;
+    const mir::Function& function;
+    const mir::BasicBlock& block;
+    const std::unordered_map<std::string, sema::Type>& value_types;
+    const std::filesystem::path& source_path;
+    support::DiagnosticSink& diagnostics;
+    CheckedHelperRequirements& requirements;
+};
+
+void SeedFunctionValueTypes(const mir::Function& function,
+                            std::unordered_map<std::string, sema::Type>& value_types) {
+    value_types.clear();
+    value_types.reserve(function.locals.size());
+    for (const auto& local : function.locals) {
+        value_types.emplace(local.name, local.type);
     }
-    return type;
+    for (const auto& block : function.blocks) {
+        for (const auto& instruction : block.instructions) {
+            if (!instruction.result.empty()) {
+                value_types.insert_or_assign(instruction.result, instruction.type);
+            }
+        }
+    }
+}
+
+const sema::Type* LookupCheckedHelperValueType(const CheckedHelperAnalysisContext& context,
+                                               std::string_view value_name,
+                                               std::string_view check_name) {
+    const auto it = context.value_types.find(std::string(value_name));
+    if (it != context.value_types.end()) {
+        return &it->second;
+    }
+
+    ReportBackendError(context.source_path,
+                       "LLVM bootstrap executable emission could not resolve " + std::string(check_name) +
+                           " operand type for '" + std::string(value_name) + "' in function '" + context.function.name +
+                           "' block '" + context.block.label + "'",
+                       context.diagnostics);
+    return nullptr;
+}
+
+std::string CheckedHelperAnalysisContextString(std::string_view check_name,
+                                               const CheckedHelperAnalysisContext& context) {
+    return "checked-helper analysis for " + std::string(check_name) + " in function '" + context.function.name +
+           "' block '" + context.block.label + "'";
+}
+
+bool AddDivCheckRequirement(const CheckedHelperAnalysisContext& context,
+                            const mir::Instruction& instruction) {
+    if (instruction.operands.size() != 2) {
+        ReportBackendError(context.source_path,
+                           "LLVM bootstrap executable emission requires div_check to use exactly two operands in function '" +
+                               context.function.name + "' block '" + context.block.label + "'",
+                           context.diagnostics);
+        return false;
+    }
+
+    const sema::Type* rhs_type = LookupCheckedHelperValueType(context, instruction.operands[1], "div_check");
+    if (rhs_type == nullptr) {
+        return false;
+    }
+
+    BackendTypeInfo lowered_type;
+    if (!LowerInstructionType(context.module,
+                              *rhs_type,
+                              context.source_path,
+                              context.diagnostics,
+                              CheckedHelperAnalysisContextString("div_check", context),
+                              lowered_type)) {
+        return false;
+    }
+
+    context.requirements.div_backend_names.insert(lowered_type.backend_name);
+    return true;
+}
+
+bool AddShiftCheckRequirement(const CheckedHelperAnalysisContext& context,
+                              const mir::Instruction& instruction) {
+    if (instruction.operands.size() != 2) {
+        ReportBackendError(context.source_path,
+                           "LLVM bootstrap executable emission requires shift_check to use exactly two operands in function '" +
+                               context.function.name + "' block '" + context.block.label + "'",
+                           context.diagnostics);
+        return false;
+    }
+
+    const sema::Type* value_type = LookupCheckedHelperValueType(context, instruction.operands[0], "shift_check");
+    if (value_type == nullptr) {
+        return false;
+    }
+
+    BackendTypeInfo lowered_type;
+    if (!LowerInstructionType(context.module,
+                              *value_type,
+                              context.source_path,
+                              context.diagnostics,
+                              CheckedHelperAnalysisContextString("shift_check", context),
+                              lowered_type)) {
+        return false;
+    }
+
+    const std::size_t bit_width = IntegerBitWidth(lowered_type);
+    if (bit_width == 0) {
+        ReportBackendError(context.source_path,
+                           "LLVM bootstrap executable emission requires integer shift_check values in function '" +
+                               context.function.name + "' block '" + context.block.label + "'",
+                           context.diagnostics);
+        return false;
+    }
+
+    context.requirements.shift_widths.insert(bit_width);
+    return true;
 }
 
 bool EmitAggregateEqualityComparison(const ExecutableValue& lhs,
@@ -712,6 +808,412 @@ std::string ComparePredicateForLLVM(const mir::Instruction& instruction,
 }
 
 }  // namespace
+
+bool CollectCheckedHelperRequirements(const mir::Module& module,
+                                      const std::filesystem::path& source_path,
+                                      support::DiagnosticSink& diagnostics,
+                                      CheckedHelperRequirements& requirements) {
+    std::unordered_map<std::string, sema::Type> value_types;
+    for (const auto& function : module.functions) {
+        SeedFunctionValueTypes(function, value_types);
+        for (const auto& block : function.blocks) {
+            const CheckedHelperAnalysisContext context{
+                .module = module,
+                .function = function,
+                .block = block,
+                .value_types = value_types,
+                .source_path = source_path,
+                .diagnostics = diagnostics,
+                .requirements = requirements,
+            };
+            for (const auto& instruction : block.instructions) {
+                switch (instruction.kind) {
+                    case mir::Instruction::Kind::kDivCheck:
+                        if (!AddDivCheckRequirement(context, instruction)) {
+                            return false;
+                        }
+                        break;
+                    case mir::Instruction::Kind::kShiftCheck:
+                        if (!AddShiftCheckRequirement(context, instruction)) {
+                            return false;
+                        }
+                        break;
+                    default:
+                        break;
+                }
+            }
+        }
+    }
+
+    return true;
+}
+
+bool EmitConvertDistinctInstruction(const mir::Instruction& instruction,
+                                    const ExecutableEmissionContext& context) {
+    const mir::BasicBlock& block = context.block;
+    const std::filesystem::path& source_path = context.source_path;
+    support::DiagnosticSink& diagnostics = context.diagnostics;
+    ExecutableFunctionState& state = context.state;
+
+    if (!RequireInstructionResult(instruction, block, source_path, diagnostics)) {
+        return false;
+    }
+
+    ExecutableValue operand;
+    if (!RequireOperandCount(instruction,
+                             1,
+                             "LLVM bootstrap executable emission",
+                             "convert_distinct",
+                             state.function->name,
+                             block,
+                             source_path,
+                             diagnostics) ||
+        !ResolveExecutableValue(state, instruction.operands.front(), block, source_path, diagnostics, operand)) {
+        return false;
+    }
+
+    BackendTypeInfo result_type;
+    if (!LowerInstructionType(*state.module,
+                              instruction.type,
+                              source_path,
+                              diagnostics,
+                              ExecutableFunctionBlockContext("convert_distinct", state, block),
+                              result_type)) {
+        return false;
+    }
+
+    RecordExecutableValue(state, instruction.result, operand.text, result_type, std::nullopt, instruction.type);
+    return true;
+}
+
+bool EmitConvertInstruction(const mir::Instruction& instruction,
+                            const ExecutableEmissionContext& context) {
+    const mir::BasicBlock& block = context.block;
+    const std::filesystem::path& source_path = context.source_path;
+    support::DiagnosticSink& diagnostics = context.diagnostics;
+    ExecutableFunctionState& state = context.state;
+
+    if (!RequireInstructionResult(instruction, block, source_path, diagnostics)) {
+        return false;
+    }
+
+    ExecutableValue operand;
+    if (!RequireOperandCount(instruction,
+                             1,
+                             "LLVM bootstrap executable emission",
+                             "convert",
+                             state.function->name,
+                             block,
+                             source_path,
+                             diagnostics) ||
+        !ResolveExecutableValue(state, instruction.operands.front(), block, source_path, diagnostics, operand)) {
+        return false;
+    }
+
+    BackendTypeInfo result_type;
+    if (!LowerInstructionType(*state.module,
+                              instruction.type,
+                              source_path,
+                              diagnostics,
+                              ExecutableFunctionBlockContext("convert", state, block),
+                              result_type)) {
+        return false;
+    }
+
+    if (operand.type.backend_name != result_type.backend_name) {
+        ReportBackendError(source_path,
+                           "LLVM bootstrap executable emission only supports representation-preserving convert in function '" +
+                               state.function->name + "' block '" + block.label + "'",
+                           diagnostics);
+        return false;
+    }
+
+    RecordExecutableValue(state, instruction.result, operand.text, result_type);
+    return true;
+}
+
+bool EmitConvertNumericInstruction(const mir::Instruction& instruction,
+                                   const ExecutableEmissionContext& context) {
+    const mir::BasicBlock& block = context.block;
+    const std::filesystem::path& source_path = context.source_path;
+    support::DiagnosticSink& diagnostics = context.diagnostics;
+    ExecutableFunctionState& state = context.state;
+    std::vector<std::string>& output_lines = context.output_lines;
+
+    if (!RequireInstructionResult(instruction, block, source_path, diagnostics)) {
+        return false;
+    }
+
+    ExecutableValue operand;
+    if (!RequireOperandCount(instruction,
+                             1,
+                             "LLVM bootstrap executable emission",
+                             "convert_numeric",
+                             state.function->name,
+                             block,
+                             source_path,
+                             diagnostics) ||
+        !ResolveExecutableValue(state, instruction.operands.front(), block, source_path, diagnostics, operand)) {
+        return false;
+    }
+
+    BackendTypeInfo result_type;
+    if (!LowerInstructionType(*state.module,
+                              instruction.type,
+                              source_path,
+                              diagnostics,
+                              ExecutableFunctionBlockContext("convert_numeric", state, block),
+                              result_type)) {
+        return false;
+    }
+
+    std::string converted;
+    if (!EmitNumericConversion(operand,
+                               result_type,
+                               context.function_index,
+                               context.block_index,
+                               context.instruction_index,
+                               output_lines,
+                               converted)) {
+        ReportBackendError(source_path,
+                           "LLVM bootstrap executable emission could not lower numeric conversion in function '" +
+                               state.function->name + "' block '" + block.label + "'",
+                           diagnostics);
+        return false;
+    }
+
+    RecordExecutableValue(state, instruction.result, converted, result_type);
+    return true;
+}
+
+bool EmitPointerToIntInstruction(const mir::Instruction& instruction,
+                                 const ExecutableEmissionContext& context) {
+    const mir::BasicBlock& block = context.block;
+    const std::filesystem::path& source_path = context.source_path;
+    support::DiagnosticSink& diagnostics = context.diagnostics;
+    ExecutableFunctionState& state = context.state;
+
+    if (!RequireInstructionResult(instruction, block, source_path, diagnostics)) {
+        return false;
+    }
+
+    ExecutableValue operand;
+    if (!RequireOperandCount(instruction,
+                             1,
+                             "LLVM bootstrap executable emission",
+                             "pointer_to_int",
+                             state.function->name,
+                             block,
+                             source_path,
+                             diagnostics) ||
+        !ResolveExecutableValue(state, instruction.operands.front(), block, source_path, diagnostics, operand)) {
+        return false;
+    }
+    if (operand.type.backend_name != "ptr") {
+        ReportBackendError(source_path,
+                           "LLVM bootstrap executable emission requires pointer operand for pointer_to_int in function '" +
+                               state.function->name + "' block '" + block.label + "'",
+                           diagnostics);
+        return false;
+    }
+
+    BackendTypeInfo result_type;
+    if (!LowerInstructionType(*state.module,
+                              instruction.type,
+                              source_path,
+                              diagnostics,
+                              ExecutableFunctionBlockContext("pointer_to_int", state, block),
+                              result_type)) {
+        return false;
+    }
+    if (IntegerBitWidth(result_type) == 0) {
+        ReportBackendError(source_path,
+                           "LLVM bootstrap executable emission requires integer result type for pointer_to_int in function '" +
+                               state.function->name + "' block '" + block.label + "'",
+                           diagnostics);
+        return false;
+    }
+
+    const std::string temp = LLVMTempName(context.function_index, context.block_index, context.instruction_index);
+    context.output_lines.push_back(temp + " = ptrtoint ptr " + operand.text + " to " + result_type.backend_name);
+    RecordExecutableValue(state, instruction.result, temp, result_type, std::nullopt, instruction.type);
+    return true;
+}
+
+bool EmitIntToPointerInstruction(const mir::Instruction& instruction,
+                                 const ExecutableEmissionContext& context) {
+    const mir::BasicBlock& block = context.block;
+    const std::filesystem::path& source_path = context.source_path;
+    support::DiagnosticSink& diagnostics = context.diagnostics;
+    ExecutableFunctionState& state = context.state;
+
+    if (!RequireInstructionResult(instruction, block, source_path, diagnostics)) {
+        return false;
+    }
+
+    ExecutableValue operand;
+    if (!RequireOperandCount(instruction,
+                             1,
+                             "LLVM bootstrap executable emission",
+                             "int_to_pointer",
+                             state.function->name,
+                             block,
+                             source_path,
+                             diagnostics) ||
+        !ResolveExecutableValue(state, instruction.operands.front(), block, source_path, diagnostics, operand)) {
+        return false;
+    }
+    if (IntegerBitWidth(operand.type) == 0) {
+        ReportBackendError(source_path,
+                           "LLVM bootstrap executable emission requires integer operand for int_to_pointer in function '" +
+                               state.function->name + "' block '" + block.label + "'",
+                           diagnostics);
+        return false;
+    }
+
+    BackendTypeInfo result_type;
+    if (!LowerInstructionType(*state.module,
+                              instruction.type,
+                              source_path,
+                              diagnostics,
+                              ExecutableFunctionBlockContext("int_to_pointer", state, block),
+                              result_type)) {
+        return false;
+    }
+    if (result_type.backend_name != "ptr") {
+        ReportBackendError(source_path,
+                           "LLVM bootstrap executable emission requires pointer result type for int_to_pointer in function '" +
+                               state.function->name + "' block '" + block.label + "'",
+                           diagnostics);
+        return false;
+    }
+
+    const std::string temp = LLVMTempName(context.function_index, context.block_index, context.instruction_index);
+    context.output_lines.push_back(temp + " = inttoptr " + operand.type.backend_name + " " + operand.text + " to ptr");
+    RecordExecutableValue(state, instruction.result, temp, result_type, std::nullopt, instruction.type);
+    return true;
+}
+
+bool EmitBoundsCheckCall(const mir::Instruction& instruction,
+                         const ExecutableEmissionContext& context) {
+    const mir::BasicBlock& block = context.block;
+    const std::filesystem::path& source_path = context.source_path;
+    support::DiagnosticSink& diagnostics = context.diagnostics;
+    ExecutableFunctionState& state = context.state;
+    std::vector<std::string>& output_lines = context.output_lines;
+
+    if (!RequireOperandRange(instruction,
+                             2,
+                             3,
+                             "LLVM bootstrap executable emission",
+                             "bounds_check to use two or three operands",
+                             state.function->name,
+                             block,
+                             source_path,
+                             diagnostics)) {
+        return false;
+    }
+
+    std::vector<std::string> operands_i64;
+    operands_i64.reserve(instruction.operands.size());
+    for (std::size_t index = 0; index < instruction.operands.size(); ++index) {
+        ExecutableValue operand;
+        if (!ResolveExecutableValue(state, instruction.operands[index], block, source_path, diagnostics, operand)) {
+            return false;
+        }
+        std::string extended;
+        if (!ExtendIntegerToI64(operand,
+                                context.function_index,
+                                context.block_index,
+                                context.instruction_index + index,
+                                "bounds",
+                                output_lines,
+                                extended)) {
+            return false;
+        }
+        operands_i64.push_back(std::move(extended));
+    }
+
+    if (instruction.op == "index") {
+        output_lines.push_back("call void @__mc_check_bounds_index(i64 " + operands_i64[0] + ", i64 " + operands_i64[1] + ")");
+        return true;
+    }
+    if (instruction.op == "slice") {
+        if (operands_i64.size() == 2) {
+            output_lines.push_back("call void @__mc_check_bounds_index(i64 " + operands_i64[0] + ", i64 " + operands_i64[1] + ")");
+            return true;
+        }
+        output_lines.push_back("call void @__mc_check_bounds_slice(i64 " + operands_i64[0] + ", i64 " + operands_i64[1] + ", i64 " + operands_i64[2] + ")");
+        return true;
+    }
+
+    ReportBackendError(source_path,
+                       "LLVM bootstrap executable emission does not recognize bounds_check mode '" + instruction.op +
+                           "' in function '" + state.function->name + "' block '" + block.label + "'",
+                       diagnostics);
+    return false;
+}
+
+bool EmitDivCheckCall(const mir::Instruction& instruction,
+                      const ExecutableEmissionContext& context) {
+    const mir::BasicBlock& block = context.block;
+    const std::filesystem::path& source_path = context.source_path;
+    support::DiagnosticSink& diagnostics = context.diagnostics;
+    ExecutableFunctionState& state = context.state;
+
+    ExecutableValue lhs;
+    ExecutableValue rhs;
+    if (!RequireOperandCount(instruction,
+                             2,
+                             "LLVM bootstrap executable emission",
+                             "div_check",
+                             state.function->name,
+                             block,
+                             source_path,
+                             diagnostics) ||
+        !ResolveExecutableValue(state, instruction.operands[0], block, source_path, diagnostics, lhs) ||
+        !ResolveExecutableValue(state, instruction.operands[1], block, source_path, diagnostics, rhs)) {
+        return false;
+    }
+    context.output_lines.push_back("call void @__mc_check_div_" + rhs.type.backend_name + "(" + rhs.type.backend_name + " " + rhs.text + ")");
+    return true;
+}
+
+bool EmitShiftCheckCall(const mir::Instruction& instruction,
+                        const ExecutableEmissionContext& context) {
+    const mir::BasicBlock& block = context.block;
+    const std::filesystem::path& source_path = context.source_path;
+    support::DiagnosticSink& diagnostics = context.diagnostics;
+    ExecutableFunctionState& state = context.state;
+
+    ExecutableValue value;
+    ExecutableValue count;
+    if (!RequireOperandCount(instruction,
+                             2,
+                             "LLVM bootstrap executable emission",
+                             "shift_check",
+                             state.function->name,
+                             block,
+                             source_path,
+                             diagnostics) ||
+        !ResolveExecutableValue(state, instruction.operands[0], block, source_path, diagnostics, value) ||
+        !ResolveExecutableValue(state, instruction.operands[1], block, source_path, diagnostics, count)) {
+        return false;
+    }
+
+    std::string count_i64;
+    if (!ExtendIntegerToI64(count,
+                            context.function_index,
+                            context.block_index,
+                            context.instruction_index,
+                            "shift",
+                            context.output_lines,
+                            count_i64)) {
+        return false;
+    }
+    context.output_lines.push_back("call void @__mc_check_shift_" + std::to_string(IntegerBitWidth(value.type)) + "(i64 " + count_i64 + ")");
+    return true;
+}
 
 bool EmitBinaryInstruction(const mir::Instruction& instruction,
                            const ExecutableEmissionContext& context) {

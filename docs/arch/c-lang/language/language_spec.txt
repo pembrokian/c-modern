@@ -106,6 +106,8 @@ Layout rules:
 - Default layout is not promised to match C.
 - C layout must be requested explicitly with @abi(c).
 - @packed is allowed only as an explicit layout escape hatch.
+- The object representation of a live value includes its declared field or element bytes plus any target-defined padding bytes required by layout.
+- Byte-wise copy copies the full object representation, including padding.
 
 Fixed arrays:
 
@@ -115,9 +117,17 @@ Fixed-size arrays are written as:
 
 Rules:
 - `[N]T` is a value type with `N` elements of `T`.
+- `N` must constant-evaluate to a compile-time integer length.
+- Named constant extents normalize to their evaluated length for semantic type identity, so `[MAX]T` and `[5]T` are the same type when `MAX` constant-evaluates to `5`.
 - Fixed arrays are distinct from slices and from owning buffers.
 - Fixed arrays do not implicitly decay to pointers.
+- Nested fixed arrays such as `[N][M]T` are ordinary value types.
 - A slice view over an array requires an explicit conversion.
+
+Fixed-array literals:
+- Explicit typed fixed-array aggregate literals such as `[4]i32{ 1, 2, 3, 4 }` are admitted as ordinary expression values where the surrounding owner already admits explicit typed aggregate values.
+- The empty collection literal `[]` is admitted only in expected-type contexts and only for `[0]T` and `Slice<T>`.
+- Standalone `[]`, non-zero fixed-array targets, and owning `Buffer<T>` targets are rejected.
 
 Explicit conversions:
 
@@ -163,6 +173,11 @@ Container model summary:
 
 Storage-lifetime guidance:
 - v0.2 does not add a separate language-level temporary-storage category.
+- Top-level `var` declarations without an initializer are zero-initialized.
+- Local storage declarations without an initializer create live storage with indeterminate contents until the program writes a value.
+- Reading local or heap-backed storage before it has been initialized is invalid behavior.
+- Ending storage through scope exit, explicit free, arena or region reset, pool-slot return, unmap, or an equivalent runtime storage-ending operation invalidates every pointer, slice, string view, or other borrowed view into that storage immediately.
+- Taking a pointer or borrowed view into a temporary does not extend that temporary's lifetime.
 - Functions that return storage whose lifetime outlives the callee should return `Buffer<T>` or another owning type.
 - Functions that return views should return `Slice<T>`.
 - Libraries should not return borrowed views into temporary internal storage.
@@ -197,6 +212,7 @@ Arithmetic rules:
 Undefined behavior is intentionally small.
 
 Undefined:
+- Read of uninitialized storage
 - Use-after-free
 - Out-of-bounds access
 - Invalid pointer dereference
@@ -218,6 +234,7 @@ Indexing rules:
 6. Pointers and Aliasing
 
 Pointer model:
+- A pointer is valid only while it still refers to live storage under the program rules.
 - Pointer arithmetic is valid only within a single live allocation, array, or one-past the end.
 - Pointer comparison is defined only for pointers into the same allocation or against nil.
 - nil is the null pointer value.
@@ -230,6 +247,7 @@ Aliasing:
 - Byte-wise inspection through ui8 pointers or byte slices is always allowed.
 - Non-aliasing assumptions must be explicit.
 - In v0.2, @noalias is a per-parameter qualifier.
+- The backend must not strengthen aliasing assumptions beyond the semantic contract accepted by sema.
 
 7. Memory and Allocation
 
@@ -265,6 +283,10 @@ Rules:
 - Typed helper APIs may infer natural alignment.
 - Typed allocation helpers and Buffer<T> constructors should be defined on top of Allocator.
 - v0.2 does not standardize hosted convenience wrappers that silently choose the default allocator for general library APIs.
+- `Buffer<T>` owns heap-backed contiguous storage.
+- `Slice<T>` and `str` are borrowed views and do not own storage.
+- Fixed arrays are values, not heap owners.
+- Free, arena reset, region release, pool return, and unmap all invalidate pointers and borrowed views into the released storage.
 
 Illustrative typed allocation helper surface:
 
@@ -474,6 +496,13 @@ Binding rules:
 - inferred local bindings must resolve to one concrete compile-time type; if
     the initializer is `nil`, generic-only, or otherwise unresolved, the binding
     must use an explicit type annotation
+- `_` is admitted as an explicit discard target in local binding and assignment positions where an ordinary identifier target is otherwise allowed
+- `_` is discard-only: it does not declare readable storage, does not have an addressable identity, and cannot be used as a value expression
+- disjoint sibling branches may reuse the same local name when the live scopes of those bindings do not overlap
+
+Expression-list and aggregate-list rules:
+- comma-delimited expression and aggregate lists may include a trailing comma
+- logical `||` expressions may chain directly and keep ordinary short-circuit semantics
 
 12. Tagged Unions
 

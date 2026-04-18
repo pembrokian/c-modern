@@ -19,6 +19,7 @@
 #include "compiler/parse/parser.h"
 #include "compiler/sema/check.h"
 #include "compiler/support/diagnostics.h"
+#include "compiler/support/dump_paths.h"
 
 namespace mc::driver {
 
@@ -59,6 +60,13 @@ struct BuildUnit {
 struct ImportedInterfaceData {
     std::unordered_map<std::string, sema::Module> modules;
     std::vector<std::pair<std::string, std::string>> interface_hashes;
+};
+
+struct DirectSourceBuildResult {
+    std::filesystem::path source_path;
+    support::DumpTargets dump_targets;
+    support::BuildArtifactTargets build_targets;
+    std::filesystem::path executable_path;
 };
 
 struct ModuleBuildState {
@@ -151,6 +159,9 @@ bool IsSupportedMode(std::string_view mode);
 bool IsSupportedEnv(std::string_view env);
 bool IsExecutableTargetKind(std::string_view kind);
 bool IsStaticLibraryTargetKind(std::string_view kind);
+bool IsPathWithinRoot(const std::filesystem::path& path,
+                      const std::filesystem::path& root);
+std::optional<std::filesystem::path> DiscoverRepositoryRoot(const std::filesystem::path& start_path);
 
 std::string HexU64(std::uint64_t value);
 std::string HashText(std::string_view text);
@@ -230,6 +241,11 @@ bool WriteTextArtifact(const std::filesystem::path& path,
                        std::string_view contents,
                        std::string_view description,
                        support::DiagnosticSink& diagnostics);
+std::optional<DirectSourceBuildResult> BuildDirectSource(const CommandOptions& options,
+                                                         support::DiagnosticSink& diagnostics);
+std::string MergeRenderedDiagnostics(std::string_view primary,
+                                     std::string_view secondary);
+int RunTestCommand(const CommandOptions& options);
 
 }  // namespace mc::driver
 

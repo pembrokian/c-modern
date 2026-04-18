@@ -31,6 +31,11 @@ bool ValidateExecutableBackendCapabilities(const mir::Module& module,
 
 bool IsProcedureSourceType(std::string_view source_name);
 
+const mir::Function* FindFunction(const mir::Module& module,
+                                  std::string_view name);
+
+bool IsSignedSourceType(std::string_view source_name);
+
 bool IsUnsignedSourceType(std::string_view source_name);
 
 bool IsFloatType(const BackendTypeInfo& type_info);
@@ -40,6 +45,21 @@ std::size_t IntegerBitWidth(const BackendTypeInfo& type_info);
 std::string DecodeStringLiteral(std::string_view literal);
 
 std::string EncodeLLVMStringBytes(std::string_view decoded);
+
+std::string EscapeLLVMQuotedString(std::string_view text);
+
+std::string FormatLLVMLiteral(const BackendTypeInfo& type_info,
+                              std::string_view value);
+
+std::string LLVMStructInsertBase(const BackendTypeInfo& type_info);
+
+bool RenderLLVMGlobalConstValue(const mir::Module& module,
+                                sema::Type type,
+                                const sema::ConstValue& value,
+                                bool wrap_hosted_main,
+                                const std::filesystem::path& source_path,
+                                support::DiagnosticSink& diagnostics,
+                                std::string& rendered);
 
 std::string FunctionBlockContext(std::string_view operation,
                                  std::string_view function_name,
@@ -128,6 +148,9 @@ bool LowerInstructionType(const mir::Module& module,
                           const std::string& context,
                           BackendTypeInfo& type_info);
 
+sema::Type StripMirAliasOrDistinct(const mir::Module& module,
+                                   sema::Type type);
+
 std::string BackendFunctionName(const std::string& source_name);
 std::string BackendGlobalName(const std::string& source_name);
 std::string BackendLocalName(const std::string& source_name);
@@ -151,6 +174,10 @@ std::string LLVMTempName(std::size_t function_index,
 std::string LLVMGlobalName(std::string_view source_name);
 
 std::string FormatReturnTypes(const std::vector<BackendTypeInfo>& types);
+
+std::string RenderLLVMParameter(const BackendTypeInfo& type_info,
+                                const mir::Local& param,
+                                bool include_name);
 
 std::optional<BackendTypeInfo> LowerFunctionReturnType(const mir::Module& module,
                                                        const std::vector<sema::Type>& return_types);
@@ -316,9 +343,24 @@ bool CollectCheckedHelperRequirements(const mir::Module& module,
                                       support::DiagnosticSink& diagnostics,
                                       CheckedHelperRequirements& requirements);
 
-bool EmitValueInstruction(const mir::Instruction& instruction,
-                          const ExecutableEmissionContext& context,
-                          const std::unordered_map<std::string, std::string>& function_symbols);
+bool EmitSymbolRefInstruction(const mir::Instruction& instruction,
+                              const ExecutableEmissionContext& context,
+                              const std::unordered_map<std::string, std::string>& function_symbols);
+
+bool EmitConvertDistinctInstruction(const mir::Instruction& instruction,
+                                    const ExecutableEmissionContext& context);
+
+bool EmitConvertInstruction(const mir::Instruction& instruction,
+                            const ExecutableEmissionContext& context);
+
+bool EmitConvertNumericInstruction(const mir::Instruction& instruction,
+                                   const ExecutableEmissionContext& context);
+
+bool EmitPointerToIntInstruction(const mir::Instruction& instruction,
+                                 const ExecutableEmissionContext& context);
+
+bool EmitIntToPointerInstruction(const mir::Instruction& instruction,
+                                 const ExecutableEmissionContext& context);
 
 bool EmitCallInstruction(const mir::Instruction& instruction,
                          const ExecutableEmissionContext& context,
@@ -326,6 +368,15 @@ bool EmitCallInstruction(const mir::Instruction& instruction,
 
 bool EmitBinaryInstruction(const mir::Instruction& instruction,
                            const ExecutableEmissionContext& context);
+
+bool EmitBoundsCheckCall(const mir::Instruction& instruction,
+                         const ExecutableEmissionContext& context);
+
+bool EmitDivCheckCall(const mir::Instruction& instruction,
+                      const ExecutableEmissionContext& context);
+
+bool EmitShiftCheckCall(const mir::Instruction& instruction,
+                        const ExecutableEmissionContext& context);
 
 bool EmitMemoryInstruction(const mir::Instruction& instruction,
                            const ExecutableEmissionContext& context);

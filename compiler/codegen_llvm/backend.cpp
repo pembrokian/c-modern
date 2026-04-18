@@ -8,7 +8,6 @@
 #include <sstream>
 #include <string_view>
 #include <unordered_map>
-#include <unordered_set>
 
 // Bootstrap LLVM backend — two-pass code generation architecture.
 //
@@ -103,16 +102,6 @@ bool CollectExecutableGlobals(const mir::Module& module,
     return true;
 }
 
-const mir::Function* FindFunction(const mir::Module& module,
-                                  std::string_view name) {
-    for (const auto& function : module.functions) {
-        if (function.name == name) {
-            return &function;
-        }
-    }
-    return nullptr;
-}
-
 bool RenderExecutableBlocks(const mir::Function& function,
                             std::size_t function_index,
                             const std::unordered_map<std::string, std::string>& function_symbols,
@@ -163,121 +152,6 @@ bool RenderExecutableBlocks(const mir::Function& function,
     return true;
 }
 
-bool FormatExecutableCallArguments(const mir::Instruction& instruction,
-                                   const ExecutableCallSignature& call_signature,
-                                   const mir::BasicBlock& block,
-                                   const std::filesystem::path& source_path,
-                                   support::DiagnosticSink& diagnostics,
-                                   ExecutableFunctionState& state,
-                                   std::string& args_text) {
-    const std::size_t argument_count = instruction.operands.size() - 1;
-    if (argument_count != call_signature.types.param_types.size()) {
-        ReportBackendError(source_path,
-                           "LLVM bootstrap executable emission expected " + std::to_string(call_signature.types.param_types.size()) +
-                               " call arguments for " + call_signature.call_label + " but saw " + std::to_string(argument_count) +
-                               " in function '" + state.function->name + "' block '" + block.label + "'",
-                           diagnostics);
-        return false;
-    }
-
-    std::vector<BackendTypeInfo> param_types;
-    if (!executable_support::LowerExecutableParamTypes(*state.module,
-                                   call_signature.types,
-                                   source_path,
-                                   diagnostics,
-                                   [&](std::size_t) {
-                                       return FunctionBlockContext("call argument", state.function->name, block);
-                                   },
-                                   param_types)) {
-        return false;
-    }
-
-    std::ostringstream args;
-    for (std::size_t index = 0; index < argument_count; ++index) {
-        ExecutableValue value;
-        if (!ResolveExecutableValue(state,
-                                    instruction.operands[1 + index],
-                                    block,
-                                    source_path,
-                                    diagnostics,
-                                    value)) {
-            return false;
-        }
-
-        if (index > 0) {
-            args << ", ";
-        }
-        args << param_types[index].backend_name << " " << value.text;
-    }
-
-    args_text = args.str();
-    return true;
-}
-
-bool ResolveExecutableCallSignature(const mir::Instruction& instruction,
-                                    const std::unordered_map<std::string, std::string>& function_symbols,
-                                    const mir::BasicBlock& block,
-                                    const std::filesystem::path& source_path,
-                                    support::DiagnosticSink& diagnostics,
-                                    ExecutableFunctionState& state,
-                                    ExecutableCallSignature& signature) {
-    if (instruction.operands.empty()) {
-        ReportBackendError(source_path,
-                           "LLVM bootstrap executable emission requires a callee operand for call in function '" +
-                               state.function->name + "' block '" + block.label + "'",
-                           diagnostics);
-        return false;
-    }
-
-    ExecutableValue callee_value;
-    if (!ResolveExecutableValue(state, instruction.operands.front(), block, source_path, diagnostics, callee_value)) {
-        return false;
-    }
-
-    const bool indirect_call = instruction.target_name.empty() || instruction.target_kind != mir::Instruction::TargetKind::kFunction;
-    if (indirect_call) {
-        if (!IsProcedureSourceType(callee_value.type.source_name)) {
-            ReportBackendError(source_path,
-                               "LLVM bootstrap executable emission requires procedure-typed callee for indirect call in function '" +
-                                   state.function->name + "' block '" + block.label + "'",
-                               diagnostics);
-            return false;
-        }
-        signature.callee_text = callee_value.text;
-        signature.call_label = "indirect call";
-        return executable_support::NormalizeProcedureTypeSignature(
-            callee_value.source_type.has_value() ? *callee_value.source_type : sema::UnknownType(),
-            source_path,
-            diagnostics,
-            "indirect call in function '" + state.function->name + "' block '" + block.label + "'",
-            signature.types);
-    }
-
-    const mir::Function* callee = FindFunction(*state.module, instruction.target_name);
-    if (callee == nullptr) {
-        ReportBackendError(source_path,
-                           "LLVM bootstrap executable emission references unknown direct callee '" +
-                               instruction.target_name + "' in function '" + state.function->name + "' block '" +
-                               block.label + "'",
-                           diagnostics);
-        return false;
-    }
-
-    const auto function_it = function_symbols.find(callee->name);
-    if (function_it == function_symbols.end()) {
-        ReportBackendError(source_path,
-                           "LLVM bootstrap executable emission has no symbol mapping for direct callee '" +
-                               instruction.target_name + "' in function '" + state.function->name + "' block '" +
-                               block.label + "'",
-                           diagnostics);
-        return false;
-    }
-
-    signature.callee_text = function_it->second;
-    signature.call_label = "call to '" + instruction.target_name + "'";
-    signature.types = executable_support::NormalizeFunctionSignature(*callee).types;
-    return true;
-}
 
 bool TypeSupportsErasedGenericEmission(const mir::Module& module,
                                        const sema::Type& type) {
@@ -317,62 +191,6 @@ bool ShouldEmitFunctionForExecutable(const mir::Module& module,
     return function.type_params.empty() || FunctionSupportsErasedGenericEmission(module, function);
 }
 
-std::string RenderLLVMParameter(const BackendTypeInfo& type_info,
-                                const mir::Local& param,
-                                bool include_name) {
-    std::string result = type_info.backend_name;
-    if (param.is_noalias) {
-        result += " noalias";
-    }
-    if (include_name) {
-        result += " " + LLVMParamName(param.name);
-    }
-    return result;
-}
-
-std::string LLVMZeroValue(const BackendTypeInfo& type_info) {
-    if (type_info.backend_name == "float" || type_info.backend_name == "double") {
-        return "0.0";
-    }
-    if (type_info.backend_name == "ptr") {
-        return "null";
-    }
-    if (type_info.backend_name == "i1") {
-        return "false";
-    }
-    if (!type_info.backend_name.empty() && (type_info.backend_name.front() == '{' || type_info.backend_name.front() == '[')) {
-        return "zeroinitializer";
-    }
-    return "0";
-}
-
-bool IsSignedSourceType(std::string_view source_name) {
-    return source_name == "i8" || source_name == "i16" || source_name == "i32" || source_name == "i64" ||
-           source_name == "isize" || source_name == "int_literal";
-}
-
-std::string LLVMStructInsertBase(const BackendTypeInfo& type_info) {
-    return IsAggregateType(type_info) ? "zeroinitializer" : LLVMZeroValue(type_info);
-}
-
-sema::Type StripMirAliasOrDistinct(const mir::Module& module, sema::Type type) {
-    std::unordered_set<std::string> visited;
-    while (type.kind == sema::Type::Kind::kNamed) {
-        const mir::TypeDecl* type_decl = FindTypeDecl(module, type.name);
-        if (type_decl == nullptr) {
-            break;
-        }
-        if (type_decl->kind != mir::TypeDecl::Kind::kDistinct && type_decl->kind != mir::TypeDecl::Kind::kAlias) {
-            break;
-        }
-        if (!visited.insert(type.name).second) {
-            break;
-        }
-        type = InstantiateAliasedType(*type_decl, type);
-    }
-    return type;
-}
-
 std::optional<std::string_view> UnsupportedExecutableInstructionName(mir::Instruction::Kind kind) {
     switch (kind) {
         case mir::Instruction::Kind::kAtomicCompareExchange:
@@ -380,262 +198,6 @@ std::optional<std::string_view> UnsupportedExecutableInstructionName(mir::Instru
         default:
             return std::nullopt;
     }
-}
-
-std::string EscapeLLVMQuotedString(std::string_view text) {
-    std::ostringstream encoded;
-    for (const unsigned char ch : text) {
-        if (ch >= 32 && ch <= 126 && ch != '\\' && ch != '"') {
-            encoded << static_cast<char>(ch);
-            continue;
-        }
-
-        encoded << '\\';
-        constexpr char kHex[] = "0123456789ABCDEF";
-        encoded << kHex[(ch >> 4) & 0xF] << kHex[ch & 0xF];
-    }
-    return encoded.str();
-}
-
-std::string FormatLLVMLiteral(const BackendTypeInfo& type_info,
-                              std::string_view value) {
-    if (type_info.backend_name == "i1") {
-        if (value == "true" || value == "1") {
-            return "true";
-        }
-        return "false";
-    }
-
-    if (type_info.backend_name == "ptr" && (value == "nil" || value == "null")) {
-        return "null";
-    }
-
-    return std::string(value);
-}
-
-bool RenderLLVMEnumConstValue(const mir::Module& module,
-                              const sema::Type& enum_type,
-                              const sema::ConstValue& value,
-                              const std::filesystem::path& source_path,
-                              support::DiagnosticSink& diagnostics,
-                              std::string& rendered) {
-    if (value.kind != sema::ConstValue::Kind::kEnum || enum_type.kind != sema::Type::Kind::kNamed) {
-        return false;
-    }
-
-    sema::Type rendered_enum_type = value.enum_type;
-    if (rendered_enum_type != enum_type && rendered_enum_type.kind == sema::Type::Kind::kNamed &&
-        rendered_enum_type.subtypes == enum_type.subtypes && VariantLeafName(rendered_enum_type.name) == VariantLeafName(enum_type.name)) {
-        rendered_enum_type.name = enum_type.name;
-    }
-
-    if (rendered_enum_type != enum_type) {
-        ReportBackendError(source_path,
-                           "LLVM bootstrap backend received mismatched enum constant type " +
-                               sema::FormatType(value.enum_type) + " for " + sema::FormatType(enum_type),
-                           diagnostics);
-        return false;
-    }
-
-    const auto* type_decl = FindTypeDecl(module, enum_type.name);
-    if (type_decl == nullptr || type_decl->kind != mir::TypeDecl::Kind::kEnum) {
-        return false;
-    }
-
-    if (value.variant_tag < 0 ||
-        value.variant_tag >= static_cast<std::int64_t>(type_decl->variants.size())) {
-        ReportBackendError(source_path,
-                           "LLVM bootstrap backend received enum constant tag out of range for type " +
-                               sema::FormatType(enum_type),
-                           diagnostics);
-        return false;
-    }
-
-    const auto variant_index = static_cast<std::size_t>(value.variant_tag);
-    const auto& variant = type_decl->variants[variant_index];
-    if (variant.name != value.variant_name) {
-        ReportBackendError(source_path,
-                           "LLVM bootstrap backend received enum constant variant mismatch for type " +
-                               sema::FormatType(enum_type),
-                           diagnostics);
-        return false;
-    }
-    if (!variant.payload_fields.empty()) {
-        ReportBackendError(source_path,
-                           "LLVM bootstrap backend does not yet support payload enum global constants for type " +
-                               sema::FormatType(enum_type),
-                           diagnostics);
-        return false;
-    }
-
-    const auto lowered_layout = LowerEnumLayout(module, *type_decl, enum_type);
-    if (!lowered_layout.has_value()) {
-        ReportBackendError(source_path,
-                           "LLVM bootstrap backend cannot lower enum global constant type " +
-                               sema::FormatType(enum_type),
-                           diagnostics);
-        return false;
-    }
-
-    std::ostringstream stream;
-    stream << "{ i64 " << value.variant_tag;
-    if (lowered_layout->payload_size != 0) {
-        stream << ", " << lowered_layout->payload_type.backend_name << " zeroinitializer";
-    }
-    stream << " }";
-    rendered = stream.str();
-    return true;
-}
-
-bool RenderLLVMGlobalConstValue(const mir::Module& module,
-                                sema::Type type,
-                                const sema::ConstValue& value,
-                                bool wrap_hosted_main,
-                                const std::filesystem::path& source_path,
-                                support::DiagnosticSink& diagnostics,
-                                std::string& rendered) {
-    type = sema::CanonicalizeBuiltinType(std::move(type));
-    if (type.kind == sema::Type::Kind::kConst && !type.subtypes.empty()) {
-        return RenderLLVMGlobalConstValue(module, type.subtypes.front(), value, wrap_hosted_main, source_path, diagnostics, rendered);
-    }
-
-    if (value.kind == sema::ConstValue::Kind::kProcedure) {
-        const sema::Type canonical_type = StripMirAliasOrDistinct(module, std::move(type));
-        if (canonical_type.kind != sema::Type::Kind::kProcedure) {
-            ReportBackendError(source_path,
-                               "LLVM bootstrap backend requires procedure-typed global constant for named procedure reference",
-                               diagnostics);
-            return false;
-        }
-        rendered = LLVMFunctionSymbol(value.procedure_name, wrap_hosted_main);
-        return true;
-    }
-
-    const sema::Type canonical_type = StripMirAliasOrDistinct(module, std::move(type));
-    const auto lowered_type = LowerTypeInfo(module, canonical_type);
-    if (!lowered_type.has_value()) {
-        ReportBackendError(source_path,
-                           "LLVM bootstrap backend cannot lower global constant type " + sema::FormatType(canonical_type),
-                           diagnostics);
-        return false;
-    }
-
-    if (value.kind != sema::ConstValue::Kind::kAggregate) {
-        if (RenderLLVMEnumConstValue(module, canonical_type, value, source_path, diagnostics, rendered)) {
-            return true;
-        }
-        rendered = FormatLLVMLiteral(*lowered_type, value.text);
-        return true;
-    }
-
-    if (canonical_type.kind == sema::Type::Kind::kArray) {
-        if (canonical_type.subtypes.empty()) {
-            ReportBackendError(source_path,
-                               "LLVM bootstrap backend requires array element type for global constant " +
-                                   sema::FormatType(canonical_type),
-                               diagnostics);
-            return false;
-        }
-
-        const auto length = mc::support::ParseArrayLength(canonical_type.metadata);
-        if (!length.has_value() || *length != value.elements.size()) {
-            ReportBackendError(source_path,
-                               "LLVM bootstrap backend requires exact array constant element count for global type " +
-                                   sema::FormatType(canonical_type),
-                               diagnostics);
-            return false;
-        }
-
-        const auto element_type = LowerTypeInfo(module, canonical_type.subtypes.front());
-        if (!element_type.has_value()) {
-            ReportBackendError(source_path,
-                               "LLVM bootstrap backend cannot lower array element type for global constant " +
-                                   sema::FormatType(canonical_type.subtypes.front()),
-                               diagnostics);
-            return false;
-        }
-
-        std::ostringstream stream;
-        stream << '[';
-        for (std::size_t index = 0; index < value.elements.size(); ++index) {
-            std::string element_text;
-            if (!RenderLLVMGlobalConstValue(module,
-                                            canonical_type.subtypes.front(),
-                                            value.elements[index],
-                                            wrap_hosted_main,
-                                            source_path,
-                                            diagnostics,
-                                            element_text)) {
-                return false;
-            }
-            if (index > 0) {
-                stream << ", ";
-            }
-            stream << element_type->backend_name << ' ' << element_text;
-        }
-        stream << ']';
-        rendered = stream.str();
-        return true;
-    }
-
-    std::vector<std::pair<std::string, sema::Type>> fields = sema::BuiltinAggregateFields(canonical_type);
-    if (fields.empty() && canonical_type.kind == sema::Type::Kind::kTuple) {
-        fields.reserve(canonical_type.subtypes.size());
-        for (std::size_t index = 0; index < canonical_type.subtypes.size(); ++index) {
-            fields.push_back({std::to_string(index), canonical_type.subtypes[index]});
-        }
-    }
-    if (fields.empty() && canonical_type.kind == sema::Type::Kind::kNamed) {
-        if (const auto* type_decl = FindTypeDecl(module, canonical_type.name); type_decl != nullptr) {
-            fields = InstantiateFields(*type_decl, canonical_type);
-        }
-    }
-    if (fields.empty()) {
-        ReportBackendError(source_path,
-                           "LLVM bootstrap backend cannot render structural global constant for type " +
-                               sema::FormatType(canonical_type),
-                           diagnostics);
-        return false;
-    }
-    if (fields.size() != value.elements.size()) {
-        ReportBackendError(source_path,
-                           "LLVM bootstrap backend requires one constant element per field for global type " +
-                               sema::FormatType(canonical_type),
-                           diagnostics);
-        return false;
-    }
-
-    std::ostringstream stream;
-    stream << '{';
-    for (std::size_t index = 0; index < fields.size(); ++index) {
-        const auto field_type = LowerTypeInfo(module, fields[index].second);
-        if (!field_type.has_value()) {
-            ReportBackendError(source_path,
-                               "LLVM bootstrap backend cannot lower field type " + sema::FormatType(fields[index].second) +
-                                   " for global constant " + sema::FormatType(canonical_type),
-                               diagnostics);
-            return false;
-        }
-
-        std::string field_text;
-        if (!RenderLLVMGlobalConstValue(module,
-                                        fields[index].second,
-                                        value.elements[index],
-                                        wrap_hosted_main,
-                                        source_path,
-                                        diagnostics,
-                                        field_text)) {
-            return false;
-        }
-
-        if (index > 0) {
-            stream << ", ";
-        }
-        stream << field_type->backend_name << ' ' << field_text;
-    }
-    stream << '}';
-    rendered = stream.str();
-    return true;
 }
 
 bool ResolveExecutableBlock(const ExecutableFunctionState& state,
@@ -719,132 +281,6 @@ ExecutableRuntimeRequirements CollectExecutableRuntimeRequirements(const mir::Mo
     return requirements;
 }
 
-bool EmitBoundsCheckCall(const mir::Instruction& instruction,
-                         std::size_t function_index,
-                         std::size_t block_index,
-                         std::size_t instruction_index,
-                         const mir::BasicBlock& block,
-                         const std::filesystem::path& source_path,
-                         support::DiagnosticSink& diagnostics,
-                         ExecutableFunctionState& state,
-                         std::vector<std::string>& output_lines) {
-    if (!RequireOperandRange(instruction,
-                             2,
-                             3,
-                             "LLVM bootstrap executable emission",
-                             "bounds_check to use two or three operands",
-                             state.function->name,
-                             block,
-                             source_path,
-                             diagnostics)) {
-        return false;
-    }
-
-    std::vector<std::string> operands_i64;
-    operands_i64.reserve(instruction.operands.size());
-    for (std::size_t index = 0; index < instruction.operands.size(); ++index) {
-        ExecutableValue operand;
-        if (!ResolveExecutableValue(state, instruction.operands[index], block, source_path, diagnostics, operand)) {
-            return false;
-        }
-        std::string extended;
-        if (!ExtendIntegerToI64(operand,
-                                function_index,
-                                block_index,
-                                instruction_index + index,
-                                "bounds",
-                                output_lines,
-                                extended)) {
-            return false;
-        }
-        operands_i64.push_back(std::move(extended));
-    }
-
-    if (instruction.op == "index") {
-        output_lines.push_back("call void @__mc_check_bounds_index(i64 " + operands_i64[0] + ", i64 " + operands_i64[1] + ")");
-        return true;
-    }
-    if (instruction.op == "slice") {
-        if (operands_i64.size() == 2) {
-            output_lines.push_back("call void @__mc_check_bounds_index(i64 " + operands_i64[0] + ", i64 " + operands_i64[1] + ")");
-            return true;
-        }
-        output_lines.push_back("call void @__mc_check_bounds_slice(i64 " + operands_i64[0] + ", i64 " + operands_i64[1] + ", i64 " + operands_i64[2] + ")");
-        return true;
-    }
-
-    ReportBackendError(source_path,
-                       "LLVM bootstrap executable emission does not recognize bounds_check mode '" + instruction.op +
-                           "' in function '" + state.function->name + "' block '" + block.label + "'",
-                       diagnostics);
-    return false;
-}
-
-bool EmitDivCheckCall(const mir::Instruction& instruction,
-                      std::size_t function_index,
-                      std::size_t block_index,
-                      std::size_t instruction_index,
-                      const mir::BasicBlock& block,
-                      const std::filesystem::path& source_path,
-                      support::DiagnosticSink& diagnostics,
-                      ExecutableFunctionState& state,
-                      std::vector<std::string>& output_lines) {
-    ExecutableValue lhs;
-    ExecutableValue rhs;
-    if (!RequireOperandCount(instruction,
-                             2,
-                             "LLVM bootstrap executable emission",
-                             "div_check",
-                             state.function->name,
-                             block,
-                             source_path,
-                             diagnostics) ||
-        !ResolveExecutableValue(state, instruction.operands[0], block, source_path, diagnostics, lhs) ||
-        !ResolveExecutableValue(state, instruction.operands[1], block, source_path, diagnostics, rhs)) {
-        return false;
-    }
-    output_lines.push_back("call void " + DivCheckHelperName(rhs.type) + "(" + rhs.type.backend_name + " " + rhs.text + ")");
-    return true;
-}
-
-bool EmitShiftCheckCall(const mir::Instruction& instruction,
-                        std::size_t function_index,
-                        std::size_t block_index,
-                        std::size_t instruction_index,
-                        const mir::BasicBlock& block,
-                        const std::filesystem::path& source_path,
-                        support::DiagnosticSink& diagnostics,
-                        ExecutableFunctionState& state,
-                        std::vector<std::string>& output_lines) {
-    ExecutableValue value;
-    ExecutableValue count;
-    if (!RequireOperandCount(instruction,
-                             2,
-                             "LLVM bootstrap executable emission",
-                             "shift_check",
-                             state.function->name,
-                             block,
-                             source_path,
-                             diagnostics) ||
-        !ResolveExecutableValue(state, instruction.operands[0], block, source_path, diagnostics, value) ||
-        !ResolveExecutableValue(state, instruction.operands[1], block, source_path, diagnostics, count)) {
-        return false;
-    }
-
-    std::string count_i64;
-    if (!ExtendIntegerToI64(count,
-                            function_index,
-                            block_index,
-                            instruction_index,
-                            "shift",
-                            output_lines,
-                            count_i64)) {
-        return false;
-    }
-    output_lines.push_back("call void " + ShiftCheckHelperName(value.type) + "(i64 " + count_i64 + ")");
-    return true;
-}
-
 bool RenderExecutableInstruction(const mir::Instruction& instruction,
                                  std::size_t function_index,
                                  std::size_t block_index,
@@ -917,10 +353,23 @@ bool RenderExecutableInstruction(const mir::Instruction& instruction,
             return EmitMemoryInstruction(instruction, emission);
         }
 
+        case mir::Instruction::Kind::kBoundsCheck: {
+            return EmitBoundsCheckCall(instruction, emission);
+        }
+
+        case mir::Instruction::Kind::kDivCheck: {
+            return EmitDivCheckCall(instruction, emission);
+        }
+
+        case mir::Instruction::Kind::kShiftCheck: {
+            return EmitShiftCheckCall(instruction, emission);
+        }
+
         case mir::Instruction::Kind::kUnary: {
             if (!RequireInstructionResult(instruction, block, source_path, diagnostics)) {
                 return false;
             }
+
             ExecutableValue operand;
             if (!RequireOperandCount(instruction,
                                      1,
@@ -942,11 +391,6 @@ bool RenderExecutableInstruction(const mir::Instruction& instruction,
                                       ExecutableFunctionBlockContext("unary", state, block),
                                       type_info)) {
                 return false;
-            }
-
-            if (instruction.op == "+") {
-                RecordExecutableValue(state, instruction.result, operand.text, type_info, std::nullopt, instruction.type);
-                return true;
             }
 
             const std::string temp = LLVMTempName(function_index, block_index, instruction_index);
@@ -987,7 +431,7 @@ bool RenderExecutableInstruction(const mir::Instruction& instruction,
         }
 
         case mir::Instruction::Kind::kSymbolRef: {
-            return EmitValueInstruction(instruction, emission, function_symbols);
+            return EmitSymbolRefInstruction(instruction, emission, function_symbols);
         }
 
         case mir::Instruction::Kind::kCall: {
@@ -999,15 +443,23 @@ bool RenderExecutableInstruction(const mir::Instruction& instruction,
         }
 
         case mir::Instruction::Kind::kConvertDistinct: {
-            return EmitValueInstruction(instruction, emission, function_symbols);
+            return EmitConvertDistinctInstruction(instruction, emission);
         }
 
         case mir::Instruction::Kind::kConvert: {
-            return EmitValueInstruction(instruction, emission, function_symbols);
+            return EmitConvertInstruction(instruction, emission);
         }
 
         case mir::Instruction::Kind::kConvertNumeric: {
-            return EmitValueInstruction(instruction, emission, function_symbols);
+            return EmitConvertNumericInstruction(instruction, emission);
+        }
+
+        case mir::Instruction::Kind::kPointerToInt: {
+            return EmitPointerToIntInstruction(instruction, emission);
+        }
+
+        case mir::Instruction::Kind::kIntToPointer: {
+            return EmitIntToPointerInstruction(instruction, emission);
         }
 
         case mir::Instruction::Kind::kVolatileLoad: {

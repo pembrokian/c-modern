@@ -17,24 +17,6 @@ bool IsNamedTypeFamily(const sema::Type& type, std::string_view family_name) {
     return type.kind == sema::Type::Kind::kNamed && LeafTypeName(type.name) == family_name;
 }
 
-sema::Type StripMirAliasOrDistinct(const mir::Module& module, sema::Type type) {
-    std::unordered_set<std::string> visited;
-    while (type.kind == sema::Type::Kind::kNamed) {
-        const mir::TypeDecl* type_decl = FindTypeDecl(module, type.name);
-        if (type_decl == nullptr) {
-            break;
-        }
-        if (type_decl->kind != mir::TypeDecl::Kind::kDistinct && type_decl->kind != mir::TypeDecl::Kind::kAlias) {
-            break;
-        }
-        if (!visited.insert(type.name).second) {
-            break;
-        }
-        type = InstantiateAliasedType(*type_decl, type);
-    }
-    return type;
-}
-
 std::optional<sema::Type> PointerPointeeType(const sema::Type& type) {
     if (type.kind != sema::Type::Kind::kPointer || type.subtypes.empty()) {
         return std::nullopt;
