@@ -3,7 +3,7 @@ Phase 254 -- Object Version Truth For Delegated Durable Mutation
 
 Status
 ------
-PROPOSED
+COMPLETED
 
 Purpose
 -------
@@ -128,6 +128,21 @@ Preferred implementation shape
   conflict truth.
 - Spend the feature in the existing delegated named-object processing lane
   rather than inventing a second durable delegated consumer.
+
+Landed implementation notes
+---------------------------
+- `object_store_service` now persists one bounded per-object version byte
+  beside the existing name and value bytes, and delegated version checks stay
+  owner-local to that service.
+- `lease_service` now captures the current object version when issuing a
+  delegated object-update lease, while still binding lease staleness to the
+  existing `workset_generation` restart boundary.
+- The existing object-update workflow lane reuses its `opcode` byte to carry
+  the expected object version for delegated updates, so restart and journal
+  continuity stay on the current four-byte workflow lane contract.
+- Delegated object-version mismatch is now caller-visible as one explicit
+  workflow outcome instead of being collapsed into the generic object-update
+  rejection state.
 
 Implementation accelerators
 ---------------------------

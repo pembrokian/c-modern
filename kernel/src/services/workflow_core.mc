@@ -26,6 +26,7 @@ const WORKFLOW_STATE_DONE: u8 = 68       // 'D'
 const WORKFLOW_STATE_CANCELLED: u8 = 67  // 'C'
 const WORKFLOW_STATE_FAILED: u8 = 70     // 'F'
 const WORKFLOW_STATE_OBJECT_UPDATED: u8 = 85   // 'U'
+const WORKFLOW_STATE_OBJECT_CONFLICT: u8 = 86  // 'V'
 const WORKFLOW_STATE_OBJECT_REJECTED: u8 = 88  // 'X'
 const WORKFLOW_STATE_OBJECT_CANCELLED: u8 = 75 // 'K'
 const WORKFLOW_STATE_UPDATE_APPLIED: u8 = 65   // 'A'
@@ -241,7 +242,12 @@ func workflow_schedule_task_spec(id: u8, due: u8) WorkflowScheduleSpec {
 
 func workflow_schedule_object_update_spec(name: u8, value: u8) WorkflowScheduleSpec {
     id := workflow_object_workflow_id(name)
-    return workflow_schedule_spec(id, WORKFLOW_KIND_OBJECT_UPDATE, workflow_payload_object_update(value))
+    return workflow_schedule_spec(id, 0, workflow_payload_object_update(value))
+}
+
+func workflow_schedule_versioned_object_update_spec(name: u8, value: u8, version: u8) WorkflowScheduleSpec {
+    id := workflow_object_workflow_id(name)
+    return workflow_schedule_spec(id, version, workflow_payload_object_update(value))
 }
 
 func workflow_schedule_update_apply_spec() WorkflowScheduleSpec {
@@ -385,6 +391,10 @@ func workflow_object_name(s: WorkflowServiceState) u8 {
     return s.id - 1
 }
 
+func workflow_object_expected_version(s: WorkflowServiceState) u8 {
+    return s.opcode
+}
+
 func workflow_wait_due(s: WorkflowServiceState) u8 {
     return workflow_waiting_state(s.due).due
 }
@@ -449,6 +459,21 @@ func workflow_schedule_object_update(s: WorkflowServiceState, name: u8, value: u
         return WorkflowResult{ state: s, effect: workflow_reply_invalid() }
     }
     spec := workflow_schedule_object_update_spec(name, value)
+    next := workflow_record(s, WORKFLOW_KIND_OBJECT_UPDATE, spec.id, spec.opcode, spec.payload, WORKFLOW_STATE_WAITING, WORKFLOW_RESTART_NONE, s.generation)
+    return WorkflowResult{ state: next, effect: workflow_schedule_effect(spec.id, WORKFLOW_STATE_WAITING) }
+}
+
+func workflow_schedule_versioned_object_update(s: WorkflowServiceState, name: u8, value: u8, version: u8) WorkflowResult {
+    if version == 0 {
+        return WorkflowResult{ state: s, effect: workflow_reply_invalid() }
+    }
+    if name == 255 {
+        return WorkflowResult{ state: s, effect: workflow_reply_invalid() }
+    }
+    if !workflow_can_schedule(s) {
+        return WorkflowResult{ state: s, effect: workflow_reply_invalid() }
+    }
+    spec := workflow_schedule_versioned_object_update_spec(name, value, version)
     next := workflow_record(s, WORKFLOW_KIND_OBJECT_UPDATE, spec.id, spec.opcode, spec.payload, WORKFLOW_STATE_WAITING, WORKFLOW_RESTART_NONE, s.generation)
     return WorkflowResult{ state: next, effect: workflow_schedule_effect(spec.id, WORKFLOW_STATE_WAITING) }
 }
@@ -626,6 +651,9 @@ func workflow_cancelled_outcome(s: WorkflowServiceState) u8 {
 func workflow_object_update_outcome(effect: service_effect.Effect) u8 {
     if service_effect.effect_reply_status(effect) == syscall.SyscallStatus.Ok {
         return WORKFLOW_STATE_OBJECT_UPDATED
+    }
+    if service_effect.effect_reply_payload_len(effect) == 1 && service_effect.effect_reply_payload(effect)[0] == object_store_service.OBJECT_UPDATE_CONFLICT {
+        return WORKFLOW_STATE_OBJECT_CONFLICT
     }
     return WORKFLOW_STATE_OBJECT_REJECTED
 }

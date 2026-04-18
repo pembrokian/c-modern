@@ -388,7 +388,7 @@ func dispatch_completion_mailbox(state: *boot.KernelBootState, msg: service_effe
 
 func dispatch_lease(state: *boot.KernelBootState, msg: service_effect.Message) service_effect.Effect {
     current: boot.KernelBootState = *state
-    lease_result := lease_service.handle(current.lease.state, msg, u8(current.completion.generation), u8(current.workset_generation), u8(current.ticket.generation))
+    lease_result := lease_service.handle(current.lease.state, current.object_store.state, msg, u8(current.completion.generation), u8(current.workset_generation), u8(current.ticket.generation))
     next := boot.bootwith_lease(current, lease_result.state)
     if lease_result.op == lease_service.LEASE_OP_NONE {
         *state = next
@@ -400,8 +400,9 @@ func dispatch_lease(state: *boot.KernelBootState, msg: service_effect.Message) s
         payload[0] = workflow_core.WORKFLOW_OP_UPDATE
         payload[1] = lease_result.first
         payload[2] = lease_result.second
+        payload[3] = lease_result.third
         *state = next
-        delegated := service_effect.message(msg.source_pid, service_topology.WORKFLOW_ENDPOINT_ID, 3, payload)
+        delegated := service_effect.message(msg.source_pid, service_topology.WORKFLOW_ENDPOINT_ID, 4, payload)
         return dispatch_workflow(state, delegated)
     }
 

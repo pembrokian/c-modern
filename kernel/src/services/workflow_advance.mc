@@ -96,6 +96,9 @@ func workflow_advance_waiting(s: workflow_core.WorkflowServiceState, timer: time
 
     if workflow_core.workflow_is_object_update(s) {
         update := object_store_service.object_update(next_object_store, workflow_core.workflow_object_name(s), workflow_core.workflow_object_value(s))
+        if workflow_core.workflow_object_expected_version(s) != 0 {
+            update = object_store_service.object_update_if_version(next_object_store, workflow_core.workflow_object_name(s), workflow_core.workflow_object_value(s), workflow_core.workflow_object_expected_version(s))
+        }
         next_object_store = update.state
         update_delivery := workflow_core.workflow_deliver_completion(s, next_completion, workflow_core.workflow_object_update_outcome(update.effect))
         return workflow_core.workflow_advance_result(update_delivery.workflow, timer, next_task, next_object_store, next_update_store, next_lease, next_ticket, update_delivery.completion)

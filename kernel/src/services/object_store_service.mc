@@ -4,16 +4,18 @@ import service_effect
 import syscall
 
 const OBJECT_STORE_CAPACITY: usize = 4
-const OBJECT_STORE_FORMAT_VERSION: u8 = 1
-const OBJECT_STORE_ARTIFACT_SIZE: usize = 13
+const OBJECT_STORE_FORMAT_VERSION: u8 = 2
+const OBJECT_STORE_ARTIFACT_SIZE: usize = 17
 const OBJECT_OP_CREATE: u8 = 67
 const OBJECT_OP_READ: u8 = 82
 const OBJECT_OP_REPLACE: u8 = 87
+const OBJECT_UPDATE_CONFLICT: u8 = 67
 
 struct ObjectSlot {
     name: u8
     used: bool
     value: u8
+    version: u8
 }
 
 struct ObjectStoreServiceState {
@@ -32,7 +34,7 @@ struct ObjectStoreResult {
 }
 
 func empty_object_slot() ObjectSlot {
-    return ObjectSlot{ name: 0, used: false, value: 0 }
+    return ObjectSlot{ name: 0, used: false, value: 0, version: 0 }
 }
 
 func object_store_init(pid: u32, slot: u32) ObjectStoreServiceState {
@@ -106,7 +108,31 @@ func object_slot_equal(left: ObjectSlot, right: ObjectSlot) bool {
     if left.value != right.value {
         return false
     }
+    if left.version != right.version {
+        return false
+    }
     return true
+}
+
+func object_update_conflict() service_effect.Effect {
+    payload := primitives.zero_payload()
+    payload[0] = OBJECT_UPDATE_CONFLICT
+    return service_effect.effect_reply(syscall.SyscallStatus.InvalidArgument, 1, payload)
+}
+
+func object_next_version(version: u8) u8 {
+    if version == 255 {
+        return 1
+    }
+    return version + 1
+}
+
+func object_current_version(s: ObjectStoreServiceState, name: u8) u8 {
+    idx := object_find(s, name)
+    if idx >= OBJECT_STORE_CAPACITY {
+        return 0
+    }
+    return object_slot_at(s, idx).version
 }
 
 func object_store_changed(before: ObjectStoreServiceState, after: ObjectStoreServiceState) bool {
@@ -137,7 +163,7 @@ func object_store_artifact_bytes(s: ObjectStoreServiceState) [OBJECT_STORE_ARTIF
     slots[2] = s.slot2
     slots[3] = s.slot3
     for i in 0..OBJECT_STORE_CAPACITY {
-        base := 1 + i * 3
+        base := 1 + i * 4
         if slots[i].used {
             bytes[base] = 1
         } else {
@@ -145,6 +171,7 @@ func object_store_artifact_bytes(s: ObjectStoreServiceState) [OBJECT_STORE_ARTIF
         }
         bytes[base + 1] = slots[i].name
         bytes[base + 2] = slots[i].value
+        bytes[base + 3] = slots[i].version
     }
     return bytes
 }
@@ -171,9 +198,9 @@ func object_store_load(pid: u32, slot: u32) ObjectStoreServiceState {
     next3 := empty_object_slot()
     count := 0
     for i in 0..OBJECT_STORE_CAPACITY {
-        base := 1 + i * 3
+        base := 1 + i * 4
         used := bytes[base] == 1
-        current := ObjectSlot{ name: bytes[base + 1], used: used, value: bytes[base + 2] }
+        current := ObjectSlot{ name: bytes[base + 1], used: used, value: bytes[base + 2], version: bytes[base + 3] }
         if used {
             count = count + 1
         }
@@ -201,7 +228,7 @@ func object_create(s: ObjectStoreServiceState, name: u8, value: u8) ObjectStoreR
     if s.count >= OBJECT_STORE_CAPACITY {
         return ObjectStoreResult{ state: s, effect: service_effect.effect_reply(syscall.SyscallStatus.Exhausted, 0, primitives.zero_payload()) }
     }
-    created := ObjectSlot{ name: name, used: true, value: value }
+    created := ObjectSlot{ name: name, used: true, value: value, version: 1 }
     return ObjectStoreResult{ state: object_append_slot(s, created), effect: service_effect.effect_reply(syscall.SyscallStatus.Ok, 0, primitives.zero_payload()) }
 }
 
@@ -221,7 +248,10 @@ func object_replace(s: ObjectStoreServiceState, name: u8, value: u8) ObjectStore
         return ObjectStoreResult{ state: s, effect: service_effect.effect_reply(syscall.SyscallStatus.InvalidArgument, 0, primitives.zero_payload()) }
     }
     current := object_slot_at(s, idx)
-    replaced := current with { value: value }
+    if current.value == value {
+        return ObjectStoreResult{ state: s, effect: service_effect.effect_reply(syscall.SyscallStatus.Ok, 0, primitives.zero_payload()) }
+    }
+    replaced := current with { value: value, version: object_next_version(current.version) }
     return ObjectStoreResult{ state: object_with_slot(s, idx, replaced), effect: service_effect.effect_reply(syscall.SyscallStatus.Ok, 0, primitives.zero_payload()) }
 }
 
@@ -235,6 +265,18 @@ func object_update(s: ObjectStoreServiceState, name: u8, value: u8) ObjectStoreR
         return ObjectStoreResult{ state: s, effect: service_effect.effect_reply(syscall.SyscallStatus.Ok, 0, primitives.zero_payload()) }
     }
     return object_replace(s, name, value)
+}
+
+func object_update_if_version(s: ObjectStoreServiceState, name: u8, value: u8, version: u8) ObjectStoreResult {
+    idx := object_find(s, name)
+    if idx >= OBJECT_STORE_CAPACITY {
+        return ObjectStoreResult{ state: s, effect: service_effect.effect_reply(syscall.SyscallStatus.InvalidArgument, 0, primitives.zero_payload()) }
+    }
+    current := object_slot_at(s, idx)
+    if current.version != version {
+        return ObjectStoreResult{ state: s, effect: object_update_conflict() }
+    }
+    return object_update(s, name, value)
 }
 
 func handle(s: ObjectStoreServiceState, m: service_effect.Message) ObjectStoreResult {

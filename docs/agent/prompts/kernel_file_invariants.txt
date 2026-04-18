@@ -549,7 +549,7 @@ Owns:
   read or replace or update behavior
 
 Local invariants:
-- object-slot truth and durable artifact bytes are centralized here
+- object-slot truth, object-local version truth, and durable artifact bytes are centralized here
 - workflow object-update paths consume this service, but object ownership stays
   here
 
@@ -596,6 +596,8 @@ Owns:
 Local invariants:
 - lease ids, kinds, payload fields, and generation coupling are owner-local
   here
+- delegated object-update leases may capture object version truth, but they do
+  not own object state or version mutation
 - workflow consumes lease truth but does not redefine the lease table shape
 
 Do not move into this file:
@@ -623,6 +625,8 @@ Local invariants:
 - snapshot and restart-visible workflow representation stay explicit here
 - workflow state and restart code bytes are canonical and reused across the
   workflow family
+- delegated object-update expected-version encoding stays explicit here rather
+  than being reconstructed in dispatch or restart helpers
 
 Do not move into this file:
 - timer ticking orchestration
@@ -674,6 +678,8 @@ Local invariants:
 - progression on timer or task or delegated execution boundaries is owned here
 - this file advances workflow state using other services, but workflow state
   meaning still comes from `workflow_core.mc`
+- delegated object-version checks fire here at commit time by calling back into
+  `object_store_service`, not by moving durable object truth into workflow
 
 Do not move into this file:
 - shell command parsing

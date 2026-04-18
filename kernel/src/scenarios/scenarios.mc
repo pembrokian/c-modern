@@ -16,6 +16,7 @@ import scenario_journal_service
 import scenario_lease_service
 import scenario_named_object_delivery_pressure
 import scenario_lifecycle
+import scenario_object_version_conflict
 import scenario_object_store_service
 import scenario_object_update_workflow
 import scenario_retained_policy
@@ -155,6 +156,10 @@ func run(state: *boot.KernelBootState) i32 {
         return result
     }
     result = scenario_delegated_object_processing.run_delegated_named_object_processing_probe()
+    if result != 0 {
+        return result
+    }
+    result = scenario_object_version_conflict.run_object_version_conflict_probe()
     if result != 0 {
         return result
     }

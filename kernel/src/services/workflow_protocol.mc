@@ -25,10 +25,13 @@ func handle(s: workflow_core.WorkflowServiceState, m: service_effect.Message) wo
         }
         return workflow_core.workflow_schedule(s, m.payload[1], m.payload[2])
     case workflow_core.WORKFLOW_OP_UPDATE:
-        if m.payload_len != 3 {
+        if m.payload_len == 3 {
+            return workflow_core.workflow_schedule_object_update(s, m.payload[1], m.payload[2])
+        }
+        if m.payload_len != 4 {
             return workflow_core.WorkflowResult{ state: s, effect: workflow_core.workflow_reply_invalid() }
         }
-        return workflow_core.workflow_schedule_object_update(s, m.payload[1], m.payload[2])
+        return workflow_core.workflow_schedule_versioned_object_update(s, m.payload[1], m.payload[2], m.payload[3])
     case workflow_core.WORKFLOW_OP_APPLY_UPDATE:
         if m.payload_len != 1 {
             return workflow_core.WorkflowResult{ state: s, effect: workflow_core.workflow_reply_invalid() }
