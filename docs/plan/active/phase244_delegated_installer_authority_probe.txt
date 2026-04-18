@@ -3,7 +3,7 @@ Phase 244 -- Delegated Installer Authority Probe
 
 Status
 ------
-PROPOSED
+COMPLETED
 
 Purpose
 -------
@@ -137,3 +137,52 @@ Future follow-up
   delegated installer work is interrupted by restart or backlog.
 - Reopen broader installer privilege policy only if one real admitted update
   consumer cannot stay honest inside the bounded lease model.
+
+Implementation summary
+----------------------
+- `lease_service` now admits one installer-apply lease kind and one bounded
+  issue or consume path for delegated update application.
+- `workflow_service` now owns one delegated update-apply workflow opcode whose
+  retained workflow record carries the installer lease id and consumes it only
+  at execution time.
+- `update_store_service` remains the owner of staged update truth and applied-
+  target truth; delegated authority only gates whether the existing owner-local
+  apply step may run.
+- Shell and scenario routing stay additive on the existing four-byte frame.
+
+Questions answered
+------------------
+1. Yes. One delegated update-apply step is enough to pressure the current
+   authority model on one real installer-shaped workflow without widening into
+   installer policy.
+2. Yes. Generation-based stale rejection remains sufficient because the lease
+   stays bound to the existing restart-visible workset generation boundary.
+3. `lease_service` owns temporary authority issuance and consume truth,
+   `workflow_service` owns retained queued execution and delegated outcome
+   classification, and `update_store_service` still owns staged and applied
+   update truth.
+4. No broader installer policy was needed. The bounded lease model remained
+   honest for the admitted delegated apply slice.
+
+Validation and results
+----------------------
+- Added `kernel/src/scenarios/scenario_delegated_installer_authority.mc` to
+  prove valid delegated apply, invalid lease rejection, already-consumed lease
+  rejection, and stale-after-workset-restart rejection.
+- Added
+  `tests/system/kernel_reset_lane_phase244_delegated_installer_authority/`
+  as the focused reset-lane fixture.
+- Registered the new fixture in `tests/tool/tool_kernel_reset_lane_suite.cpp`.
+- Validation passed:
+  - `Build debug`
+  - `mc_tool_workflow_kernel_reset_lane_unit`
+  - `mc_tool_workflow_kernel_reset_lane_full_unit`
+
+Notes
+-----
+- The landed path intentionally consumes installer authority late in
+  `workflow_service` at execution time, matching the retained delegated-work
+  boundary rather than widening dispatch.
+- The phase stayed within the existing owner split: no shell-owned authority
+  truth, no dispatch-owned installer policy, and no broadened capability
+  framework.

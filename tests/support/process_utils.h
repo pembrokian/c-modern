@@ -42,6 +42,12 @@ std::pair<CommandOutcome, std::string> RunCommandCapture(
     const std::filesystem::path& output_path,
     const std::string& context);
 
+std::pair<CommandOutcome, std::string> RunCommandCaptureInDir(
+    const std::vector<std::string>& args,
+    const std::filesystem::path& working_dir,
+    const std::filesystem::path& output_path,
+    const std::string& context);
+
 void ExpectCommandSuccess(const std::vector<std::string>& args,
                           const std::string& context);
 

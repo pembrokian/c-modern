@@ -31,6 +31,8 @@ import ticket_service
 import timer_service
 import transfer_service
 import update_store_service
+import workflow_core
+import workflow_restart
 import workflow_service
 
 struct RestartPolicyInfo {
@@ -249,18 +251,18 @@ func restart_journal(state: boot.KernelBootState) boot.KernelBootState {
 
 func restart_workflow(state: boot.KernelBootState) boot.KernelBootState {
     workflow_slot := service_topology.WORKFLOW_SLOT
-    snap := workflow_service.workflow_snapshot_record(state.workflow.state)
+    snap := workflow_core.workflow_snapshot_record(state.workflow.state)
     generation: u8 = u8(state.workset_generation)
-    reloaded := workflow_service.workflow_restart_reload(workflow_slot.pid, snap, state.journal.state.lane1, generation, true, state.connection.state)
+    reloaded := workflow_restart.workflow_restart_reload(workflow_slot.pid, snap, state.journal.state.lane1, generation, true, state.connection.state)
     next := state
     next_timer := state.timer.state
 
-    if reloaded.state == workflow_service.WORKFLOW_STATE_WAITING {
-        timer_due := workflow_service.workflow_restart_timer_due(reloaded)
-        timer_create_result := timer_service.timer_create(next_timer, workflow_service.WORKFLOW_TIMER_ID, timer_due)
+    if reloaded.state == workflow_core.WORKFLOW_STATE_WAITING {
+        timer_due := workflow_core.workflow_restart_timer_due(reloaded)
+        timer_create_result := timer_service.timer_create(next_timer, workflow_core.WORKFLOW_TIMER_ID, timer_due)
         next_timer = timer_create_result.state
     } else {
-        timer_cancel_result := timer_service.timer_cancel(next_timer, workflow_service.WORKFLOW_TIMER_ID)
+        timer_cancel_result := timer_service.timer_cancel(next_timer, workflow_core.WORKFLOW_TIMER_ID)
         next_timer = timer_cancel_result.state
     }
 

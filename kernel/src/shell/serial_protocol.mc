@@ -304,6 +304,10 @@ func encode_workflow_apply_update() [4]u8 {
     return encode_no_args(CMD_O, CMD_A)
 }
 
+func encode_workflow_apply_update_lease(id: u8) [4]u8 {
+    return encode_one_arg(CMD_O, CMD_L, id)
+}
+
 func encode_workflow_query(id: u8) [4]u8 {
     return encode_one_arg(CMD_O, CMD_Q, id)
 }
@@ -314,6 +318,10 @@ func encode_workflow_cancel(id: u8) [4]u8 {
 
 func encode_lease_issue(workflow: u8) [4]u8 {
     return encode_one_arg(CMD_Z, CMD_I, workflow)
+}
+
+func encode_lease_issue_installer_apply() [4]u8 {
+    return encode_no_args(CMD_Z, CMD_A)
 }
 
 func encode_lease_consume(id: u8, workflow: u8) [4]u8 {

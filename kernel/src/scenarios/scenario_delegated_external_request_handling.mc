@@ -7,7 +7,7 @@ import scenario_transport
 import serial_protocol
 import service_effect
 import syscall
-import workflow_service
+import workflow_core
 
 const FAIL_EXTERNAL_TICKET_OPEN_0: i32 = 24101
 const FAIL_EXTERNAL_TICKET_OPEN_1: i32 = 24135
@@ -55,7 +55,7 @@ func expect_schedule(effect: service_effect.Effect, id: u8) bool {
         return false
     }
     payload := service_effect.effect_reply_payload(effect)
-    return payload[0] == id && payload[1] == workflow_service.WORKFLOW_STATE_WAITING
+    return payload[0] == id && payload[1] == workflow_core.WORKFLOW_STATE_WAITING
 }
 
 func expect_workflow(effect: service_effect.Effect, status: syscall.SyscallStatus, state: u8, restart: u8) bool {
@@ -135,15 +135,15 @@ func run_delegated_external_request_probe() i32 {
         return FAIL_EXTERNAL_TICKET_EXECUTE_VALID
     }
     effect = kernel_dispatch.kernel_dispatch_step(&state, scenario_transport.cmd_workflow_query(1))
-    if !expect_workflow(effect, syscall.SyscallStatus.Ok, workflow_service.WORKFLOW_STATE_WAITING, workflow_service.WORKFLOW_RESTART_NONE) {
+    if !expect_workflow(effect, syscall.SyscallStatus.Ok, workflow_core.WORKFLOW_STATE_WAITING, workflow_core.WORKFLOW_RESTART_NONE) {
         return FAIL_EXTERNAL_TICKET_WAITING_VALID
     }
     effect = kernel_dispatch.kernel_dispatch_step(&state, scenario_transport.cmd_workflow_query(1))
-    if !expect_workflow(effect, syscall.SyscallStatus.Ok, workflow_service.WORKFLOW_STATE_CONNECTION_TICKET_USED, workflow_service.WORKFLOW_RESTART_NONE) {
+    if !expect_workflow(effect, syscall.SyscallStatus.Ok, workflow_core.WORKFLOW_STATE_CONNECTION_TICKET_USED, workflow_core.WORKFLOW_RESTART_NONE) {
         return FAIL_EXTERNAL_TICKET_DONE_VALID
     }
     effect = kernel_dispatch.kernel_dispatch_step(&state, scenario_transport.cmd_completion_fetch())
-    if !expect_completion(effect, 1, workflow_service.WORKFLOW_STATE_CONNECTION_TICKET_USED, workflow_service.WORKFLOW_RESTART_NONE, 1) {
+    if !expect_completion(effect, 1, workflow_core.WORKFLOW_STATE_CONNECTION_TICKET_USED, workflow_core.WORKFLOW_RESTART_NONE, 1) {
         return FAIL_EXTERNAL_TICKET_FETCH_VALID
     }
     effect = kernel_dispatch.kernel_dispatch_step(&state, scenario_transport.cmd_completion_ack())
@@ -169,15 +169,15 @@ func run_delegated_external_request_probe() i32 {
         return FAIL_EXTERNAL_TICKET_EXECUTE_CONSUMED
     }
     effect = kernel_dispatch.kernel_dispatch_step(&state, scenario_transport.cmd_workflow_query(2))
-    if !expect_workflow(effect, syscall.SyscallStatus.Ok, workflow_service.WORKFLOW_STATE_WAITING, workflow_service.WORKFLOW_RESTART_NONE) {
+    if !expect_workflow(effect, syscall.SyscallStatus.Ok, workflow_core.WORKFLOW_STATE_WAITING, workflow_core.WORKFLOW_RESTART_NONE) {
         return FAIL_EXTERNAL_TICKET_WAITING_CONSUMED
     }
     effect = kernel_dispatch.kernel_dispatch_step(&state, scenario_transport.cmd_workflow_query(2))
-    if !expect_workflow(effect, syscall.SyscallStatus.Ok, workflow_service.WORKFLOW_STATE_CONNECTION_TICKET_CONSUMED, workflow_service.WORKFLOW_RESTART_NONE) {
+    if !expect_workflow(effect, syscall.SyscallStatus.Ok, workflow_core.WORKFLOW_STATE_CONNECTION_TICKET_CONSUMED, workflow_core.WORKFLOW_RESTART_NONE) {
         return FAIL_EXTERNAL_TICKET_DONE_CONSUMED
     }
     effect = kernel_dispatch.kernel_dispatch_step(&state, scenario_transport.cmd_completion_fetch())
-    if !expect_completion(effect, 2, workflow_service.WORKFLOW_STATE_CONNECTION_TICKET_CONSUMED, workflow_service.WORKFLOW_RESTART_NONE, 1) {
+    if !expect_completion(effect, 2, workflow_core.WORKFLOW_STATE_CONNECTION_TICKET_CONSUMED, workflow_core.WORKFLOW_RESTART_NONE, 1) {
         return FAIL_EXTERNAL_TICKET_FETCH_CONSUMED
     }
     effect = kernel_dispatch.kernel_dispatch_step(&state, scenario_transport.cmd_completion_ack())
@@ -194,12 +194,12 @@ func run_delegated_external_request_probe() i32 {
         return FAIL_EXTERNAL_TICKET_EXECUTE_INVALID
     }
     effect = kernel_dispatch.kernel_dispatch_step(&state, scenario_transport.cmd_workflow_query(3))
-    if !expect_workflow(effect, syscall.SyscallStatus.Ok, workflow_service.WORKFLOW_STATE_WAITING, workflow_service.WORKFLOW_RESTART_NONE) {
+    if !expect_workflow(effect, syscall.SyscallStatus.Ok, workflow_core.WORKFLOW_STATE_WAITING, workflow_core.WORKFLOW_RESTART_NONE) {
         return FAIL_EXTERNAL_TICKET_WAITING_INVALID
     }
     effect = kernel_dispatch.kernel_dispatch_step(&state, scenario_transport.cmd_workflow_query(3))
     effect = kernel_dispatch.kernel_dispatch_step(&state, scenario_transport.cmd_completion_fetch())
-    if !expect_completion(effect, 3, workflow_service.WORKFLOW_STATE_CONNECTION_TICKET_INVALID, workflow_service.WORKFLOW_RESTART_NONE, 1) {
+    if !expect_completion(effect, 3, workflow_core.WORKFLOW_STATE_CONNECTION_TICKET_INVALID, workflow_core.WORKFLOW_RESTART_NONE, 1) {
         return FAIL_EXTERNAL_TICKET_FETCH_INVALID
     }
     effect = kernel_dispatch.kernel_dispatch_step(&state, scenario_transport.cmd_completion_ack())
@@ -235,15 +235,15 @@ func run_delegated_external_request_probe() i32 {
         return FAIL_EXTERNAL_TICKET_EXECUTE_STALE
     }
     effect = kernel_dispatch.kernel_dispatch_step(&state, scenario_transport.cmd_workflow_query(4))
-    if !expect_workflow(effect, syscall.SyscallStatus.Ok, workflow_service.WORKFLOW_STATE_WAITING, workflow_service.WORKFLOW_RESTART_NONE) {
+    if !expect_workflow(effect, syscall.SyscallStatus.Ok, workflow_core.WORKFLOW_STATE_WAITING, workflow_core.WORKFLOW_RESTART_NONE) {
         return FAIL_EXTERNAL_TICKET_WAITING_STALE
     }
     effect = kernel_dispatch.kernel_dispatch_step(&state, scenario_transport.cmd_workflow_query(4))
-    if !expect_workflow(effect, syscall.SyscallStatus.Ok, workflow_service.WORKFLOW_STATE_CONNECTION_TICKET_STALE, workflow_service.WORKFLOW_RESTART_NONE) {
+    if !expect_workflow(effect, syscall.SyscallStatus.Ok, workflow_core.WORKFLOW_STATE_CONNECTION_TICKET_STALE, workflow_core.WORKFLOW_RESTART_NONE) {
         return FAIL_EXTERNAL_TICKET_DONE_STALE
     }
     effect = kernel_dispatch.kernel_dispatch_step(&state, scenario_transport.cmd_completion_fetch())
-    if !expect_completion(effect, 4, workflow_service.WORKFLOW_STATE_CONNECTION_TICKET_STALE, workflow_service.WORKFLOW_RESTART_NONE, 1) {
+    if !expect_completion(effect, 4, workflow_core.WORKFLOW_STATE_CONNECTION_TICKET_STALE, workflow_core.WORKFLOW_RESTART_NONE, 1) {
         return FAIL_EXTERNAL_TICKET_FETCH_STALE
     }
     effect = kernel_dispatch.kernel_dispatch_step(&state, scenario_transport.cmd_completion_ack())

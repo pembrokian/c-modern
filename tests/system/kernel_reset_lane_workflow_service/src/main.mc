@@ -4,7 +4,7 @@ import scenario_transport
 import serial_protocol
 import service_effect
 import syscall
-import workflow_service
+import workflow_core
 
 func expect_state(effect: service_effect.Effect, state: u8, restart: u8) bool {
     if service_effect.effect_reply_status(effect) != syscall.SyscallStatus.Ok {
@@ -27,7 +27,7 @@ func smoke_workflow_progress_and_restart_boundary() bool {
     }
 
     effect = kernel_dispatch.kernel_dispatch_step(&state, scenario_transport.cmd_workflow_query(1))
-    if !expect_state(effect, workflow_service.WORKFLOW_STATE_WAITING, workflow_service.WORKFLOW_RESTART_NONE) {
+    if !expect_state(effect, workflow_core.WORKFLOW_STATE_WAITING, workflow_core.WORKFLOW_RESTART_NONE) {
         return false
     }
 
@@ -37,17 +37,17 @@ func smoke_workflow_progress_and_restart_boundary() bool {
     }
 
     effect = kernel_dispatch.kernel_dispatch_step(&state, scenario_transport.cmd_workflow_query(1))
-    if !expect_state(effect, workflow_service.WORKFLOW_STATE_WAITING, workflow_service.WORKFLOW_RESTART_RESUMED) {
+    if !expect_state(effect, workflow_core.WORKFLOW_STATE_WAITING, workflow_core.WORKFLOW_RESTART_RESUMED) {
         return false
     }
 
     effect = kernel_dispatch.kernel_dispatch_step(&state, scenario_transport.cmd_workflow_query(1))
-    if !expect_state(effect, workflow_service.WORKFLOW_STATE_RUNNING, workflow_service.WORKFLOW_RESTART_RESUMED) {
+    if !expect_state(effect, workflow_core.WORKFLOW_STATE_RUNNING, workflow_core.WORKFLOW_RESTART_RESUMED) {
         return false
     }
 
     effect = kernel_dispatch.kernel_dispatch_step(&state, scenario_transport.cmd_workflow_query(1))
-    if !expect_state(effect, workflow_service.WORKFLOW_STATE_DONE, workflow_service.WORKFLOW_RESTART_RESUMED) {
+    if !expect_state(effect, workflow_core.WORKFLOW_STATE_DONE, workflow_core.WORKFLOW_RESTART_RESUMED) {
         return false
     }
 
@@ -67,7 +67,7 @@ func smoke_workflow_progress_and_restart_boundary() bool {
     }
 
     effect = kernel_dispatch.kernel_dispatch_step(&state, scenario_transport.cmd_workflow_query(2))
-    if !expect_state(effect, workflow_service.WORKFLOW_STATE_CANCELLED, workflow_service.WORKFLOW_RESTART_CANCELLED) {
+    if !expect_state(effect, workflow_core.WORKFLOW_STATE_CANCELLED, workflow_core.WORKFLOW_RESTART_CANCELLED) {
         return false
     }
 

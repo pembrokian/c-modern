@@ -7,7 +7,7 @@ import service_effect
 import service_topology
 import syscall
 import update_store_service
-import workflow_service
+import workflow_core
 
 const FAIL_UPDATE_APPLY_SETUP: i32 = 24301
 const FAIL_UPDATE_APPLY_STAGE0: i32 = 24302
@@ -112,7 +112,7 @@ func run_update_apply_workflow_probe() i32 {
     apply_id := service_effect.effect_reply_payload(effect)[0]
 
     effect = kernel_dispatch.kernel_dispatch_step(&state, scenario_transport.cmd_workflow_query(apply_id))
-    if !expect_workflow(effect, syscall.SyscallStatus.Ok, workflow_service.WORKFLOW_STATE_WAITING, workflow_service.WORKFLOW_RESTART_NONE) {
+    if !expect_workflow(effect, syscall.SyscallStatus.Ok, workflow_core.WORKFLOW_STATE_WAITING, workflow_core.WORKFLOW_RESTART_NONE) {
         return FAIL_UPDATE_APPLY_WAITING
     }
 
@@ -122,12 +122,12 @@ func run_update_apply_workflow_probe() i32 {
     }
 
     effect = kernel_dispatch.kernel_dispatch_step(&state, scenario_transport.cmd_workflow_query(apply_id))
-    if !expect_workflow(effect, syscall.SyscallStatus.Ok, workflow_service.WORKFLOW_STATE_WAITING, workflow_service.WORKFLOW_RESTART_RESUMED) {
+    if !expect_workflow(effect, syscall.SyscallStatus.Ok, workflow_core.WORKFLOW_STATE_WAITING, workflow_core.WORKFLOW_RESTART_RESUMED) {
         return FAIL_UPDATE_APPLY_RESUMED
     }
 
     effect = kernel_dispatch.kernel_dispatch_step(&state, scenario_transport.cmd_workflow_query(apply_id))
-    if !expect_workflow(effect, syscall.SyscallStatus.Ok, workflow_service.WORKFLOW_STATE_UPDATE_APPLIED, workflow_service.WORKFLOW_RESTART_RESUMED) {
+    if !expect_workflow(effect, syscall.SyscallStatus.Ok, workflow_core.WORKFLOW_STATE_UPDATE_APPLIED, workflow_core.WORKFLOW_RESTART_RESUMED) {
         return FAIL_UPDATE_APPLY_DONE
     }
 
@@ -145,7 +145,7 @@ func run_update_apply_workflow_probe() i32 {
     }
 
     effect = kernel_dispatch.kernel_dispatch_step(&state, scenario_transport.cmd_completion_fetch())
-    if !expect_completion(effect, apply_id, workflow_service.WORKFLOW_STATE_UPDATE_APPLIED, workflow_service.WORKFLOW_RESTART_RESUMED, 1) {
+    if !expect_completion(effect, apply_id, workflow_core.WORKFLOW_STATE_UPDATE_APPLIED, workflow_core.WORKFLOW_RESTART_RESUMED, 1) {
         return FAIL_UPDATE_APPLY_FETCH
     }
 
@@ -169,17 +169,17 @@ func run_update_apply_workflow_probe() i32 {
     reject_id := service_effect.effect_reply_payload(effect)[0]
 
     effect = kernel_dispatch.kernel_dispatch_step(&state, scenario_transport.cmd_workflow_query(reject_id))
-    if !expect_workflow(effect, syscall.SyscallStatus.Ok, workflow_service.WORKFLOW_STATE_WAITING, workflow_service.WORKFLOW_RESTART_NONE) {
+    if !expect_workflow(effect, syscall.SyscallStatus.Ok, workflow_core.WORKFLOW_STATE_WAITING, workflow_core.WORKFLOW_RESTART_NONE) {
         return FAIL_UPDATE_APPLY_REJECT_WAITING
     }
 
     effect = kernel_dispatch.kernel_dispatch_step(&state, scenario_transport.cmd_workflow_query(reject_id))
-    if !expect_workflow(effect, syscall.SyscallStatus.Ok, workflow_service.WORKFLOW_STATE_UPDATE_REJECTED, workflow_service.WORKFLOW_RESTART_NONE) {
+    if !expect_workflow(effect, syscall.SyscallStatus.Ok, workflow_core.WORKFLOW_STATE_UPDATE_REJECTED, workflow_core.WORKFLOW_RESTART_NONE) {
         return FAIL_UPDATE_APPLY_REJECT_DONE
     }
 
     effect = kernel_dispatch.kernel_dispatch_step(&state, scenario_transport.cmd_completion_fetch())
-    if !expect_completion(effect, reject_id, workflow_service.WORKFLOW_STATE_UPDATE_REJECTED, workflow_service.WORKFLOW_RESTART_NONE, 1) {
+    if !expect_completion(effect, reject_id, workflow_core.WORKFLOW_STATE_UPDATE_REJECTED, workflow_core.WORKFLOW_RESTART_NONE, 1) {
         return FAIL_UPDATE_APPLY_REJECT_FETCH
     }
 
@@ -208,7 +208,7 @@ func run_update_apply_workflow_probe() i32 {
     cancel_id := service_effect.effect_reply_payload(effect)[0]
 
     effect = kernel_dispatch.kernel_dispatch_step(&state, scenario_transport.cmd_workflow_query(cancel_id))
-    if !expect_workflow(effect, syscall.SyscallStatus.Ok, workflow_service.WORKFLOW_STATE_WAITING, workflow_service.WORKFLOW_RESTART_NONE) {
+    if !expect_workflow(effect, syscall.SyscallStatus.Ok, workflow_core.WORKFLOW_STATE_WAITING, workflow_core.WORKFLOW_RESTART_NONE) {
         return FAIL_UPDATE_APPLY_CANCEL_WAITING
     }
 
@@ -223,7 +223,7 @@ func run_update_apply_workflow_probe() i32 {
     }
 
     effect = kernel_dispatch.kernel_dispatch_step(&state, scenario_transport.cmd_workflow_query(cancel_id))
-    if !expect_workflow(effect, syscall.SyscallStatus.Ok, workflow_service.WORKFLOW_STATE_UPDATE_CANCELLED, workflow_service.WORKFLOW_RESTART_CANCELLED) {
+    if !expect_workflow(effect, syscall.SyscallStatus.Ok, workflow_core.WORKFLOW_STATE_UPDATE_CANCELLED, workflow_core.WORKFLOW_RESTART_CANCELLED) {
         return FAIL_UPDATE_APPLY_CANCEL_DONE
     }
 
@@ -232,7 +232,7 @@ func run_update_apply_workflow_probe() i32 {
     }
 
     effect = kernel_dispatch.kernel_dispatch_step(&state, scenario_transport.cmd_completion_fetch())
-    if !expect_completion(effect, cancel_id, workflow_service.WORKFLOW_STATE_UPDATE_CANCELLED, workflow_service.WORKFLOW_RESTART_CANCELLED, 2) {
+    if !expect_completion(effect, cancel_id, workflow_core.WORKFLOW_STATE_UPDATE_CANCELLED, workflow_core.WORKFLOW_RESTART_CANCELLED, 2) {
         return FAIL_UPDATE_APPLY_CANCEL_FETCH
     }
 

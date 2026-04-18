@@ -4,7 +4,7 @@ import kernel_dispatch
 import scenario_transport
 import service_effect
 import syscall
-import workflow_service
+import workflow_core
 
 const FIRST_SUBMISSION_ID: u8 = 1
 
@@ -85,12 +85,12 @@ func run_completion_mailbox_probe() i32 {
     workflow_submission_count = workflow_submission_count + 1
 
     effect = kernel_dispatch.kernel_dispatch_step(&state, scenario_transport.cmd_workflow_query(7))
-    if !expect_workflow(effect, syscall.SyscallStatus.Ok, workflow_service.WORKFLOW_STATE_RUNNING, workflow_service.WORKFLOW_RESTART_NONE, expected_task_id(workflow_submission_count)) {
+    if !expect_workflow(effect, syscall.SyscallStatus.Ok, workflow_core.WORKFLOW_STATE_RUNNING, workflow_core.WORKFLOW_RESTART_NONE, expected_task_id(workflow_submission_count)) {
         return FAIL_COMPLETION_RUNNING_0
     }
 
     effect = kernel_dispatch.kernel_dispatch_step(&state, scenario_transport.cmd_workflow_query(7))
-    if !expect_workflow(effect, syscall.SyscallStatus.Ok, workflow_service.WORKFLOW_STATE_DONE, workflow_service.WORKFLOW_RESTART_NONE, 0) {
+    if !expect_workflow(effect, syscall.SyscallStatus.Ok, workflow_core.WORKFLOW_STATE_DONE, workflow_core.WORKFLOW_RESTART_NONE, 0) {
         return FAIL_COMPLETION_DONE_0
     }
 
@@ -112,7 +112,7 @@ func run_completion_mailbox_probe() i32 {
     if payload[0] != 7 {
         return FAIL_COMPLETION_FETCH_ID
     }
-    if payload[1] != workflow_service.WORKFLOW_STATE_DONE {
+    if payload[1] != workflow_core.WORKFLOW_STATE_DONE {
         return FAIL_COMPLETION_FETCH_STATE
     }
 
@@ -137,11 +137,11 @@ func run_completion_mailbox_probe() i32 {
         }
         workflow_submission_count = workflow_submission_count + 1
         effect = kernel_dispatch.kernel_dispatch_step(&state, scenario_transport.cmd_workflow_query(u8(id)))
-        if !expect_workflow(effect, syscall.SyscallStatus.Ok, workflow_service.WORKFLOW_STATE_RUNNING, workflow_service.WORKFLOW_RESTART_NONE, expected_task_id(workflow_submission_count)) {
+        if !expect_workflow(effect, syscall.SyscallStatus.Ok, workflow_core.WORKFLOW_STATE_RUNNING, workflow_core.WORKFLOW_RESTART_NONE, expected_task_id(workflow_submission_count)) {
             return FAIL_COMPLETION_FILL_RUNNING_BASE + (id - 11)
         }
         effect = kernel_dispatch.kernel_dispatch_step(&state, scenario_transport.cmd_workflow_query(u8(id)))
-        if !expect_workflow(effect, syscall.SyscallStatus.Ok, workflow_service.WORKFLOW_STATE_DONE, workflow_service.WORKFLOW_RESTART_NONE, 0) {
+        if !expect_workflow(effect, syscall.SyscallStatus.Ok, workflow_core.WORKFLOW_STATE_DONE, workflow_core.WORKFLOW_RESTART_NONE, 0) {
             return FAIL_COMPLETION_FILL_DONE_BASE + (id - 11)
         }
     }
@@ -162,26 +162,26 @@ func run_completion_mailbox_probe() i32 {
     workflow_submission_count = workflow_submission_count + 1
 
     effect = kernel_dispatch.kernel_dispatch_step(&state, scenario_transport.cmd_workflow_query(15))
-    if !expect_workflow(effect, syscall.SyscallStatus.Ok, workflow_service.WORKFLOW_STATE_RUNNING, workflow_service.WORKFLOW_RESTART_NONE, expected_task_id(workflow_submission_count)) {
+    if !expect_workflow(effect, syscall.SyscallStatus.Ok, workflow_core.WORKFLOW_STATE_RUNNING, workflow_core.WORKFLOW_RESTART_NONE, expected_task_id(workflow_submission_count)) {
         return FAIL_COMPLETION_STALL_RUNNING
     }
 
     effect = kernel_dispatch.kernel_dispatch_step(&state, scenario_transport.cmd_workflow_query(15))
-    if !expect_workflow(effect, syscall.SyscallStatus.Exhausted, workflow_service.WORKFLOW_STATE_DELIVERING, workflow_service.WORKFLOW_RESTART_NONE, workflow_service.WORKFLOW_STATE_DONE) {
+    if !expect_workflow(effect, syscall.SyscallStatus.Exhausted, workflow_core.WORKFLOW_STATE_DELIVERING, workflow_core.WORKFLOW_RESTART_NONE, workflow_core.WORKFLOW_STATE_DONE) {
         return FAIL_COMPLETION_STALL_FIRST_STATUS
     }
 
-    stall_first_check := expect_delivery_payload(effect, workflow_service.WORKFLOW_STATE_DELIVERING, workflow_service.WORKFLOW_STATE_DONE, FAIL_COMPLETION_STALL_FIRST_STATE, FAIL_COMPLETION_STALL_FIRST_OUTCOME)
+    stall_first_check := expect_delivery_payload(effect, workflow_core.WORKFLOW_STATE_DELIVERING, workflow_core.WORKFLOW_STATE_DONE, FAIL_COMPLETION_STALL_FIRST_STATE, FAIL_COMPLETION_STALL_FIRST_OUTCOME)
     if stall_first_check != 0 {
         return stall_first_check
     }
 
     effect = kernel_dispatch.kernel_dispatch_step(&state, scenario_transport.cmd_workflow_query(15))
-    if !expect_workflow(effect, syscall.SyscallStatus.WouldBlock, workflow_service.WORKFLOW_STATE_DELIVERING, workflow_service.WORKFLOW_RESTART_NONE, workflow_service.WORKFLOW_STATE_DONE) {
+    if !expect_workflow(effect, syscall.SyscallStatus.WouldBlock, workflow_core.WORKFLOW_STATE_DELIVERING, workflow_core.WORKFLOW_RESTART_NONE, workflow_core.WORKFLOW_STATE_DONE) {
         return FAIL_COMPLETION_STALL_SECOND_STATUS
     }
 
-    stall_second_check := expect_delivery_payload(effect, workflow_service.WORKFLOW_STATE_DELIVERING, workflow_service.WORKFLOW_STATE_DONE, FAIL_COMPLETION_STALL_SECOND_STATE, FAIL_COMPLETION_STALL_SECOND_STATE)
+    stall_second_check := expect_delivery_payload(effect, workflow_core.WORKFLOW_STATE_DELIVERING, workflow_core.WORKFLOW_STATE_DONE, FAIL_COMPLETION_STALL_SECOND_STATE, FAIL_COMPLETION_STALL_SECOND_STATE)
     if stall_second_check != 0 {
         return FAIL_COMPLETION_STALL_SECOND_STATE
     }
@@ -192,12 +192,12 @@ func run_completion_mailbox_probe() i32 {
     }
 
     effect = kernel_dispatch.kernel_dispatch_step(&state, scenario_transport.cmd_workflow_query(15))
-    if !expect_workflow(effect, syscall.SyscallStatus.Ok, workflow_service.WORKFLOW_STATE_DONE, workflow_service.WORKFLOW_RESTART_NONE, 0) {
+    if !expect_workflow(effect, syscall.SyscallStatus.Ok, workflow_core.WORKFLOW_STATE_DONE, workflow_core.WORKFLOW_RESTART_NONE, 0) {
         return FAIL_COMPLETION_RECOVER_STATUS
     }
 
     payload = service_effect.effect_reply_payload(effect)
-    if payload[0] != workflow_service.WORKFLOW_STATE_DONE {
+    if payload[0] != workflow_core.WORKFLOW_STATE_DONE {
         return FAIL_COMPLETION_RECOVER_STATE
     }
 

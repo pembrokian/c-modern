@@ -7,6 +7,7 @@ import scenario_completion_mailbox
 import scenario_connection_completion_pressure
 import scenario_connection_backed_workflow
 import scenario_delegated_external_request_handling
+import scenario_delegated_installer_authority
 import scenario_connection_service
 import scenario_coordination
 import scenario_delegated_object_processing
@@ -125,6 +126,10 @@ func run(state: *boot.KernelBootState) i32 {
         return result
     }
     result = scenario_update_apply_workflow.run_update_apply_workflow_probe()
+    if result != 0 {
+        return result
+    }
+    result = scenario_delegated_installer_authority.run_delegated_installer_authority_probe()
     if result != 0 {
         return result
     }

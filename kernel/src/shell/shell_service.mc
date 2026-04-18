@@ -572,6 +572,10 @@ func workflow_apply_update(s: ShellServiceState, m: service_effect.Message) serv
     return forward_one(s, service_topology.WORKFLOW_ENDPOINT_ID, serial_protocol.CMD_A)
 }
 
+func workflow_apply_update_lease(s: ShellServiceState, m: service_effect.Message) service_effect.Effect {
+    return forward_two(s, service_topology.WORKFLOW_ENDPOINT_ID, serial_protocol.CMD_L, m.payload[2])
+}
+
 func workflow_query(s: ShellServiceState, m: service_effect.Message) service_effect.Effect {
     return forward_two(s, service_topology.WORKFLOW_ENDPOINT_ID, serial_protocol.CMD_Q, m.payload[2])
 }
@@ -589,6 +593,12 @@ const WORKFLOW_ROUTES: [5]OpHandler = [5]OpHandler{
 }
 
 func route_workflow(s: ShellServiceState, m: service_effect.Message, op: u8) service_effect.Effect {
+    if op == serial_protocol.CMD_L {
+        if !bang3(m) {
+            return invalid_effect(SHELL_INVALID_SHAPE)
+        }
+        return workflow_apply_update_lease(s, m)
+    }
     return dispatch(WORKFLOW_ROUTES, s, m, op)
 }
 
@@ -652,6 +662,10 @@ func lease_issue(s: ShellServiceState, m: service_effect.Message) service_effect
     return forward_two(s, service_topology.LEASE_ENDPOINT_ID, serial_protocol.CMD_I, m.payload[2])
 }
 
+func lease_issue_installer_apply(s: ShellServiceState, m: service_effect.Message) service_effect.Effect {
+    return forward_one(s, service_topology.LEASE_ENDPOINT_ID, serial_protocol.CMD_A)
+}
+
 func lease_consume(s: ShellServiceState, m: service_effect.Message) service_effect.Effect {
     payload: [4]u8 = primitives.zero_payload()
     payload[0] = serial_protocol.CMD_U
@@ -681,6 +695,12 @@ const LEASE_ROUTES: [5]OpHandler = [5]OpHandler{
 }
 
 func route_lease(s: ShellServiceState, m: service_effect.Message, op: u8) service_effect.Effect {
+    if op == serial_protocol.CMD_A {
+        if !bang23(m) {
+            return invalid_effect(SHELL_INVALID_SHAPE)
+        }
+        return lease_issue_installer_apply(s, m)
+    }
     return dispatch(LEASE_ROUTES, s, m, op)
 }
 

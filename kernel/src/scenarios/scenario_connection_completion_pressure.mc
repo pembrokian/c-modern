@@ -6,7 +6,7 @@ import primitives
 import scenario_transport
 import service_effect
 import syscall
-import workflow_service
+import workflow_core
 
 const FAIL_FILL_SCHEDULE_BASE: i32 = 24001
 const FAIL_FILL_RUNNING_BASE: i32 = 24005
@@ -45,7 +45,7 @@ func expect_schedule(reply: service_effect.Effect, id: u8) bool {
         return false
     }
     payload := service_effect.effect_reply_payload(reply)
-    return payload[0] == id && payload[1] == workflow_service.WORKFLOW_STATE_WAITING
+    return payload[0] == id && payload[1] == workflow_core.WORKFLOW_STATE_WAITING
 }
 
 func expect_workflow(reply: service_effect.Effect, status: syscall.SyscallStatus, state: u8, restart: u8, value: u8) bool {
@@ -75,12 +75,12 @@ func run_connection_completion_pressure_probe() i32 {
         }
 
         reply = kernel_dispatch.kernel_dispatch_step(&state, scenario_transport.cmd_workflow_query(u8(id)))
-        if !expect_workflow(reply, syscall.SyscallStatus.Ok, workflow_service.WORKFLOW_STATE_RUNNING, workflow_service.WORKFLOW_RESTART_NONE, u8(id - 10)) {
+        if !expect_workflow(reply, syscall.SyscallStatus.Ok, workflow_core.WORKFLOW_STATE_RUNNING, workflow_core.WORKFLOW_RESTART_NONE, u8(id - 10)) {
             return FAIL_FILL_RUNNING_BASE + (id - 11)
         }
 
         reply = kernel_dispatch.kernel_dispatch_step(&state, scenario_transport.cmd_workflow_query(u8(id)))
-        if !expect_workflow(reply, syscall.SyscallStatus.Ok, workflow_service.WORKFLOW_STATE_DONE, workflow_service.WORKFLOW_RESTART_NONE, 0) {
+        if !expect_workflow(reply, syscall.SyscallStatus.Ok, workflow_core.WORKFLOW_STATE_DONE, workflow_core.WORKFLOW_RESTART_NONE, 0) {
             return FAIL_FILL_DONE_BASE + (id - 11)
         }
     }
@@ -101,24 +101,24 @@ func run_connection_completion_pressure_probe() i32 {
     }
 
     reply = kernel_dispatch.kernel_dispatch_step(&state, scenario_transport.cmd_workflow_query(1))
-    if !expect_workflow(reply, syscall.SyscallStatus.Ok, workflow_service.WORKFLOW_STATE_WAITING, workflow_service.WORKFLOW_RESTART_NONE, 0) {
+    if !expect_workflow(reply, syscall.SyscallStatus.Ok, workflow_core.WORKFLOW_STATE_WAITING, workflow_core.WORKFLOW_RESTART_NONE, 0) {
         return FAIL_EXTERNAL_WAITING
     }
 
     reply = kernel_dispatch.kernel_dispatch_step(&state, scenario_transport.cmd_workflow_query(1))
-    if !expect_workflow(reply, syscall.SyscallStatus.Ok, workflow_service.WORKFLOW_STATE_RUNNING, workflow_service.WORKFLOW_RESTART_NONE, EXTERNAL_RUNNING_TASK_ID) {
+    if !expect_workflow(reply, syscall.SyscallStatus.Ok, workflow_core.WORKFLOW_STATE_RUNNING, workflow_core.WORKFLOW_RESTART_NONE, EXTERNAL_RUNNING_TASK_ID) {
         return FAIL_EXTERNAL_RUNNING
     }
 
     reply = kernel_dispatch.kernel_dispatch_step(&state, scenario_transport.cmd_workflow_query(1))
-    if !expect_workflow(reply, syscall.SyscallStatus.Exhausted, workflow_service.WORKFLOW_STATE_DELIVERING, workflow_service.WORKFLOW_RESTART_NONE, workflow_service.WORKFLOW_STATE_CONNECTION_EXECUTED) {
+    if !expect_workflow(reply, syscall.SyscallStatus.Exhausted, workflow_core.WORKFLOW_STATE_DELIVERING, workflow_core.WORKFLOW_RESTART_NONE, workflow_core.WORKFLOW_STATE_CONNECTION_EXECUTED) {
         return FAIL_EXTERNAL_STALL_FIRST_STATUS
     }
     payload = service_effect.effect_reply_payload(reply)
-    if payload[0] != workflow_service.WORKFLOW_STATE_DELIVERING {
+    if payload[0] != workflow_core.WORKFLOW_STATE_DELIVERING {
         return FAIL_EXTERNAL_STALL_FIRST_STATE
     }
-    if payload[2] != workflow_service.WORKFLOW_STATE_CONNECTION_EXECUTED {
+    if payload[2] != workflow_core.WORKFLOW_STATE_CONNECTION_EXECUTED {
         return FAIL_EXTERNAL_STALL_FIRST_OUTCOME
     }
 
@@ -132,11 +132,11 @@ func run_connection_completion_pressure_probe() i32 {
     }
 
     reply = kernel_dispatch.kernel_dispatch_step(&state, scenario_transport.cmd_workflow_query(1))
-    if !expect_workflow(reply, syscall.SyscallStatus.WouldBlock, workflow_service.WORKFLOW_STATE_DELIVERING, workflow_service.WORKFLOW_RESTART_NONE, workflow_service.WORKFLOW_STATE_CONNECTION_EXECUTED) {
+    if !expect_workflow(reply, syscall.SyscallStatus.WouldBlock, workflow_core.WORKFLOW_STATE_DELIVERING, workflow_core.WORKFLOW_RESTART_NONE, workflow_core.WORKFLOW_STATE_CONNECTION_EXECUTED) {
         return FAIL_EXTERNAL_STALL_SECOND_STATUS
     }
     payload = service_effect.effect_reply_payload(reply)
-    if payload[0] != workflow_service.WORKFLOW_STATE_DELIVERING {
+    if payload[0] != workflow_core.WORKFLOW_STATE_DELIVERING {
         return FAIL_EXTERNAL_STALL_SECOND_STATE
     }
 
@@ -146,11 +146,11 @@ func run_connection_completion_pressure_probe() i32 {
     }
 
     reply = kernel_dispatch.kernel_dispatch_step(&state, scenario_transport.cmd_workflow_query(1))
-    if !expect_workflow(reply, syscall.SyscallStatus.Ok, workflow_service.WORKFLOW_STATE_CONNECTION_EXECUTED, workflow_service.WORKFLOW_RESTART_NONE, 0) {
+    if !expect_workflow(reply, syscall.SyscallStatus.Ok, workflow_core.WORKFLOW_STATE_CONNECTION_EXECUTED, workflow_core.WORKFLOW_RESTART_NONE, 0) {
         return FAIL_EXTERNAL_RECOVER
     }
     payload = service_effect.effect_reply_payload(reply)
-    if payload[0] != workflow_service.WORKFLOW_STATE_CONNECTION_EXECUTED {
+    if payload[0] != workflow_core.WORKFLOW_STATE_CONNECTION_EXECUTED {
         return FAIL_EXTERNAL_RECOVER_STATE
     }
 
@@ -182,10 +182,10 @@ func run_connection_completion_pressure_probe() i32 {
     if payload[0] != 1 {
         return FAIL_EXTERNAL_FETCH_ID
     }
-    if payload[1] != workflow_service.WORKFLOW_STATE_CONNECTION_EXECUTED {
+    if payload[1] != workflow_core.WORKFLOW_STATE_CONNECTION_EXECUTED {
         return FAIL_EXTERNAL_FETCH_STATE
     }
-    if payload[2] != workflow_service.WORKFLOW_RESTART_NONE {
+    if payload[2] != workflow_core.WORKFLOW_RESTART_NONE {
         return FAIL_EXTERNAL_FETCH_RESTART
     }
     if payload[3] != 1 {

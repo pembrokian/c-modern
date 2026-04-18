@@ -27,7 +27,7 @@ import timer_service
 import transfer_grant
 import transfer_service
 import update_store_service
-import workflow_service
+import workflow_core
 
 enum RetainedSummaryParticipation {
     None,
@@ -76,7 +76,7 @@ struct KernelBootState {
     connection_restart_outcome: RestartOutcome
     journal: ServiceCell<journal_service.JournalServiceState>
     journal_restart_outcome: RestartOutcome
-    workflow: ServiceCell<workflow_service.WorkflowServiceState>
+    workflow: ServiceCell<workflow_core.WorkflowServiceState>
     lease: ServiceCell<lease_service.LeaseServiceState>
     completion: ServiceCell<completion_mailbox_service.CompletionMailboxServiceState>
     object_store: ServiceCell<object_store_service.ObjectStoreServiceState>
@@ -120,7 +120,7 @@ func kernel_init() KernelBootState {
     task_cell := ServiceCell<task_service.TaskServiceState>{ state: task_service.task_init(task_slot.pid, 1), generation: 1 }
     connection_cell := ServiceCell<connection_service.ConnectionServiceState>{ state: connection_service.connection_init(connection_slot.pid, 1), generation: 1 }
     journal_cell := ServiceCell<journal_service.JournalServiceState>{ state: journal_service.journal_load(journal_slot.pid, 1), generation: 1 }
-    workflow_cell := ServiceCell<workflow_service.WorkflowServiceState>{ state: workflow_service.workflow_state_init(workflow_slot.pid), generation: 1 }
+    workflow_cell := ServiceCell<workflow_core.WorkflowServiceState>{ state: workflow_core.workflow_state_init(workflow_slot.pid), generation: 1 }
     lease_cell := ServiceCell<lease_service.LeaseServiceState>{ state: lease_service.lease_init(lease_slot.pid, 1), generation: 1 }
     completion_cell := ServiceCell<completion_mailbox_service.CompletionMailboxServiceState>{ state: completion_mailbox_service.completion_mailbox_init(completion_slot.pid, 1), generation: 1 }
     object_store_cell := ServiceCell<object_store_service.ObjectStoreServiceState>{ state: object_store_service.object_store_load(object_store_slot.pid, 1), generation: 1 }

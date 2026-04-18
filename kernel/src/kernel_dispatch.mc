@@ -34,6 +34,8 @@ import timer_service
 import transfer_grant
 import transfer_service
 import update_store_service
+import workflow_core
+import workflow_protocol
 import workflow_service
 
 // MAX_EFFECT_CHAIN_DEPTH guards against send loops between services.
@@ -304,7 +306,7 @@ func dispatch_connection(state: *boot.KernelBootState, msg: service_effect.Messa
         if service_effect.effect_has_reply(prepared.effect) == 1 {
             return prepared.effect
         }
-        step := workflow_service.workflow_step_schedule_connection(current.workflow.state, current.timer.state, current.task.state, current.object_store.state, current.update_store.state, current.journal.state, current.lease.state, current.ticket.state, current.completion.state, prepared.request, msg.payload[1], prepared.opcode, u8(current.workset_generation))
+        step := workflow_protocol.workflow_step_schedule_connection(current.workflow.state, current.timer.state, current.task.state, current.object_store.state, current.update_store.state, current.journal.state, current.lease.state, current.ticket.state, current.completion.state, prepared.request, msg.payload[1], prepared.opcode, u8(current.workset_generation))
         if object_store_service.object_store_changed(current.object_store.state, step.object_store) {
             if !object_store_service.object_store_persist(step.object_store) {
                 return service_effect.effect_reply(syscall.SyscallStatus.Closed, 0, primitives.zero_payload())
@@ -395,7 +397,7 @@ func dispatch_lease(state: *boot.KernelBootState, msg: service_effect.Message) s
 
     if lease_result.op == lease_service.LEASE_OP_SCHEDULE_OBJECT_UPDATE {
         payload := primitives.zero_payload()
-        payload[0] = workflow_service.WORKFLOW_OP_UPDATE
+        payload[0] = workflow_core.WORKFLOW_OP_UPDATE
         payload[1] = lease_result.first
         payload[2] = lease_result.second
         *state = next
@@ -412,7 +414,7 @@ func dispatch_lease(state: *boot.KernelBootState, msg: service_effect.Message) s
 func dispatch_workflow(state: *boot.KernelBootState, msg: service_effect.Message) service_effect.Effect {
     current: boot.KernelBootState = *state
     previous_workflow := current.workflow.state
-    step := workflow_service.step(current.workflow.state, current.timer.state, current.task.state, current.object_store.state, current.update_store.state, current.journal.state, current.lease.state, current.ticket.state, current.completion.state, current.connection.state, msg, u8(current.workset_generation), u8(current.ticket.generation))
+    step := workflow_protocol.step(current.workflow.state, current.timer.state, current.task.state, current.object_store.state, current.update_store.state, current.journal.state, current.lease.state, current.ticket.state, current.completion.state, current.connection.state, msg, u8(current.workset_generation), u8(current.ticket.generation))
     if object_store_service.object_store_changed(current.object_store.state, step.object_store) {
         if !object_store_service.object_store_persist(step.object_store) {
             return service_effect.effect_reply(syscall.SyscallStatus.Closed, 0, primitives.zero_payload())
@@ -437,8 +439,8 @@ func dispatch_workflow(state: *boot.KernelBootState, msg: service_effect.Message
     next = boot.bootwith_lease(next, step.lease)
     next = boot.bootwith_ticket(next, step.ticket)
     next = boot.bootwith_completion(next, step.completion)
-    if workflow_service.workflow_is_connection(previous_workflow) && !workflow_service.workflow_is_active(step.workflow) && !workflow_service.workflow_is_delivering(step.workflow) && previous_workflow.id != 0 {
-        next = boot.bootwith_connection(next, connection_service.connection_request_finish(next.connection.state, workflow_service.workflow_connection_slot(previous_workflow), previous_workflow.id))
+    if workflow_core.workflow_is_connection(previous_workflow) && !workflow_core.workflow_is_active(step.workflow) && !workflow_core.workflow_is_delivering(step.workflow) && previous_workflow.id != 0 {
+        next = boot.bootwith_connection(next, connection_service.connection_request_finish(next.connection.state, workflow_core.workflow_connection_slot(previous_workflow), previous_workflow.id))
     }
     *state = next
     return step.effect

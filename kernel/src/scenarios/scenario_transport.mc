@@ -207,6 +207,10 @@ func cmd_workflow_apply_update() syscall.ReceiveObservation {
     return serial_obs(DEFAULT_SERIAL_ROUTE.endpoint, DEFAULT_SERIAL_ROUTE.pid, serial_protocol.encode_workflow_apply_update())
 }
 
+func cmd_workflow_apply_update_lease(id: u8) syscall.ReceiveObservation {
+    return serial_obs(DEFAULT_SERIAL_ROUTE.endpoint, DEFAULT_SERIAL_ROUTE.pid, serial_protocol.encode_workflow_apply_update_lease(id))
+}
+
 func cmd_workflow_query(id: u8) syscall.ReceiveObservation {
     return serial_obs(DEFAULT_SERIAL_ROUTE.endpoint, DEFAULT_SERIAL_ROUTE.pid, serial_protocol.encode_workflow_query(id))
 }
@@ -217,6 +221,10 @@ func cmd_workflow_cancel(id: u8) syscall.ReceiveObservation {
 
 func cmd_lease_issue(workflow: u8) syscall.ReceiveObservation {
     return serial_obs(DEFAULT_SERIAL_ROUTE.endpoint, DEFAULT_SERIAL_ROUTE.pid, serial_protocol.encode_lease_issue(workflow))
+}
+
+func cmd_lease_issue_installer_apply() syscall.ReceiveObservation {
+    return serial_obs(DEFAULT_SERIAL_ROUTE.endpoint, DEFAULT_SERIAL_ROUTE.pid, serial_protocol.encode_lease_issue_installer_apply())
 }
 
 func cmd_lease_consume(id: u8, workflow: u8) syscall.ReceiveObservation {

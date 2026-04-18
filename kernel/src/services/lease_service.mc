@@ -6,11 +6,13 @@ const LEASE_CAPACITY: usize = 4
 
 const LEASE_CMD_ISSUE_COMPLETION: u8 = 73       // 'I'
 const LEASE_CMD_CONSUME_COMPLETION: u8 = 85     // 'U'
+const LEASE_CMD_ISSUE_INSTALLER_APPLY: u8 = 65  // 'A'
 const LEASE_CMD_ISSUE_OBJECT_UPDATE: u8 = 87    // 'W'
 const LEASE_CMD_CONSUME_OBJECT_UPDATE: u8 = 68  // 'D'
 const LEASE_CMD_ISSUE_EXTERNAL_TICKET: u8 = 84  // 'T'
 
 const LEASE_KIND_COMPLETION: u8 = 67     // 'C'
+const LEASE_KIND_INSTALLER_APPLY: u8 = 65  // 'A'
 const LEASE_KIND_OBJECT_UPDATE: u8 = 87  // 'W'
 const LEASE_KIND_EXTERNAL_TICKET: u8 = 84  // 'T'
 
@@ -18,9 +20,11 @@ const LEASE_OP_NONE: u8 = 0
 const LEASE_OP_TAKE_COMPLETION: u8 = 1
 const LEASE_OP_SCHEDULE_OBJECT_UPDATE: u8 = 2
 const LEASE_OP_USE_EXTERNAL_TICKET: u8 = 3
+const LEASE_OP_USE_INSTALLER_APPLY: u8 = 4
 
 const LEASE_STALE: u8 = 83    // 'S'
 const LEASE_INVALID: u8 = 73  // 'I'
+const LEASE_CONSUMED: u8 = 80 // 'P'
 
 struct LeaseServiceState {
     pid: u32
@@ -89,6 +93,10 @@ func lease_issue_completion(s: LeaseServiceState, workflow: u8, generation: u8) 
     return lease_issue(s, LEASE_KIND_COMPLETION, workflow, 0, generation)
 }
 
+func lease_issue_installer_apply(s: LeaseServiceState, generation: u8) LeaseResult {
+    return lease_issue(s, LEASE_KIND_INSTALLER_APPLY, 0, 0, generation)
+}
+
 func lease_issue_object_update(s: LeaseServiceState, name: u8, value: u8, generation: u8) LeaseResult {
     return lease_issue(s, LEASE_KIND_OBJECT_UPDATE, name, value, generation)
 }
@@ -141,6 +149,31 @@ func lease_consume_completion(s: LeaseServiceState, id: u8, workflow: u8, genera
     return LeaseResult{ state: s, effect: lease_failure(LEASE_INVALID), op: LEASE_OP_NONE, first: 0, second: 0 }
 }
 
+func lease_missing_installer_apply_code(s: LeaseServiceState, id: u8) u8 {
+    if id != 0 && id < s.next {
+        return LEASE_CONSUMED
+    }
+    return LEASE_INVALID
+}
+
+func lease_consume_installer_apply(s: LeaseServiceState, id: u8, generation: u8) LeaseResult {
+    for i in 0..s.len {
+        if s.ids[i] != id {
+            continue
+        }
+        if s.kinds[i] != LEASE_KIND_INSTALLER_APPLY {
+            return LeaseResult{ state: s, effect: lease_failure(LEASE_INVALID), op: LEASE_OP_NONE, first: 0, second: 0 }
+        }
+
+        next := lease_remove_at(s, i)
+        if s.gens[i] != generation {
+            return LeaseResult{ state: next, effect: lease_failure(LEASE_STALE), op: LEASE_OP_NONE, first: 0, second: 0 }
+        }
+        return LeaseResult{ state: next, effect: lease_reply(syscall.SyscallStatus.Ok, 0, primitives.zero_payload()), op: LEASE_OP_USE_INSTALLER_APPLY, first: 0, second: 0 }
+    }
+    return LeaseResult{ state: s, effect: lease_failure(lease_missing_installer_apply_code(s, id)), op: LEASE_OP_NONE, first: 0, second: 0 }
+}
+
 func lease_consume_object_update(s: LeaseServiceState, id: u8, generation: u8) LeaseResult {
     for i in 0..s.len {
         if s.ids[i] != id {
@@ -188,6 +221,11 @@ func handle(s: LeaseServiceState, m: service_effect.Message, completion_generati
             return LeaseResult{ state: s, effect: lease_failure(LEASE_INVALID), op: LEASE_OP_NONE, first: 0, second: 0 }
         }
         return lease_issue_completion(s, m.payload[1], completion_generation)
+    case LEASE_CMD_ISSUE_INSTALLER_APPLY:
+        if m.payload_len != 1 {
+            return LeaseResult{ state: s, effect: lease_failure(LEASE_INVALID), op: LEASE_OP_NONE, first: 0, second: 0 }
+        }
+        return lease_issue_installer_apply(s, workset_generation)
     case LEASE_CMD_CONSUME_COMPLETION:
         if m.payload_len != 3 {
             return LeaseResult{ state: s, effect: lease_failure(LEASE_INVALID), op: LEASE_OP_NONE, first: 0, second: 0 }

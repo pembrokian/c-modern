@@ -24,7 +24,10 @@ Authority and scope:
 1. Core Terms
 
 Module:
-- a module is the compilation unit represented by one source file in v0.2
+- a module is one logical compilation unit in v0.2
+- direct-source workflows keep one source file per module
+- project mode may map one ordinary logical module to multiple explicit source
+	files through `build.toml` `module_sets.<module>.files = [...]`
 - a module is the unit of import, separate compilation, and interface-artifact
 	emission
 - a module name is the public identity used by import statements and
@@ -52,7 +55,9 @@ Project:
 	source language does not gain package syntax from that fact
 
 Rules:
-- one source file equals one module in v0.2
+- direct-source workflows use one source file per module in v0.2
+- project mode may assemble one ordinary logical module from multiple explicit
+	source files owned by the selected target's build description
 - the language must not require a hidden prelude or ambient module set
 - packages help the build tool define `internal.mc` legality, but they do not
 	become a second module system
@@ -65,6 +70,8 @@ Module name rules:
 - module identity is not inferred from directory structure alone
 - a build tool may map file paths to module names, but that mapping must remain
 	explicit and stable within the project model
+- when project mode uses `module_sets.<module>.files`, the table key is the
+	canonical module name used by `import`
 - a source file literally named `internal.mc` still has the module name
 	`internal`; the special meaning is visibility and import legality, not an
 	alternate naming scheme
@@ -103,6 +110,10 @@ Canonical resolution algorithm for v0.2:
 - for project-driven builds, the ordinary explicit roots are the configured
 	`search_paths.modules` entries for the target; any repository-local stdlib
 	discovery remains a tool-mode convenience rather than a language rule
+- for project-driven builds, explicit target-owned `module_sets` are consulted
+	before the legacy single-file `<root>/<module>.mc` probe so the logical
+	module identity remains stable even when its implementation spans several
+	files
 - each candidate module path is formed mechanically as `<root>/<module-name>.mc`
 - each candidate is classified as either an ordinary module or an
 	`internal.mc` module based on the source filename
@@ -154,6 +165,9 @@ Visibility lattice for v0.2:
 - ordinary modules expose all non-private declarations to any legal importer
 - `internal.mc` modules expose all non-private declarations only to legal
 	same-package importers
+- when an ordinary module is defined by multiple explicit project-mode source
+	files, `@private` remains private to the logical module rather than to one
+	physical file part
 - packages, directories, build targets, and source roots do not create any
 	further visibility classes
 
@@ -223,12 +237,17 @@ Rules:
 	dependents should not need to rebuild
 - package identity and module kind metadata must be sufficient to validate
 	`internal.mc` legality without generating importer-specific artifacts
+- when a project-mode multi-file module set is used, one logical module still
+	emits one deterministic `.mci`, one deterministic object, and one
+	deterministic build-state record
 
 7. Build-Tool Responsibilities
 
 The build tool may:
 - choose source roots explicitly
 - map source files to module names
+- map one ordinary module name to multiple explicit source files in project
+	mode through target-owned `module_sets`
 - assign explicit package identities to configured roots
 - resolve imports through ordered roots plus package-identity filtering
 - emit object files and interface artifacts
@@ -247,7 +266,9 @@ The build tool must not:
 8. Bottom Line
 
 Modern C v0.2 should have:
-- one source file per module
+- direct-source one-source-file-per-module workflows
+- project-mode explicit multi-file ordinary modules through target-owned
+	`module_sets`
 - explicit, acyclic imports
 - default-public top-level declarations
 - `@private` as the only declaration-level hiding tool

@@ -7,7 +7,7 @@ import service_effect
 import service_topology
 import serial_protocol
 import syscall
-import workflow_service
+import workflow_core
 
 const FAIL_LEASE_SCHEDULE_7: i32 = 23301
 const FAIL_LEASE_RUNNING_7: i32 = 23302
@@ -56,11 +56,11 @@ func run_lease_service_probe() i32 {
         return FAIL_LEASE_SCHEDULE_7
     }
     effect = kernel_dispatch.kernel_dispatch_step(&state, scenario_transport.cmd_workflow_query(7))
-    if !expect_workflow(effect, syscall.SyscallStatus.Ok, workflow_service.WORKFLOW_STATE_RUNNING, workflow_service.WORKFLOW_RESTART_NONE) {
+    if !expect_workflow(effect, syscall.SyscallStatus.Ok, workflow_core.WORKFLOW_STATE_RUNNING, workflow_core.WORKFLOW_RESTART_NONE) {
         return FAIL_LEASE_RUNNING_7
     }
     effect = kernel_dispatch.kernel_dispatch_step(&state, scenario_transport.cmd_workflow_query(7))
-    if !expect_workflow(effect, syscall.SyscallStatus.Ok, workflow_service.WORKFLOW_STATE_DONE, workflow_service.WORKFLOW_RESTART_NONE) {
+    if !expect_workflow(effect, syscall.SyscallStatus.Ok, workflow_core.WORKFLOW_STATE_DONE, workflow_core.WORKFLOW_RESTART_NONE) {
         return FAIL_LEASE_DONE_7
     }
 
@@ -78,7 +78,7 @@ func run_lease_service_probe() i32 {
         return FAIL_LEASE_CONSUME_7_STATUS
     }
     payload := service_effect.effect_reply_payload(effect)
-    if payload[0] != 7 || payload[1] != workflow_service.WORKFLOW_STATE_DONE || payload[2] != workflow_service.WORKFLOW_RESTART_NONE || payload[3] != 1 {
+    if payload[0] != 7 || payload[1] != workflow_core.WORKFLOW_STATE_DONE || payload[2] != workflow_core.WORKFLOW_RESTART_NONE || payload[3] != 1 {
         return FAIL_LEASE_CONSUME_7_PAYLOAD
     }
 
@@ -87,11 +87,11 @@ func run_lease_service_probe() i32 {
         return FAIL_LEASE_SCHEDULE_8
     }
     effect = kernel_dispatch.kernel_dispatch_step(&state, scenario_transport.cmd_workflow_query(8))
-    if !expect_workflow(effect, syscall.SyscallStatus.Ok, workflow_service.WORKFLOW_STATE_RUNNING, workflow_service.WORKFLOW_RESTART_NONE) {
+    if !expect_workflow(effect, syscall.SyscallStatus.Ok, workflow_core.WORKFLOW_STATE_RUNNING, workflow_core.WORKFLOW_RESTART_NONE) {
         return FAIL_LEASE_RUNNING_8
     }
     effect = kernel_dispatch.kernel_dispatch_step(&state, scenario_transport.cmd_workflow_query(8))
-    if !expect_workflow(effect, syscall.SyscallStatus.Ok, workflow_service.WORKFLOW_STATE_DONE, workflow_service.WORKFLOW_RESTART_NONE) {
+    if !expect_workflow(effect, syscall.SyscallStatus.Ok, workflow_core.WORKFLOW_STATE_DONE, workflow_core.WORKFLOW_RESTART_NONE) {
         return FAIL_LEASE_DONE_8
     }
 
@@ -126,7 +126,7 @@ func run_lease_service_probe() i32 {
         return FAIL_LEASE_CONSUME_8_STATUS
     }
     payload = service_effect.effect_reply_payload(effect)
-    if payload[0] != 8 || payload[1] != workflow_service.WORKFLOW_STATE_DONE || payload[2] != workflow_service.WORKFLOW_RESTART_NONE || payload[3] != 1 {
+    if payload[0] != 8 || payload[1] != workflow_core.WORKFLOW_STATE_DONE || payload[2] != workflow_core.WORKFLOW_RESTART_NONE || payload[3] != 1 {
         return FAIL_LEASE_CONSUME_8_PAYLOAD
     }
 

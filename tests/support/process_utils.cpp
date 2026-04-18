@@ -122,6 +122,7 @@ CommandOutcome WaitForCommandExit(pid_t pid,
 }
 
 CommandOutcome RunCommandDirect(const std::vector<std::string>& args,
+                                const std::filesystem::path* working_dir,
                                 int stdout_fd,
                                 int stderr_fd,
                                 const std::string& context) {
@@ -136,6 +137,9 @@ CommandOutcome RunCommandDirect(const std::vector<std::string>& args,
     }
 
     if (pid == 0) {
+        if (working_dir != nullptr && chdir(working_dir->c_str()) != 0) {
+            _exit(127);
+        }
         if (stdout_fd >= 0 && dup2(stdout_fd, STDOUT_FILENO) < 0) {
             _exit(127);
         }
@@ -173,11 +177,19 @@ void CopyDirectoryTree(const std::filesystem::path& source,
 
 CommandOutcome RunCommand(const std::vector<std::string>& args,
                           const std::string& context) {
-    return RunCommandDirect(args, -1, -1, context);
+    return RunCommandDirect(args, nullptr, -1, -1, context);
 }
 
 std::pair<CommandOutcome, std::string> RunCommandCapture(
     const std::vector<std::string>& args,
+    const std::filesystem::path& output_path,
+    const std::string& context) {
+    return RunCommandCaptureInDir(args, std::filesystem::current_path(), output_path, context);
+}
+
+std::pair<CommandOutcome, std::string> RunCommandCaptureInDir(
+    const std::vector<std::string>& args,
+    const std::filesystem::path& working_dir,
     const std::filesystem::path& output_path,
     const std::string& context) {
     std::filesystem::create_directories(output_path.parent_path());
@@ -186,7 +198,7 @@ std::pair<CommandOutcome, std::string> RunCommandCapture(
         const int saved_errno = errno;
         Fail(context + ": failed to open output capture file: errno=" + std::to_string(saved_errno));
     }
-    const CommandOutcome outcome = RunCommandDirect(args, output_fd, output_fd, context);
+    const CommandOutcome outcome = RunCommandDirect(args, &working_dir, output_fd, output_fd, context);
     CloseFd(output_fd);
     const std::string output = ReadFile(output_path);
     return {outcome, output};

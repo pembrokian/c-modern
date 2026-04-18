@@ -5,7 +5,7 @@ import scenario_transport
 import serial_protocol
 import service_effect
 import syscall
-import workflow_service
+import workflow_core
 
 const FAIL_WORKFLOW_SCHEDULE: i32 = 2312
 const FAIL_WORKFLOW_WAITING: i32 = 2313
@@ -39,7 +39,7 @@ func run_workflow_service_probe() i32 {
     }
 
     effect = kernel_dispatch.kernel_dispatch_step(&state, scenario_transport.cmd_workflow_query(7))
-    if !expect_workflow(effect, workflow_service.WORKFLOW_STATE_WAITING, workflow_service.WORKFLOW_RESTART_NONE) {
+    if !expect_workflow(effect, workflow_core.WORKFLOW_STATE_WAITING, workflow_core.WORKFLOW_RESTART_NONE) {
         return FAIL_WORKFLOW_WAITING
     }
 
@@ -49,17 +49,17 @@ func run_workflow_service_probe() i32 {
     }
 
     effect = kernel_dispatch.kernel_dispatch_step(&state, scenario_transport.cmd_workflow_query(7))
-    if !expect_workflow(effect, workflow_service.WORKFLOW_STATE_WAITING, workflow_service.WORKFLOW_RESTART_RESUMED) {
+    if !expect_workflow(effect, workflow_core.WORKFLOW_STATE_WAITING, workflow_core.WORKFLOW_RESTART_RESUMED) {
         return FAIL_WORKFLOW_RESUMED
     }
 
     effect = kernel_dispatch.kernel_dispatch_step(&state, scenario_transport.cmd_workflow_query(7))
-    if !expect_workflow(effect, workflow_service.WORKFLOW_STATE_RUNNING, workflow_service.WORKFLOW_RESTART_RESUMED) {
+    if !expect_workflow(effect, workflow_core.WORKFLOW_STATE_RUNNING, workflow_core.WORKFLOW_RESTART_RESUMED) {
         return FAIL_WORKFLOW_RUNNING
     }
 
     effect = kernel_dispatch.kernel_dispatch_step(&state, scenario_transport.cmd_workflow_query(7))
-    if !expect_workflow(effect, workflow_service.WORKFLOW_STATE_DONE, workflow_service.WORKFLOW_RESTART_RESUMED) {
+    if !expect_workflow(effect, workflow_core.WORKFLOW_STATE_DONE, workflow_core.WORKFLOW_RESTART_RESUMED) {
         return FAIL_WORKFLOW_DONE
     }
 
@@ -69,7 +69,7 @@ func run_workflow_service_probe() i32 {
     }
 
     effect = kernel_dispatch.kernel_dispatch_step(&state, scenario_transport.cmd_workflow_query(255))
-    if !expect_workflow(effect, workflow_service.WORKFLOW_STATE_FAILED, workflow_service.WORKFLOW_RESTART_NONE) {
+    if !expect_workflow(effect, workflow_core.WORKFLOW_STATE_FAILED, workflow_core.WORKFLOW_RESTART_NONE) {
         return FAIL_WORKFLOW_FAILED
     }
 
@@ -89,7 +89,7 @@ func run_workflow_service_probe() i32 {
     }
 
     effect = kernel_dispatch.kernel_dispatch_step(&state, scenario_transport.cmd_workflow_query(56))
-    if !expect_workflow(effect, workflow_service.WORKFLOW_STATE_CANCELLED, workflow_service.WORKFLOW_RESTART_CANCELLED) {
+    if !expect_workflow(effect, workflow_core.WORKFLOW_STATE_CANCELLED, workflow_core.WORKFLOW_RESTART_CANCELLED) {
         return FAIL_WORKFLOW_CANCELLED
     }
 

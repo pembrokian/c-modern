@@ -8,7 +8,7 @@ import serial_protocol
 import service_effect
 import service_topology
 import syscall
-import workflow_service
+import workflow_core
 
 const FIRST_SUBMISSION_ID: u8 = 1
 
@@ -104,7 +104,7 @@ func run_named_object_delivery_pressure_probe() i32 {
         workflow_submission_count = workflow_submission_count + 1
 
         effect = kernel_dispatch.kernel_dispatch_step(&state, scenario_transport.cmd_workflow_query(u8(id)))
-        if !expect_workflow(effect, syscall.SyscallStatus.Ok, workflow_service.WORKFLOW_STATE_RUNNING, workflow_service.WORKFLOW_RESTART_NONE) {
+        if !expect_workflow(effect, syscall.SyscallStatus.Ok, workflow_core.WORKFLOW_STATE_RUNNING, workflow_core.WORKFLOW_RESTART_NONE) {
             return FAIL_PRESSURE_FILL_RUNNING_BASE + (id - 11)
         }
         if service_effect.effect_reply_payload(effect)[2] != expected_task_id(workflow_submission_count) {
@@ -112,7 +112,7 @@ func run_named_object_delivery_pressure_probe() i32 {
         }
 
         effect = kernel_dispatch.kernel_dispatch_step(&state, scenario_transport.cmd_workflow_query(u8(id)))
-        if !expect_workflow(effect, syscall.SyscallStatus.Ok, workflow_service.WORKFLOW_STATE_DONE, workflow_service.WORKFLOW_RESTART_NONE) {
+        if !expect_workflow(effect, syscall.SyscallStatus.Ok, workflow_core.WORKFLOW_STATE_DONE, workflow_core.WORKFLOW_RESTART_NONE) {
             return FAIL_PRESSURE_FILL_DONE_BASE + (id - 11)
         }
     }
@@ -135,15 +135,15 @@ func run_named_object_delivery_pressure_probe() i32 {
     update_id := service_effect.effect_reply_payload(effect)[0]
 
     effect = kernel_dispatch.kernel_dispatch_step(&state, scenario_transport.cmd_workflow_query(update_id))
-    if !expect_workflow(effect, syscall.SyscallStatus.Ok, workflow_service.WORKFLOW_STATE_WAITING, workflow_service.WORKFLOW_RESTART_NONE) {
+    if !expect_workflow(effect, syscall.SyscallStatus.Ok, workflow_core.WORKFLOW_STATE_WAITING, workflow_core.WORKFLOW_RESTART_NONE) {
         return FAIL_PRESSURE_WAITING
     }
 
     effect = kernel_dispatch.kernel_dispatch_step(&state, scenario_transport.cmd_workflow_query(update_id))
-    if !expect_workflow(effect, syscall.SyscallStatus.Exhausted, workflow_service.WORKFLOW_STATE_DELIVERING, workflow_service.WORKFLOW_RESTART_NONE) {
+    if !expect_workflow(effect, syscall.SyscallStatus.Exhausted, workflow_core.WORKFLOW_STATE_DELIVERING, workflow_core.WORKFLOW_RESTART_NONE) {
         return FAIL_PRESSURE_EXHAUSTED
     }
-    if !expect_delivery_outcome(effect, workflow_service.WORKFLOW_STATE_OBJECT_UPDATED) {
+    if !expect_delivery_outcome(effect, workflow_core.WORKFLOW_STATE_OBJECT_UPDATED) {
         return FAIL_PRESSURE_EXHAUSTED_OUTCOME
     }
 
@@ -158,10 +158,10 @@ func run_named_object_delivery_pressure_probe() i32 {
     }
 
     effect = kernel_dispatch.kernel_dispatch_step(&state, scenario_transport.cmd_workflow_query(update_id))
-    if !expect_workflow(effect, syscall.SyscallStatus.WouldBlock, workflow_service.WORKFLOW_STATE_DELIVERING, workflow_service.WORKFLOW_RESTART_RESUMED) {
+    if !expect_workflow(effect, syscall.SyscallStatus.WouldBlock, workflow_core.WORKFLOW_STATE_DELIVERING, workflow_core.WORKFLOW_RESTART_RESUMED) {
         return FAIL_PRESSURE_RESUMED
     }
-    if !expect_delivery_outcome(effect, workflow_service.WORKFLOW_STATE_OBJECT_UPDATED) {
+    if !expect_delivery_outcome(effect, workflow_core.WORKFLOW_STATE_OBJECT_UPDATED) {
         return FAIL_PRESSURE_RESUMED_OUTCOME
     }
 
@@ -176,7 +176,7 @@ func run_named_object_delivery_pressure_probe() i32 {
     }
 
     effect = kernel_dispatch.kernel_dispatch_step(&state, scenario_transport.cmd_workflow_query(update_id))
-    if !expect_workflow(effect, syscall.SyscallStatus.Ok, workflow_service.WORKFLOW_STATE_OBJECT_UPDATED, workflow_service.WORKFLOW_RESTART_RESUMED) {
+    if !expect_workflow(effect, syscall.SyscallStatus.Ok, workflow_core.WORKFLOW_STATE_OBJECT_UPDATED, workflow_core.WORKFLOW_RESTART_RESUMED) {
         return FAIL_PRESSURE_RECOVERED
     }
 
@@ -199,7 +199,7 @@ func run_named_object_delivery_pressure_probe() i32 {
     }
 
     effect = kernel_dispatch.kernel_dispatch_step(&state, scenario_transport.cmd_completion_fetch())
-    if !expect_completion(effect, update_id, workflow_service.WORKFLOW_STATE_OBJECT_UPDATED, workflow_service.WORKFLOW_RESTART_RESUMED, 1) {
+    if !expect_completion(effect, update_id, workflow_core.WORKFLOW_STATE_OBJECT_UPDATED, workflow_core.WORKFLOW_RESTART_RESUMED, 1) {
         return FAIL_PRESSURE_FETCH
     }
 

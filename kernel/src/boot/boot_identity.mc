@@ -16,6 +16,7 @@ import shell_service
 import task_service
 import timer_service
 import update_store_service
+import workflow_core
 import workflow_service
 
 // Named ServiceRef accessors for the four boot-wired services.
@@ -98,7 +99,7 @@ func bootstate_metadata_for_target(s: KernelBootState, target: u8) u8 {
     case serial_protocol.TARGET_JOURNAL:
         return u8(journal_service.journal_count(s.journal.state))
     case serial_protocol.TARGET_WORKFLOW:
-        return u8(workflow_service.workflow_active_count(s.workflow.state))
+        return u8(workflow_core.workflow_active_count(s.workflow.state))
     case serial_protocol.TARGET_LEASE:
         return u8(lease_service.lease_count(s.lease.state))
     case serial_protocol.TARGET_COMPLETION:

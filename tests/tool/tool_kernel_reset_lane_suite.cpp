@@ -442,9 +442,10 @@ ResetLaneScenarioTiming RunKernelResetLaneScenario(const std::filesystem::path& 
     std::vector<std::string> command = {executable_path.generic_string()};
 
     const auto run_start = std::chrono::steady_clock::now();
-    const auto [run_outcome, run_output] = RunCommandCapture(command,
-                                                             build_dir / run_output_name,
-                                                             run_context);
+    const auto [run_outcome, run_output] = mc::test_support::RunCommandCaptureInDir(command,
+                                                                                     build_dir,
+                                                                                     build_dir / run_output_name,
+                                                                                     run_context);
     const auto run_end = std::chrono::steady_clock::now();
     ExpectKernelResetLaneRunSuccess(scenario, run_outcome, run_output);
 
@@ -458,7 +459,7 @@ ResetLaneScenarioTiming RunKernelResetLaneScenario(const std::filesystem::path& 
     };
 }
 
-constexpr std::array<ResetLaneScenario, 60> kResetLaneScenarios = {{
+constexpr std::array<ResetLaneScenario, 61> kResetLaneScenarios = {{
     {.label = "repo project", .scenario_key = "repo", .target_name = "kernel", .include_in_fast = true, .build_warn_ms = 2000},
     {.label = "smoke", .fixture_relative_path = "tests/smoke/kernel_reset_lane_serial_round_trip", .scenario_key = "smoke", .target_name = "app", .include_in_fast = true},
     {.label = "retained state", .fixture_relative_path = "tests/system/kernel_reset_lane_retained_log", .scenario_key = "retained_state", .context_label = "retained-state", .target_name = "app", .include_in_fast = true},
@@ -519,6 +520,7 @@ constexpr std::array<ResetLaneScenario, 60> kResetLaneScenarios = {{
     {.label = "delegated external request handling", .fixture_relative_path = "tests/system/kernel_reset_lane_phase241_delegated_external_request_handling", .scenario_key = "phase241_delegated_external_request_handling", .context_label = "phase 241 delegated external request handling", .target_name = "app", .include_in_fast = true, .build_warn_ms = 1000},
     {.label = "update manifest and staged artifact store", .fixture_relative_path = "tests/system/kernel_reset_lane_phase242_update_store", .scenario_key = "phase242_update_store", .context_label = "phase 242 update manifest and staged artifact store", .target_name = "app", .include_in_fast = true, .build_warn_ms = 1000},
     {.label = "restart-safe update apply workflow", .fixture_relative_path = "tests/system/kernel_reset_lane_phase243_update_apply_workflow", .scenario_key = "phase243_update_apply_workflow", .context_label = "phase 243 restart-safe update apply workflow", .target_name = "app", .include_in_fast = true, .build_warn_ms = 1000},
+    {.label = "delegated installer authority", .fixture_relative_path = "tests/system/kernel_reset_lane_phase244_delegated_installer_authority", .scenario_key = "phase244_delegated_installer_authority", .context_label = "phase 244 delegated installer authority", .target_name = "app", .include_in_fast = true, .build_warn_ms = 1000},
 }};
 
 std::vector<const ResetLaneScenario*> SelectResetLaneScenarios(ResetLaneMode mode) {

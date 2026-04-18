@@ -8,7 +8,7 @@ import serial_protocol
 import service_effect
 import service_topology
 import syscall
-import workflow_service
+import workflow_core
 
 const FAIL_DELEGATED_SETUP: i32 = 23601
 const FAIL_DELEGATED_CREATE: i32 = 23602
@@ -101,12 +101,12 @@ func run_delegated_named_object_processing_probe() i32 {
     update_id := service_effect.effect_reply_payload(effect)[0]
 
     effect = kernel_dispatch.kernel_dispatch_step(&state, scenario_transport.cmd_workflow_query(update_id))
-    if !expect_workflow(effect, syscall.SyscallStatus.Ok, workflow_service.WORKFLOW_STATE_WAITING, workflow_service.WORKFLOW_RESTART_NONE) {
+    if !expect_workflow(effect, syscall.SyscallStatus.Ok, workflow_core.WORKFLOW_STATE_WAITING, workflow_core.WORKFLOW_RESTART_NONE) {
         return FAIL_DELEGATED_WAITING
     }
 
     effect = kernel_dispatch.kernel_dispatch_step(&state, scenario_transport.cmd_workflow_query(update_id))
-    if !expect_workflow(effect, syscall.SyscallStatus.Ok, workflow_service.WORKFLOW_STATE_OBJECT_UPDATED, workflow_service.WORKFLOW_RESTART_NONE) {
+    if !expect_workflow(effect, syscall.SyscallStatus.Ok, workflow_core.WORKFLOW_STATE_OBJECT_UPDATED, workflow_core.WORKFLOW_RESTART_NONE) {
         return FAIL_DELEGATED_DONE
     }
 
@@ -116,7 +116,7 @@ func run_delegated_named_object_processing_probe() i32 {
     }
 
     effect = kernel_dispatch.kernel_dispatch_step(&state, scenario_transport.cmd_completion_fetch())
-    if !expect_completion(effect, update_id, workflow_service.WORKFLOW_STATE_OBJECT_UPDATED, workflow_service.WORKFLOW_RESTART_NONE, 1) {
+    if !expect_completion(effect, update_id, workflow_core.WORKFLOW_STATE_OBJECT_UPDATED, workflow_core.WORKFLOW_RESTART_NONE, 1) {
         return FAIL_DELEGATED_FETCH
     }
 
