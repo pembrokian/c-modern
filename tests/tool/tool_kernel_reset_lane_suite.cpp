@@ -459,7 +459,7 @@ ResetLaneScenarioTiming RunKernelResetLaneScenario(const std::filesystem::path& 
     };
 }
 
-constexpr std::array<ResetLaneScenario, 61> kResetLaneScenarios = {{
+constexpr std::array<ResetLaneScenario, 62> kResetLaneScenarios = {{
     {.label = "repo project", .scenario_key = "repo", .target_name = "kernel", .include_in_fast = true, .build_warn_ms = 2000},
     {.label = "smoke", .fixture_relative_path = "tests/smoke/kernel_reset_lane_serial_round_trip", .scenario_key = "smoke", .target_name = "app", .include_in_fast = true},
     {.label = "retained state", .fixture_relative_path = "tests/system/kernel_reset_lane_retained_log", .scenario_key = "retained_state", .context_label = "retained-state", .target_name = "app", .include_in_fast = true},
@@ -521,6 +521,7 @@ constexpr std::array<ResetLaneScenario, 61> kResetLaneScenarios = {{
     {.label = "update manifest and staged artifact store", .fixture_relative_path = "tests/system/kernel_reset_lane_phase242_update_store", .scenario_key = "phase242_update_store", .context_label = "phase 242 update manifest and staged artifact store", .target_name = "app", .include_in_fast = true, .build_warn_ms = 1000},
     {.label = "restart-safe update apply workflow", .fixture_relative_path = "tests/system/kernel_reset_lane_phase243_update_apply_workflow", .scenario_key = "phase243_update_apply_workflow", .context_label = "phase 243 restart-safe update apply workflow", .target_name = "app", .include_in_fast = true, .build_warn_ms = 1000},
     {.label = "delegated installer authority", .fixture_relative_path = "tests/system/kernel_reset_lane_phase244_delegated_installer_authority", .scenario_key = "phase244_delegated_installer_authority", .context_label = "phase 244 delegated installer authority", .target_name = "app", .include_in_fast = true, .build_warn_ms = 1000},
+    {.label = "update recovery and reporting pressure", .fixture_relative_path = "tests/system/kernel_reset_lane_phase245_update_recovery_completion_pressure", .scenario_key = "phase245_update_recovery_completion_pressure", .context_label = "phase 245 update recovery and reporting pressure", .target_name = "app", .include_in_fast = true, .build_warn_ms = 1000},
 }};
 
 std::vector<const ResetLaneScenario*> SelectResetLaneScenarios(ResetLaneMode mode) {

@@ -3,7 +3,7 @@ Phase 245 -- Update Recovery And Completion Reporting Pressure
 
 Status
 ------
-PROPOSED
+COMPLETED
 
 Purpose
 -------
@@ -18,12 +18,12 @@ distribution, or package-manager claims.
 
 Repository status note
 ----------------------
-- Phase 243 is expected to produce restart-safe update-apply outcomes.
-- Phase 244 is expected to produce delegated installer authority outcomes.
+- Phase 243 admits restart-safe update-apply outcomes.
+- Phase 244 admits delegated installer authority outcomes.
 - Phase 232 and Phase 240 already establish the current completion-mailbox plus
   workflow-local retry split under internal and external pressure.
-- The repository still lacks one phase whose primary purpose is to make a
-  product-shaped update workflow contend with backlog and restart timing.
+- The repository previously lacked one phase whose primary purpose was to make
+  a product-shaped update workflow contend with backlog and restart timing.
 
 Problem being solved
 --------------------
@@ -141,3 +141,60 @@ Future follow-up
   after the fact.
 - Reopen rollback or dependency-management work only when a real admitted
   update consumer proves the bounded remote update lane insufficient.
+
+Implementation summary
+----------------------
+- `workflow_service` keeps deferred update reporting on the existing
+  `WORKFLOW_STATE_DELIVERING` path rather than adding an update-specific retry
+  framework or second reporting surface.
+- `completion_mailbox_service` continues to own first-full `Exhausted` then
+  repeated-full `WouldBlock`; the update lane now proves that same backlog
+  contract on a delegated installer apply outcome.
+- `update_store_service` still owns staged and applied update truth; the new
+  pressure path proves the applied target can remain durable and visible while
+  completion reporting is still pending or resumed after restart.
+- `lease_service` still owns temporary installer authority; Phase 245 reuses
+  the Phase 244 delegated apply lane rather than widening authority policy.
+
+Questions answered
+------------------
+1. Yes. The existing completion-mailbox plus workflow-local retry split
+   remains honest for a staged remote update outcome.
+2. The narrowest caller-visible truth is still `workflow_query(...)`
+   returning `WORKFLOW_STATE_DELIVERING` with mailbox `Exhausted` or
+   `WouldBlock`, while payload byte 2 carries the pending terminal update
+   outcome and payload byte 1 keeps restart truth explicit.
+3. No new bounded update outcome class was required. Restart during deferred
+   reporting is still represented honestly by the existing `DELIVERING` state,
+   the pending outcome byte, and `WORKFLOW_RESTART_RESUMED`.
+4. Yes. The update milestone now has one real composed delegated-update lane
+   that survives backlog and restart pressure without forcing rollback,
+   fairness, broker, or supervisor frameworks.
+
+Validation and results
+----------------------
+- Added `kernel/src/scenarios/scenario_update_recovery_completion_pressure.mc`
+  to prove delegated update apply, mailbox-full deferred reporting, and
+  restart-resumed reporting.
+- Added
+  `tests/system/kernel_reset_lane_phase245_update_recovery_completion_pressure/`
+  as the focused reset-lane fixture for the composed remote update lane.
+- Registered the new fixture in `tests/tool/tool_kernel_reset_lane_suite.cpp`
+  and wired the scenario into the repo-owned reset-lane kernel run.
+- Validation passed:
+  - `Build debug`
+  - `mc_tool_workflow_kernel_reset_lane_unit`
+  - `mc_tool_workflow_kernel_reset_lane_full_unit`
+
+Notes
+-----
+- The landed phase intentionally reuses the current delivery contract instead
+  of inventing an update-reporting framework or a second completion owner.
+- No ownership boundary weakened: backlog truth stays in
+  `completion_mailbox_service`, queued execution and retry stay in
+  `workflow_service`, staged plus applied update truth stay in
+  `update_store_service`, and temporary installer authority stays in
+  `lease_service`.
+- The scenario code stayed explicit and flat rather than opening compiler work;
+  it uses distinct locals instead of leaning on still-limited sibling-branch
+  or repeated-local rebinding shapes.

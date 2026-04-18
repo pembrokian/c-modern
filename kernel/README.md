@@ -50,6 +50,17 @@ The following modules are deferred until the named phase boundary forces them:
 
 Recent service targets
 
+- Phase 245 (landed): update recovery and completion reporting pressure.
+  Delegated update apply now proves one composed backlog-plus-restart path on
+  the existing owners: `workflow_service.mc` keeps the pending update outcome
+  on `WORKFLOW_STATE_DELIVERING`, `completion_mailbox_service.mc` still owns
+  first-full `Exhausted` then repeated-full `WouldBlock`,
+  `update_store_service.mc` keeps durable applied-target truth visible while
+  reporting is deferred, and workflow restart resumes delivery honestly
+  without widening completion, installer, or rollback policy. The focused
+  reset-lane fixture is
+  `tests/system/kernel_reset_lane_phase245_update_recovery_completion_pressure`.
+
 - Phase 242 (landed): update manifest and staged artifact store first slice.
   `update_store_service.mc` is now the bounded durable owner for one staged
   artifact plus one compact manifest truth record. The owner supports stage,
@@ -117,7 +128,8 @@ Recent service targets
   focused reset-lane fixture is
   `tests/system/kernel_reset_lane_phase220_timer_task_service`.
 
-- Next open: the strongest adjacent product-shaped pressure is one restart-safe
-  workflow that validates and applies the staged update owned by
-  `update_store_service` without widening into package-manager, installer, or
-  dependency frameworks.
+- Next open: only widen beyond the bounded remote update lane if one real
+  admitted consumer needs broader package, distribution, install-policy, or
+  reporting semantics that cannot stay honest on the current
+  `update_store_service` plus `workflow_service` plus
+  `completion_mailbox_service` plus `lease_service` split.

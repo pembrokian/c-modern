@@ -29,6 +29,7 @@ import scenario_workflow_service
 import scenario_steps
 import scenario_transfer
 import scenario_update_apply_workflow
+import scenario_update_recovery_completion_pressure
 import scenario_update_store_service
 import scenario_workset_identity
 
@@ -130,6 +131,10 @@ func run(state: *boot.KernelBootState) i32 {
         return result
     }
     result = scenario_delegated_installer_authority.run_delegated_installer_authority_probe()
+    if result != 0 {
+        return result
+    }
+    result = scenario_update_recovery_completion_pressure.run_update_recovery_completion_pressure_probe()
     if result != 0 {
         return result
     }
