@@ -135,6 +135,7 @@ struct DefaultCase : Node {
 //   kDerefField      : left = base
 //   kIndex           : left = base, right = index
 //   kSlice           : left = base, right = begin, extra = end
+//   kEmptyCollection : type_target = inferred expected collection type
 //   kAggregateInit   : left = named base or type_target = explicit/inferred type, field_inits = fields
 //   kRecordUpdate    : left = base value expression, field_inits = replaced fields
 //   kParen           : left = inner expression
@@ -166,6 +167,7 @@ struct Expr : Node {
         kDerefField,
         kIndex,
         kSlice,
+        kEmptyCollection,
         kAggregateInit,
         kRecordUpdate,
         kParen,

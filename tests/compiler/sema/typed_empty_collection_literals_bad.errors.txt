@@ -1,0 +1,2 @@
+empty collection literal requires an explicit expected collection type
+empty collection literal does not support Buffer<T>; use an explicit non-owning Slice<T> or zero-length array

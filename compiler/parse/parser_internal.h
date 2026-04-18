@@ -137,6 +137,7 @@ class Parser {
     std::unique_ptr<Expr> ParseTypeCallExpr();
     std::unique_ptr<Expr> ParseTypeAggregateInitExpr();
     std::unique_ptr<Expr> ParseBraceAggregateInitExpr();
+    std::unique_ptr<Expr> ParseEmptyCollectionExpr();
     std::unique_ptr<Expr> ParseUnaryExpr();
     std::unique_ptr<Expr> ParsePostfixExpr();
     std::vector<FieldInit> ParseFieldInitListUntil(TokenKind terminator, bool allow_dotted_name = false);

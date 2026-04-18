@@ -73,6 +73,8 @@ std::string_view ToString(Expr::Kind kind) {
             return "IndexExpr";
         case Expr::Kind::kSlice:
             return "SliceExpr";
+        case Expr::Kind::kEmptyCollection:
+            return "EmptyCollectionExpr";
         case Expr::Kind::kAggregateInit:
             return "AggregateInitExpr";
         case Expr::Kind::kRecordUpdate:
@@ -188,6 +190,7 @@ std::string_view SecondaryTextLabel(const Expr& expr) {
         case Expr::Kind::kDerefField:
         case Expr::Kind::kIndex:
         case Expr::Kind::kSlice:
+        case Expr::Kind::kEmptyCollection:
         case Expr::Kind::kAggregateInit:
         case Expr::Kind::kRecordUpdate:
         case Expr::Kind::kParen:
@@ -333,6 +336,14 @@ void DumpExpr(const Expr& expr, std::ostringstream& stream, Indent indent, int d
         stream << SecondaryTextLabel(expr) << expr.secondary_text;
     }
     stream << '\n';
+
+    if (expr.kind == Expr::Kind::kEmptyCollection) {
+        if (expr.type_target != nullptr) {
+            WriteLine(stream, indent + 1, "typeTarget:");
+            DumpType(*expr.type_target, stream, indent + 2, depth + 1);
+        }
+        return;
+    }
 
     if (expr.left != nullptr) {
         WriteLine(stream, indent + 1, "left:");

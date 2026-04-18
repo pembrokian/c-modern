@@ -150,6 +150,8 @@ std::string RenderExprInline(const ast::Expr& expr) {
             stream << ']';
             return stream.str();
         }
+        case ast::Expr::Kind::kEmptyCollection:
+            return "[]";
         case ast::Expr::Kind::kAggregateInit:
             return expr.type_target != nullptr ? RenderTypeInline(*expr.type_target)
                                                : (expr.left != nullptr ? RenderExprInline(*expr.left) : std::string("<?>"));

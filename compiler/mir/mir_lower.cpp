@@ -1872,6 +1872,17 @@ class FunctionLowerer {
                 });
                 return {value, type};
             }
+            case Expr::Kind::kEmptyCollection: {
+                const sema::Type type = KnownTypeOrError(ExprTypeOrUnknown(expr), expr.span, "empty collection literal type");
+                const std::string value = NewValue();
+                Emit({
+                    .kind = Instruction::Kind::kAggregateInit,
+                    .result = value,
+                    .type = type,
+                    .target = sema::FormatType(type),
+                });
+                return {value, type};
+            }
             case Expr::Kind::kRecordUpdate: {
                 const auto base = LowerExpr(*expr.left);
                 const sema::Type type = KnownTypeOrError(ExprTypeOrUnknown(expr), expr.span, "record update type");

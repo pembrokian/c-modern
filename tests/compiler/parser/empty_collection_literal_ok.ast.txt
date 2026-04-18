@@ -1,0 +1,13 @@
+SourceFile
+  ModuleKind=ordinary
+  FuncDecl name=empty_bytes
+    returns:
+      NamedType name=Slice
+        typeArgs:
+          NamedType name=u8
+    body:
+      BlockStmt
+        statements:
+          ReturnStmt
+            exprs:
+              EmptyCollectionExpr

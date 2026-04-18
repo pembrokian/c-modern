@@ -1,0 +1,7 @@
+SemanticModule
+  Const names=[EMPTY_BYTES] type=Slice<u8> values=[{ptr: nil, len: 0}]
+  Const names=[EMPTY_CODES] type=[0]u8 values=[{}]
+  Function name=zero_args params=[] returns=[Slice<u8>]
+  Function name=zero_codes params=[] returns=[[0]u8]
+  Function name=call_len params=[Slice<u8>] returns=[usize]
+  Function name=use params=[] returns=[usize]

@@ -1,0 +1,13 @@
+Module
+  Function name=empty_len returns=[usize]
+    Local name=bytes type=Slice<u8>
+    Block label=entry0
+      aggregate_init %v0:Slice<u8> target=Slice<u8>
+      store_local target=bytes operands=[%v0]
+      load_local %v1:Slice<u8> target=bytes
+      field %v2:usize target=len target_kind=field target_name=len target_display=bytes.len target_base=Slice<u8> operands=[%v1]
+      terminator return values=[%v2]
+  Function name=empty_codes returns=[[0]u8]
+    Block label=entry0
+      aggregate_init %v0:[0]u8 target=[0]u8
+      terminator return values=[%v0]

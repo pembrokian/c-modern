@@ -8,6 +8,8 @@ The example tree is staged for three roles:
 
 Current bootstrap canonical examples mirror the representative MIR fixtures under `tests/compiler/mir/` so Phase 4 close-out validation can point at concrete canonical sources outside the test harness itself.
 
+Current small examples also include `small/typed_empty_collections.mc`, a narrow source-level proof for Phase 249's expected-type `[]` literal on `Slice<T>` and `[0]T` without implying broader collection inference.
+
 Current repository-specific admitted real projects:
 
 - `real/grep_lite/` for bounded text search over a single file

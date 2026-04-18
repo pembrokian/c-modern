@@ -557,6 +557,48 @@ class Checker {
         return UnknownType();
     }
 
+    Type ResolveEmptyCollectionLiteralType(const Expr& expr) {
+        if (expr.type_target == nullptr) {
+            return UnknownType();
+        }
+        ValidateTypeExpr(expr.type_target.get(), CurrentTypeParams(), expr.type_target->span);
+        return SemanticTypeFromAst(expr.type_target.get(), CurrentTypeParams());
+    }
+
+    bool IsAdmittedEmptyCollectionType(const Type& expected_type, std::string& message) const {
+        const Type normalized = NormalizeAggregateExpectedType(expected_type);
+        if (IsUnknown(normalized)) {
+            message = "empty collection literal requires an explicit expected collection type";
+            return false;
+        }
+
+        const Type resolved = StripType(normalized, *module_, TypeStripMode::kAliasesOnly);
+        if (resolved.kind == Type::Kind::kArray) {
+            const auto length = mc::support::ParseArrayLength(resolved.metadata);
+            if (!length.has_value()) {
+                message = "empty collection literal requires a fixed zero-length array type";
+                return false;
+            }
+            if (*length != 0) {
+                message = "empty collection literal only supports zero-length array targets; got " + FormatType(resolved);
+                return false;
+            }
+            return true;
+        }
+
+        if (resolved.kind == Type::Kind::kNamed && resolved.name == "Slice" && resolved.subtypes.size() == 1) {
+            return true;
+        }
+
+        if (resolved.kind == Type::Kind::kNamed && resolved.name == "Buffer") {
+            message = "empty collection literal does not support Buffer<T>; use an explicit non-owning Slice<T> or zero-length array";
+            return false;
+        }
+
+        message = "empty collection literal only supports zero-length array and Slice<T> expected types";
+        return false;
+    }
+
     std::vector<std::pair<std::string, Type>> ResolveAggregateFieldTypes(const Type& aggregate_type) const {
         const Type normalized = NormalizeAggregateExpectedType(aggregate_type);
         const Type resolved_aggregate = StripType(normalized, *module_, TypeStripMode::kAliasesOnly);
@@ -621,7 +663,7 @@ class Checker {
     }
 
     void ApplyExpectedAggregateType(Expr& expr, const Type& expected_type) {
-        if (expr.kind != Expr::Kind::kAggregateInit) {
+        if (expr.kind != Expr::Kind::kAggregateInit && expr.kind != Expr::Kind::kEmptyCollection) {
             return;
         }
 
@@ -632,6 +674,10 @@ class Checker {
 
         if (expr.type_target == nullptr && expr.left == nullptr) {
             expr.type_target = TypeToAst(normalized);
+        }
+
+        if (expr.kind == Expr::Kind::kEmptyCollection) {
+            return;
         }
 
         const Type aggregate_type = ResolveAggregateInitType(expr);
@@ -2117,6 +2163,21 @@ class Checker {
                 }
                 return record(UnknownType());
             }
+            case Expr::Kind::kEmptyCollection: {
+                const Type collection_type = ResolveEmptyCollectionLiteralType(expr);
+                if (IsUnknown(collection_type)) {
+                    Report(expr.span, "empty collection literal requires an explicit expected collection type");
+                    return record(UnknownType());
+                }
+
+                std::string message;
+                if (!IsAdmittedEmptyCollectionType(collection_type, message)) {
+                    Report(expr.span, message);
+                    return record(UnknownType());
+                }
+
+                return record(NormalizeAggregateExpectedType(collection_type));
+            }
             case Expr::Kind::kAggregateInit: {
                 Type aggregate_type = ResolveAggregateInitType(expr);
                 if (IsUnknown(aggregate_type)) {
@@ -3126,6 +3187,37 @@ std::optional<ConstValue> ConstExprEvaluator::EvaluateConstExpr(const Expr& expr
         }
         case Expr::Kind::kField:
             return EvaluateEnumConst(expr, nullptr, report_errors, active_names);
+        case Expr::Kind::kEmptyCollection: {
+            Type collection_type = context_.resolve_aggregate_init_type(expr);
+            if (IsUnknown(collection_type)) {
+                return std::nullopt;
+            }
+
+            const Type resolved_collection = StripType(collection_type, context_.module, TypeStripMode::kAliasesOnly);
+            ConstValue result;
+            result.kind = ConstValue::Kind::kAggregate;
+            if (resolved_collection.kind == Type::Kind::kArray) {
+                const auto length = mc::support::ParseArrayLength(resolved_collection.metadata);
+                if (!length.has_value() || *length != 0) {
+                    return std::nullopt;
+                }
+                result.text = RenderConstValue(result);
+                return result;
+            }
+
+            if (resolved_collection.kind != Type::Kind::kNamed || resolved_collection.name != "Slice") {
+                return std::nullopt;
+            }
+
+            ConstValue nil_value;
+            nil_value.kind = ConstValue::Kind::kNil;
+            nil_value.text = "nil";
+            result.field_names = {"ptr", "len"};
+            result.elements.push_back(std::move(nil_value));
+            result.elements.push_back(MakeConstValue(static_cast<std::int64_t>(0)));
+            result.text = RenderConstValue(result);
+            return result;
+        }
         case Expr::Kind::kAggregateInit: {
             Type aggregate_type = context_.resolve_aggregate_init_type(expr);
             if (IsUnknown(aggregate_type)) {

@@ -384,6 +384,9 @@ Rules:
 - `expr.*` is the standardized explicit dereference syntax used in current examples
 - indexing and slicing are distinct postfix forms
 - `.0`, `.1`, and similar numeric field selections are admitted for tuple-style payload projection and tuple values
+- `[]` is a dedicated primary-expression spelling for the typed empty-
+    collection literal admitted only through expected-type sema ownership; it is
+    not a standalone inferred collection value
 
 10. Primary Expressions
 
@@ -392,10 +395,12 @@ primary_expr    = literal
                 | <identifier>
                 | qualified_name
                 | conversion_expr
+                | empty_collection_literal
                 | parenthesized_expr
 
 qualified_name  = <identifier> "." <identifier>
 conversion_expr = named_type "(" expr_list ")"
+empty_collection_literal = "[" "]"
 parenthesized_expr = "(" expr ")"
 
 literal         = <int_lit>
@@ -410,6 +415,9 @@ Rules:
 - explicit conversions use parenthesized type-expression syntax such as `(EventMask)(1)`
 - qualified names cover ordinary module-member references such as `io.write_line`
 - function calls and conversions are separate syntactic forms: `foo(x)` is an expression call, while `(<type-expr>)(x)` is an explicit conversion
+- `[]` is admitted only where the surrounding owner already states the target
+    collection type; the current admitted expected-type families are `Slice<T>`
+    and zero-length fixed arrays `[0]T`
 
 11. Switch Case Patterns
 

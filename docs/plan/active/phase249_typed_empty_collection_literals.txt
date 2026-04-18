@@ -3,7 +3,7 @@ Phase 249 -- Typed Empty Collection Literals
 
 Status
 ------
-PROPOSED
+COMPLETE
 
 Purpose
 -------
@@ -31,6 +31,19 @@ Repository status note
 - The repository still lacks one bounded phase whose primary purpose is to add
   the zero-element literal surface without implying allocation, ownership
   transfer, or ambient collection-kind inference.
+
+Landing summary
+---------------
+- the parser now admits `[]` as a dedicated empty-collection literal surface
+  without changing postfix index or slice ownership
+- sema now gives `[]` meaning only in existing expected-type owners and only
+  for `[0]T` and `Slice<T>` targets; standalone `[]`, non-zero arrays, and
+  owning `Buffer<T>` targets remain rejected
+- MIR and executable lowering reuse the existing zero-operand
+  `aggregate_init` path, so no new runtime instruction, allocation policy, or
+  collection framework was added
+- the repository carries focused parser, sema, and MIR regressions plus one
+  small checked-in example in `examples/small/typed_empty_collections.mc`
 
 Problem being solved
 --------------------
@@ -151,6 +164,23 @@ Acceptance criteria
   container-literal frameworks
 - at least one real repository-owned caller becomes clearer because the direct
   empty value spelling is now available
+
+Phase review
+------------
+- Preserved invariants: destination type remains explicit; no allocation or
+  ownership transfer is implied; sema remains the owner of admitted collection
+  families; `Buffer<T>` stays closed because its empty form would imply
+  ownership policy rather than a pure zero value
+- Ownership boundaries stayed narrow: parser only recognizes the `[]` surface,
+  sema decides admissible targets and diagnostics, and MIR or backend only see
+  already-typed zero-value aggregates
+- No new center of gravity emerged: the landing extends the existing expected-
+  type aggregate hook and existing zero-operand aggregate lowering instead of
+  adding another literal inference subsystem or runtime collection helper
+- Intentional simplicity: the repository did not invent a non-empty collection
+  literal family, standalone `[]`, or owning collection construction; the
+  checked-in example spends the syntax without pretending the kernel or stdlib
+  had stronger current pressure than they actually do
 
 Future follow-up
 ----------------

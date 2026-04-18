@@ -186,6 +186,7 @@ This file is a fast orientation map for agents working in this repository.
 - Phase 247 admits trailing commas in the existing comma-delimited expression and aggregate-init list owners, and the repository now carries explicit parser and lowering regressions for chained `a || b || c` short-circuit forms instead of treating that surface as a deferred limitation.
 - Phase 248 normalizes module-local compile-time integer array extents through sema and downstream local-annotation reconstruction, so `[CAP + 1]T` and `[5]T` now share one semantic fixed-array type when the extent evaluates to `5`.
 - Phase 248 now also normalizes imported qualified constant extents in downstream MIR type reconstruction, so local annotations such as `[helper_extents.WIDTH + 1]T` lower with the same fixed-array identity as their checked extent values.
+- Phase 249 admits `[]` only in existing expected-type owners and only for `[0]T` and `Slice<T>`; standalone `[]`, non-zero arrays, and owning `Buffer<T>` targets remain rejected so the phase does not widen into collection inference or hidden allocation policy.
 
 ## Where To Change Things
 
@@ -194,6 +195,7 @@ This file is a fast orientation map for agents working in this repository.
   - `compiler/parse`
   - `compiler/ast`
   - matching parser fixtures
+  - typed empty collection literals now also require the existing sema expected-type hook because parser ownership stops at recognizing the dedicated `[]` surface
 
 - New semantic rule or type/layout rule:
   - `compiler/sema/check.cpp`

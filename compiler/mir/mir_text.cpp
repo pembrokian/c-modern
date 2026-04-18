@@ -92,6 +92,7 @@ constexpr std::string_view kExprKindNames[] = {"name",
                                                "deref-field",
                                                "index",
                                                "slice",
+                                               "empty-collection",
                                                "aggregate-init",
                                                "record-update",
                                                "paren"};
@@ -289,6 +290,8 @@ std::string RenderExprInline(const Expr& expr) {
             stream << ']';
             return stream.str();
         }
+        case Expr::Kind::kEmptyCollection:
+            return "[]";
         case Expr::Kind::kAggregateInit: {
             std::ostringstream stream;
             stream << RenderExprOrPlaceholder(expr.left.get()) << '{';

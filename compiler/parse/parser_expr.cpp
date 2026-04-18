@@ -470,6 +470,16 @@ std::unique_ptr<Expr> Parser::ParseBraceAggregateInitExpr() {
     return expr;
 }
 
+std::unique_ptr<Expr> Parser::ParseEmptyCollectionExpr() {
+    auto expr = std::make_unique<Expr>();
+    expr->kind = Expr::Kind::kEmptyCollection;
+    expr->span.begin = Current().span.begin;
+    Consume(TokenKind::kLBracket, "expected '[' to start empty collection literal");
+    Consume(TokenKind::kRBracket, "expected ']' after '[' in empty collection literal");
+    expr->span.end = Previous().span.end;
+    return expr;
+}
+
 std::vector<std::unique_ptr<Expr>> Parser::ParseExprListUntil(TokenKind terminator) {
     std::vector<std::unique_ptr<Expr>> result;
     result.push_back(ParseExpr());
@@ -724,6 +734,10 @@ std::unique_ptr<Expr> Parser::ParseAssignmentTarget() {
 }
 
 std::unique_ptr<Expr> Parser::ParsePrimaryExpr() {
+    if (Check(TokenKind::kLBracket) && Peek(1).kind == TokenKind::kRBracket) {
+        return ParseEmptyCollectionExpr();
+    }
+
     if (allow_aggregate_init_ && Check(TokenKind::kLBrace)) {
         return ParseBraceAggregateInitExpr();
     }
