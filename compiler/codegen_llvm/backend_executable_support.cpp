@@ -28,6 +28,8 @@ std::string RenderLLVMParameter(const BackendTypeInfo& type_info,
     return stream.str();
 }
 
+}  // namespace
+
 std::string DecodeStringLiteral(std::string_view literal) {
     if (literal.size() >= 2 && literal.front() == '"' && literal.back() == '"') {
         literal.remove_prefix(1);
@@ -86,8 +88,6 @@ std::string EncodeLLVMStringBytes(std::string_view decoded) {
     encoded << "\\00";
     return encoded.str();
 }
-
-}  // namespace
 
 namespace executable_support {
 

@@ -11,6 +11,8 @@ bool IsSignedSourceType(std::string_view source_name) {
            source_name == "isize" || source_name == "int_literal";
 }
 
+}  // namespace
+
 bool IsUnsignedSourceType(std::string_view source_name) {
     return source_name == "u8" || source_name == "u16" || source_name == "u32" || source_name == "u64" ||
            source_name == "usize" || source_name == "uintptr";
@@ -30,8 +32,6 @@ std::size_t IntegerBitWidth(const BackendTypeInfo& type_info) {
     }
     return static_cast<std::size_t>(std::stoul(std::string(digits)));
 }
-
-}  // namespace
 
 bool ResolveExecutableValue(const ExecutableFunctionState& state,
                             const std::string& value_name,

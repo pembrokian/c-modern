@@ -3,7 +3,7 @@ Phase 250 -- LLVM Executable Backend Decomposition
 
 Status
 ------
-PROPOSED
+COMPLETED
 
 Purpose
 -------
@@ -229,3 +229,37 @@ Future follow-up
 - If later work wants stronger compile-time help for MIR instruction coverage,
   pursue that as a separate tooling or warning-policy slice instead of folding
   it into this structural refactor.
+
+Implemented outcome
+-------------------
+- `compiler/codegen_llvm/backend.cpp` now stays focused on executable-backend
+  orchestration, public entrypoints, module assembly, target validation, and
+  the single visible executable instruction dispatcher.
+- Call lowering now lives in `compiler/codegen_llvm/backend_executable_calls.cpp`.
+- Numeric and compare lowering now lives in
+  `compiler/codegen_llvm/backend_executable_numeric.cpp`.
+- Aggregate, slice, enum, and memory-container lowering now lives in
+  `compiler/codegen_llvm/backend_executable_aggregate.cpp`.
+- Shared executable helpers now flow through
+  `compiler/codegen_llvm/backend_internal.h` and the existing executable
+  support owners instead of being redefined in multiple lowering families.
+
+Validation
+----------
+- `Build debug`
+- `ctest --test-dir build/debug -R mc_codegen_llvm_unit --output-on-failure`
+
+Phase review against spec
+-------------------------
+- `backend.cpp` is materially smaller and now reads as the executable-backend
+  owner for orchestration and routing rather than the primary home for most
+  instruction-family lowering logic.
+- Three real executable lowering families moved into behavior-owned sibling
+  files: calls, numeric or compare, and aggregate or slice or enum or
+  memory-container lowering.
+- Shared executable helpers now have one clear owner via the internal backend
+  contract and existing executable support files.
+- Unsupported executable MIR capability checks remain centralized through the
+  existing preflight and dispatcher-owned boundaries.
+- Focused LLVM backend validation passed without changing target policy or the
+  public backend API surface.

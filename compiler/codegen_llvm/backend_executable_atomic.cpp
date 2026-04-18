@@ -185,14 +185,15 @@ std::string ExecutableAtomicContext(std::string_view operation,
 namespace executable_atomic {
 
 bool RenderAtomicInstruction(const mir::Instruction& instruction,
-                             std::size_t function_index,
-                             std::size_t block_index,
-                             std::size_t instruction_index,
-                             const mir::BasicBlock& block,
-                             const std::filesystem::path& source_path,
-                             support::DiagnosticSink& diagnostics,
-                             ExecutableFunctionState& state,
-                             std::vector<std::string>& output_lines) {
+                             const ExecutableEmissionContext& context) {
+    const std::size_t function_index = context.function_index;
+    const std::size_t block_index = context.block_index;
+    const std::size_t instruction_index = context.instruction_index;
+    const mir::BasicBlock& block = context.block;
+    const std::filesystem::path& source_path = context.source_path;
+    support::DiagnosticSink& diagnostics = context.diagnostics;
+    ExecutableFunctionState& state = context.state;
+    std::vector<std::string>& output_lines = context.output_lines;
     switch (instruction.kind) {
         case mir::Instruction::Kind::kAtomicLoad: {
             if (!RequireAtomicInstructionResult(instruction, block, source_path, diagnostics, state, "atomic_load") ||

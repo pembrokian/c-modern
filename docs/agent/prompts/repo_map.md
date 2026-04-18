@@ -86,6 +86,11 @@ This file is a fast orientation map for agents working in this repository.
 - `compiler/codegen_llvm`
   - bootstrap LLVM backend scaffolding
   - frozen hosted Darwin arm64 target configuration and backend preflight entrypoints
+  - `backend.cpp`: public executable-backend owner for module assembly, target validation, public entrypoints, and the single visible executable instruction dispatcher
+  - `backend_executable_calls.cpp`: executable call lowering owner
+  - `backend_executable_numeric.cpp`: executable numeric and compare lowering owner
+  - `backend_executable_aggregate.cpp`: executable aggregate, slice, enum, and memory-container lowering owner
+  - `backend_internal.h`: internal executable-backend cross-file contract for shared helper surfaces used by the split lowering owners
 
 - `compiler/support`
   - diagnostics, source-manager utilities, deterministic dump-path helpers

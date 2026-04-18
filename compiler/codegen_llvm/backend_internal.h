@@ -5,6 +5,7 @@
 #include <filesystem>
 #include <functional>
 #include <optional>
+#include <set>
 #include <sstream>
 #include <string>
 #include <string_view>
@@ -16,6 +17,9 @@
 
 namespace mc::codegen_llvm {
 
+struct ExecutableValue;
+struct ExecutableFunctionState;
+
 bool ValidateBootstrapTarget(const TargetConfig& target,
                             const std::filesystem::path& source_path,
                             support::DiagnosticSink& diagnostics);
@@ -24,6 +28,52 @@ bool ValidateExecutableBackendCapabilities(const mir::Module& module,
                                           const TargetConfig& target,
                                           const std::filesystem::path& source_path,
                                           support::DiagnosticSink& diagnostics);
+
+bool IsProcedureSourceType(std::string_view source_name);
+
+bool IsUnsignedSourceType(std::string_view source_name);
+
+bool IsFloatType(const BackendTypeInfo& type_info);
+
+std::size_t IntegerBitWidth(const BackendTypeInfo& type_info);
+
+std::string DecodeStringLiteral(std::string_view literal);
+
+std::string EncodeLLVMStringBytes(std::string_view decoded);
+
+std::string FunctionBlockContext(std::string_view operation,
+                                 std::string_view function_name,
+                                 const mir::BasicBlock& block);
+
+std::string ExecutableFunctionBlockContext(std::string_view operation,
+                                           const ExecutableFunctionState& state,
+                                           const mir::BasicBlock& block);
+
+bool RequireOperandRange(const mir::Instruction& instruction,
+                         std::size_t minimum_count,
+                         std::size_t maximum_count,
+                         std::string_view backend_name,
+                         std::string_view requirement,
+                         std::string_view function_name,
+                         const mir::BasicBlock& block,
+                         const std::filesystem::path& source_path,
+                         support::DiagnosticSink& diagnostics);
+
+std::string EmitSliceLengthValue(std::size_t function_index,
+                                 std::size_t block_index,
+                                 std::size_t instruction_index,
+                                 std::string_view suffix,
+                                 std::string_view lower_i64,
+                                 const std::optional<std::string>& upper_i64,
+                                 std::string_view fallback_upper_bound,
+                                 std::vector<std::string>& output_lines);
+
+std::string EmitAggregateStackSlot(const ExecutableValue& value,
+                                   std::size_t function_index,
+                                   std::size_t block_index,
+                                   std::size_t instruction_index,
+                                   std::string_view suffix,
+                                   std::vector<std::string>& output_lines);
 
 void ReportBackendError(const std::filesystem::path& source_path,
                         const std::string& message,
@@ -142,6 +192,11 @@ struct ExecutableGlobalInfo {
 
 using ExecutableGlobals = std::unordered_map<std::string, ExecutableGlobalInfo>;
 
+struct CheckedHelperRequirements {
+    std::set<std::string> div_backend_names;
+    std::set<std::size_t> shift_widths;
+};
+
 struct ExecutableSignature {
     std::vector<sema::Type> param_types;
     std::vector<sema::Type> return_types;
@@ -167,6 +222,17 @@ struct ExecutableFunctionState {
     const ExecutableGlobals* globals = nullptr;
     std::unordered_map<std::string, ExecutableStringConstant> string_constants;
     std::unordered_map<std::string, ExecutableValue> values;
+};
+
+struct ExecutableEmissionContext {
+    std::size_t function_index = 0;
+    std::size_t block_index = 0;
+    std::size_t instruction_index = 0;
+    const mir::BasicBlock& block;
+    const std::filesystem::path& source_path;
+    support::DiagnosticSink& diagnostics;
+    ExecutableFunctionState& state;
+    std::vector<std::string>& output_lines;
 };
 
 bool ResolveExecutableValue(const ExecutableFunctionState& state,
@@ -236,6 +302,60 @@ bool EmitNumericConversion(const ExecutableValue& operand,
                            std::vector<std::string>& output_lines,
                            std::string& result_text);
 
+bool CollectCheckedHelperRequirements(const mir::Module& module,
+                                      const std::filesystem::path& source_path,
+                                      support::DiagnosticSink& diagnostics,
+                                      CheckedHelperRequirements& requirements);
+
+bool EmitValueInstruction(const mir::Instruction& instruction,
+                          const ExecutableEmissionContext& context,
+                          const std::unordered_map<std::string, std::string>& function_symbols);
+
+bool EmitCallInstruction(const mir::Instruction& instruction,
+                         const ExecutableEmissionContext& context,
+                         const std::unordered_map<std::string, std::string>& function_symbols);
+
+bool EmitBinaryInstruction(const mir::Instruction& instruction,
+                           const ExecutableEmissionContext& context);
+
+bool EmitMemoryInstruction(const mir::Instruction& instruction,
+                           const ExecutableEmissionContext& context);
+
+bool ResolveEnumInstructionLayout(const mir::Instruction& instruction,
+                                  const mir::Module& module,
+                                  const std::filesystem::path& source_path,
+                                  support::DiagnosticSink& diagnostics,
+                                  const std::string& context,
+                                  EnumBackendLayout& layout,
+                                  std::size_t& variant_index);
+
+std::string EmitEnumPayloadFieldPointer(const std::string& enum_slot,
+                                        const EnumBackendLayout& layout,
+                                        std::size_t payload_offset,
+                                        std::size_t function_index,
+                                        std::size_t block_index,
+                                        std::size_t instruction_index,
+                                        std::string_view suffix,
+                                        std::vector<std::string>& output_lines);
+
+bool EmitAggregateInitInstruction(const mir::Instruction& instruction,
+                                  const ExecutableEmissionContext& context);
+
+bool EmitVariantInitInstruction(const mir::Instruction& instruction,
+                                const ExecutableEmissionContext& context);
+
+bool EmitVariantMatchInstruction(const mir::Instruction& instruction,
+                                 const ExecutableEmissionContext& context);
+
+bool EmitVariantExtractInstruction(const mir::Instruction& instruction,
+                                   const ExecutableEmissionContext& context);
+
+bool EmitArenaNewInstruction(const mir::Instruction& instruction,
+                             const ExecutableEmissionContext& context);
+
+bool EmitSliceInstruction(const mir::Instruction& instruction,
+                          const ExecutableEmissionContext& context);
+
 namespace executable_support {
 
 ExecutableFunctionSignature NormalizeFunctionSignature(const mir::Function& function);
@@ -300,14 +420,7 @@ bool CollectExecutableStringConstants(const mir::Module& module,
 namespace executable_atomic {
 
 bool RenderAtomicInstruction(const mir::Instruction& instruction,
-                             std::size_t function_index,
-                             std::size_t block_index,
-                             std::size_t instruction_index,
-                             const mir::BasicBlock& block,
-                             const std::filesystem::path& source_path,
-                             support::DiagnosticSink& diagnostics,
-                             ExecutableFunctionState& state,
-                             std::vector<std::string>& output_lines);
+                             const ExecutableEmissionContext& context);
 
 }  // namespace executable_atomic
 
