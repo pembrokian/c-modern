@@ -54,6 +54,7 @@ const CMD_O: u8 = 79   // 'O' — workflow command family
 const CMD_V: u8 = 86   // 'V' — completion mailbox command family
 const CMD_Z: u8 = 90   // 'Z' — lease command family
 const CMD_H: u8 = 72   // 'H' — connection command family
+const CMD_B: u8 = 66   // 'B' — update store command family
 
 const TARGET_SERIAL: u8 = 83    // 'S'
 const TARGET_SHELL: u8 = 72     // 'H'
@@ -74,6 +75,7 @@ const TARGET_OBJECT_STORE: u8 = 78  // 'N'
 const TARGET_LEASE: u8 = 90     // 'Z'
 const TARGET_COMPLETION: u8 = 66  // 'B'
 const TARGET_CONNECTION: u8 = 67  // 'C'
+const TARGET_UPDATE_STORE: u8 = 68  // 'D'
 
 const PARTICIPANT_NONE: u8 = 78  // 'N'
 const POLICY_CLEAR: u8 = 67      // 'C'
@@ -224,6 +226,22 @@ func encode_object_read(name: u8) [4]u8 {
 
 func encode_object_replace(name: u8, value: u8) [4]u8 {
     return encode_two_args(CMD_N, CMD_W, name, value)
+}
+
+func encode_update_stage(value: u8) [4]u8 {
+    return encode_one_arg(CMD_B, CMD_A, value)
+}
+
+func encode_update_clear() [4]u8 {
+    return encode_no_args(CMD_B, CMD_C)
+}
+
+func encode_update_query() [4]u8 {
+    return encode_no_args(CMD_B, CMD_Q)
+}
+
+func encode_update_manifest(version: u8, expected_len: u8) [4]u8 {
+    return encode_two_args(CMD_B, CMD_M, version, expected_len)
 }
 
 func encode_timer_create(id: u8, due: u8) [4]u8 {

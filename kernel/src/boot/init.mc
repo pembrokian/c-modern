@@ -30,6 +30,7 @@ import task_service
 import ticket_service
 import timer_service
 import transfer_service
+import update_store_service
 import workflow_service
 
 struct RestartPolicyInfo {
@@ -83,6 +84,8 @@ func restart_policy_for_target(target: u8) RestartPolicyInfo {
         return restart_policy_single(target, serial_protocol.POLICY_KEEP)
     case serial_protocol.TARGET_OBJECT_STORE:
         return restart_policy_single(target, serial_protocol.POLICY_KEEP)
+    case serial_protocol.TARGET_UPDATE_STORE:
+        return restart_policy_single(target, serial_protocol.POLICY_KEEP)
     default:
         return RestartPolicyInfo{ target: 0, owner0: serial_protocol.PARTICIPANT_NONE, owner1: serial_protocol.PARTICIPANT_NONE, policy: serial_protocol.PARTICIPANT_NONE }
     }
@@ -133,6 +136,8 @@ func restart(state: boot.KernelBootState, endpoint: u32) boot.KernelBootState {
         return restart_completion_mailbox(state)
     case service_topology.OBJECT_STORE_ENDPOINT_ID:
         return restart_object_store(state)
+    case service_topology.UPDATE_STORE_ENDPOINT_ID:
+        return restart_update_store(state)
     default:
         return state
     }
@@ -280,4 +285,10 @@ func restart_object_store(state: boot.KernelBootState) boot.KernelBootState {
     slot := service_topology.OBJECT_STORE_SLOT
     next := boot.bootrestart_object_store(state, object_store_service.object_store_load(slot.pid, 1))
     return boot.bootwith_object_store_restart_outcome(next, boot.RestartOutcome.DurableReloaded)
+}
+
+func restart_update_store(state: boot.KernelBootState) boot.KernelBootState {
+    slot := service_topology.UPDATE_STORE_SLOT
+    next := boot.bootrestart_update_store(state, update_store_service.update_store_load(slot.pid, 1))
+    return boot.bootwith_update_store_restart_outcome(next, boot.RestartOutcome.DurableReloaded)
 }

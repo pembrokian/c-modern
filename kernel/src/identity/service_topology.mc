@@ -45,6 +45,7 @@ const LEASE_ENDPOINT_ID: u32 = 23
 const COMPLETION_MAILBOX_ENDPOINT_ID: u32 = 24
 const OBJECT_STORE_ENDPOINT_ID: u32 = 25
 const CONNECTION_ENDPOINT_ID: u32 = 26
+const UPDATE_STORE_ENDPOINT_ID: u32 = 27
 
 // ServiceSlot records the static wiring for one boot service: which endpoint
 // it occupies and which pid owns it.  Both values are fixed at kernel_init
@@ -86,8 +87,9 @@ const LEASE_SLOT: ServiceSlot = { endpoint: LEASE_ENDPOINT_ID, pid: 14 }
 const COMPLETION_MAILBOX_SLOT: ServiceSlot = { endpoint: COMPLETION_MAILBOX_ENDPOINT_ID, pid: 15 }
 const OBJECT_STORE_SLOT: ServiceSlot = { endpoint: OBJECT_STORE_ENDPOINT_ID, pid: 16 }
 const CONNECTION_SLOT: ServiceSlot = { endpoint: CONNECTION_ENDPOINT_ID, pid: 17 }
+const UPDATE_STORE_SLOT: ServiceSlot = { endpoint: UPDATE_STORE_ENDPOINT_ID, pid: 18 }
 
-const SERVICE_SLOTS: [17]ServiceSlot = {
+const SERVICE_SLOTS: [18]ServiceSlot = {
     SERIAL_SLOT,
     SHELL_SLOT,
     LOG_SLOT,
@@ -104,10 +106,11 @@ const SERVICE_SLOTS: [17]ServiceSlot = {
     LEASE_SLOT,
     COMPLETION_MAILBOX_SLOT,
     OBJECT_STORE_SLOT,
-    CONNECTION_SLOT
+    CONNECTION_SLOT,
+    UPDATE_STORE_SLOT
 }
 
-const SERVICE_RESTART_MODES: [17]ServiceRestartMode = {
+const SERVICE_RESTART_MODES: [18]ServiceRestartMode = {
     ServiceRestartMode.None,
     ServiceRestartMode.None,
     ServiceRestartMode.Reload,
@@ -124,15 +127,16 @@ const SERVICE_RESTART_MODES: [17]ServiceRestartMode = {
     ServiceRestartMode.Reset,
     ServiceRestartMode.Reload,
     ServiceRestartMode.Reload,
-    ServiceRestartMode.Reset
+    ServiceRestartMode.Reset,
+    ServiceRestartMode.Reload
 }
 
 // SERVICE_COUNT is the number of boot-wired services in the static topology.
 // Increment this when a new slot constant is added above.
-const SERVICE_COUNT: u32 = 17
+const SERVICE_COUNT: u32 = 18
 
 func service_count() usize {
-    return 17
+    return 18
 }
 
 func service_slot_at(index: usize) ServiceSlot {
@@ -214,6 +218,8 @@ func service_authority_class(endpoint: u32) ServiceAuthorityClass {
         return ServiceAuthorityClass.DurableOwner
     case CONNECTION_ENDPOINT_ID:
         return ServiceAuthorityClass.PublicEndpoint
+    case UPDATE_STORE_ENDPOINT_ID:
+        return ServiceAuthorityClass.DurableOwner
     default:
         if endpoint_is_boot_wired(endpoint) {
             return ServiceAuthorityClass.PublicEndpoint

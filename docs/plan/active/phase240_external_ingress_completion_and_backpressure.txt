@@ -3,7 +3,7 @@ Phase 240 -- External Ingress Completion And Backpressure
 
 Status
 ------
-LANDED
+PROPOSED
 
 Purpose
 -------
@@ -112,22 +112,6 @@ Test obligations
 - one focused reset-lane fixture for external ingress completion pressure
 - `mc_tool_workflow_kernel_reset_lane_unit`
 - `mc_tool_workflow_kernel_reset_lane_full_unit`
-
-Implementation status
----------------------
-- Landed by keeping external request occupancy in `connection_service` until
-  `workflow_service` reaches a true terminal state instead of clearing the
-  request when mailbox delivery first stalls.
-- The bounded caller-visible deferred truth remains the existing workflow query
-  surface: external completion pressure reports `WORKFLOW_STATE_DELIVERING`
-  with `Exhausted` on first full delivery and `WouldBlock` on repeated full
-  delivery, while the connection slot remains occupied and rejects new ingress.
-- Validation now includes the deterministic
-  `scenario_connection_completion_pressure` probe, the focused
-  `tests/system/kernel_reset_lane_phase240_external_ingress_completion_pressure`
-  fixture, and grouped reset-lane coverage in
-  `mc_tool_workflow_kernel_reset_lane_unit` and
-  `mc_tool_workflow_kernel_reset_lane_full_unit`.
 
 Acceptance criteria
 -------------------

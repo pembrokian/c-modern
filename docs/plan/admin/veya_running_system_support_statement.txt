@@ -9,10 +9,10 @@ Purpose
 -------
 Record the current admitted Veya running-system slice separately from the
 broader position note so the repository can state exactly what the work
-through Phase 230 does and does not support.
+through Phase 242 does and does not support.
 
 This is the current refreshed running-system statement.  It supersedes the
-earlier Phase 120 through Phase 121 statement and reflects the post-Phase-230
+earlier Phase 120 through Phase 121 statement and reflects the post-Phase-242
 landing.
 
 This note is intentionally narrower than the current-position assessment.
@@ -152,12 +152,22 @@ Repository status note
   compact owner-local durable artifact, making the retained-versus-durable
   boundary executable without widening into a filesystem or storage
   framework.
+- Phases 231–233 admit one retained workflow owner, one retained completion
+  mailbox owner, and one bounded delegation lease owner.
+- Phase 234 admits `object_store_service` as one bounded durable named-object
+  owner.
+- Phases 235–241 pressure that service graph through durable updates,
+  delegated durable work, delivery pressure, external ingress,
+  connection-backed workflow execution, external completion pressure, and one
+  delegated external request path.
+- Phase 242 admits `update_store_service` as one bounded staged-update owner
+  with one compact manifest and one staged artifact slot.
 
 Core rule
 ---------
 - Keep this running-system support statement separate from the broader
   position note.
-- State only the admitted Phase 109 through Phase 230 running-system slice,
+- State only the admitted Phase 109 through Phase 242 running-system slice,
   not a larger platform ambition.
 - Keep service policy init-owned and explicit.
 - Reopen broader running-system claims only when a later kernel proof lands
@@ -189,26 +199,34 @@ Frozen support matrix
   transferred-handle consumer that performs one follow-through send;
   ticket_service as one bounded reset-style owner that issues two-byte
   `[epoch, id]` tickets and rejects stale or already-consumed tickets
-  explicitly; journal_service as one bounded durable owner with fixed lanes,
-  compact append/replay/clear behavior, and explicit boot/init reload from a
-  host-backed durable artifact;
-  shell_service as a stateless
-  command-routing owner with compact hostile-user invalid classification
-  (`?C` unknown command, `?S` malformed admitted shape) plus bounded
-  lifecycle query, restart, identity, retained-summary, retained-policy, and
-  compact service-state plus retained-versus-durable boundary routing on
-  fixed public targets;
-  serial_service as serial ingress and reply staging owner; handle-bearing
-  observations remain outside ordinary named messaging and are rejected at
-  the dispatch gateway with `InvalidCapability` unless they target the
-  explicit transfer endpoint
+  explicitly; journal_service as one bounded durable replay owner with fixed
+  lanes, compact append/replay/clear behavior, and explicit boot/init reload
+  from a host-backed durable artifact; object_store_service as one bounded
+  durable named-object owner with fixed-capacity create/read/replace plus one
+  workflow-facing update step; update_store_service as one bounded staged-
+  update owner with one staged artifact slot, one compact manifest record,
+  one classification query, and one explicit durable reload path;
+  workflow_service as one bounded retained delayed-work owner with journal-
+  backed restart continuity; completion_mailbox_service as one bounded
+  retained completion owner; lease_service as one bounded temporary
+  delegation owner; connection_service as one bounded external-ingress owner;
+  shell_service as a stateless command-routing owner with compact hostile-user
+  invalid classification (`?C` unknown command, `?S` malformed admitted
+  shape) plus bounded lifecycle query, restart, identity, retained-summary,
+  retained-policy, authority-inspection, compact service-state, and retained-
+  versus-durable boundary routing on fixed public targets; serial_service as
+  serial ingress and reply staging owner; handle-bearing observations remain
+  outside ordinary named messaging and are rejected at the dispatch gateway
+  with `InvalidCapability` unless they target the explicit transfer endpoint
 - admitted topology boundary: service_topology.mc owns SERIAL_ENDPOINT_ID,
   SHELL_ENDPOINT_ID, LOG_ENDPOINT_ID, KV_ENDPOINT_ID, ECHO_ENDPOINT_ID,
-  TRANSFER_ENDPOINT_ID, QUEUE_ENDPOINT_ID, TICKET_ENDPOINT_ID, and
-  JOURNAL_ENDPOINT_ID as the neutral topology module with no service imports;
-  shell_service.mc is topology-neutral;
-  service_topology also owns static restart classification; kernel_dispatch
-  routes through named arms referencing service_topology
+  TRANSFER_ENDPOINT_ID, QUEUE_ENDPOINT_ID, TICKET_ENDPOINT_ID,
+  JOURNAL_ENDPOINT_ID, OBJECT_STORE_ENDPOINT_ID, WORKFLOW_ENDPOINT_ID,
+  COMPLETION_MAILBOX_ENDPOINT_ID, LEASE_ENDPOINT_ID,
+  CONNECTION_ENDPOINT_ID, and UPDATE_STORE_ENDPOINT_ID as the neutral
+  topology module with no service imports; shell_service.mc is
+  topology-neutral; service_topology also owns static restart classification;
+  kernel_dispatch routes through named arms referencing service_topology
 - admitted event codes boundary: event_codes.mc owns EVENT_SERIAL_BUFFERED
   through EVENT_SERIAL_CLEARED; serial_shell_event_log.mc is a ring-buffer
   sink consuming those codes from real effects
@@ -276,9 +294,18 @@ Frozen support matrix
   inspection, Phase 208 retained-policy inspection, Phase 209 authority
   vocabulary and ownership-table audit, Phase 212 authority inspection
   follow-through, Phase 213 unified identity taxonomy for restartable
-  services, Phase 214 system introspection surface for service state, and
-  Phase 217 retained-versus-durable state boundary, and Phase 230 durable
-  journal service first pressure step
+  services, Phase 214 system introspection surface for service state, Phase
+  217 retained-versus-durable state boundary, Phase 230 durable journal
+  service first pressure step, Phase 231 restart-safe workflow service probe,
+  Phase 232 completion mailbox pressure probe, Phase 233 bounded delegation
+  lease service probe, Phase 234 durable named object store first slice,
+  Phase 235 restart-safe named object update workflow, Phase 236 delegated
+  named object processing lane, Phase 237 named object update recovery and
+  delivery pressure, Phase 238 connection service narrow ingress admission,
+  Phase 239 connection-backed workflow execution, Phase 240 external ingress
+  completion and backpressure, Phase 241 delegated external request
+  handling, and Phase 242 update manifest and staged artifact store first
+  slice
 - unsupported today: dynamic discovery, a general namespace model, dynamic
   loading, a service manager, broader init policy, public freestanding `mc
   run` or `mc test`, broader target-family admission, multicore claims,

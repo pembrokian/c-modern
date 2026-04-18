@@ -33,6 +33,7 @@ import ticket_service
 import timer_service
 import transfer_grant
 import transfer_service
+import update_store_service
 import workflow_service
 
 // MAX_EFFECT_CHAIN_DEPTH guards against send loops between services.
@@ -358,6 +359,18 @@ func dispatch_object_store(state: *boot.KernelBootState, msg: service_effect.Mes
     return result.effect
 }
 
+func dispatch_update_store(state: *boot.KernelBootState, msg: service_effect.Message) service_effect.Effect {
+    current: boot.KernelBootState = *state
+    result := update_store_service.handle(current.update_store.state, msg)
+    if update_store_service.update_store_changed(current.update_store.state, result.state) {
+        if !update_store_service.update_store_persist(result.state) {
+            return service_effect.effect_reply(syscall.SyscallStatus.Closed, 0, primitives.zero_payload())
+        }
+    }
+    *state = boot.bootwith_update_store(current, result.state)
+    return result.effect
+}
+
 func dispatch_completion_mailbox(state: *boot.KernelBootState, msg: service_effect.Message) service_effect.Effect {
     current: boot.KernelBootState = *state
     result: completion_mailbox_service.CompletionMailboxResult = completion_mailbox_service.handle(current.completion.state, msg)
@@ -484,6 +497,8 @@ func leaf_route(endpoint: u32) LeafRoute {
         return LeafRoute{ endpoint: endpoint, reply: dispatch_completion_mailbox }
     case service_topology.OBJECT_STORE_ENDPOINT_ID:
         return LeafRoute{ endpoint: endpoint, reply: dispatch_object_store }
+    case service_topology.UPDATE_STORE_ENDPOINT_ID:
+        return LeafRoute{ endpoint: endpoint, reply: dispatch_update_store }
     default:
         return LeafRoute{ endpoint: endpoint, reply: dispatch_invalid_endpoint }
     }

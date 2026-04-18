@@ -3,7 +3,7 @@ Phase 241 -- Delegated External Request Handling
 
 Status
 ------
-LANDED
+PROPOSED
 
 Purpose
 -------
@@ -19,10 +19,10 @@ rather than declaring the milestone complete after owner-local handling alone.
 Repository status note
 ----------------------
 - Phase 233 already proved bounded delegation on an internal completion path.
-- Phase 239 landed the connection-backed external workflow lane.
-- Phase 240 kept external request occupancy live until completion delivery succeeds.
-- Phase 241 lands one delegated external ticket-use path with explicit valid,
-  stale, invalid, and already-consumed outcomes.
+- Phase 239 is expected to make external ingress drive workflow work.
+- Phase 240 is expected to stress completion delivery under external backlog.
+- The repository still lacks one external request path that uses bounded
+  delegated authority and restart-visible stale rejection.
 
 Problem being solved
 --------------------
@@ -98,27 +98,19 @@ Questions this phase must answer
 4. Does this phase expose a real need for broader session or routing policy,
    or can those remain honestly deferred?
 
-Landed implementation shape
----------------------------
-- `lease_service` issues one external ticket lease kind bound to the current
-  `ticket_service` generation.
-- `connection_service` reserves the `128..255` request-byte family for
-  delegated external ticket-use requests and continues owning request lifetime.
-- `workflow_service` consumes the delegated lease only when the queued
-  connection-backed workflow executes, then reports valid, stale, invalid, and
-  already-consumed outcomes through the existing completion mailbox owner.
-- `ticket_service` now distinguishes stale, invalid, and already-consumed
-  ticket uses so the external delegated path can report truthful terminal
-  outcomes without widening dispatch or shell policy.
-- The shell transport stays four bytes wide by adding one additive
-  `ZT<epoch><id>` lease-issue command rather than widening the frame.
+Preferred implementation shape
+------------------------------
+- Keep temporary authority in `lease_service`.
+- Keep external request lifetime and ingress truth in `connection_service`.
+- Keep queued execution in `workflow_service` when the delegated path needs
+  restart-safe work.
+- Reuse completion-mailbox outcomes for the delegated external request path.
 
 Test obligations
 ----------------
 - `Build debug`
-- one focused scenario proving delegated external handling, stale-after-
-  restart rejection, invalid delegated request rejection, and already-consumed
-  rejection
+- one focused scenario proving delegated external handling, one stale-after-
+  restart rejection, and one already-consumed rejection
 - one focused reset-lane fixture for delegated external request handling
 - `mc_tool_workflow_kernel_reset_lane_unit`
 - `mc_tool_workflow_kernel_reset_lane_full_unit`
@@ -131,18 +123,6 @@ Acceptance criteria
 - ingress, workflow, completion, and authority truths remain in their bounded
   owners
 - no session, authentication, or routing framework is introduced
-
-Landing summary
----------------
-- One delegated external request path now exists: a connection-backed external
-  request can carry a lease id that authorizes one ticket use when the queued
-  workflow executes.
-- The delegated path reports four terminal outcomes through the workflow and
-  completion owners: used, invalid, stale, and consumed.
-- The implementation stays owner-local: `lease_service` owns temporary
-  authority, `ticket_service` owns restart-visible ticket truth,
-  `connection_service` owns ingress lifetime, and `workflow_service` owns the
-  queued execution step.
 
 Future follow-up
 ----------------

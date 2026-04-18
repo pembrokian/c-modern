@@ -158,6 +158,8 @@ func lifecycle_target_endpoint(target: u8) u32 {
         return service_topology.OBJECT_STORE_ENDPOINT_ID
     case serial_protocol.TARGET_CONNECTION:
         return service_topology.CONNECTION_ENDPOINT_ID
+    case serial_protocol.TARGET_UPDATE_STORE:
+        return service_topology.UPDATE_STORE_ENDPOINT_ID
     default:
         return 0
     }
@@ -446,6 +448,34 @@ func route_object_store(s: ShellServiceState, m: service_effect.Message, op: u8)
     return dispatch(OBJECT_ROUTES, s, m, op)
 }
 
+func update_stage(s: ShellServiceState, m: service_effect.Message) service_effect.Effect {
+    return forward_two(s, service_topology.UPDATE_STORE_ENDPOINT_ID, serial_protocol.CMD_A, m.payload[2])
+}
+
+func update_clear(s: ShellServiceState, m: service_effect.Message) service_effect.Effect {
+    return forward_two(s, service_topology.UPDATE_STORE_ENDPOINT_ID, serial_protocol.CMD_C, serial_protocol.CMD_BANG)
+}
+
+func update_query(s: ShellServiceState, m: service_effect.Message) service_effect.Effect {
+    return forward_two(s, service_topology.UPDATE_STORE_ENDPOINT_ID, serial_protocol.CMD_Q, serial_protocol.CMD_BANG)
+}
+
+func update_manifest(s: ShellServiceState, m: service_effect.Message) service_effect.Effect {
+    return forward_three(s, service_topology.UPDATE_STORE_ENDPOINT_ID, serial_protocol.CMD_M, m.payload[2], m.payload[3])
+}
+
+const UPDATE_ROUTES: [5]OpHandler = [5]OpHandler{
+    OpHandler{ op: serial_protocol.CMD_A, check: bang3, run: update_stage },
+    OpHandler{ op: serial_protocol.CMD_C, check: bang23, run: update_clear },
+    OpHandler{ op: serial_protocol.CMD_Q, check: bang23, run: update_query },
+    OpHandler{ op: serial_protocol.CMD_M, check: anymsg, run: update_manifest },
+    UNUSED_ROUTE
+}
+
+func route_update_store(s: ShellServiceState, m: service_effect.Message, op: u8) service_effect.Effect {
+    return dispatch(UPDATE_ROUTES, s, m, op)
+}
+
 func timer_create(s: ShellServiceState, m: service_effect.Message) service_effect.Effect {
     return forward_three(s, service_topology.TIMER_ENDPOINT_ID, serial_protocol.CMD_C, m.payload[2], m.payload[3])
 }
@@ -723,6 +753,8 @@ func handle(s: ShellServiceState, m: service_effect.Message) service_effect.Effe
 
     case serial_protocol.CMD_H:
         return route_connection(s, m, op)
+    case serial_protocol.CMD_B:
+        return route_update_store(s, m, op)
     default:
         return invalid_effect(SHELL_INVALID_COMMAND)
     }

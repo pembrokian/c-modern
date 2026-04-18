@@ -49,6 +49,8 @@ func state_class(target: u8) u8 {
         return STATE_CLASS_DURABLE
     case serial_protocol.TARGET_OBJECT_STORE:
         return STATE_CLASS_DURABLE
+    case serial_protocol.TARGET_UPDATE_STORE:
+        return STATE_CLASS_DURABLE
     case serial_protocol.TARGET_WORKFLOW:
         return STATE_CLASS_RETAINED
     case serial_protocol.TARGET_LEASE:

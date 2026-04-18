@@ -7,7 +7,7 @@ This file is a fast orientation map for agents working in this repository.
 - `CMakeLists.txt`: canonical build graph and CTest registration
 - `Makefile`: convenience wrapper around the CMake workflow
 - `README.md`: current repository summary and common commands
-- `kernel/`: repository-owned Veya kernel bring-up tree; currently at the Phase 241 delegated external request handling slice over the hosted reset-lane workflow surface
+- `kernel/`: repository-owned Veya kernel bring-up tree; currently at the Phase 242 update manifest and staged artifact store slice over the hosted reset-lane workflow surface
 - `docs/agent/prompts/plan_spec.txt`: normative spec for the required structure of new per-phase plan documents
 - `docs/plan/admin/canopus_repo_layout_and_test_policy.txt`: current repository policy for Veya source, build, and test placement
 - `docs/plan/plan.txt`: authoritative multi-phase implementation plan
@@ -33,8 +33,9 @@ This file is a fast orientation map for agents working in this repository.
   - repository-owned Veya kernel sources rather than disposable proof-only fixtures
   - `docs/arch/veya/kernel_style_guide.txt`: required style guide for kernel/src/ service modules and kernel main.mc orchestration
   - `build.toml`: hosted reset-lane manifest used by the active workflow suite and the maintained reset-lane tool regressions
-  - `src/main.mc`: explicit architecture entry plus thin root orchestration over the landed bounded service graph, including the durable journal owner, durable object-store owner, retained workflow owner, retained completion mailbox owner, bounded delegation lease owner, bounded connection ingress owner, connection-backed workflow execution path, and delegated external ticket-use follow-through
+  - `src/main.mc`: explicit architecture entry plus thin root orchestration over the landed bounded service graph, including the durable journal owner, durable object-store owner, durable update-store owner, retained workflow owner, retained completion mailbox owner, bounded delegation lease owner, bounded connection ingress owner, connection-backed workflow execution path, and delegated external ticket-use follow-through
   - `src/services/object_store_service.mc`: bounded durable named-object owner with fixed-capacity create/read/replace semantics, one owner-local workflow-facing update step, owner-local artifact persistence, and explicit reload-on-restart follow-through
+  - `src/services/update_store_service.mc`: bounded durable staged-update owner with one fixed artifact slot, one compact manifest record, owner-local classification query, owner-local artifact persistence, and explicit reload-on-restart follow-through
   - `src/sched.mc`: scheduler-owned lifecycle validation for bounded spawn, wait, sleep, and wake follow-through
   - `src/lifecycle.mc`: lifecycle-owned task and process slot mutation for spawn, timer block, wake-to-ready, exit, and waited-child release follow-through
   - `src/debug/`: one logical `debug` module split through `module_sets.debug`, owning the running-system audit progression from the first running kernel slice through the current Phase 233 bounded delegation lease slice
@@ -177,6 +178,7 @@ This file is a fast orientation map for agents working in this repository.
 - Remaining top-level `build/debug/phase*` paths are preserved manual or probe areas rather than active regression output policy.
 - Phase 240 extends the Phase 239 connection-backed workflow lane by requiring external request occupancy to remain live until completion delivery succeeds under mailbox pressure.
 - Phase 241 adds one delegated external request path by letting the connection-backed workflow lane consume a bounded lease that authorizes one ticket use at execution time.
+- Phase 242 adds one product-shaped durable owner, `update_store_service`, so staged artifact bytes and manifest truth stay separate from both `object_store_service` and workflow logic.
 
 ## Where To Change Things
 

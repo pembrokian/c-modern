@@ -59,6 +59,7 @@ Record one maintained repository position after Phase 230 admitted one bounded d
 Record one maintained repository position after Phase 231 admitted one retained workflow owner without opening scheduler, process, or compiler frameworks.
 Record one maintained repository position after Phase 232 admitted one retained completion mailbox owner without opening mailbox frameworks, subscriptions, or compiler surfaces.
 Record one maintained repository position after Phase 233 admitted one bounded delegation lease owner without opening sessions, capability frameworks, or compiler surfaces.
+Record one maintained repository position after Phase 242 admitted one bounded staged-update owner without opening package-manager, installer, storage-framework, or compiler surfaces.
 Record one maintained repository position after Phase 231 admitted one retained workflow owner without opening scheduler, process, or compiler frameworks.
 Record one maintained repository position after Phase 232 admitted one retained completion mailbox owner without opening mailbox frameworks, subscriptions, or compiler surfaces.
 Record one maintained repository position after Phase 233 admitted one bounded delegation lease owner without opening sessions, capability frameworks, or compiler surfaces.
@@ -245,6 +246,8 @@ Current repository truth
 - The landed Phase 214 system introspection surface for service state adds one compact shell-visible `XC<target>!` query that composes lifecycle class, restart mode, retained participation, retained policy, a bounded generation marker, and already-admitted local count metadata without widening into discovery, dashboards, or reopened compiler work.
 - The landed Phase 217 retained-versus-durable state boundary adds one compact shell-visible `XD<target>!` query that projects retained-state class, durable-state non-admission, and explicit durable requirements without widening into storage frameworks, persistence mechanisms, or reopened compiler work.
 - The landed Phase 230 durable journal service first pressure step admits one bounded durable `journal_service` owner with fixed append/replay/clear lanes, explicit boot/init durable reload, and one owner-local durable artifact, making durable recovery executable without widening into a filesystem framework, storage registry, or reopened compiler work.
+- The landed Phase 231 through Phase 241 workflow, completion, delegation, ingress, and external-request follow-through all belong to that same admitted slice rather than to scheduler, broker, session, or compiler frameworks.
+- The landed Phase 242 update manifest and staged artifact store first slice also belongs to that same admitted slice rather than to a package manager, installer framework, storage registry, or reopened compiler wave.
 - Phase 202 then removed the retired freestanding archive itself, refreshed active docs to the live grouped workflow owners, and added one workflow-suite guard so every checked-in reset-lane fixture with a `build.toml` stays represented in the scenario table; this maintenance step belongs to workflow and documentation honesty rather than to a new runtime or compiler surface.
 - The repository therefore proves that the current language, sema, MIR,
   backend, runtime, and build path are sufficient for one honest small kernel

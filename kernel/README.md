@@ -31,7 +31,7 @@ Source tree layout (Phase 219)
 - `src/` root: `main.mc` (entry), `kernel_dispatch.mc` (routing), `event_codes.mc` (shared shell-event constants)
 - `src/boot/`: `boot.mc`, `boot_identity.mc`, `boot_update.mc`, `init.mc`
 - `src/identity/`: `service_identity.mc`, `service_state.mc`, `service_topology.mc`, `identity_taxonomy.mc`
-- `src/services/`: `echo_service.mc`, `file_service.mc`, `kv_service.mc`, `log_service.mc`, `queue_service.mc`, `task_service.mc`, `ticket_service.mc`, `timer_service.mc`, `transfer_grant.mc`, `transfer_service.mc`
+- `src/services/`: `completion_mailbox_service.mc`, `connection_service.mc`, `echo_service.mc`, `file_service.mc`, `journal_service.mc`, `kv_service.mc`, `lease_service.mc`, `log_service.mc`, `object_store_service.mc`, `queue_service.mc`, `task_service.mc`, `ticket_service.mc`, `timer_service.mc`, `transfer_grant.mc`, `transfer_service.mc`, `update_store_service.mc`, `workflow_service.mc`
 - `src/shell/`: `serial_protocol.mc`, `serial_service.mc`, `serial_shell_event_log.mc`, `serial_shell_path.mc`, `shell_service.mc`
 - `src/scenarios/`: `scenarios.mc` and all `scenario_*.mc` files
 - `src/transport/`: `primitives.mc`, `syscall.mc`, `ipc.mc`, `service_effect.mc`
@@ -49,6 +49,15 @@ The following modules are deferred until the named phase boundary forces them:
 - `mmu` — probably never in this tree; hosted execution makes MMU stubs meaningless
 
 Recent service targets
+
+- Phase 242 (landed): update manifest and staged artifact store first slice.
+  `update_store_service.mc` is now the bounded durable owner for one staged
+  artifact plus one compact manifest truth record. The owner supports stage,
+  manifest, query, and clear operations, persists owner-local state to
+  `mc_update_store_service.bin`, reloads explicitly on restart, and stays
+  separate from both `object_store_service` and workflow ownership. The focused
+  reset-lane fixture is
+  `tests/system/kernel_reset_lane_phase242_update_store`.
 
 - Phase 240 (landed): external ingress completion pressure. External
   connection-backed workflow results now keep request occupancy truth in
@@ -108,7 +117,7 @@ Recent service targets
   focused reset-lane fixture is
   `tests/system/kernel_reset_lane_phase220_timer_task_service`.
 
-- Next open: delegated durable-object mutation is now the strongest adjacent
-  pressure, but it should stay deferred until one bounded authority follow-
-  through can land without widening into sessions, ACLs, or a capability
-  framework.
+- Next open: the strongest adjacent product-shaped pressure is one restart-safe
+  workflow that validates and applies the staged update owned by
+  `update_store_service` without widening into package-manager, installer, or
+  dependency frameworks.

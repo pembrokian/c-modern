@@ -26,6 +26,7 @@ import ticket_service
 import timer_service
 import transfer_grant
 import transfer_service
+import update_store_service
 import workflow_service
 
 enum RetainedSummaryParticipation {
@@ -79,9 +80,11 @@ struct KernelBootState {
     lease: ServiceCell<lease_service.LeaseServiceState>
     completion: ServiceCell<completion_mailbox_service.CompletionMailboxServiceState>
     object_store: ServiceCell<object_store_service.ObjectStoreServiceState>
+    update_store: ServiceCell<update_store_service.UpdateStoreServiceState>
     lease_restart_outcome: RestartOutcome
     completion_restart_outcome: RestartOutcome
     object_store_restart_outcome: RestartOutcome
+    update_store_restart_outcome: RestartOutcome
     grants: transfer_grant.GrantTable
 }
 
@@ -103,6 +106,7 @@ func kernel_init() KernelBootState {
     lease_slot := service_topology.LEASE_SLOT
     completion_slot := service_topology.COMPLETION_MAILBOX_SLOT
     object_store_slot := service_topology.OBJECT_STORE_SLOT
+    update_store_slot := service_topology.UPDATE_STORE_SLOT
 
     path_state := serial_shell_path.path_init(serial_service.serial_init(serial_slot.pid, 1), shell_service.shell_init(shell_slot.pid, 1), shell_slot.endpoint)
     log_cell := ServiceCell<log_service.LogServiceState>{ state: log_service.log_init(log_slot.pid, 1), generation: 1 }
@@ -120,6 +124,7 @@ func kernel_init() KernelBootState {
     lease_cell := ServiceCell<lease_service.LeaseServiceState>{ state: lease_service.lease_init(lease_slot.pid, 1), generation: 1 }
     completion_cell := ServiceCell<completion_mailbox_service.CompletionMailboxServiceState>{ state: completion_mailbox_service.completion_mailbox_init(completion_slot.pid, 1), generation: 1 }
     object_store_cell := ServiceCell<object_store_service.ObjectStoreServiceState>{ state: object_store_service.object_store_load(object_store_slot.pid, 1), generation: 1 }
+    update_store_cell := ServiceCell<update_store_service.UpdateStoreServiceState>{ state: update_store_service.update_store_load(update_store_slot.pid, 1), generation: 1 }
 
     return KernelBootState{
         path_state: path_state,
@@ -153,9 +158,11 @@ func kernel_init() KernelBootState {
         lease: lease_cell,
         completion: completion_cell,
         object_store: object_store_cell,
+        update_store: update_store_cell,
         lease_restart_outcome: RestartOutcome.None,
         completion_restart_outcome: RestartOutcome.None,
         object_store_restart_outcome: RestartOutcome.None,
+        update_store_restart_outcome: RestartOutcome.None,
         grants: transfer_grant.grant_init()
     }
 }

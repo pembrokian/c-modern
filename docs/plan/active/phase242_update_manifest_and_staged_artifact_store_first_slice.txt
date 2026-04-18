@@ -3,7 +3,7 @@ Phase 242 -- Update Manifest And Staged Artifact Store First Slice
 
 Status
 ------
-PROPOSED
+COMPLETED
 
 Purpose
 -------
@@ -30,6 +30,24 @@ Repository status note
 - The repository still lacks one product-shaped durable owner whose contract is
   explicitly about update manifests and staged artifacts rather than generic
   objects or external requests.
+
+Implementation summary
+----------------------
+- Added `kernel/src/services/update_store_service.mc` as the sole owner of one
+  staged artifact plus one compact manifest record.
+- Kept the contract bounded to four staged bytes, one manifest version byte,
+  one expected-length byte, one classification query, and one explicit clear
+  path.
+- Wired the owner through `service_topology`, `shell_service`,
+  `serial_protocol`, `kernel_dispatch`, `boot`, `boot_update`, `init`,
+  `boot_identity`, and `service_state` without widening `object_store_service`,
+  workflow ownership, or shell transport width.
+- Added one focused scenario in
+  `kernel/src/scenarios/scenario_update_store_service.mc` and one focused
+  reset-lane fixture in
+  `tests/system/kernel_reset_lane_phase242_update_store`.
+- Updated adjacent topology fixtures that still assumed the pre-Phase-242
+  service count so the boot-wired truth remains explicit and shared.
 
 Problem being solved
 --------------------
@@ -141,6 +159,43 @@ Acceptance criteria
 - manifest and staged-artifact state survive restart and remain queryable
 - no package-manager, dependency, or filesystem framework is introduced
 - the milestone now has one concrete product-shaped durable input surface
+
+Validation
+----------
+- `Build debug`
+- `ctest --test-dir build/debug -R mc_tool_workflow_kernel_reset_lane_unit --output-on-failure`
+
+Results
+-------
+- The staged artifact and manifest truth now persist in one owner-local durable
+  artifact (`mc_update_store_service.bin`) and reload through the ordinary boot
+  or init durable path.
+- The shell-visible surface remains fixed at four bytes by routing update-store
+  operations through one additive `CMD_B` family and one dedicated
+  `TARGET_UPDATE_STORE` lifecycle target.
+- Restart-visible topology truth is now 18 services, with
+  `UPDATE_STORE_ENDPOINT_ID = 27` and reload-classified restart behavior.
+- The owning reset-lane workflow suite passes with the new focused fixture
+  included.
+
+Decisions and non-decisions
+---------------------------
+- Decision: the update milestone starts with a dedicated durable owner rather
+  than widening `object_store_service` with manifest semantics.
+- Decision: manifest truth stays compact and owner-local: presence, version,
+  expected length, and artifact classification.
+- Non-decision: this phase does not validate, apply, install, roll back, or
+  schedule staged updates.
+- Non-decision: this phase does not add package metadata, dependency graphs,
+  directory layout, or tool-side schema frameworks.
+
+Deferred follow-up
+------------------
+- The next honest product-shaped follow-through is one restart-safe workflow
+  that validates and applies the staged update through this owner.
+- Richer manifest semantics should remain deferred until one admitted update
+  workflow needs more than version, expected length, and staged-artifact
+  classification.
 
 Future follow-up
 ----------------

@@ -15,6 +15,7 @@ import ticket_service
 import timer_service
 import transfer_grant
 import transfer_service
+import update_store_service
 import workflow_service
 
 func bootwith_log(s: KernelBootState, log: log_service.LogServiceState) KernelBootState {
@@ -209,6 +210,14 @@ func bootwith_object_store_restart_outcome(s: KernelBootState, outcome: RestartO
     return s with { object_store_restart_outcome: outcome }
 }
 
+func bootwith_update_store(s: KernelBootState, update_store: update_store_service.UpdateStoreServiceState) KernelBootState {
+    return s with { update_store.state: update_store }
+}
+
+func bootwith_update_store_restart_outcome(s: KernelBootState, outcome: RestartOutcome) KernelBootState {
+    return s with { update_store_restart_outcome: outcome }
+}
+
 func bootrestart_workflow(s: KernelBootState, workflow: workflow_service.WorkflowServiceState) KernelBootState {
     return s with { workflow.state: workflow, workflow.generation: s.workflow.generation + 1 }
 }
@@ -223,4 +232,8 @@ func bootrestart_completion(s: KernelBootState, completion: completion_mailbox_s
 
 func bootrestart_object_store(s: KernelBootState, object_store: object_store_service.ObjectStoreServiceState) KernelBootState {
     return s with { object_store.state: object_store, object_store.generation: s.object_store.generation + 1 }
+}
+
+func bootrestart_update_store(s: KernelBootState, update_store: update_store_service.UpdateStoreServiceState) KernelBootState {
+    return s with { update_store.state: update_store, update_store.generation: s.update_store.generation + 1 }
 }
