@@ -245,7 +245,7 @@
                                                                       switch_case.pattern.variant_name,
                                                                       binding_index);
                     const std::string storage_name =
-                        BindVisibleLocal(binding_name, binding_value.type, true, switch_case.pattern.span);
+                        BindVisibleLocal(binding_name, binding_value.type, false, switch_case.pattern.span);
                     SnapshotValueToLocal(storage_name, binding_value);
                 }
                 LowerStmtList(switch_case.statements);

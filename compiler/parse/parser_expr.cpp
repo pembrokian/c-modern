@@ -411,10 +411,7 @@ std::unique_ptr<Expr> Parser::ParseTypeCallExpr() {
     Consume(TokenKind::kLParen, "expected '(' after conversion target type");
     SkipNewlines();
     if (!Check(TokenKind::kRParen)) {
-        do {
-            expr->args.push_back(ParseExpr());
-            SkipNewlines();
-        } while (Match(TokenKind::kComma) && (SkipNewlines(), true));
+        expr->args = ParseExprListUntil(TokenKind::kRParen);
     }
     Consume(TokenKind::kRParen, "expected ')' after call arguments");
     expr->span.end = Previous().span.end;
@@ -437,10 +434,7 @@ std::unique_ptr<Expr> Parser::ParseBareIntegerConversionExpr() {
     Consume(TokenKind::kLParen, "expected '(' after conversion target type");
     SkipNewlines();
     if (!Check(TokenKind::kRParen)) {
-        do {
-            expr->args.push_back(ParseExpr());
-            SkipNewlines();
-        } while (Match(TokenKind::kComma) && (SkipNewlines(), true));
+        expr->args = ParseExprListUntil(TokenKind::kRParen);
     }
     Consume(TokenKind::kRParen, "expected ')' after call arguments");
     expr->span.end = Previous().span.end;
@@ -455,10 +449,7 @@ std::unique_ptr<Expr> Parser::ParseTypeAggregateInitExpr() {
     Consume(TokenKind::kLBrace, "expected '{' after aggregate initializer type");
     SkipNewlines();
     if (!Check(TokenKind::kRBrace)) {
-        do {
-            expr->field_inits.push_back(ParseFieldInit());
-            SkipNewlines();
-        } while (Match(TokenKind::kComma) && (SkipNewlines(), true));
+        expr->field_inits = ParseFieldInitListUntil(TokenKind::kRBrace);
     }
     Consume(TokenKind::kRBrace, "expected '}' after aggregate initializer");
     expr->span.end = Previous().span.end;
@@ -472,14 +463,26 @@ std::unique_ptr<Expr> Parser::ParseBraceAggregateInitExpr() {
     Consume(TokenKind::kLBrace, "expected '{' to start aggregate initializer");
     SkipNewlines();
     if (!Check(TokenKind::kRBrace)) {
-        do {
-            expr->field_inits.push_back(ParseFieldInit());
-            SkipNewlines();
-        } while (Match(TokenKind::kComma) && (SkipNewlines(), true));
+        expr->field_inits = ParseFieldInitListUntil(TokenKind::kRBrace);
     }
     Consume(TokenKind::kRBrace, "expected '}' after aggregate initializer");
     expr->span.end = Previous().span.end;
     return expr;
+}
+
+std::vector<std::unique_ptr<Expr>> Parser::ParseExprListUntil(TokenKind terminator) {
+    std::vector<std::unique_ptr<Expr>> result;
+    result.push_back(ParseExpr());
+    SkipNewlines();
+    while (Match(TokenKind::kComma)) {
+        SkipNewlines();
+        if (Check(terminator)) {
+            break;
+        }
+        result.push_back(ParseExpr());
+        SkipNewlines();
+    }
+    return result;
 }
 
 std::unique_ptr<Expr> Parser::ParseUnaryExpr() {
@@ -601,10 +604,7 @@ std::unique_ptr<Expr> Parser::ParsePostfixExpr() {
             node->left = std::move(expr);
             SkipNewlines();
             if (!Check(TokenKind::kRParen)) {
-                do {
-                    node->args.push_back(ParseExpr());
-                    SkipNewlines();
-                } while (Match(TokenKind::kComma) && (SkipNewlines(), true));
+                node->args = ParseExprListUntil(TokenKind::kRParen);
             }
             Consume(TokenKind::kRParen, "expected ')' after call arguments");
             node->span.end = Previous().span.end;
@@ -620,10 +620,7 @@ std::unique_ptr<Expr> Parser::ParsePostfixExpr() {
             node->left = std::move(expr);
             SkipNewlines();
             if (!Check(TokenKind::kRBrace)) {
-                do {
-                    node->field_inits.push_back(ParseFieldInit());
-                    SkipNewlines();
-                } while (Match(TokenKind::kComma) && (SkipNewlines(), true));
+                node->field_inits = ParseFieldInitListUntil(TokenKind::kRBrace);
             }
             Consume(TokenKind::kRBrace, "expected '}' after aggregate initializer");
             node->span.end = Previous().span.end;
@@ -639,10 +636,7 @@ std::unique_ptr<Expr> Parser::ParsePostfixExpr() {
             Consume(TokenKind::kLBrace, "expected '{' after 'with'");
             SkipNewlines();
             if (!Check(TokenKind::kRBrace)) {
-                do {
-                    node->field_inits.push_back(ParseFieldInit(true));
-                    SkipNewlines();
-                } while (Match(TokenKind::kComma) && (SkipNewlines(), true));
+                node->field_inits = ParseFieldInitListUntil(TokenKind::kRBrace, true);
             }
             Consume(TokenKind::kRBrace, "expected '}' after record update");
             node->span.end = Previous().span.end;
@@ -653,6 +647,21 @@ std::unique_ptr<Expr> Parser::ParsePostfixExpr() {
         break;
     }
     return expr;
+}
+
+std::vector<FieldInit> Parser::ParseFieldInitListUntil(TokenKind terminator, bool allow_dotted_name) {
+    std::vector<FieldInit> result;
+    result.push_back(ParseFieldInit(allow_dotted_name));
+    SkipNewlines();
+    while (Match(TokenKind::kComma)) {
+        SkipNewlines();
+        if (Check(terminator)) {
+            break;
+        }
+        result.push_back(ParseFieldInit(allow_dotted_name));
+        SkipNewlines();
+    }
+    return result;
 }
 
 FieldInit Parser::ParseFieldInit(bool allow_dotted_name) {

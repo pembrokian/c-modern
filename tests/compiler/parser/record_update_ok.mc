@@ -1,3 +1,3 @@
 func update(cfg: Config) Config {
-    return cfg with { path: "out", mode: "fast" }
+    return cfg with { path: "out", mode: "fast", }
 }

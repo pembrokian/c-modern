@@ -125,7 +125,7 @@ void TestLogicalShortCircuitLoweringUsesControlFlow() {
         "}\n"
         "\n"
         "func either(left: bool) bool {\n"
-        "    return left || hit()\n"
+        "    return left || false || hit()\n"
         "}\n",
         diagnostics);
 

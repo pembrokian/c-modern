@@ -373,6 +373,9 @@ std::vector<std::unique_ptr<Expr>> Parser::ParseExprList() {
     std::vector<std::unique_ptr<Expr>> result;
     result.push_back(ParseExpr());
     while (Match(TokenKind::kComma)) {
+        if (IsStatementTerminator(Current().kind)) {
+            break;
+        }
         result.push_back(ParseExpr());
     }
     return result;

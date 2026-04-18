@@ -314,7 +314,7 @@ break_stmt      = "break"
 continue_stmt   = "continue"
 defer_stmt      = "defer" expr
 
-expr_list       = expr { "," expr }
+expr_list       = expr { "," expr } [ "," ]
 statement_sep   = <newline>
 ```
 
@@ -371,7 +371,7 @@ index_access    = "[" expr "]"
 slice_access    = "[" [ expr ] ":" [ expr ] "]"
 call_suffix     = "(" [ expr_list ] ")"
 aggregate_init_suffix = "{" [ field_init_list ] "}"
-field_init_list = field_init { "," field_init }
+field_init_list = field_init { "," field_init } [ "," ]
 field_init      = [ <identifier> ":" ] expr
 ```
 

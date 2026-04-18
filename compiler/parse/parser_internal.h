@@ -108,6 +108,7 @@ class Parser {
     std::unique_ptr<Stmt> ParseBindingStmt(Stmt::Kind kind, mc::support::SourcePosition start, bool allow_storage_without_initializer);
     std::unique_ptr<Stmt> ParseAssignOrExprStmt();
     std::vector<std::unique_ptr<Expr>> ParseExprList();
+    std::vector<std::unique_ptr<Expr>> ParseExprListUntil(TokenKind terminator);
 
     std::unique_ptr<Expr> ParseExpr(bool allow_aggregate_init = true);
     std::unique_ptr<Expr> ParseRangeExpr();
@@ -138,6 +139,7 @@ class Parser {
     std::unique_ptr<Expr> ParseBraceAggregateInitExpr();
     std::unique_ptr<Expr> ParseUnaryExpr();
     std::unique_ptr<Expr> ParsePostfixExpr();
+    std::vector<FieldInit> ParseFieldInitListUntil(TokenKind terminator, bool allow_dotted_name = false);
     FieldInit ParseFieldInit(bool allow_dotted_name = false);
     std::unique_ptr<Expr> ParseAssignmentTarget();
     std::unique_ptr<Expr> NormalizeAssignmentTarget(std::unique_ptr<Expr> target);

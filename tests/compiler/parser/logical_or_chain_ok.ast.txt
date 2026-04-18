@@ -1,0 +1,34 @@
+SourceFile
+  ModuleKind=ordinary
+  FuncDecl name=pick
+    ParamDecl name=a
+      NamedType name=bool
+    ParamDecl name=b
+      NamedType name=bool
+    ParamDecl name=c
+      NamedType name=bool
+    returns:
+      NamedType name=bool
+    body:
+      BlockStmt
+        statements:
+          IfStmt
+            exprs:
+              BinaryExpr text=||
+                left:
+                  BinaryExpr text=||
+                    left:
+                      NameExpr text=a
+                    right:
+                      NameExpr text=b
+                right:
+                  NameExpr text=c
+            then:
+              BlockStmt
+                statements:
+                  ReturnStmt
+                    exprs:
+                      LiteralExpr text=true kind=true
+          ReturnStmt
+            exprs:
+              LiteralExpr text=false kind=false

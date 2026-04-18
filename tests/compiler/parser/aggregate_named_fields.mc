@@ -1,3 +1,3 @@
 func build() {
-    cfg = Config{ path: "out", mode: "fast" }
+    cfg = Config{ path: "out", mode: "fast", }
 }

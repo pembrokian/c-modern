@@ -3,7 +3,7 @@ Phase 247 -- Parser Follow-Through For Chained Disjunctions And Trailing Commas
 
 Status
 ------
-PROPOSED
+LANDED
 
 Purpose
 -------
