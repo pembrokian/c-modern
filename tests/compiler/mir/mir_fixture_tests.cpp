@@ -52,7 +52,11 @@ std::string LowerToValidatedDump(const std::string& source_text,
         mc::test_support::Fail("fixture should pass semantic checking: " + source_path.generic_string() + "\n" + diagnostics.Render());
     }
 
-    const auto lowered = mc::mir::LowerSourceFile(*parsed.source_file, *checked.module, source_path, diagnostics);
+    const auto lowered = mc::mir::LowerSourceFile(*parsed.source_file,
+                                                  *checked.module,
+                                                  source_path,
+                                                  options.imported_modules,
+                                                  diagnostics);
     if (!lowered.ok) {
         mc::test_support::Fail("fixture should lower successfully: " + source_path.generic_string() + "\n" + diagnostics.Render());
     }
@@ -193,7 +197,11 @@ void RunFixture(const std::filesystem::path& source_root,
         mc::test_support::Fail("fixture should pass semantic checking: " + source_path.generic_string() + "\n" + diagnostics.Render());
     }
 
-    const auto lowered = mc::mir::LowerSourceFile(*parsed.source_file, *checked.module, source_path, diagnostics);
+    const auto lowered = mc::mir::LowerSourceFile(*parsed.source_file,
+                                                  *checked.module,
+                                                  source_path,
+                                                  options.imported_modules,
+                                                  diagnostics);
 
     if (lowered.ok) {
         mc::test_support::Fail("fixture should fail to lower: " + source_path.generic_string());
@@ -215,12 +223,14 @@ int main(int argc, char** argv) {
         {"canonical_eval.mc", "canonical_eval.mir.txt", true, "eval.mc", {}, {}},
         {"canonical_memory_poll.mc", "canonical_memory_poll.mir.txt", true, "memory_poll.mc", {}, {}},
         {"canonical_window_stats.mc", "canonical_window_stats.mir.txt", true, "window_stats.mc", {}, {}},
+        {"canonical_array_grid_lookup.mc", "canonical_array_grid_lookup.mir.txt", true, "array_grid_lookup.mc", {}, {}},
         {"imported_generic_box_ok.mc", "imported_generic_box_ok.mir.txt", true, "", {}, {{"helper_box", "import_roots/helper_box.mc"}}},
         {"import_root_ok_main.mc", "import_root_ok_main.mir.txt", true, "", {"tests/compiler/mir/import_roots"}, {}},
         {"imported_atomic_ok.mc", "imported_atomic_ok.mir.txt", true, "", {}, {{"sync", "import_roots/sync_module.mc"}}},
         {"imported_event_buffer_ok.mc", "imported_event_buffer_ok.mir.txt", true, "", {"tests/compiler/mir/import_roots"}, {}},
         {"qualified_variant_import_root_ok.mc", "qualified_variant_import_root_ok.mir.txt", true, "", {}, {{"color_module", "import_roots/color_module.mc"}}},
         {"switch_imported_const_ok.mc", "switch_imported_const_ok.mir.txt", true, "", {}, {{"switch_consts", "import_roots/switch_consts.mc"}}},
+        {"imported_array_extent_expr_ok.mc", "imported_array_extent_expr_ok.mir.txt", true, "", {}, {{"helper_extents", "import_roots/helper_extents.mc"}}},
         {"switch_shared_case_ok.mc", "switch_shared_case_ok.mir.txt", true, "", {}, {}},
     };
 

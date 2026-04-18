@@ -1434,6 +1434,12 @@ void RunCodegenExecutableProjectSuite(const std::filesystem::path& source_root,
                     0,
                     {});
 
+    RunBuiltFixture(mc_path,
+                    source_root / "examples/canonical/array_grid_lookup.mc",
+                    work_root / "array_grid_lookup_build",
+                    0,
+                    {});
+
     RunBuiltFixtureWithIrSnippetChecks(mc_path,
                                        source_root / "examples/canonical/hosted_default_allocator_use.mc",
                                        work_root / "hosted_default_allocator_use_build",

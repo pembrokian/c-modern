@@ -1,0 +1,12 @@
+Module
+  Import name=helper_extents
+  ConstGlobal names=[LOCAL_OFFSET] type=usize
+    init 1
+  Function name=widen returns=[[6]u8]
+    Local name=input type=[6]u8 param readonly
+    Local name=mirror type=[6]u8
+    Block label=entry0
+      load_local %v0:[6]u8 target=input
+      store_local target=mirror operands=[%v0]
+      load_local %v1:[6]u8 target=mirror
+      terminator return values=[%v1]

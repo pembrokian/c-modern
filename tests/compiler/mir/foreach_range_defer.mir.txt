@@ -6,10 +6,10 @@ Module
     Local name=values type=Slice<i32> param readonly
     Local name=total type=i32
     Local name=%hidden.defer_callee0 type=proc()->void readonly
-    Local name=%hidden.iterable1 type=Slice<i32>
-    Local name=%hidden.index2 type=usize
     Local name=index type=usize
     Local name=value type=i32
+    Local name=%hidden.iterable1 type=Slice<i32>
+    Local name=%hidden.index2 type=usize
     Local name=idx type=int_literal
     Block label=entry0
       const %v0:int_literal op=0

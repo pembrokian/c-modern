@@ -3,7 +3,7 @@ Phase 248 -- Array Type Follow-Through For Named Extents And 2D Arrays
 
 Status
 ------
-PROPOSED
+COMPLETE
 
 Purpose
 -------
@@ -33,6 +33,22 @@ Repository status note
 - The repository still lacks one bounded language phase whose primary purpose
   is to make array type identity and nested fixed-array use honest across the
   real compiler pipeline.
+
+Landing summary
+---------------
+- module-local compile-time integer expressions in array type positions now
+  normalize through sema and the downstream `ResolveTypeFromAst(...)` helper,
+  so local annotations no longer preserve raw extent text such as
+  `[CAP + 1]u8` after sema has already proved the length is `5`
+- nested fixed arrays remain the existing nested semantic form, but the phase
+  now proves that `[N][M]T` survives sema, MIR, and executable lowering via a
+  canonical caller and focused fixture coverage
+- the phase spends named extents in `examples/canonical/bounded_ring_buffer.mc`
+  and spends nested arrays in `examples/canonical/array_grid_lookup.mc`
+- imported qualified const extents in type positions now also normalize
+  through the MIR follow-through path, and the repository carries an explicit
+  imported-module MIR regression for mixed imported-plus-local extent
+  expressions
 
 Problem being solved
 --------------------

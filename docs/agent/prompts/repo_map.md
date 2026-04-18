@@ -184,6 +184,8 @@ This file is a fast orientation map for agents working in this repository.
 - Phase 245 adds one composed mailbox-pressure and restart-resumed reporting path so delegated update apply now proves deferred completion delivery without widening the completion or installer owners.
 - Phase 246 admits same-name local bindings in disjoint sibling branches and admits `_` as a discard target in local binding and assignment positions while keeping `_` unreadable and storage-free; MIR lowering now preserves that local-target truth through scoped visible-local mapping instead of assuming function-wide source-name uniqueness.
 - Phase 247 admits trailing commas in the existing comma-delimited expression and aggregate-init list owners, and the repository now carries explicit parser and lowering regressions for chained `a || b || c` short-circuit forms instead of treating that surface as a deferred limitation.
+- Phase 248 normalizes module-local compile-time integer array extents through sema and downstream local-annotation reconstruction, so `[CAP + 1]T` and `[5]T` now share one semantic fixed-array type when the extent evaluates to `5`.
+- Phase 248 now also normalizes imported qualified constant extents in downstream MIR type reconstruction, so local annotations such as `[helper_extents.WIDTH + 1]T` lower with the same fixed-array identity as their checked extent values.
 
 ## Where To Change Things
 

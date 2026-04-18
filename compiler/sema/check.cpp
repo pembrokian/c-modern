@@ -3654,43 +3654,89 @@ std::string DumpModule(const Module& module) {
     return stream.str();
 }
 
-// Evaluate a simple array-length expression using pre-computed constant values
-// stored in the module's global summaries.  Handles integer literals and plain
-// name references to module-scoped const declarations.  Returns nullopt for
-// any expression it cannot reduce to a non-negative integer.
-static std::optional<std::size_t> EvalArrayLengthFromModule(
-    const ast::Expr* length_expr, const Module& module) {
-    if (length_expr == nullptr) {
+// Evaluate an array-length expression using the checked module's constant
+// summaries. This keeps downstream type reconstruction aligned with the
+// checker-owned constant-evaluation contract for the integer expression forms
+// that can be resolved from Module::globals alone.
+static std::optional<ConstValue> EvalConstExprFromModule(
+    const ast::Expr* expr,
+    const Module& module,
+    const std::unordered_map<std::string, Module>* imported_modules) {
+    if (expr == nullptr) {
         return std::nullopt;
     }
-    if (length_expr->kind == ast::Expr::Kind::kLiteral) {
-        return mc::support::ParseArrayLength(length_expr->text);
-    }
-    if (length_expr->kind == ast::Expr::Kind::kName) {
-        const GlobalSummary* g = FindGlobalSummary(module, length_expr->text);
-        if (g == nullptr || !g->is_const) {
-            return std::nullopt;
-        }
-        for (std::size_t i = 0; i < g->names.size(); ++i) {
-            if (g->names[i] == length_expr->text &&
-                i < g->constant_values.size() &&
-                g->constant_values[i].has_value() &&
-                g->constant_values[i]->kind == ConstValue::Kind::kInteger &&
-                g->constant_values[i]->integer_value >= 0) {
-                return static_cast<std::size_t>(g->constant_values[i]->integer_value);
+
+    switch (expr->kind) {
+        case ast::Expr::Kind::kName: {
+            const GlobalSummary* global = FindGlobalSummary(module, expr->text);
+            if (global == nullptr || !global->is_const) {
+                return std::nullopt;
             }
+            return ParseGlobalConstValue(*global, expr->text);
         }
+        case ast::Expr::Kind::kQualifiedName: {
+            const Module* source_module = &module;
+            std::string global_name = expr->secondary_text;
+            if (imported_modules != nullptr) {
+                const auto imported = imported_modules->find(expr->text);
+                if (imported != imported_modules->end()) {
+                    source_module = &imported->second;
+                } else {
+                    global_name = expr->text + "." + expr->secondary_text;
+                }
+            } else {
+                global_name = expr->text + "." + expr->secondary_text;
+            }
+
+            const GlobalSummary* global = FindGlobalSummary(*source_module, global_name);
+            if (global == nullptr || !global->is_const) {
+                return std::nullopt;
+            }
+            return ParseGlobalConstValue(*global, global_name);
+        }
+        case ast::Expr::Kind::kLiteral:
+            return ParseLiteralConstValue(*expr);
+        case ast::Expr::Kind::kUnary: {
+            const auto operand = EvalConstExprFromModule(expr->left.get(), module, imported_modules);
+            if (!operand.has_value()) {
+                return std::nullopt;
+            }
+            return EvaluateConstUnaryOp(expr->text, *operand);
+        }
+        case ast::Expr::Kind::kBinary: {
+            const auto left = EvalConstExprFromModule(expr->left.get(), module, imported_modules);
+            const auto right = EvalConstExprFromModule(expr->right.get(), module, imported_modules);
+            if (!left.has_value() || !right.has_value()) {
+                return std::nullopt;
+            }
+            return EvaluateConstBinaryOp(expr->text, *left, *right);
+        }
+        case ast::Expr::Kind::kParen:
+            return EvalConstExprFromModule(expr->left.get(), module, imported_modules);
+        default:
+            return std::nullopt;
     }
-    return std::nullopt;
 }
 
-Type ResolveTypeFromAst(const ast::TypeExpr* type_expr, const Module& module) {
+static std::optional<std::size_t> EvalArrayLengthFromModule(const ast::Expr* length_expr,
+                                                            const Module& module,
+                                                            const std::unordered_map<std::string, Module>* imported_modules) {
+    const auto value = EvalConstExprFromModule(length_expr, module, imported_modules);
+    if (!value.has_value() || value->kind != ConstValue::Kind::kInteger || value->integer_value < 0) {
+        return std::nullopt;
+    }
+    return static_cast<std::size_t>(value->integer_value);
+}
+
+Type ResolveTypeFromAst(const ast::TypeExpr* type_expr,
+                        const Module& module,
+                        const std::unordered_map<std::string, Module>* imported_modules) {
     if (type_expr == nullptr ||
         type_expr->kind != ast::TypeExpr::Kind::kArray) {
         return TypeFromAst(type_expr);
     }
     // Recursively resolve the element type first.
-    Type inner = ResolveTypeFromAst(type_expr->inner.get(), module);
+    Type inner = ResolveTypeFromAst(type_expr->inner.get(), module, imported_modules);
     // Get base type from TypeFromAst to pick up the length text produced by
     // RenderExprInline (which is file-local to type.cpp).
     Type base = TypeFromAst(type_expr);
@@ -3699,7 +3745,7 @@ Type ResolveTypeFromAst(const ast::TypeExpr* type_expr, const Module& module) {
     if (!mc::support::ParseArrayLength(base.metadata).has_value() &&
         type_expr->length_expr != nullptr) {
         const auto len = EvalArrayLengthFromModule(
-            type_expr->length_expr.get(), module);
+            type_expr->length_expr.get(), module, imported_modules);
         if (len.has_value()) {
             base.metadata = std::to_string(*len);
         }

@@ -10,10 +10,10 @@ Module
     Local name=slice type=Slice<i32>
     Local name=window type=Slice<i32>
     Local name=total type=i32
-    Local name=%hidden.iterable0 type=Slice<i32>
-    Local name=%hidden.index1 type=usize
     Local name=index type=usize
     Local name=value type=i32
+    Local name=%hidden.iterable0 type=Slice<i32>
+    Local name=%hidden.index1 type=usize
     Block label=entry0
       load_local %v0:[4]i32 target=values
       array_to_slice %v1:Slice<i32> target=Slice<i32> operands=[%v0]

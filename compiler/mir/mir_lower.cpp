@@ -2066,7 +2066,7 @@ class FunctionLowerer {
     }
 
     void LowerBindingLike(const Stmt& stmt, bool is_mutable) {
-        const sema::Type declared_type = sema::ResolveTypeFromAst(stmt.type_ann.get(), sema_module_);
+        const sema::Type declared_type = sema::ResolveTypeFromAst(stmt.type_ann.get(), sema_module_, imported_modules_);
         if (!stmt.has_initializer) {
             for (std::size_t index = 0; index < stmt.pattern.names.size(); ++index) {
                 if (stmt.pattern.IsDiscard(index)) {

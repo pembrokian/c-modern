@@ -1,0 +1,7 @@
+SemanticModule
+  TypeDecl name=Buffer kind=struct
+    Field name=data type=[5]u8
+  Const names=[BASE] type=usize values=[4]
+  Const names=[WIDTH] type=usize values=[5]
+  Var names=[SCRATCH] type=[5]u8 values=[zero]
+  Function name=copy params=[[5]u8] returns=[[5]u8]

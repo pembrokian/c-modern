@@ -1,0 +1,103 @@
+Module
+  ConstGlobal names=[ROWS] type=usize
+    init 2
+  ConstGlobal names=[COLS] type=usize
+    init 3
+  Function name=row_sum returns=[i32]
+    Local name=values type=[3]i32 param readonly
+    Block label=entry0
+      load_local %v0:[3]i32 target=values
+      const %v1:int_literal op=0
+      const %v2:usize op=3
+      bounds_check op=index operands=[%v1, %v2]
+      index %v3:i32 target_kind=index target_display=values[0] target_base=[3]i32 operands=[%v0, %v1] target_types=[int_literal]
+      load_local %v4:[3]i32 target=values
+      const %v5:int_literal op=1
+      const %v6:usize op=3
+      bounds_check op=index operands=[%v5, %v6]
+      index %v7:i32 target_kind=index target_display=values[1] target_base=[3]i32 operands=[%v4, %v5] target_types=[int_literal]
+      binary %v8:i32 op=+ arithmetic=wrap operands=[%v3, %v7]
+      load_local %v9:[3]i32 target=values
+      const %v10:int_literal op=2
+      const %v11:usize op=3
+      bounds_check op=index operands=[%v10, %v11]
+      index %v12:i32 target_kind=index target_display=values[2] target_base=[3]i32 operands=[%v9, %v10] target_types=[int_literal]
+      binary %v13:i32 op=+ arithmetic=wrap operands=[%v8, %v12]
+      terminator return values=[%v13]
+  Function name=grid_sum returns=[i32]
+    Local name=values type=[2][3]i32 param readonly
+    Block label=entry0
+      load_local %v0:[2][3]i32 target=values
+      const %v1:int_literal op=0
+      const %v2:usize op=2
+      bounds_check op=index operands=[%v1, %v2]
+      index %v3:[3]i32 target_kind=index target_display=values[0] target_base=[2][3]i32 operands=[%v0, %v1] target_types=[int_literal]
+      symbol_ref %v4:proc([3]i32)->i32 target=row_sum target_kind=function target_name=row_sum
+      call %v5:i32 target=row_sum target_kind=function target_name=row_sum operands=[%v4, %v3]
+      load_local %v6:[2][3]i32 target=values
+      const %v7:int_literal op=1
+      const %v8:usize op=2
+      bounds_check op=index operands=[%v7, %v8]
+      index %v9:[3]i32 target_kind=index target_display=values[1] target_base=[2][3]i32 operands=[%v6, %v7] target_types=[int_literal]
+      symbol_ref %v10:proc([3]i32)->i32 target=row_sum target_kind=function target_name=row_sum
+      call %v11:i32 target=row_sum target_kind=function target_name=row_sum operands=[%v10, %v9]
+      binary %v12:i32 op=+ arithmetic=wrap operands=[%v5, %v11]
+      terminator return values=[%v12]
+  Function name=main returns=[i32]
+    Local name=weights type=[2][3]i32
+    Block label=entry0
+      const %v0:int_literal op=1
+      const %v1:int_literal op=2
+      const %v2:int_literal op=3
+      aggregate_init %v3:[3]i32 target=[3]i32 operands=[%v0, %v1, %v2] fields=[_, _, _]
+      const %v4:int_literal op=4
+      const %v5:int_literal op=5
+      const %v6:int_literal op=6
+      aggregate_init %v7:[3]i32 target=[3]i32 operands=[%v4, %v5, %v6] fields=[_, _, _]
+      aggregate_init %v8:[2][3]i32 target=[2][3]i32 operands=[%v3, %v7] fields=[_, _]
+      store_local target=weights operands=[%v8]
+      load_local %v9:[2][3]i32 target=weights
+      const %v10:int_literal op=1
+      const %v11:usize op=2
+      bounds_check op=index operands=[%v10, %v11]
+      index %v12:[3]i32 target_kind=index target_display=weights[1] target_base=[2][3]i32 operands=[%v9, %v10] target_types=[int_literal]
+      const %v13:int_literal op=2
+      const %v14:usize op=3
+      bounds_check op=index operands=[%v13, %v14]
+      index %v15:i32 target_kind=index target_display=weights[1][2] target_base=[3]i32 operands=[%v12, %v13] target_types=[int_literal]
+      const %v16:int_literal op=6
+      convert_numeric %v17:i32 target=i32 operands=[%v16]
+      binary %v18:bool op=!= operands=[%v15, %v17]
+      terminator cond value=%v18 true=if_then1 false=if_merge2
+    Block label=if_then1
+      const %v19:int_literal op=91
+      terminator return values=[%v19]
+    Block label=if_merge2
+      load_local %v20:[2][3]i32 target=weights
+      const %v21:int_literal op=0
+      const %v22:usize op=2
+      bounds_check op=index operands=[%v21, %v22]
+      index %v23:[3]i32 target_kind=index target_display=weights[0] target_base=[2][3]i32 operands=[%v20, %v21] target_types=[int_literal]
+      symbol_ref %v24:proc([3]i32)->i32 target=row_sum target_kind=function target_name=row_sum
+      call %v25:i32 target=row_sum target_kind=function target_name=row_sum operands=[%v24, %v23]
+      const %v26:int_literal op=6
+      convert_numeric %v27:i32 target=i32 operands=[%v26]
+      binary %v28:bool op=!= operands=[%v25, %v27]
+      terminator cond value=%v28 true=if_then3 false=if_merge4
+    Block label=if_then3
+      const %v29:int_literal op=92
+      terminator return values=[%v29]
+    Block label=if_merge4
+      load_local %v30:[2][3]i32 target=weights
+      symbol_ref %v31:proc([2][3]i32)->i32 target=grid_sum target_kind=function target_name=grid_sum
+      call %v32:i32 target=grid_sum target_kind=function target_name=grid_sum operands=[%v31, %v30]
+      const %v33:int_literal op=21
+      convert_numeric %v34:i32 target=i32 operands=[%v33]
+      binary %v35:bool op=!= operands=[%v32, %v34]
+      terminator cond value=%v35 true=if_then5 false=if_merge6
+    Block label=if_then5
+      const %v36:int_literal op=93
+      terminator return values=[%v36]
+    Block label=if_merge6
+      const %v37:int_literal op=0
+      terminator return values=[%v37]

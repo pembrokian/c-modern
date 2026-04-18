@@ -202,9 +202,12 @@ std::string DumpModule(const Module& module);
 void BuildModuleLookupMaps(Module& module);
 
 // Resolve a type expression to its semantic Type, evaluating array length
-// expressions that refer to named constants in the given module's globals.
-// Falls back to TypeFromAst for any length that cannot be resolved.
-Type ResolveTypeFromAst(const ast::TypeExpr* type_expr, const Module& module);
+// expressions that refer to named constants in the given module's globals or
+// visible imported-module surfaces. Falls back to TypeFromAst for any length
+// that cannot be resolved.
+Type ResolveTypeFromAst(const ast::TypeExpr* type_expr,
+                        const Module& module,
+                        const std::unordered_map<std::string, Module>* imported_modules = nullptr);
 
 }  // namespace mc::sema
 

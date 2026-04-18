@@ -1,0 +1,231 @@
+Phase 250 -- LLVM Executable Backend Decomposition
+==================================================
+
+Status
+------
+PROPOSED
+
+Purpose
+-------
+Admit one bounded structural refactor that shrinks the ownership pressure in
+`compiler/codegen_llvm/backend.cpp` by decomposing the executable LLVM IR
+emission path into behavior-owned sibling files while keeping backend
+semantics, public APIs, and the current one-bootstrap-target policy unchanged.
+
+This phase exists now because the repository has already split type lowering,
+inspect lowering, dump rendering, names, host invocation, atomic executable
+lowering, and executable support helpers into separate units, but the main
+executable instruction-selection surface still concentrates too many unrelated
+families in one file. The next honest move is not a subsystem rewrite. It is a
+local decomposition that makes the executable backend easier to extend and
+review without changing what the backend means.
+
+Repository status note
+----------------------
+- `compiler/codegen_llvm/backend.cpp` still owns the top-level executable LLVM
+  IR rendering path, including `RenderExecutableInstruction`, many
+  instruction-family helpers, module assembly, target validation, and public
+  entrypoints.
+- The inspect path already lives in `compiler/codegen_llvm/backend_inspect.cpp`
+  and is called through `LowerInspectModule(...)`; this is no longer a real
+  co-location problem.
+- Backend leaf ownership is already partially decomposed into
+  `backend_types.cpp`, `backend_names.cpp`, `backend_dump.cpp`,
+  `backend_host.cpp`, `backend_executable_support.cpp`,
+  `backend_executable_value_support.cpp`, and
+  `backend_executable_atomic.cpp`.
+- `docs/plan/critique_closures/phase127_backend_critique_treatment.txt`
+  already records that the earlier "one giant backend file" critique became
+  partly outdated after those splits, while leaving executable lowering as the
+  remaining concentrated owner.
+- The repository has targeted executable-backend regression coverage in
+  `tests/tool/codegen_llvm_tests.cpp`, including preflight capability checks,
+  call-signature guards, source-filename escaping, enum behavior, and object
+  build success or failure boundaries.
+
+Problem being solved
+--------------------
+- The current executable emission owner is still too concentrated to be an
+  honest long-term maintenance boundary. `backend.cpp` contains orchestration,
+  module assembly, function emission, and large instruction-family subsystems
+  for calls, aggregates, slices, enum comparison, memory-container helpers,
+  numeric operations, and bootstrap runtime helper requirements.
+- That concentration is not just aesthetic. It makes new MIR instruction work
+  harder to route correctly, encourages duplicate leaf helpers, and makes small
+  local changes require reading through unrelated lowering families before the
+  real owner is obvious.
+- Leaving the file as-is would continue to blur the difference between
+  executable-backend orchestration and executable instruction-family logic even
+  though the rest of `compiler/codegen_llvm/` already moved toward smaller,
+  behavior-owned files.
+- A broad rewrite would be dishonest because the backend strategy, target
+  choice, public API, and MIR contract are not the actual problem. The real
+  current-repo problem is that one remaining owner file still holds too many
+  executable lowering families at once.
+
+Non-goals
+---------
+- no backend-strategy rewrite
+- no new backend program or standalone executable-inspector binary
+- no target-policy expansion beyond the current bootstrap hosted target
+- no inspect-path redesign beyond shared-helper cleanup required by the file
+  split
+- no MIR instruction semantic changes
+- no generic registry, plugin, or table-driven instruction framework
+- no host-toolchain portability expansion beyond preserving the existing
+  `TargetConfig`-driven command shape
+- no opportunistic performance work such as lookup maps or string-literal
+  deduplication unless required by the decomposition itself
+
+Invariants
+----------
+- MIR remains the semantic contract; executable backend code only lowers MIR
+  truth and must not redefine language meaning.
+- Inspect lowering remains a separate owner from executable LLVM IR emission.
+- `backend.cpp` remains the public entrypoint owner for `LowerModule`,
+  `BuildObjectFile`, `BuildExecutable`, `RenderLlvmModule`, and bootstrap
+  target configuration.
+- Target selection remains runtime data through `TargetConfig` and
+  `BootstrapTargetConfig()`, not preprocessor state.
+- Unsupported executable MIR operations remain rejected through one shared,
+  target-aware capability boundary before or at executable lowering; the file
+  split must not create divergent support lists.
+- Deterministic backend dumps, deterministic LLVM textual output, and the
+  current test-visible diagnostics must remain stable unless an intentional
+  follow-on phase changes them.
+- Host-tool invocation remains outside the executable instruction-family files.
+- The first phase cut must preserve the current bootstrap hosted backend
+  behavior for direct source, project workflow, and focused object-build tests.
+
+Required surface changes
+------------------------
+1. Reduce `compiler/codegen_llvm/backend.cpp` to executable-backend
+   orchestration, module assembly, top-level dispatch, target validation, and
+   public API entrypoints rather than keeping most instruction-family logic in
+   the same implementation unit.
+2. Move large executable instruction families into behavior-owned sibling
+   files. The minimum expected cut is one split for calls and signatures, one
+   split for numeric or compare lowering, and one split for aggregate or slice
+   or enum or memory-container lowering. The exact file names may vary, but the
+   cut must follow real behavior ownership instead of arbitrary line-count
+   slicing.
+3. Deduplicate backend leaf helpers that are currently repeated or nearly
+   repeated across executable-support owners, including string-literal encode or
+   decode helpers and parameter-rendering helpers when they truly share one
+   executable lowering contract.
+4. Keep a single visible dispatcher for executable MIR instruction lowering so
+   new instruction kinds still have one obvious routing point, even after the
+   family-specific implementations move.
+5. Keep executable preflight and lowering diagnostics aligned by sharing the
+   unsupported-instruction ownership instead of letting each new file maintain
+   its own unsupported-op truth.
+6. Add or update focused executable-backend tests only where the split changes
+   routing, helper ownership, or failure boundaries enough that the current
+   tests would no longer protect the intended structure.
+
+Forbidden changes
+-----------------
+- do not collapse inspect and executable paths back into one new abstraction in
+  the name of symmetry
+- do not split files by arbitrary helper count, alphabetical grouping, or line
+  quotas instead of by executable behavior family
+- do not move MIR or sema truth into backend-local fallback logic merely to
+  make file cuts easier
+- do not replace `TargetConfig` with compile-time `#ifdef` target selection
+- do not create a new backend framework, instruction registry, visitor system,
+  or plugin mechanism to solve a local file-ownership problem
+- do not change user-visible backend semantics, runtime helper contracts, or
+  object-build workflow just to make the decomposition appear larger or more
+  "complete"
+- do not widen the phase into deferred executable limitations such as top-level
+  string-global lowering, broader generic monomorphization, or second-target
+  backend work
+
+Phase role in the larger sequence
+---------------------------------
+- This phase consumes the remaining structural pressure explicitly named after
+  the earlier backend hardening and host split work: executable LLVM lowering
+  is still the main concentrated owner after types, inspect, dump, names, host
+  execution, atomic lowering, and executable support moved out.
+- It prepares later executable-backend follow-through by making call,
+  aggregate, enum, and numeric work land in smaller owners instead of expanding
+  one long file again.
+- It does not claim backend-completion progress. It is a maintenance-boundary
+  phase that makes later correctness fixes and feature slices cheaper and more
+  reviewable.
+
+Relevant backlog items this phase intentionally brings under pressure
+--------------------------------------------------------------------
+- keep executable lowering of top-level string constants explicit until a real
+  owner needs that capability; this phase must avoid accidentally widening into
+  that deferred backend repair while moving helper ownership around
+- keep broader executable support for value-shaped user-body generic helpers
+  deferred; the decomposition must not blur that still-unsupported boundary
+- keep broader backend and target widening explicit after the current one
+  hosted target first decision
+
+Questions this phase must answer
+--------------------------------
+1. What is the thinnest honest role for `backend.cpp` after executable-family
+   code moves out?
+2. Which instruction families are large enough and cohesive enough to own a
+   dedicated sibling file today rather than waiting for another feature phase?
+3. Which duplicated leaf helpers are genuinely shared executable-lowering
+   utilities, and which should stay family-local?
+4. How can unsupported-op checks and related diagnostics stay centralized after
+   the executable lowering code is spread across more files?
+5. What test set is narrow but sufficient to prove that the decomposition did
+   not alter backend behavior or capability gating?
+
+Preferred implementation shape
+------------------------------
+- Keep one top-level executable instruction dispatcher in `backend.cpp`, but
+  turn each large case family into a call into a sibling owner rather than
+  embedding most lowering logic inline.
+- Prefer a few coarse behavior files over many tiny files. Good first-cut
+  shapes include `backend_executable_calls.cpp`,
+  `backend_executable_numeric.cpp`, and a combined aggregate or enum or memory
+  owner chosen by current cohesion.
+- Move shared executable helpers into existing executable support files when
+  they truly serve multiple families; otherwise keep helpers local to the new
+  family owner file.
+- Preserve current state-threading through `ExecutableFunctionState` unless a
+  smaller local cleanup clearly removes redundancy without weakening ownership.
+- Treat this as a file-ownership cleanup, not as an excuse to redesign the MIR
+  contract, runtime helper policy, or target model.
+
+Test obligations
+----------------
+- `Build debug`
+- the narrowest owning executable-backend unit or integration suite that covers
+  object emission behavior in `tests/tool/codegen_llvm_tests.cpp`
+- focused regressions for direct-call signature derivation, malformed indirect
+  call signature rejection, unsupported executable-op preflight, and at least
+  one enum or aggregate executable emission case if those families move files
+- one cold object-build pass proving that emitted LLVM IR and object artifacts
+  still materialize correctly after the decomposition
+
+Acceptance criteria
+-------------------
+- `backend.cpp` is materially smaller and now reads as executable-backend
+  orchestration plus routing rather than as the primary home for most
+  instruction-family logic
+- at least three real executable lowering families have moved into sibling
+  files with behavior-owned boundaries
+- duplicated executable-lowering leaf helpers have one clear owner where shared
+  use is real
+- preflight capability checks and lowering diagnostics still agree on
+  unsupported executable MIR operations
+- focused codegen LLVM tests still pass without user-visible semantic or target
+  behavior changes
+
+Future follow-up
+----------------
+- If later executable phases expose deeper pressure inside one moved family,
+  split that family again only when a real owner boundary becomes visible.
+- If top-level string-global lowering, broader generic executable support, or
+  second-target work becomes active, keep each as its own phase rather than
+  treating this decomposition as permission to widen scope.
+- If later work wants stronger compile-time help for MIR instruction coverage,
+  pursue that as a separate tooling or warning-policy slice instead of folding
+  it into this structural refactor.

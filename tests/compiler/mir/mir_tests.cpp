@@ -29,7 +29,11 @@ mc::mir::LowerResult Lower(const std::string& source,
     if (!checked.ok) {
         Fail("source should pass semantic checking before MIR lowering:\n" + diagnostics.Render());
     }
-    return mc::mir::LowerSourceFile(*parsed.source_file, *checked.module, "<mir-test>", diagnostics);
+    return mc::mir::LowerSourceFile(*parsed.source_file,
+                                    *checked.module,
+                                    "<mir-test>",
+                                    options.imported_modules,
+                                    diagnostics);
 }
 
 mc::mir::LowerResult Lower(const std::string& source, mc::support::DiagnosticSink& diagnostics) {

@@ -1,6 +1,6 @@
 const CAPACITY: usize = 4
 
-func total(values: [4]i32, head: usize, len: usize) i32 {
+func total(values: [CAPACITY]i32, head: usize, len: usize) i32 {
     slots: Slice<i32> = (Slice<i32>)(values)
     sum: i32 = 0
     index: usize = 0
@@ -13,7 +13,7 @@ func total(values: [4]i32, head: usize, len: usize) i32 {
 }
 
 func main() i32 {
-    values: [4]i32
+    values: [CAPACITY]i32
     values[0] = 0
     values[1] = 0
     values[2] = 0

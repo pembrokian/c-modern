@@ -108,6 +108,8 @@ Array types:
 - fixed arrays are value types
 - array length is part of the type
 - array length must be a compile-time integer constant
+- different source spellings that evaluate to the same compile-time length
+	denote the same array type
 - arrays do not decay implicitly to pointers or slices
 
 Tuple types:
@@ -155,7 +157,8 @@ Normalization rules:
 
 Equality rules:
 - structural forms compare structurally after normalization
-- array equality includes both normalized element type and array length text after compile-time validation
+- array equality includes both normalized element type and normalized
+	compile-time array length value
 - pointer equality includes normalized pointee type
 - `const` is preserved in equality; it is not stripped as decoration
 - tuple equality depends on ordered element types
