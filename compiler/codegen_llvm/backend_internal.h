@@ -82,6 +82,15 @@ void ReportBackendError(const std::filesystem::path& source_path,
 const mir::TypeDecl* FindTypeDecl(const mir::Module& module,
                                   std::string_view name);
 
+sema::Type InstantiateAliasedType(const mir::TypeDecl& type_decl,
+                                  const sema::Type& instantiated_type);
+
+std::vector<std::pair<std::string, sema::Type>> InstantiateFields(
+    const mir::TypeDecl& type_decl,
+    const sema::Type& instantiated_type);
+
+bool IsAggregateType(const BackendTypeInfo& type_info);
+
 std::string VariantLeafName(std::string_view variant_name);
 
 const mir::VariantDecl* FindVariantDecl(const mir::TypeDecl& type_decl,

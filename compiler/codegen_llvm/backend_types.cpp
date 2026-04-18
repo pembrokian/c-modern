@@ -7,12 +7,6 @@
 
 namespace mc::codegen_llvm {
 
-namespace {
-
-std::optional<BackendTypeInfo> LowerTypeInfoImpl(const mir::Module& module,
-                                                 const sema::Type& type,
-                                                 bool aggregate_field_storage);
-
 sema::Type InstantiateAliasedType(const mir::TypeDecl& type_decl, const sema::Type& instantiated_type) {
     sema::Type aliased_type = type_decl.aliased_type;
     if (!type_decl.type_params.empty()) {
@@ -32,6 +26,17 @@ std::vector<std::pair<std::string, sema::Type>> InstantiateFields(const mir::Typ
     }
     return fields;
 }
+
+bool IsAggregateType(const BackendTypeInfo& type_info) {
+    return !type_info.backend_name.empty() &&
+           (type_info.backend_name.front() == '{' || type_info.backend_name.front() == '[' || type_info.backend_name.front() == '<');
+}
+
+namespace {
+
+std::optional<BackendTypeInfo> LowerTypeInfoImpl(const mir::Module& module,
+                                                 const sema::Type& type,
+                                                 bool aggregate_field_storage);
 
 std::size_t AlignTo(std::size_t value,
                     std::size_t alignment) {

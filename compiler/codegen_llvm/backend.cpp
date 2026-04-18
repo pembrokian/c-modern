@@ -1,6 +1,15 @@
 #include "compiler/codegen_llvm/backend.h"
 #include "compiler/codegen_llvm/backend_internal.h"
 
+#include <cstdlib>
+#include <functional>
+#include <optional>
+#include <set>
+#include <sstream>
+#include <string_view>
+#include <unordered_map>
+#include <unordered_set>
+
 // Bootstrap LLVM backend — two-pass code generation architecture.
 //
 // This file contains two independent passes over the MIR module:
@@ -25,14 +34,6 @@
 //   { ptr i8*, i64 cap, i64 used, ptr Allocator* }
 // The allocation alignment is rounded up to the pointer size of the target.
 // Changing the Arena struct in the runtime requires updating this function.
-#include <cstdlib>
-#include <functional>
-#include <optional>
-#include <set>
-#include <sstream>
-#include <string_view>
-#include <unordered_map>
-#include <unordered_set>
 
 #include "compiler/sema/type_utils.h"
 #include "compiler/support/assert.h"
@@ -53,67 +54,8 @@ bool IsBootstrapTarget(const TargetConfig& target) {
            target.object_format == kBootstrapObjectFormat;
 }
 
-bool ValidateBootstrapTargetImpl(const TargetConfig& target,
-                                const std::filesystem::path& source_path,
-                                support::DiagnosticSink& diagnostics) {
-    if (IsBootstrapTarget(target)) {
-        return true;
-    }
-
-    ReportBackendError(source_path,
-                       "LLVM bootstrap backend only supports bootstrap 'arm64-apple-darwin' targets in Stage 3; got triple='" +
-                           target.triple + "' target_family='" + target.target_family + "'",
-                       diagnostics);
-    return false;
-}
-
 // Forward declaration — defined below once TypeSupportsErasedGenericEmission is available.
 bool FunctionSupportsErasedGenericEmission(const mir::Module& module, const mir::Function& function);
-
-bool ValidateExecutableBackendCapabilitiesImpl(const mir::Module& module,
-                                              const TargetConfig& target,
-                                              const std::filesystem::path& source_path,
-                                              support::DiagnosticSink& diagnostics) {
-    if (!IsBootstrapTarget(target)) {
-        return true;
-    }
-
-    for (const auto& function : module.functions) {
-        // Non-extern generic functions whose type parameters appear in ABI-significant
-        // positions cannot be emitted by the bootstrap backend (monomorphization is not
-        // yet supported).  Catch this early so the caller gets a compiler diagnostic
-        // instead of a silent definition omission followed by a linker error.
-        if (!function.is_extern && !function.type_params.empty() &&
-            !FunctionSupportsErasedGenericEmission(module, function)) {
-            ReportBackendError(source_path,
-                               "generic function '" + function.name +
-                                   "' uses type parameters in ABI-incompatible positions; "
-                                   "monomorphized generic functions are not yet supported by the bootstrap backend",
-                               diagnostics);
-            return false;
-        }
-
-        for (const auto& block : function.blocks) {
-            for (const auto& instruction : block.instructions) {
-                const auto unsupported = UnsupportedExecutableInstructionName(instruction.kind);
-                if (!unsupported.has_value()) {
-                    continue;
-                }
-
-                ReportBackendError(source_path,
-                                   "LLVM bootstrap executable emission does not yet support MIR instruction '" + std::string(*unsupported) +
-                                       "' before LLVM IR emission in function '" +
-                                       function.name + "' block '" + block.label + "'",
-                                   diagnostics);
-                return false;
-            }
-        }
-    }
-
-    return true;
-}
-
-std::string LLVMTypeName(const BackendTypeInfo& type_info);
 
 bool RenderExecutableInstruction(const mir::Instruction& instruction,
                                  std::size_t function_index,
@@ -166,28 +108,6 @@ const mir::Function* FindFunction(const mir::Module& module,
     for (const auto& function : module.functions) {
         if (function.name == name) {
             return &function;
-        }
-    }
-    return nullptr;
-}
-
-const mir::Local* FindMirLocal(const mir::Function& function,
-                               std::string_view name) {
-    for (const auto& local : function.locals) {
-        if (local.name == name) {
-            return &local;
-        }
-    }
-    return nullptr;
-}
-
-const mir::GlobalDecl* FindMirGlobal(const mir::Module& module,
-                                     std::string_view name) {
-    for (const auto& global : module.globals) {
-        for (const auto& global_name : global.names) {
-            if (global_name == name) {
-                return &global;
-            }
         }
     }
     return nullptr;
@@ -250,8 +170,7 @@ bool FormatExecutableCallArguments(const mir::Instruction& instruction,
                                    support::DiagnosticSink& diagnostics,
                                    ExecutableFunctionState& state,
                                    std::string& args_text) {
-    const std::size_t argument_start = 1;
-    const std::size_t argument_count = instruction.operands.size() - argument_start;
+    const std::size_t argument_count = instruction.operands.size() - 1;
     if (argument_count != call_signature.types.param_types.size()) {
         ReportBackendError(source_path,
                            "LLVM bootstrap executable emission expected " + std::to_string(call_signature.types.param_types.size()) +
@@ -277,7 +196,7 @@ bool FormatExecutableCallArguments(const mir::Instruction& instruction,
     for (std::size_t index = 0; index < argument_count; ++index) {
         ExecutableValue value;
         if (!ResolveExecutableValue(state,
-                                    instruction.operands[argument_start + index],
+                                    instruction.operands[1 + index],
                                     block,
                                     source_path,
                                     diagnostics,
@@ -288,7 +207,7 @@ bool FormatExecutableCallArguments(const mir::Instruction& instruction,
         if (index > 0) {
             args << ", ";
         }
-        args << LLVMTypeName(param_types[index]) << " " << value.text;
+        args << param_types[index].backend_name << " " << value.text;
     }
 
     args_text = args.str();
@@ -398,49 +317,21 @@ bool ShouldEmitFunctionForExecutable(const mir::Module& module,
     return function.type_params.empty() || FunctionSupportsErasedGenericEmission(module, function);
 }
 
-sema::Type InstantiateAliasedType(const mir::TypeDecl& type_decl, const sema::Type& instantiated_type) {
-    sema::Type aliased_type = type_decl.aliased_type;
-    if (!type_decl.type_params.empty()) {
-        aliased_type = sema::SubstituteTypeParams(std::move(aliased_type), type_decl.type_params, instantiated_type.subtypes);
-    }
-    return aliased_type;
-}
-
-std::vector<std::pair<std::string, sema::Type>> InstantiateFields(const mir::TypeDecl& type_decl,
-                                                                  const sema::Type& instantiated_type) {
-    std::vector<std::pair<std::string, sema::Type>> fields = type_decl.fields;
-    if (type_decl.type_params.empty()) {
-        return fields;
-    }
-    for (auto& field : fields) {
-        field.second = sema::SubstituteTypeParams(std::move(field.second), type_decl.type_params, instantiated_type.subtypes);
-    }
-    return fields;
-}
-
-std::string LLVMTypeName(const BackendTypeInfo& type_info) {
-    return type_info.backend_name;
-}
-
 std::string RenderLLVMParameter(const BackendTypeInfo& type_info,
                                 const mir::Local& param,
                                 bool include_name) {
-    std::ostringstream stream;
-    stream << type_info.backend_name;
+    std::string result = type_info.backend_name;
     if (param.is_noalias) {
-        stream << " noalias";
+        result += " noalias";
     }
     if (include_name) {
-        stream << " " << LLVMParamName(param.name);
+        result += " " + LLVMParamName(param.name);
     }
-    return stream.str();
+    return result;
 }
 
 std::string LLVMZeroValue(const BackendTypeInfo& type_info) {
-    if (type_info.backend_name == "float") {
-        return "0.0";
-    }
-    if (type_info.backend_name == "double") {
+    if (type_info.backend_name == "float" || type_info.backend_name == "double") {
         return "0.0";
     }
     if (type_info.backend_name == "ptr") {
@@ -455,74 +346,13 @@ std::string LLVMZeroValue(const BackendTypeInfo& type_info) {
     return "0";
 }
 
-bool IsAggregateType(const BackendTypeInfo& type_info) {
-    return !type_info.backend_name.empty() &&
-           (type_info.backend_name.front() == '{' || type_info.backend_name.front() == '[' || type_info.backend_name.front() == '<');
-}
-
 bool IsSignedSourceType(std::string_view source_name) {
     return source_name == "i8" || source_name == "i16" || source_name == "i32" || source_name == "i64" ||
            source_name == "isize" || source_name == "int_literal";
 }
 
-std::optional<std::size_t> FindFieldIndex(const mir::Module& module,
-                                          const sema::Type& base_type,
-                                          std::string_view field_name) {
-    const auto builtin_fields = sema::BuiltinAggregateFields(base_type);
-    if (!builtin_fields.empty()) {
-        for (std::size_t index = 0; index < builtin_fields.size(); ++index) {
-            if (builtin_fields[index].first == field_name) {
-                return index;
-            }
-        }
-    }
-    const sema::Type lowered_base = sema::CanonicalizeBuiltinType(base_type);
-    if (lowered_base.kind == sema::Type::Kind::kNamed) {
-        if (const auto* type_decl = FindTypeDecl(module, lowered_base.name)) {
-            const auto fields = InstantiateFields(*type_decl, lowered_base);
-            for (std::size_t index = 0; index < fields.size(); ++index) {
-                if (fields[index].first == field_name) {
-                    return index;
-                }
-            }
-        }
-    }
-    return std::nullopt;
-}
-
-std::optional<sema::Type> FindFieldType(const mir::Module& module,
-                                        const sema::Type& base_type,
-                                        std::string_view field_name) {
-    const auto builtin_fields = sema::BuiltinAggregateFields(base_type);
-    for (const auto& field : builtin_fields) {
-        if (field.first == field_name) {
-            return field.second;
-        }
-    }
-    const sema::Type canonical_base = sema::CanonicalizeBuiltinType(base_type);
-    if (canonical_base.kind == sema::Type::Kind::kNamed) {
-        if (const auto* type_decl = FindTypeDecl(module, canonical_base.name)) {
-            const auto fields = InstantiateFields(*type_decl, canonical_base);
-            for (const auto& field : fields) {
-                if (field.first == field_name) {
-                    return field.second;
-                }
-            }
-        }
-    }
-    return std::nullopt;
-}
-
-std::string_view LeafTypeName(std::string_view name) {
-    const std::size_t separator = name.rfind('.');
-    if (separator == std::string_view::npos) {
-        return name;
-    }
-    return name.substr(separator + 1);
-}
-
-bool IsNamedTypeFamily(const sema::Type& type, std::string_view family_name) {
-    return type.kind == sema::Type::Kind::kNamed && LeafTypeName(type.name) == family_name;
+std::string LLVMStructInsertBase(const BackendTypeInfo& type_info) {
+    return IsAggregateType(type_info) ? "zeroinitializer" : LLVMZeroValue(type_info);
 }
 
 sema::Type StripMirAliasOrDistinct(const mir::Module& module, sema::Type type) {
@@ -541,55 +371,6 @@ sema::Type StripMirAliasOrDistinct(const mir::Module& module, sema::Type type) {
         type = InstantiateAliasedType(*type_decl, type);
     }
     return type;
-}
-
-std::optional<sema::Type> PointerPointeeType(const sema::Type& type) {
-    if (type.kind != sema::Type::Kind::kPointer || type.subtypes.empty()) {
-        return std::nullopt;
-    }
-    return type.subtypes.front();
-}
-
-std::optional<sema::Type> AtomicElementType(const mir::Module& module, const sema::Type& pointer_type) {
-    const auto pointee = PointerPointeeType(StripMirAliasOrDistinct(module, pointer_type));
-    if (!pointee.has_value()) {
-        return std::nullopt;
-    }
-    const sema::Type stripped_pointee = StripMirAliasOrDistinct(module, *pointee);
-    if (stripped_pointee.kind != sema::Type::Kind::kNamed || !IsNamedTypeFamily(stripped_pointee, "Atomic") ||
-        stripped_pointee.subtypes.empty()) {
-        return std::nullopt;
-    }
-    return stripped_pointee.subtypes.front();
-}
-
-std::optional<sema::Type> FindFunctionValueType(const mir::Module& module,
-                                                const mir::Function& function,
-                                                std::string_view value_name) {
-    for (const auto& local : function.locals) {
-        if (local.name == value_name) {
-            return local.type;
-        }
-    }
-    for (const auto& block : function.blocks) {
-        for (const auto& instruction : block.instructions) {
-            if (instruction.result == value_name) {
-                return instruction.type;
-            }
-        }
-    }
-    for (const auto& global : module.globals) {
-        for (const auto& global_name : global.names) {
-            if (global_name == value_name) {
-                return global.type;
-            }
-        }
-    }
-    return std::nullopt;
-}
-
-std::string LLVMStructInsertBase(const BackendTypeInfo& type_info) {
-    return IsAggregateType(type_info) ? "zeroinitializer" : LLVMZeroValue(type_info);
 }
 
 std::optional<std::string_view> UnsupportedExecutableInstructionName(mir::Instruction::Kind kind) {
@@ -855,25 +636,6 @@ bool RenderLLVMGlobalConstValue(const mir::Module& module,
     stream << '}';
     rendered = stream.str();
     return true;
-}
-
-bool ResolveExecutableLocal(const ExecutableFunctionState& state,
-                            const std::string& local_name,
-                            const mir::BasicBlock& block,
-                            const std::filesystem::path& source_path,
-                            support::DiagnosticSink& diagnostics,
-                            std::string& local_slot) {
-    const auto it = state.local_slots.find(local_name);
-    if (it != state.local_slots.end()) {
-        local_slot = it->second;
-        return true;
-    }
-
-    ReportBackendError(source_path,
-                       "LLVM bootstrap executable emission references unknown local '" + local_name +
-                           "' in function '" + state.function->name + "' block '" + block.label + "'",
-                       diagnostics);
-    return false;
 }
 
 bool ResolveExecutableBlock(const ExecutableFunctionState& state,
@@ -1200,14 +962,14 @@ bool RenderExecutableInstruction(const mir::Instruction& instruction,
                                        std::to_string(type_info.alignment));
             } else if (instruction.op == "-") {
                 if (IsFloatType(type_info)) {
-                    output_lines.push_back(temp + " = fsub " + LLVMTypeName(type_info) + " 0.0, " + operand.text);
+                    output_lines.push_back(temp + " = fsub " + type_info.backend_name + " 0.0, " + operand.text);
                 } else {
-                    output_lines.push_back(temp + " = sub " + LLVMTypeName(type_info) + " 0, " + operand.text);
+                    output_lines.push_back(temp + " = sub " + type_info.backend_name + " 0, " + operand.text);
                 }
             } else if (instruction.op == "!") {
                 output_lines.push_back(temp + " = xor i1 " + operand.text + ", true");
             } else if (instruction.op == "~") {
-                output_lines.push_back(temp + " = xor " + LLVMTypeName(type_info) + " " + operand.text + ", -1");
+                output_lines.push_back(temp + " = xor " + type_info.backend_name + " " + operand.text + ", -1");
             } else {
                 ReportBackendError(source_path,
                                    "LLVM bootstrap executable emission does not support unary operator '" + instruction.op +
@@ -1288,7 +1050,7 @@ bool RenderExecutableInstruction(const mir::Instruction& instruction,
                 return false;
             }
             const std::string temp = LLVMTempName(function_index, block_index, instruction_index);
-            output_lines.push_back(temp + " = load volatile " + LLVMTypeName(result_type) + ", ptr " + ptr.text + ", align " +
+            output_lines.push_back(temp + " = load volatile " + result_type.backend_name + ", ptr " + ptr.text + ", align " +
                                    std::to_string(result_type.alignment));
             RecordExecutableValue(state, instruction.result, temp, result_type);
             return true;
@@ -1337,7 +1099,7 @@ bool RenderExecutableInstruction(const mir::Instruction& instruction,
                                    diagnostics);
                 return false;
             }
-            output_lines.push_back("store volatile " + LLVMTypeName(value.type) + " " + value.text + ", ptr " + ptr.text +
+            output_lines.push_back("store volatile " + value.type.backend_name + " " + value.text + ", ptr " + ptr.text +
                                    ", align " + std::to_string(value.type.alignment));
             return true;
         }
@@ -1993,14 +1755,54 @@ bool RenderLlvmModuleImpl(const mir::Module& module,
 bool ValidateBootstrapTarget(const TargetConfig& target,
                             const std::filesystem::path& source_path,
                             support::DiagnosticSink& diagnostics) {
-    return ValidateBootstrapTargetImpl(target, source_path, diagnostics);
+    if (IsBootstrapTarget(target)) {
+        return true;
+    }
+
+    ReportBackendError(source_path,
+                       "LLVM bootstrap backend only supports bootstrap 'arm64-apple-darwin' targets in Stage 3; got triple='" +
+                           target.triple + "' target_family='" + target.target_family + "'",
+                       diagnostics);
+    return false;
 }
 
 bool ValidateExecutableBackendCapabilities(const mir::Module& module,
                                           const TargetConfig& target,
                                           const std::filesystem::path& source_path,
                                           support::DiagnosticSink& diagnostics) {
-    return ValidateExecutableBackendCapabilitiesImpl(module, target, source_path, diagnostics);
+    if (!IsBootstrapTarget(target)) {
+        return true;
+    }
+
+    for (const auto& function : module.functions) {
+        if (!function.is_extern && !function.type_params.empty() &&
+            !FunctionSupportsErasedGenericEmission(module, function)) {
+            ReportBackendError(source_path,
+                               "generic function '" + function.name +
+                                   "' uses type parameters in ABI-incompatible positions; "
+                                   "monomorphized generic functions are not yet supported by the bootstrap backend",
+                               diagnostics);
+            return false;
+        }
+
+        for (const auto& block : function.blocks) {
+            for (const auto& instruction : block.instructions) {
+                const auto unsupported = UnsupportedExecutableInstructionName(instruction.kind);
+                if (!unsupported.has_value()) {
+                    continue;
+                }
+
+                ReportBackendError(source_path,
+                                   "LLVM bootstrap executable emission does not yet support MIR instruction '" + std::string(*unsupported) +
+                                       "' before LLVM IR emission in function '" +
+                                       function.name + "' block '" + block.label + "'",
+                                   diagnostics);
+                return false;
+            }
+        }
+    }
+
+    return true;
 }
 
 bool RenderLlvmModule(const mir::Module& module,

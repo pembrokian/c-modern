@@ -5,15 +5,6 @@
 namespace mc::codegen_llvm {
 namespace {
 
-sema::Type InstantiateAliasedType(const mir::TypeDecl& type_decl,
-                                  const sema::Type& instantiated_type) {
-    sema::Type aliased_type = type_decl.aliased_type;
-    if (!type_decl.type_params.empty()) {
-        aliased_type = sema::SubstituteTypeParams(std::move(aliased_type), type_decl.type_params, instantiated_type.subtypes);
-    }
-    return aliased_type;
-}
-
 sema::Type StripMirAliasOrDistinct(const mir::Module& module,
                                    sema::Type type) {
     std::unordered_set<std::string> visited;

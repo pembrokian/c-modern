@@ -5,31 +5,6 @@ namespace {
 
 constexpr std::string_view kBufferStructType = "{ptr, i64, i64, ptr}";
 
-sema::Type 
-InstantiateAliasedType(const mir::TypeDecl& type_decl, const sema::Type& instantiated_type) {
-    sema::Type aliased_type = type_decl.aliased_type;
-    if (!type_decl.type_params.empty()) {
-        aliased_type = sema::SubstituteTypeParams(std::move(aliased_type),
-                                                  type_decl.type_params,
-                                                  instantiated_type.subtypes);
-    }
-    return aliased_type;
-}
-
-std::vector<std::pair<std::string, sema::Type>> 
-InstantiateFields(const mir::TypeDecl& type_decl, const sema::Type& instantiated_type) {
-    std::vector<std::pair<std::string, sema::Type>> fields = type_decl.fields;
-    if (type_decl.type_params.empty()) {
-        return fields;
-    }
-    for (auto& field : fields) {
-        field.second = sema::SubstituteTypeParams(std::move(field.second),
-                                                  type_decl.type_params,
-                                                  instantiated_type.subtypes);
-    }
-    return fields;
-}
-
 std::optional<std::size_t> 
 FindFieldIndexForMemory(const mir::Module& module, const sema::Type& base_type, std::string_view field_name) {
     const auto builtin_fields = sema::BuiltinAggregateFields(base_type);
@@ -84,13 +59,6 @@ const mir::Local* FindFunctionLocal(const mir::Function& function,
         }
     }
     return nullptr;
-}
-
-bool IsAggregateExecutableType(const BackendTypeInfo& type_info) {
-    return !type_info.backend_name.empty() &&
-           (type_info.backend_name.front() == '{' ||
-            type_info.backend_name.front() == '[' ||
-            type_info.backend_name.front() == '<');
 }
 
 bool ResolveExecutableLocalSlot(const ExecutableFunctionState& state,
@@ -648,7 +616,7 @@ EmitMemoryInstruction(const mir::Instruction& instruction, const ExecutableEmiss
                                   instruction.result,
                                   temp,
                                   type_info,
-                                  IsAggregateExecutableType(type_info) ? std::optional<std::string>(local_slot) : std::nullopt,
+                                  IsAggregateType(type_info) ? std::optional<std::string>(local_slot) : std::nullopt,
                                   instruction.type);
             return true;
         }

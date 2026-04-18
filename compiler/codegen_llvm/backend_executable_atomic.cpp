@@ -5,14 +5,6 @@
 namespace mc::codegen_llvm {
 namespace {
 
-sema::Type InstantiateAliasedType(const mir::TypeDecl& type_decl, const sema::Type& instantiated_type) {
-    sema::Type aliased_type = type_decl.aliased_type;
-    if (!type_decl.type_params.empty()) {
-        aliased_type = sema::SubstituteTypeParams(std::move(aliased_type), type_decl.type_params, instantiated_type.subtypes);
-    }
-    return aliased_type;
-}
-
 std::string_view LeafTypeName(std::string_view name) {
     const std::size_t separator = name.rfind('.');
     if (separator == std::string_view::npos) {
