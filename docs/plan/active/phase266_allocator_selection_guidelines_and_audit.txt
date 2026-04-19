@@ -3,7 +3,7 @@ Phase 266 -- Allocator Selection Guidelines And Audit
 
 Status
 ------
-PROPOSED
+COMPLETED
 
 Purpose
 -------
@@ -11,21 +11,22 @@ Close Band B by stating which admitted memory owner should be used where and
 why, so later launcher, bundle, and UI phases do not silently reopen the same
 allocation-policy questions.
 
-This phase exists now because the roadmap deliberately admits several bounded
-memory owners in sequence. The repository should stop after that wave and turn
-the result into explicit guidance instead of carrying allocator choice as
-unwritten tribal knowledge.
+This phase now closes with an explicit post-Band-B selection statement. The
+roadmap deliberately admitted several bounded memory owners in sequence, and
+the repository now turns that wave into maintained guidance instead of leaving
+allocator choice as unwritten tribal knowledge.
 
 Repository status note
 ----------------------
-- Phase 262 is expected to define one fixed-size pool owner.
-- Phase 263 is expected to define one maintained scratch-work arena contract.
-- Phase 264 is expected to define one larger-granularity page or run owner.
-- Phase 265 is expected to decide whether slab-style small-object reuse is real
-  pressure or still deferred.
-- The repo currently has strong library-design rules about explicit allocation
-  policy, but no consolidated post-Band-B guidance tying those rules to the
-  concrete admitted owners.
+- Phase 262 landed one fixed-size pool owner.
+- Phase 263 landed one maintained scratch-work arena contract.
+- Phase 264 landed one larger-granularity page or run owner.
+- Phase 265 now explicitly decides that slab-style small-object reuse is still
+  deferred because no admitted consumer outranks the landed pool, arena, and
+  run owners.
+- The repo already had strong library-design rules about explicit allocation
+  policy, but it did not yet have one consolidated post-Band-B guidance note
+  tying those rules to the concrete admitted owners.
 
 Problem being solved
 --------------------
@@ -37,6 +38,34 @@ Problem being solved
   to prevent.
 - The repository needs one honest answer to which memory owners are now
   maintained truth and which allocator-like pressures remain deferred.
+
+Implemented outcome
+-------------------
+- Phase 266 remains document-focused. No new allocator family lands.
+- The repository now has one explicit maintained selection rule set for the
+  admitted memory owners.
+- The admitted post-Band-B memory owners are:
+  - heap-backed `Buffer<T>` for ordinary owning contiguous storage when no
+    narrower lifetime or reuse owner fits better
+  - raw-byte `mem.Pool` for bounded repeated fixed-size slot reuse with
+    explicit take/return invalidation
+  - explicit `Arena` for transient scratch work where the whole working set can
+    die together at `arena_reset(...)` or `arena_deinit(...)`
+  - page-rounded `mem.Run` for larger-granularity byte staging where run
+    identity and capacity matter and `Buffer<u8>` would hide that choice
+- Slab-style small-object reuse remains explicitly deferred.
+
+Ownership boundaries
+--------------------
+- Files that should change in this phase: the Phase 266 closeout note and the
+  adjacent policy docs that inherit allocator choice from Band B.
+- Files that must not change in this phase: `stdlib/mem.mc`,
+  `runtime/hosted/mc_hosted_runtime.c`, compiler layers, kernel owners, and the
+  admitted Band B consumers, because Phase 266 is an audit over landed owners
+  rather than a new implementation wave.
+- The owning abstraction remains `stdlib/mem.mc` for public memory vocabulary.
+  Consumer-local selection still belongs to the caller that knows its lifetime,
+  reuse, and granularity needs.
 
 Non-goals
 ---------
@@ -54,6 +83,18 @@ Invariants
 - Deferred allocator-like pressures must stay concrete rather than vague.
 - The audit must not turn one hosted proof into a claim of full platform
   memory completion.
+
+Preserved invariants
+--------------------
+- The audit classifies only the actually landed owners: `Buffer<T>`, `Pool`,
+  `Arena`, and `Run`, plus the explicit slab deferral from Phase 265.
+- Allocation policy remains visible in API shapes and call sites rather than
+  moving into hidden adapters, registries, or framework defaults.
+- Deferred allocator pressure stays concrete: typed size queries, slab-style
+  caches, allocator adapters, and run sub-allocation remain separately named
+  rather than blurred into vague “ergonomics” or “performance” buckets.
+- The hosted real-project proofs remain exactly that: bounded admitted proofs,
+  not a platform-wide memory-completion claim.
 
 Required surface changes
 ------------------------
@@ -98,12 +139,70 @@ Questions this phase must answer
 4. What should the repository now say about heap-backed buffers versus pools
    versus arenas versus larger runs?
 
+Answered questions
+------------------
+1. Maintained truth now includes heap-backed `Buffer<T>` for ordinary owning
+  contiguous storage, `mem.Pool` for fixed-size bounded reuse, `Arena` for
+  transient scratch lifetimes, and `mem.Run` for larger-granularity staged
+  byte ownership.
+2. Deferred allocator-like pressures are slab-style caches, typed pool sizing
+  via an ordinary `sizeof(T)`-style language surface, allocator-adapter APIs
+  such as `arena_allocator(...)`, and run-local sub-allocation or mapping
+  helpers. Each remains deferred until a later admitted consumer makes that
+  exact owner the narrowest honest repair.
+3. No later launcher or UI phase currently needs a new generic memory owner.
+  Band C should start by using the landed owners directly and reopen allocator
+  design only if a concrete new pressure fails to fit them honestly.
+4. The repository should now say:
+  - choose heap-backed buffers for ordinary variable-length owning storage
+  - choose pools for repeated bounded fixed-size slot churn
+  - choose arenas for scratch work with one shared invalidation boundary
+  - choose runs when larger-granularity byte staging is part of the contract
+
 Preferred implementation shape
 ------------------------------
 - Keep the phase document-focused.
 - Reuse the repository's earlier frontier-audit style: classify admitted
   owners, classify deferred owners, and state the handoff cleanly.
 - Prefer short explicit selection rules over a narrative essay.
+
+Selection rules
+---------------
+- `Buffer<T>`: use for ordinary owning contiguous storage when the caller needs
+  variable-sized data and neither fixed-slot reuse, scratch-wide reset, nor
+  larger-granularity run identity is part of the contract.
+- `mem.Pool`: use for repeated bounded fixed-size object or byte-slot reuse
+  when the caller can state `slot_size` explicitly and can tolerate explicit
+  invalidation at `pool_return(...)`.
+- `Arena`: use for transient scratch allocations whose full working set can be
+  invalidated together. Do not use it for retained state, hidden ownership, or
+  borrowed text that should outlive the scratch pass.
+- `mem.Run`: use for explicit larger-granularity raw-byte staging where run
+  capacity, page-rounded sizing, or run identity matter to the consumer.
+- Slab-style owner: do not introduce one by convenience. Reopen only when a
+  later admitted consumer exposes repeated small-object churn that cannot stay
+  honest on buffer, pool, arena, or run ownership.
+
+Deferred pressures
+------------------
+- typed pool wrappers still wait on an ordinary library-visible `sizeof(T)`-
+  style size query
+- allocator-adapter helpers such as `arena_allocator(...)` remain deferred
+- run sub-allocation, mapping helpers, and second larger-unit families remain
+  deferred
+- slab-style small-object caches remain deferred
+- no later launcher or UI phase should smuggle in a new generic allocator to
+  compensate for those deferred fronts
+
+Important non-decisions
+-----------------------
+- This phase does not reinterpret `Buffer<T>` as an ambient default allocator
+  policy. It remains one explicit owning contiguous storage type.
+- This phase does not convert `mem.Pool` into a typed `Pool<T>` surface.
+- This phase does not widen `Arena` into a region framework or hidden lifetime
+  system.
+- This phase does not widen `Run` into VM, mapping, or caching policy.
+- This phase does not admit slab simply to complete an allocator taxonomy.
 
 Implementation accelerators
 ---------------------------
@@ -143,6 +242,14 @@ Relevant test surfaces
 - If ambiguity remains, rerun only the narrowest consumer proof from the
   ambiguous earlier phase.
 
+Focused validation
+------------------
+- No new executable validation surface is introduced by this phase.
+- The existing Band B proofs remain the owning evidence:
+  - `mc_tool_real_project_pool_rows_unit`
+  - `mc_tool_real_project_arena_expr_unit`
+  - `mc_tool_real_project_bundle_stage_unit`
+
 Test obligations
 ----------------
 - no new executable validation by default
@@ -155,6 +262,26 @@ Acceptance criteria
 - later phases can see clearly which memory owners are admitted and maintained
 - deferred allocator-like pressures remain visible and bounded
 - no new allocator family is smuggled into the audit
+
+Acceptance result
+-----------------
+- The repository now has one explicit post-Band-B memory selection statement.
+- Later phases can see clearly which memory owners are admitted and maintained.
+- Deferred allocator-like pressures remain visible and bounded.
+- No new allocator family or hidden memory framework was smuggled into the
+  audit.
+
+Phase review
+------------
+- Preserved invariants: allocation choice remains explicit, owner-local, and
+  visible; no earlier Band B owner was reinterpreted beyond its landed
+  acceptance criteria.
+- Ownership boundaries: `mem` stays the vocabulary owner; consumer-local code
+  still chooses the owner that matches its contract; no dispatch, boot,
+  topology, parser, checker, or codegen responsibility widened.
+- Accidental abstractions: none emerged. The phase closes with short rules and
+  explicit deferrals instead of a registry, adapter layer, or framework-scale
+  memory taxonomy.
 
 Future follow-up
 ----------------

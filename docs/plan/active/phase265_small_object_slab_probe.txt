@@ -3,40 +3,87 @@ Phase 265 -- Small Object Slab Probe
 
 Status
 ------
-PROPOSED
+COMPLETED
 
 Purpose
 -------
-Probe whether the repository actually needs one slab-style small-object owner
+Decide whether the repository actually needs one slab-style small-object owner
 after landing explicit pool, arena, and larger-run choices, and admit it only
 if one repeated small-object family still does not fit those earlier owners
 honestly.
 
-This phase exists now because Band B should not assume a slab allocator is
-needed merely because many systems have one. It should only land if the real
-repository pressure after Phases 262 through 264 still points at a distinct
-small-object reuse problem.
+This phase now closes with an explicit non-landing. Band B should not assume a
+slab allocator is needed merely because many systems have one, and the real
+repository pressure after Phases 262 through 264 still does not point at a
+distinct small-object reuse problem that pool, arena, or run ownership model
+dishonestly.
 
 Repository status note
 ----------------------
-- Phase 262 is expected to admit one fixed-size pool owner.
-- Phase 263 is expected to spend the arena surface on one transient-work
-  consumer.
-- Phase 264 is expected to define one larger-granularity page or run owner.
-- The repository currently has no admitted slab or magazine or cache family,
-  and the roadmap explicitly wants to avoid allocator taxonomy for its own
-  sake.
+- Phase 262 landed one fixed-size pool owner in `stdlib/mem.mc` and spent it
+  in `examples/real/pool_rows/`.
+- Phase 263 landed one explicit scratch-work arena contract in `stdlib/mem.mc`
+  and spent it in `examples/real/arena_expr/`.
+- Phase 264 landed one larger-granularity `mem.Run` owner in `stdlib/mem.mc`
+  and spent it in `examples/real/bundle_stage/`.
+- The repository still has no admitted slab or magazine or cache family, and
+  this phase keeps that result explicit rather than speculative.
 
 Problem being solved
 --------------------
-- Even after pool, arena, and run choices are explicit, the repository may
-  still discover one high-churn small-object family whose lifetime and reuse
-  pattern is not well modeled by any of those earlier owners.
-- If that pressure is real, the honest answer is to name it as one bounded
-  slab-style owner rather than making later launcher or UI code hand-roll small
-  object caching.
-- If that pressure is not real, the repository needs this phase to say so and
-  refuse the allocator widening.
+- Even after pool, arena, and run choices are explicit, the repository could
+  still have discovered one high-churn small-object family whose lifetime and
+  reuse pattern was not well modeled by any of those earlier owners.
+- If that pressure had been real, the honest answer would have been to name it
+  as one bounded slab-style owner rather than making later launcher or UI code
+  hand-roll small-object caching.
+- The audit result is that this pressure is not real on the currently admitted
+  slice, so the repository needed this phase to say so and refuse allocator
+  widening.
+
+Implemented outcome
+-------------------
+- No slab-style owner lands in Phase 265.
+- `stdlib/mem.mc` remains unchanged as the public owner of the admitted memory
+  vocabulary: heap-backed `Buffer<T>`, raw-byte `Pool`, explicit scratch
+  `Arena`, and page-rounded raw-byte `Run`.
+- The maintained consumer evidence stays exactly on the three Band B consumers
+  that exposed the pressure:
+  - `examples/real/pool_rows/`: repeated fixed-size slot reuse already fits the
+    raw-byte `mem.Pool` contract honestly.
+  - `examples/real/arena_expr/`: transient parse-tree nodes already fit one
+    explicit arena lifetime plus `arena_reset(...)` honestly.
+  - `examples/real/bundle_stage/`: bundle-sized staging already fits one
+    larger-granularity `mem.Run` owner honestly.
+- No admitted consumer currently hand-rolls a per-type cache, a per-size-class
+  free list, or a reuse layer whose narrowest honest owner would be slab.
+
+Audit evidence
+--------------
+- The only maintained repeated small-object family in the admitted slice is the
+  row-slot churn in `examples/real/pool_rows/`, and that project already uses
+  `mem.pool_take(...)` plus `mem.pool_return(...)` directly with explicit slot
+  invalidation.
+- `examples/real/arena_expr/` allocates AST nodes with `mem.arena_new<T>(...)`
+  and invalidates them wholesale at `mem.arena_reset(...)`; that is transient
+  scratch pressure, not long-lived cached-object pressure.
+- `examples/real/bundle_stage/` uses one page-rounded byte run for bulk staged
+  payload ownership; it does not expose small-object reuse pressure at all.
+- Other real projects on the admitted hosted slice still use explicit
+  heap-backed `Buffer<u8>` allocation and immediate free patterns. None expose
+  a repeated object-cache family stronger than the already landed pool slice.
+
+Ownership boundaries
+--------------------
+- Files that should change in this phase: the Phase 265 closeout note and the
+  adjacent planning or reference docs that inherit allocator policy from it.
+- Files that must not change in this phase: `stdlib/mem.mc`,
+  `runtime/hosted/mc_hosted_runtime.c`, compiler layers, kernel owners, and the
+  admitted Band B consumers, because no real consumer proved a missing slab
+  owner.
+- The controlling owners remain the earlier Band B surfaces plus their real
+  consumers. This phase is an audit over those owners, not a new memory-owner
+  implementation wave.
 
 Non-goals
 ---------
@@ -55,15 +102,26 @@ Invariants
 - The phase must be allowed to conclude that no slab owner should land yet.
 - Allocation choice must remain visible rather than ambient.
 
+Preserved invariants
+--------------------
+- Slab does not land because the earlier Band B owners were not demonstrably
+  insufficient for any admitted repeated object family.
+- Object invalidation remains explicit at `pool_return(...)`, `arena_reset(...)`,
+  `arena_deinit(...)`, and `run_deinit(...)`.
+- Allocation policy remains visible in API shape and consumer-local call sites
+  instead of becoming ambient or registry-driven.
+- No ownership boundary weakened: `mem` remains the vocabulary owner, and the
+  three real projects remain the proof owners for their respective allocation
+  shapes.
+
 Required surface changes
 ------------------------
 1. Audit the post-262 through 264 memory pressures for a real small-object
-   family that still lacks an honest owner.
-2. If that pressure is real, admit one slab-style small-object owner for that
-   family only.
-3. If that pressure is not real, document the non-landing explicitly and keep
-   the repository on pool, arena, and run owners only.
-4. Add focused validation for whichever of those two outcomes is honest.
+  family that still lacks an honest owner.
+2. Record the audit result explicitly: no admitted consumer currently justifies
+  a slab-style owner.
+3. Keep the repository on pool, arena, and run owners only.
+4. Add focused validation for that explicit non-landing outcome.
 
 Forbidden changes
 -----------------
@@ -96,6 +154,19 @@ Questions this phase must answer
 3. If not, what exact evidence justifies deferring slab work completely?
 4. What is the smallest validation surface that proves the chosen answer?
 
+Answered questions
+------------------
+1. No. There is no admitted small-object family that currently fails to fit
+  pool, arena, or run ownership honestly.
+2. No new owner is admitted.
+3. The exact evidence is the maintained three-consumer audit: `pool_rows`
+  already spends repeated fixed-size reuse on `mem.Pool`; `arena_expr` is
+  transient scratch on `Arena`; `bundle_stage` is larger-granularity staging
+  on `Run`; no other admitted consumer exposes a stronger small-object cache
+  family.
+4. The smallest focused validation surface is the three real-project grouped
+  cases that already own those Band B consumers.
+
 Preferred implementation shape
 ------------------------------
 - Start with an audit against the real consumers landed in Phases 262 through
@@ -104,6 +175,14 @@ Preferred implementation shape
   churn that neither pool nor arena nor run ownership can model cleanly.
 - If a slab owner lands, keep it narrow, typed, and tied to that object family
   instead of a general size-class framework.
+
+Actual implementation shape
+---------------------------
+- The phase stays document-focused.
+- No new allocator family, no new runtime surface, and no new consumer-local
+  helper layer lands.
+- The real implementation work is the explicit closeout itself: record the
+  non-landing, sync adjacent planning docs, and preserve the existing owners.
 
 Implementation accelerators
 ---------------------------
@@ -137,20 +216,23 @@ Relevant file-local invariants
 
 Relevant test surfaces
 ~~~~~~~~~~~~~~~~~~~~~~
-- Primary owning validation surface: the consumer-local proof that exposed the
-  unresolved small-object pressure.
-- Narrowest expected first executable validation target: that consumer's
-  project-scoped run, test, or grouped real-project case.
-- No broad compiler or reset-lane suite is justified unless the chosen consumer
-  actually lives there.
+- Primary owning validation surface: the three grouped real-project cases that
+  already own the admitted Band B consumers.
+- Narrowest executable validation targets:
+  - `mc_tool_real_project_pool_rows_unit`
+  - `mc_tool_real_project_arena_expr_unit`
+  - `mc_tool_real_project_bundle_stage_unit`
+- No broad compiler or reset-lane suite is justified because the outcome is an
+  explicit non-landing on the existing hosted real-project slice.
 
 Test obligations
 ----------------
 - no new broad validation by default
 - if a slab owner lands, run `Build debug` plus the narrowest consumer-scoped
   executable proof
-- if the phase concludes slab is still deferred, record the evidence in the
-  doc and rerun only the consumer proof that motivated the audit
+- because this phase concludes slab is still deferred, record the evidence in
+  the doc and rerun only the three Band B consumer proofs that motivated the
+  audit
 
 Acceptance criteria
 -------------------
@@ -160,9 +242,24 @@ Acceptance criteria
 - if slab does not land, that deferral is explicit and evidence-based
 - Band B remains bounded and avoids allocator taxonomy drift
 
+Acceptance result
+-----------------
+- The repository now has an explicit honest answer: slab-style small-object
+  pressure is still deferred.
+- The deferral is evidence-based and tied to the current admitted consumers,
+  not to generic allocator preference.
+- Band B remains bounded. No new center of gravity, registry, or allocator
+  taxonomy emerged.
+
 Future follow-up
 ----------------
 - Let Phase 266 incorporate the slab result into the allocator-selection
   guidance.
 - Reopen slab only when a second materially different small-object family
   emerges and the first answer no longer holds.
+
+Focused validation
+------------------
+- `ctest --test-dir build/debug -R '^mc_tool_real_project_pool_rows_unit$' --output-on-failure`
+- `ctest --test-dir build/debug -R '^mc_tool_real_project_arena_expr_unit$' --output-on-failure`
+- `ctest --test-dir build/debug -R '^mc_tool_real_project_bundle_stage_unit$' --output-on-failure`

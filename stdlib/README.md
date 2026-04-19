@@ -33,6 +33,12 @@ Current repository-specific notes:
   `mem.run_capacity(...)`, `mem.run_slice(...)`, and `mem.run_deinit(...)`;
   the first maintained consumer is `examples/real/bundle_stage/`, so larger-
   granularity bundle staging no longer has to hide behind `Buffer<u8>`
+- the Phase 266 Band B closeout now makes the current selection rule explicit:
+  use `Buffer<T>` for ordinary owning contiguous storage, `mem.Pool` for
+  bounded fixed-size slot reuse, `Arena` for transient scratch lifetimes, and
+  `mem.Run` for larger-granularity byte staging where run identity matters;
+  slab-style small-object caches remain deferred until a later admitted
+  consumer proves one is the narrowest honest owner
 - `strings` stays non-allocating in the admitted slice and currently exposes
   borrowed-text helpers only, including `strings.bytes(...)` for explicit
   borrowed byte views over `str`

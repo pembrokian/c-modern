@@ -250,12 +250,17 @@ Phase 264 -- Page Or Run Tracking First Slice
   or run allocation owner honestly enough for later app or UI state.
 
 Phase 265 -- Small Object Slab Probe
-- Exit criterion: one small-object or slab owner proves it is the narrowest
-  honest fit for one admitted repeated allocation pattern.
+- Landed result: no slab owner was admitted because the maintained Band B
+  consumers still fit `mem.Pool`, `Arena`, and `mem.Run` honestly; Phase 265
+  now records slab-style small-object reuse as explicitly deferred until a new
+  consumer proves otherwise.
 
 Phase 266 -- Allocator Selection Guidelines And Audit
-- Exit criterion: the repository states which memory owner to use for which
-  admitted slice and which allocator-like pressures should stay deferred.
+- Landed result: the repository now states the maintained post-Band-B choice
+  rules for ordinary heap-backed buffers, fixed-size pools, scratch arenas,
+  and larger-granularity runs, while keeping slab-style caches and other
+  allocator-like follow-through explicitly deferred until a later consumer
+  proves one of them is the narrowest honest next owner.
 
 Outcome checkpoint after Band B:
 - the repository should have a clearer memory substrate that later launcher,

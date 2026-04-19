@@ -128,6 +128,12 @@ Good fit for:
 - page-table support structures
 - driver objects
 
+Current repository status:
+- after the Phase 265 slab probe, the repository still keeps slab-style
+  small-object reuse deferred because the admitted consumers fit fixed-size
+  pools, explicit scratch arenas, and page-rounded runs honestly; no current
+  maintained owner yet needs a per-type or per-size cache layer
+
 3F. Physical page allocator
 
 Typical properties:
