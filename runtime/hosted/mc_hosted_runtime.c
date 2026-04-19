@@ -43,6 +43,12 @@ struct mc_arena {
     struct mc_allocator* alloc;
 };
 
+struct mc_run {
+    uint8_t* data;
+    int64_t cap;
+    struct mc_allocator* alloc;
+};
+
 struct mc_pool {
     uint8_t* data;
     uint8_t* in_use;
@@ -139,6 +145,7 @@ enum mc_error_kind {
 
 static const uintptr_t k_mc_error_kind_scale = (uintptr_t) 65536u;
 static const uintptr_t k_mc_unknown_errno_code = (uintptr_t) 65535u;
+static const int64_t k_mc_mem_run_granule_bytes = 4096;
 
 static void mc_zero_buffer_u8(struct mc_buffer_u8* out, struct mc_allocator* alloc) {
     if (out == NULL) {
@@ -253,6 +260,17 @@ static int mc_grow_poller(struct mc_io_poller* poller) {
     poller->entries = next_entries;
     poller->cap = next_cap;
     return 1;
+}
+
+static size_t mc_round_up_run_capacity(size_t requested) {
+    const size_t granule = (size_t) k_mc_mem_run_granule_bytes;
+    if (requested == 0) {
+        return granule;
+    }
+    if (requested > SIZE_MAX - (granule - 1u)) {
+        return 0;
+    }
+    return ((requested + granule - 1u) / granule) * granule;
 }
 
 static void mc_fill_ipv4_sockaddr(struct sockaddr_in* addr,
@@ -443,6 +461,66 @@ int64_t __mc_mem_buffer_len_u8(struct mc_buffer_u8* buf) {
         return 0;
     }
     return buf->len;
+}
+
+int64_t __mc_mem_run_granule_bytes(void) {
+    return k_mc_mem_run_granule_bytes;
+}
+
+uintptr_t __mc_mem_run_init(struct mc_allocator* alloc, int64_t min_bytes) {
+    struct mc_allocator* actual_alloc = alloc != NULL ? alloc : &k_default_allocator;
+    if (min_bytes < 0) {
+        return 0;
+    }
+
+    const size_t requested = (size_t) min_bytes;
+    const size_t rounded = mc_round_up_run_capacity(requested);
+    if (rounded == 0 || rounded > (size_t) INT64_MAX) {
+        return 0;
+    }
+
+    struct mc_run* run = (struct mc_run*) malloc(sizeof(struct mc_run));
+    if (run == NULL) {
+        return 0;
+    }
+
+    uint8_t* data = (uint8_t*) malloc(rounded);
+    if (data == NULL) {
+        free(run);
+        return 0;
+    }
+
+    memset(data, 0, rounded);
+    run->data = data;
+    run->cap = (int64_t) rounded;
+    run->alloc = actual_alloc;
+    return (uintptr_t) run;
+}
+
+void __mc_mem_run_deinit(uintptr_t raw) {
+    struct mc_run* run = (struct mc_run*) raw;
+    if (run == NULL) {
+        return;
+    }
+
+    free(run->data);
+    free(run);
+}
+
+int64_t __mc_mem_run_capacity(uintptr_t raw) {
+    struct mc_run* run = (struct mc_run*) raw;
+    if (run == NULL || run->cap < 0) {
+        return 0;
+    }
+    return run->cap;
+}
+
+uint8_t* __mc_mem_run_data(uintptr_t raw) {
+    struct mc_run* run = (struct mc_run*) raw;
+    if (run == NULL) {
+        return NULL;
+    }
+    return run->data;
 }
 
 struct mc_arena* __mc_mem_arena_init(struct mc_allocator* alloc, int64_t cap) {

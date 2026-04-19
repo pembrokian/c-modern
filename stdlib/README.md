@@ -28,6 +28,11 @@ Current repository-specific notes:
   `buffer_new`, `buffer_free`, `buffer_len`, and `slice_from_buffer`; the
   admitted bootstrap surface now supports explicit generic helper calls such as
   `mem.buffer_new<u8>(...)` and `mem.slice_from_buffer<u8>(...)`
+- the admitted `mem` surface now also includes page-rounded raw-byte `Run`
+  ownership through `mem.run_granule_bytes()`, `mem.run_init(...)`,
+  `mem.run_capacity(...)`, `mem.run_slice(...)`, and `mem.run_deinit(...)`;
+  the first maintained consumer is `examples/real/bundle_stage/`, so larger-
+  granularity bundle staging no longer has to hide behind `Buffer<u8>`
 - `strings` stays non-allocating in the admitted slice and currently exposes
   borrowed-text helpers only, including `strings.bytes(...)` for explicit
   borrowed byte views over `str`

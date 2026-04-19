@@ -6,12 +6,26 @@ struct Pool {
     raw: uintptr
 }
 
+struct Run {
+    raw: uintptr
+}
+
 distinct Arena = *u8
 
 @private
 extern(c) func __mc_mem_default_allocator() *Allocator
 @private
 extern(c) func __mc_mem_buffer_len_u8(buf: *Buffer<u8>) usize
+@private
+extern(c) func __mc_mem_run_granule_bytes() usize
+@private
+extern(c) func __mc_mem_run_init(alloc: *Allocator, min_bytes: usize) uintptr
+@private
+extern(c) func __mc_mem_run_deinit(raw: uintptr)
+@private
+extern(c) func __mc_mem_run_capacity(raw: uintptr) usize
+@private
+extern(c) func __mc_mem_run_data(raw: uintptr) *u8
 @private
 extern(c) func __mc_mem_arena_init(alloc: *Allocator, cap: usize) Arena
 @private
@@ -40,6 +54,26 @@ func default_allocator() *Allocator {
 
 func buffer_len(buf: *Buffer<u8>) usize {
     return __mc_mem_buffer_len_u8(buf)
+}
+
+func run_granule_bytes() usize {
+    return __mc_mem_run_granule_bytes()
+}
+
+func run_init(alloc: *Allocator, min_bytes: usize) Run {
+    return Run{ raw: __mc_mem_run_init(alloc, min_bytes) }
+}
+
+func run_deinit(run: Run) {
+    __mc_mem_run_deinit(run.raw)
+}
+
+func run_capacity(run: Run) usize {
+    return __mc_mem_run_capacity(run.raw)
+}
+
+func run_slice(run: Run) Slice<u8> {
+    return Slice<u8>{ ptr: __mc_mem_run_data(run.raw), len: run_capacity(run) }
 }
 
 func arena_init(alloc: *Allocator, cap: usize) Arena {

@@ -1,0 +1,8 @@
+name = "bundle-stage"
+family = "tool-real-project"
+runner = "mc_tool_real_project_tests"
+selector = "bundle-stage"
+function = "TestRealBundleStageProject"
+roots = [
+  "examples/real/bundle_stage/",
+]

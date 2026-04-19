@@ -1,0 +1,22 @@
+schema = 1
+project = "bundle-stage"
+default = "bundle-stage"
+
+[targets.bundle-stage]
+kind = "exe"
+package = "bundle-stage"
+root = "src/main.mc"
+mode = "debug"
+env = "hosted"
+
+[targets.bundle-stage.search_paths]
+modules = ["src", "../../../stdlib"]
+
+[targets.bundle-stage.runtime]
+startup = "default"
+
+[targets.bundle-stage.tests]
+enabled = true
+roots = ["tests"]
+mode = "checked"
+timeout_ms = 5000

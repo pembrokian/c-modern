@@ -36,6 +36,10 @@ void TestRealPoolRowsProject(const std::filesystem::path& source_root,
                              const std::filesystem::path& binary_root,
                              const std::filesystem::path& mc_path);
 
+void TestRealBundleStageProject(const std::filesystem::path& source_root,
+                                const std::filesystem::path& binary_root,
+                                const std::filesystem::path& mc_path);
+
 void TestRealLineFilterRelayProject(const std::filesystem::path& source_root,
                                     const std::filesystem::path& binary_root,
                                     const std::filesystem::path& mc_path);

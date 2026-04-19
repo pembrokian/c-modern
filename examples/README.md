@@ -20,6 +20,7 @@ Current repository-specific admitted real projects:
 - `real/pipe_handoff/` for the admitted handle-first thread-plus-pipe communication proof on the minimal `io.pipe()` surface
 - `real/pipe_ready/` for the admitted poller-coupled pipe-readiness proof on `io.pipe()` plus `io.poller_*`
 - `real/pool_rows/` for the admitted fixed-size pool take-or-return proof on `mem.Pool` with explicit exhaustion, return, and slot reuse
+- `real/bundle_stage/` for the admitted page-rounded run allocation proof on `mem.Run` with explicit bundle-sized staging, used-byte tracking, and release
 - `real/line_filter_relay/` for the admitted narrow hosted subprocess proof over explicit argv spawn plus pipe-backed stdin/stdout relay
 - `real/evented_echo/` for the admitted hosted networking project proof
 - `real/evented_partial_write/` for the admitted partial-write networking follow-on
@@ -35,12 +36,14 @@ build/debug/bin/mc run --project examples/real/worker_queue/build.toml --build-d
 build/debug/bin/mc run --project examples/real/pipe_handoff/build.toml --build-dir build/debug/probes/pipe_handoff
 build/debug/bin/mc run --project examples/real/pipe_ready/build.toml --build-dir build/debug/probes/pipe_ready
 build/debug/bin/mc run --project examples/real/pool_rows/build.toml --build-dir build/debug/probes/pool_rows
+build/debug/bin/mc run --project examples/real/bundle_stage/build.toml --build-dir build/debug/probes/bundle_stage -- path/to/bundle.bin
 build/debug/bin/mc run --project examples/real/line_filter_relay/build.toml --build-dir build/debug/probes/line_filter_relay -- "phase forty five"
 build/debug/bin/mc test --project examples/real/arena_expr/build.toml --build-dir build/debug/probes/arena_expr_tests
 build/debug/bin/mc test --project examples/real/worker_queue/build.toml --build-dir build/debug/probes/worker_queue
 build/debug/bin/mc test --project examples/real/pipe_handoff/build.toml --build-dir build/debug/probes/pipe_handoff
 build/debug/bin/mc test --project examples/real/pipe_ready/build.toml --build-dir build/debug/probes/pipe_ready
 build/debug/bin/mc test --project examples/real/pool_rows/build.toml --build-dir build/debug/probes/pool_rows
+build/debug/bin/mc test --project examples/real/bundle_stage/build.toml --build-dir build/debug/probes/bundle_stage
 build/debug/bin/mc test --project examples/real/line_filter_relay/build.toml --build-dir build/debug/probes/line_filter_relay
 ```
 
