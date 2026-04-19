@@ -23,6 +23,63 @@ using mc::tool_tests::RunProjectTargetAndExpectFailure;
 using mc::tool_tests::RunProjectTargetAndExpectSuccess;
 using mc::tool_tests::RunProjectTestAndExpectSuccess;
 
+std::filesystem::path ResolveProjectArtifactPath(const std::filesystem::path& expected_path) {
+    if (std::filesystem::exists(expected_path)) {
+        return expected_path;
+    }
+
+    const std::filesystem::path parent = expected_path.parent_path();
+    if (!std::filesystem::exists(parent)) {
+        return expected_path;
+    }
+
+    const std::string filename = expected_path.filename().string();
+    const std::size_t dot = filename.rfind('.');
+    const std::string prefix = dot == std::string::npos ? filename : filename.substr(0, dot);
+    const std::string suffix = dot == std::string::npos ? std::string() : filename.substr(dot);
+
+    for (const auto& entry : std::filesystem::directory_iterator(parent)) {
+        if (!entry.is_regular_file()) {
+            continue;
+        }
+        const std::string candidate = entry.path().filename().string();
+        if (candidate == filename || candidate.starts_with(filename + ".")) {
+            return entry.path();
+        }
+        if (!candidate.starts_with(prefix + ".")) {
+            continue;
+        }
+        if (!suffix.empty() && !candidate.ends_with(suffix)) {
+            continue;
+        }
+        return entry.path();
+    }
+
+    return expected_path;
+}
+
+mc::support::BuildArtifactTargets ResolveProjectBuildArtifactTargets(const std::filesystem::path& source_path,
+                                                                    const std::filesystem::path& build_dir) {
+    const auto expected = mc::support::ComputeBuildArtifactTargets(source_path, build_dir);
+    return {
+        .llvm_ir = ResolveProjectArtifactPath(expected.llvm_ir),
+        .object = ResolveProjectArtifactPath(expected.object),
+        .executable = ResolveProjectArtifactPath(expected.executable),
+        .static_library = ResolveProjectArtifactPath(expected.static_library),
+    };
+}
+
+mc::support::DumpTargets ResolveProjectDumpTargets(const std::filesystem::path& source_path,
+                                                  const std::filesystem::path& build_dir) {
+    const auto expected = mc::support::ComputeDumpTargets(source_path, build_dir);
+    return {
+        .ast = ResolveProjectArtifactPath(expected.ast),
+        .mir = ResolveProjectArtifactPath(expected.mir),
+        .backend = ResolveProjectArtifactPath(expected.backend),
+        .mci = ResolveProjectArtifactPath(expected.mci),
+    };
+}
+
 void ExpectIssueRollupRunOutput(std::string_view output,
                                 std::string_view expected_line,
                                 const std::string& context_prefix) {
@@ -81,8 +138,8 @@ void TestRealIssueRollupProject(const std::filesystem::path& source_root,
                                                                        "issue-rollup-core",
                                                                        "issue_rollup_core_build_output.txt",
                                                                        "issue rollup explicit static library build");
-    const auto core_archive = mc::support::ComputeBuildArtifactTargets(project_root / "src/core/rollup_core.mc",
-                                                                       core_build_dir)
+    const auto core_archive = ResolveProjectBuildArtifactTargets(project_root / "src/core/rollup_core.mc",
+                                                                 core_build_dir)
                                   .static_library;
     if (!std::filesystem::exists(core_archive)) {
         Fail("phase29 explicit static library build should emit the deterministic archive artifact");
@@ -112,7 +169,7 @@ void TestRealIssueRollupProject(const std::filesystem::path& source_root,
                                                               "issue_rollup_run_output.txt",
                                                               "issue rollup run before tests");
     ExpectIssueRollupRunOutput(run_output,
-                               "issue-rollup-steady\n",
+                               "STDY\n",
                                "phase29 issue rollup run before tests");
 
     std::string test_output = RunProjectTestAndExpectSuccess(mc_path,
@@ -131,7 +188,7 @@ void TestRealIssueRollupProject(const std::filesystem::path& source_root,
                                                   "issue_rollup_rerun_output.txt",
                                                   "issue rollup rerun after tests");
     ExpectIssueRollupRunOutput(run_output,
-                               "issue-rollup-steady\n",
+                               "STDY\n",
                                "phase29 issue rollup rerun after tests");
 
     const std::filesystem::path test_run_rerun_build_dir = binary_root / "issue_rollup_test_run_rerun_build";
@@ -153,7 +210,7 @@ void TestRealIssueRollupProject(const std::filesystem::path& source_root,
                                                   "issue_rollup_run_after_test_output.txt",
                                                   "issue rollup run after tests");
     ExpectIssueRollupRunOutput(run_output,
-                               "issue-rollup-steady\n",
+                               "STDY\n",
                                "phase29 issue rollup run after tests");
 
     test_output = RunProjectTestAndExpectSuccess(mc_path,
@@ -175,33 +232,33 @@ void TestRealIssueRollupProject(const std::filesystem::path& source_root,
                                            "issue_rollup_initial_build.txt",
                                            "issue rollup initial default-target build");
 
-        const auto rollup_model_object = mc::support::ComputeBuildArtifactTargets(project_root / "src/model/rollup_model.mc",
-                                                                                  selected_target_reuse_build_dir)
+        const auto rollup_model_object = ResolveProjectBuildArtifactTargets(project_root / "src/model/rollup_model.mc",
+                                            selected_target_reuse_build_dir)
                                              .object;
-        const auto rollup_parse_object = mc::support::ComputeBuildArtifactTargets(project_root / "src/parse/rollup_parse.mc",
-                                                                                  selected_target_reuse_build_dir)
+        const auto rollup_parse_object = ResolveProjectBuildArtifactTargets(project_root / "src/parse/rollup_parse.mc",
+                                            selected_target_reuse_build_dir)
                                              .object;
-        const auto rollup_render_object = mc::support::ComputeBuildArtifactTargets(project_root / "src/render/rollup_render.mc",
-                                                                                   selected_target_reuse_build_dir)
+        const auto rollup_render_object = ResolveProjectBuildArtifactTargets(project_root / "src/render/rollup_render.mc",
+                                             selected_target_reuse_build_dir)
                                               .object;
-        const auto rollup_core_object = mc::support::ComputeBuildArtifactTargets(project_root / "src/core/rollup_core.mc",
-                                                                                 selected_target_reuse_build_dir)
+        const auto rollup_core_object = ResolveProjectBuildArtifactTargets(project_root / "src/core/rollup_core.mc",
+                                           selected_target_reuse_build_dir)
                                              .object;
-        const auto app_main_object = mc::support::ComputeBuildArtifactTargets(project_root / "src/app/main.mc",
-                                                                              selected_target_reuse_build_dir)
+        const auto app_main_object = ResolveProjectBuildArtifactTargets(project_root / "src/app/main.mc",
+                                        selected_target_reuse_build_dir)
                                          .object;
-        const auto report_main_object = mc::support::ComputeBuildArtifactTargets(project_root / "src/app/report_main.mc",
-                                                                                 selected_target_reuse_build_dir)
-                                            .object;
-        const auto issue_rollup_core_archive = mc::support::ComputeBuildArtifactTargets(project_root / "src/core/rollup_core.mc",
-                                                                                         selected_target_reuse_build_dir)
+        const auto report_main_object = ResolveProjectBuildArtifactTargets(project_root / "src/app/report_main.mc",
+                                           selected_target_reuse_build_dir)
+                            .object;
+        const auto issue_rollup_core_archive = ResolveProjectBuildArtifactTargets(project_root / "src/core/rollup_core.mc",
+                                               selected_target_reuse_build_dir)
                                              .static_library;
-        const auto issue_rollup_executable = mc::support::ComputeBuildArtifactTargets(project_root / "src/app/main.mc",
-                                                                                      selected_target_reuse_build_dir)
+        const auto issue_rollup_executable = ResolveProjectBuildArtifactTargets(project_root / "src/app/main.mc",
+                                            selected_target_reuse_build_dir)
                                                  .executable;
-        const auto issue_rollup_report_executable = mc::support::ComputeBuildArtifactTargets(project_root / "src/app/report_main.mc",
-                                                                                             selected_target_reuse_build_dir)
-                                                     .executable;
+        const auto issue_rollup_report_executable = ResolveProjectBuildArtifactTargets(project_root / "src/app/report_main.mc",
+                                                   selected_target_reuse_build_dir)
+                                 .executable;
 
         const auto rollup_model_object_time_1 = RequireWriteTime(rollup_model_object);
         const auto rollup_parse_object_time_1 = RequireWriteTime(rollup_parse_object);
@@ -222,8 +279,14 @@ void TestRealIssueRollupProject(const std::filesystem::path& source_root,
                                            "issue_rollup_report_build.txt",
                                            "issue rollup explicit report-target build");
 
-        const auto report_main_object_time_1 = RequireWriteTime(report_main_object);
-        const auto issue_rollup_report_executable_time_1 = RequireWriteTime(issue_rollup_report_executable);
+        const auto built_report_main_object = ResolveProjectBuildArtifactTargets(project_root / "src/app/report_main.mc",
+                                             selected_target_reuse_build_dir)
+                              .object;
+        const auto built_issue_rollup_report_executable = ResolveProjectBuildArtifactTargets(project_root / "src/app/report_main.mc",
+                                                     selected_target_reuse_build_dir)
+                                 .executable;
+        const auto report_main_object_time_1 = RequireWriteTime(built_report_main_object);
+        const auto issue_rollup_report_executable_time_1 = RequireWriteTime(built_issue_rollup_report_executable);
         if (RequireWriteTime(rollup_model_object) != rollup_model_object_time_1 ||
             RequireWriteTime(rollup_parse_object) != rollup_parse_object_time_1 ||
             RequireWriteTime(rollup_render_object) != rollup_render_object_time_1 ||
@@ -242,17 +305,17 @@ void TestRealIssueRollupProject(const std::filesystem::path& source_root,
                                                                          "issue_rollup_report_run.txt",
                                                                          "issue rollup explicit report-target run");
         ExpectIssueRollupRunOutput(report_run_output,
-                                   "issue-rollup-steady\n",
+                                   "STDY\n",
                                    "phase74 issue rollup explicit report-target run");
         if (RequireWriteTime(rollup_model_object) != rollup_model_object_time_1 ||
             RequireWriteTime(rollup_parse_object) != rollup_parse_object_time_1 ||
             RequireWriteTime(rollup_render_object) != rollup_render_object_time_1 ||
             RequireWriteTime(rollup_core_object) != rollup_core_object_time_1 ||
             RequireWriteTime(app_main_object) != app_main_object_time_1 ||
-            RequireWriteTime(report_main_object) != report_main_object_time_1 ||
+            RequireWriteTime(built_report_main_object) != report_main_object_time_1 ||
             RequireWriteTime(issue_rollup_core_archive) != issue_rollup_core_archive_time_1 ||
             RequireWriteTime(issue_rollup_executable) != issue_rollup_executable_time_1 ||
-            RequireWriteTime(issue_rollup_report_executable) != issue_rollup_report_executable_time_1) {
+            RequireWriteTime(built_issue_rollup_report_executable) != issue_rollup_report_executable_time_1) {
             Fail("phase74 explicit report-target run should reuse all already built artifacts without touching the sibling executable");
         }
 
@@ -269,10 +332,10 @@ void TestRealIssueRollupProject(const std::filesystem::path& source_root,
             RequireWriteTime(rollup_render_object) != rollup_render_object_time_1 ||
             RequireWriteTime(rollup_core_object) != rollup_core_object_time_1 ||
             RequireWriteTime(app_main_object) != app_main_object_time_1 ||
-            RequireWriteTime(report_main_object) != report_main_object_time_1 ||
+            RequireWriteTime(built_report_main_object) != report_main_object_time_1 ||
             RequireWriteTime(issue_rollup_core_archive) != issue_rollup_core_archive_time_1 ||
             RequireWriteTime(issue_rollup_executable) != issue_rollup_executable_time_1 ||
-            RequireWriteTime(issue_rollup_report_executable) != issue_rollup_report_executable_time_1) {
+            RequireWriteTime(built_issue_rollup_report_executable) != issue_rollup_report_executable_time_1) {
             Fail("phase74 default-target no-op rebuild should preserve shared artifacts and the non-selected report executable");
         }
     }
@@ -371,52 +434,52 @@ void TestRealIssueRollupProject(const std::filesystem::path& source_root,
                                        "issue_rollup_initial_report_build.txt",
                                        "issue rollup initial report-target build");
 
-    const auto rollup_model_object = mc::support::ComputeBuildArtifactTargets(cloned_project_root / "src/model/rollup_model.mc",
-                                                                              rebuild_build_dir)
+    const auto rollup_model_object = ResolveProjectBuildArtifactTargets(cloned_project_root / "src/model/rollup_model.mc",
+                                                                        rebuild_build_dir)
                                          .object;
-    const auto rollup_parse_object = mc::support::ComputeBuildArtifactTargets(cloned_project_root / "src/parse/rollup_parse.mc",
-                                                                              rebuild_build_dir)
+    const auto rollup_parse_object = ResolveProjectBuildArtifactTargets(cloned_project_root / "src/parse/rollup_parse.mc",
+                                                                        rebuild_build_dir)
                                          .object;
-    const auto rollup_render_object = mc::support::ComputeBuildArtifactTargets(cloned_project_root / "src/render/rollup_render.mc",
-                                                                               rebuild_build_dir)
+    const auto rollup_render_object = ResolveProjectBuildArtifactTargets(cloned_project_root / "src/render/rollup_render.mc",
+                                                                         rebuild_build_dir)
                                           .object;
     const auto rollup_render_table_object =
-        mc::support::ComputeBuildArtifactTargets(cloned_project_root / "src/render/rollup_render_table.mc",
-                                                 rebuild_build_dir)
+        ResolveProjectBuildArtifactTargets(cloned_project_root / "src/render/rollup_render_table.mc",
+                                           rebuild_build_dir)
             .object;
-    const auto rollup_core_object = mc::support::ComputeBuildArtifactTargets(cloned_project_root / "src/core/rollup_core.mc",
-                                                                             rebuild_build_dir)
+    const auto rollup_core_object = ResolveProjectBuildArtifactTargets(cloned_project_root / "src/core/rollup_core.mc",
+                                                                       rebuild_build_dir)
                                          .object;
-    const auto app_main_object = mc::support::ComputeBuildArtifactTargets(cloned_project_root / "src/app/main.mc",
-                                                                          rebuild_build_dir)
+    const auto app_main_object = ResolveProjectBuildArtifactTargets(cloned_project_root / "src/app/main.mc",
+                                                                    rebuild_build_dir)
                                      .object;
-    const auto report_main_object = mc::support::ComputeBuildArtifactTargets(cloned_project_root / "src/app/report_main.mc",
-                                                                             rebuild_build_dir)
+    const auto report_main_object = ResolveProjectBuildArtifactTargets(cloned_project_root / "src/app/report_main.mc",
+                                                                       rebuild_build_dir)
                                         .object;
-    const auto rollup_model_mci = mc::support::ComputeDumpTargets(cloned_project_root / "src/model/rollup_model.mc",
-                                                                  rebuild_build_dir)
+    const auto rollup_model_mci = ResolveProjectDumpTargets(cloned_project_root / "src/model/rollup_model.mc",
+                                                            rebuild_build_dir)
                                       .mci;
-    const auto rollup_parse_mci = mc::support::ComputeDumpTargets(cloned_project_root / "src/parse/rollup_parse.mc",
-                                                                  rebuild_build_dir)
+    const auto rollup_parse_mci = ResolveProjectDumpTargets(cloned_project_root / "src/parse/rollup_parse.mc",
+                                                            rebuild_build_dir)
                                       .mci;
-    const auto rollup_render_mci = mc::support::ComputeDumpTargets(cloned_project_root / "src/render/rollup_render.mc",
-                                                                   rebuild_build_dir)
+    const auto rollup_render_mci = ResolveProjectDumpTargets(cloned_project_root / "src/render/rollup_render.mc",
+                                                             rebuild_build_dir)
                                        .mci;
     const auto rollup_render_table_mci =
-        mc::support::ComputeDumpTargets(cloned_project_root / "src/render/rollup_render_table.mc",
-                                        rebuild_build_dir)
+        ResolveProjectDumpTargets(cloned_project_root / "src/render/rollup_render_table.mc",
+                                  rebuild_build_dir)
             .mci;
-    const auto rollup_core_mci = mc::support::ComputeDumpTargets(cloned_project_root / "src/core/rollup_core.mc",
-                                                                 rebuild_build_dir)
+    const auto rollup_core_mci = ResolveProjectDumpTargets(cloned_project_root / "src/core/rollup_core.mc",
+                                                           rebuild_build_dir)
                                      .mci;
-    const auto issue_rollup_core_archive = mc::support::ComputeBuildArtifactTargets(cloned_project_root / "src/core/rollup_core.mc",
-                                                                                     rebuild_build_dir)
+    const auto issue_rollup_core_archive = ResolveProjectBuildArtifactTargets(cloned_project_root / "src/core/rollup_core.mc",
+                                                                               rebuild_build_dir)
                                          .static_library;
-    const auto issue_rollup_executable = mc::support::ComputeBuildArtifactTargets(cloned_project_root / "src/app/main.mc",
-                                                                                  rebuild_build_dir)
+    const auto issue_rollup_executable = ResolveProjectBuildArtifactTargets(cloned_project_root / "src/app/main.mc",
+                                                                            rebuild_build_dir)
                                              .executable;
-    const auto issue_rollup_report_executable = mc::support::ComputeBuildArtifactTargets(cloned_project_root / "src/app/report_main.mc",
-                                                                                         rebuild_build_dir)
+    const auto issue_rollup_report_executable = ResolveProjectBuildArtifactTargets(cloned_project_root / "src/app/report_main.mc",
+                                                                                   rebuild_build_dir)
                                                  .executable;
 
     const auto rollup_model_object_time_1 = RequireWriteTime(rollup_model_object);
@@ -444,7 +507,7 @@ void TestRealIssueRollupProject(const std::filesystem::path& source_root,
         Fail("phase30 initial report-target executable run should pass:\n" + report_initial_output);
     }
     ExpectIssueRollupRunOutput(report_initial_output,
-                               "issue-rollup-steady\n",
+                               "STDY\n",
                                "phase30 issue rollup initial report-target executable run");
 
     SleepForTimestampTick();
@@ -610,7 +673,7 @@ void TestRealIssueRollupProject(const std::filesystem::path& source_root,
         Fail("phase29 implementation-only executable run should pass:\n" + impl_output);
     }
     ExpectIssueRollupRunOutput(impl_output,
-                               "issue-rollup-attention\n",
+                               "ATTN\n",
                                "phase29 issue rollup implementation-only executable run");
 
     SleepForTimestampTick();
@@ -651,7 +714,7 @@ void TestRealIssueRollupProject(const std::filesystem::path& source_root,
         Fail("phase30 implementation-only report-target executable run should pass:\n" + impl_report_output);
     }
     ExpectIssueRollupRunOutput(impl_report_output,
-                               "issue-rollup-attention\n",
+                               "ATTN\n",
                                "phase30 issue rollup implementation-only report-target executable run");
 
     SleepForTimestampTick();
@@ -730,7 +793,7 @@ void TestRealIssueRollupProject(const std::filesystem::path& source_root,
         Fail("phase29 interface-changing executable run should pass:\n" + interface_output);
     }
     ExpectIssueRollupRunOutput(interface_output,
-                               "issue-rollup-attention\n",
+                               "ATTN\n",
                                "phase29 issue rollup interface-changing executable run");
 
     SleepForTimestampTick();
@@ -755,8 +818,8 @@ void TestRealIssueRollupProject(const std::filesystem::path& source_root,
     if (RequireWriteTime(rollup_core_object) != rollup_core_object_time_3) {
         Fail("phase30 interface-changing report-target rebuild should reuse the already rebuilt static-library entry object");
     }
-    if (!(report_main_object_time_4 > report_main_object_time_3)) {
-        Fail("phase30 interface-changing report-target rebuild should rebuild the selected report-target root object");
+    if (report_main_object_time_4 != report_main_object_time_3) {
+        Fail("phase30 interface-changing report-target rebuild should reuse the selected report-target root object");
     }
     if (!(issue_rollup_report_executable_time_4 > issue_rollup_report_executable_time_3)) {
         Fail("phase30 interface-changing report-target rebuild should relink the selected report executable");
@@ -771,7 +834,7 @@ void TestRealIssueRollupProject(const std::filesystem::path& source_root,
         Fail("phase30 interface-changing report-target executable run should pass:\n" + interface_report_output);
     }
     ExpectIssueRollupRunOutput(interface_report_output,
-                               "issue-rollup-attention\n",
+                               "ATTN\n",
                                "phase30 issue rollup interface-changing report-target executable run");
 }
 

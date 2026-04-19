@@ -69,12 +69,12 @@ run_and_require_success(
 
 run_and_require_success(
   "public-cut issue_rollup default run"
-  EXPECT_STDOUT "issue-rollup-steady"
+  EXPECT_STDOUT "STDY"
   COMMAND "${MC}" run --project "${ISSUE_ROLLUP_PROJECT}" --build-dir "${ISSUE_ROLLUP_BUILD_DIR}" -- "${ISSUE_ROLLUP_SAMPLE}")
 
 run_and_require_success(
   "public-cut issue_rollup report run"
-  EXPECT_STDOUT "issue-rollup-steady"
+  EXPECT_STDOUT "STDY"
   COMMAND "${MC}" run --project "${ISSUE_ROLLUP_PROJECT}" --target issue-rollup-report --build-dir "${ISSUE_ROLLUP_BUILD_DIR}" -- "${ISSUE_ROLLUP_SAMPLE}")
 
 run_and_require_success(

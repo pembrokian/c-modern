@@ -3,7 +3,7 @@ Phase 278 -- Fixed-Font Text Rendering Or Cell Rendering Path
 
 Status
 ------
-PROPOSED
+COMPLETED
 
 Purpose
 -------
@@ -81,20 +81,38 @@ Relevant backlog items this phase intentionally brings under pressure
 
 Questions this phase must answer
 --------------------------------
-1. Is fixed-font text or fixed-cell rendering the more honest first contract?
-2. What payload shape keeps the rendering path deterministic and testable?
-3. What part of the current `issue_rollup` render code should remain app-local?
-4. What focused proof shows readable output on the admitted surface without
-   implying a richer graphics stack?
+1. Fixed-cell rendering is the more honest first contract.
+2. The payload is one fixed four-byte readable cell contract.
+3. Render classification and manifest-aware policy remain app-local in the
+  existing `issue_rollup` render modules.
+4. One reset-lane visible-state fixture plus narrow `issue_rollup`
+  real-project validation prove the path without implying a richer graphics
+  stack.
 
 Preferred implementation shape
 ------------------------------
 - Reuse the first app's existing render classification as the consumer-side
   decision point.
-- Introduce one fixed rendering contract that the display owner can consume.
+- Reuse the existing fixed four-cell readable payload that the display owner
+  already stores.
 - Prefer cells or equally bounded fixed-font text because they are easier to
   validate deterministically than richer drawing primitives.
 - Keep manifest and render-policy decisions inside the app.
+
+Implementation summary
+----------------------
+- Land the shared visible contract as the existing four-byte readable cell
+  payload: `EMTY`, `STDY`, `BUSY`, and `ATTN`.
+- Keep `display_surface.mc` as the fixed-surface owner and keep
+  `issue_rollup_app.mc` on the app-owned present seam introduced in Phase 277.
+- Keep render classification and manifest-aware render policy in
+  `examples/real/issue_rollup/src/render/rollup_render.mc` and its adjacent
+  table helper rather than widening display or launcher ownership.
+- Align the hosted `issue_rollup` output path with the same four-cell visible
+  contract by emitting the readable cell strings instead of a second hosted
+  rendering family.
+- Add one focused reset-lane proof for fixed-cell visible-state transitions and
+  keep the real-project validation narrow to `issue_rollup`.
 
 Implementation accelerators
 ---------------------------
@@ -142,6 +160,13 @@ Test obligations
 - `mc_tool_workflow_kernel_reset_lane_unit`
 - `mc_tool_workflow_kernel_reset_lane_full_unit`
 
+Validation completed
+--------------------
+- `Build debug`
+- `mc_tool_workflow_kernel_reset_lane_unit`
+- `mc_tool_real_project_issue_rollup_unit`
+- `mc_tool_real_project_issue_rollup_imported_aggregate_const_unit`
+
 Acceptance criteria
 -------------------
 - one stable text-or-cell rendering path exists on the admitted surface
@@ -149,6 +174,20 @@ Acceptance criteria
 - app-local render policy remains app-local and the display owner remains a
   surface owner
 - no font, layout, or graphics framework is introduced
+
+Phase review against spec
+-------------------------
+- Met: one stable rendering path now exists through the fixed four-cell
+  visible contract used by both the hosted and reset-lane `issue_rollup`
+  paths.
+- Met: render policy stayed app-local in the existing `issue_rollup` render
+  modules and no new text-layout, font, widget, or graphics owner was added.
+- Met: the display owner stayed a fixed-surface owner only; it still stores and
+  reports cells and does not classify app state.
+- Met: Phase 278 adds one deterministic visible-state fixture and keeps the
+  real-project follow-through narrow.
+- Deferred exactly as intended: no second rendering family, no font system, no
+  layout engine, and no display-owner growth into a toolkit.
 
 Future follow-up
 ----------------

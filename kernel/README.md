@@ -13,7 +13,7 @@ Rules
 - Keep compiler, sema, MIR, backend, ABI, target, runtime, and `hal` surfaces closed unless a narrow blocker forces a local change.
 - Add modules only when a specific phase boundary needs them, at the lean behavioral minimum the four-section standard allows.
 
-Current scope (through Phase 277)
+Current scope (through Phase 278)
 
 - All three canonical service shapes are present: forwarding (`serial_service`, `shell_service`, `serial_shell_path`), append/tail (`log_service`), and key/value (`kv_service`).
 - The compact shell route now reaches `log_service` and `kv_service` over the real reset-lane path instead of stopping at shell-local echo behavior.
@@ -31,6 +31,7 @@ Current scope (through Phase 277)
 - Phase 275 adds one explicit `display_surface.mc` owner for one fixed four-cell visible target and one bounded launcher-triggered foreground present handoff.
 - Phase 276 adds one explicit `foreground_input_route.mc` seam that keeps event parsing in `input_event.mc`, keeps foreground truth in `launcher_service.mc`, and routes the admitted input family to exactly one current foreground app without widening launcher, display, or dispatch into a UI framework.
 - Phase 277 adds one explicit `issue_rollup_app.mc` owner for the first app-driven present path, keeps render classification in the `issue_rollup` render modules, and removes the old launcher-time display-token shortcut so launch/input now reach the surface only through an explicit app-to-display present request.
+- Phase 278 keeps the first rendering answer on that same app-to-display path by reusing the existing readable four-cell visible contract (`EMTY`, `STDY`, `BUSY`, `ATTN`) and aligning the hosted `issue_rollup` path to the same cell-shaped output rather than admitting a second rendering family.
 
 Source tree layout (Phase 219)
 
@@ -55,6 +56,14 @@ The following modules are deferred until the named phase boundary forces them:
 - `mmu` — probably never in this tree; hosted execution makes MMU stubs meaningless
 
 Recent service targets
+
+- Phase 278 (landed): fixed-cell rendering path.
+  The admitted readable rendering contract is the existing four-byte visible
+  cell payload already carried by `display_surface.mc` and `issue_rollup_app.mc`.
+  `issue_rollup` render policy stays in the app-local render modules, hosted
+  `issue_rollup` output now emits the same readable cell tokens, and the focused
+  reset-lane fixture is
+  `tests/system/kernel_reset_lane_phase278_fixed_cell_rendering`.
 
 - Phase 277 (landed): explicit repaint/present contract.
   `issue_rollup_app.mc` now owns one bounded app-local summary plus one direct

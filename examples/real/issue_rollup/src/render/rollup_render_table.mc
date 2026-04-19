@@ -1,28 +1,28 @@
 import io
 
 func write_empty() i32 {
-    if io.write_line("issue-rollup-empty") != 0 {
+    if io.write_line("EMTY") != 0 {
         return 1
     }
     return 0
 }
 
 func write_steady() i32 {
-    if io.write_line("issue-rollup-steady") != 0 {
+    if io.write_line("STDY") != 0 {
         return 1
     }
     return 0
 }
 
 func write_busy() i32 {
-    if io.write_line("issue-rollup-busy") != 0 {
+    if io.write_line("BUSY") != 0 {
         return 1
     }
     return 0
 }
 
 func write_attention() i32 {
-    if io.write_line("issue-rollup-attention") != 0 {
+    if io.write_line("ATTN") != 0 {
         return 1
     }
     return 0

@@ -151,7 +151,7 @@ void TestIssueRollupImportedAggregateConstPressure(const std::filesystem::path& 
         Fail("issue rollup aggregate const executable run should succeed, got:\n" + run_output);
     }
     ExpectIssueRollupRunOutput(run_output,
-                               "issue-rollup-steady\n",
+                               "STDY\n",
                                "phase58 issue rollup aggregate const executable run");
 }
 
