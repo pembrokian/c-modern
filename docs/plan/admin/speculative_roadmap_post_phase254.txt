@@ -192,18 +192,79 @@ Outcome checkpoint after Band A:
   local support code, but still remain visibly bounded rather than in a broad
   language-expansion wave.
 
-Band B - Memory Expansion
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+Band B - Make Memory An Honest Substrate For Later System Growth
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+Phases 262 through 266 should admit just enough allocator and memory-shape
+truth that later launcher, manifest, and UI work can build on a clear owned
+memory story instead of silently relying on ad hoc allocation habits.
 
-why? right launcher state, ui surfaces, app manifests - these are allocator 
-heavy, risk being app shaped and not enough system shaped. need to acknowledge
-missing mem shape story
+Likely themes:
+- one explicit fixed-size pool owner for repeated bounded objects
+- one arena or scratch owner for parser, workflow, or build-adjacent transient
+  allocations
+- one page or run-tracking owner if app or UI work needs larger units of memory
+- one small-object or slab-style owner only if the admitted slices prove it is
+  the narrowest honest fit
+- one selection or audit phase that states which memory owner should be used
+  where and why
 
-Phase 262 fixed_size_pool_allocator_first_slice.txt
-Phase 263 arena_allocator_for_parser_and_workflow_scratch.txt
-Phase 264 page_allocator_and_page_run_tracking.txt
-Phase 265 small_object_slab_allocator_probe.txt
-Phase 266 allocator_selection_guidelines_and_audit.txt
+Why this band comes here:
+- launcher state, app manifests, UI surfaces, and later document or view state
+  will all need a clearer memory story, and those pressures are naturally more
+  system-shaped than app-shaped.
+- The repository should admit that shape now so later work does not smuggle in
+  allocation policy through whichever owner happens to need memory first.
+- This band is deliberately earlier than the first UI phases because a basic UI
+  proof will be easier to keep honest if its memory boundaries already have
+  named owners.
+
+Why this band remains bounded:
+- this is not a general allocator framework wave
+- this is not a garbage collector, tracing runtime, or ownership-automation
+  wave
+- this is not a replacement for the existing compiler or kernel owners that
+  already manage their own temporary state
+- every phase should spend on one concrete allocation shape, not on a broad
+  memory taxonomy
+
+Possible phases in this band:
+
+Phase 262 -- Fixed-Size Pool Allocator First Slice
+- Exit criterion: one narrow fixed-size pool owner exists and is used by one
+  real repository-owned consumer that repeatedly allocates the same bounded
+  shape.
+
+Phase 263 -- Arena Allocator For Scratch Work
+- Exit criterion: one explicit arena or scratch owner handles transient parser,
+  workflow, or build-adjacent allocations without turning those owners into a
+  lifetime framework.
+
+Phase 264 -- Page Or Run Tracking First Slice
+- Exit criterion: the repository can name and use one larger-granularity page
+  or run allocation owner honestly enough for later app or UI state.
+
+Phase 265 -- Small Object Slab Probe
+- Exit criterion: one small-object or slab owner proves it is the narrowest
+  honest fit for one admitted repeated allocation pattern.
+
+Phase 266 -- Allocator Selection Guidelines And Audit
+- Exit criterion: the repository states which memory owner to use for which
+  admitted slice and which allocator-like pressures should stay deferred.
+
+Outcome checkpoint after Band B:
+- the repository should have a clearer memory substrate that later launcher,
+  app, and UI work can reuse without inventing memory policy on the fly.
+
+Memory band guardrails
+----------------------
+- keep the memory story explicit and owner-local
+- keep temporary scratch allocation separate from long-lived program or UI
+  state
+- keep the first allocator slices small and concrete
+- do not let one phase become a general memory-management framework by
+  accident
+- if a later UI or app phase needs a different memory owner, record that as a
+  separate follow-through instead of widening this band
 
 Band C - Turn The Current Kernel Into An App-Shaped System Substrate
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~

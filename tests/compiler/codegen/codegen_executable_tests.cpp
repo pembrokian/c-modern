@@ -1610,6 +1610,104 @@ void RunCodegenExecutableProjectSuite(const std::filesystem::path& source_root,
                                               {"@service_cell_helpers.service_cell_with_state(",
                                                "@service_cell_helpers.service_cell_restart("});
 
+    const std::filesystem::path imported_runtime_table_project_root = work_root / "imported_runtime_table_project";
+    WriteFile(imported_runtime_table_project_root / "build.toml",
+              "schema = 1\n"
+              "project = \"phase259-imported-runtime-table\"\n"
+              "default = \"app\"\n"
+              "\n"
+              "[targets.app]\n"
+              "kind = \"exe\"\n"
+              "root = \"src/main.mc\"\n"
+              "mode = \"debug\"\n"
+              "env = \"hosted\"\n"
+              "\n"
+              "[targets.app.search_paths]\n"
+              "modules = [\"src\"]\n"
+              "\n"
+              "[targets.app.runtime]\n"
+              "startup = \"default\"\n");
+    WriteFile(imported_runtime_table_project_root / "src/rollup_render_table_helper.mc",
+              "func write_empty() i32 {\n"
+              "    return 10\n"
+              "}\n"
+              "\n"
+              "func write_steady() i32 {\n"
+              "    return 20\n"
+              "}\n"
+              "\n"
+              "func write_busy() i32 {\n"
+              "    return 30\n"
+              "}\n"
+              "\n"
+              "func write_attention() i32 {\n"
+              "    return 40\n"
+              "}\n"
+              "\n"
+              "const ROLLUP_WRITERS: [4]func() i32 = [4]func() i32{\n"
+              "    write_empty,\n"
+              "    write_steady,\n"
+              "    write_busy,\n"
+              "    write_attention,\n"
+              "}\n");
+    WriteFile(imported_runtime_table_project_root / "src/main.mc",
+              "import rollup_render_table_helper\n"
+              "\n"
+              "struct Summary {\n"
+              "    open_items: usize\n"
+              "    closed_items: usize\n"
+              "    blocked_items: usize\n"
+              "    priority_items: usize\n"
+              "}\n"
+              "\n"
+              "const ROLLUP_EMPTY: i32 = 0\n"
+              "const ROLLUP_STEADY: i32 = 1\n"
+              "const ROLLUP_BUSY: i32 = 2\n"
+              "const ROLLUP_ATTENTION: i32 = 3\n"
+              "\n"
+              "const LOCAL_WRITERS: [4]func() i32 = rollup_render_table_helper.ROLLUP_WRITERS\n"
+              "\n"
+              "func total_items(summary: Summary) usize {\n"
+              "    return summary.open_items + summary.closed_items + summary.blocked_items\n"
+              "}\n"
+              "\n"
+              "func has_priority(summary: Summary) bool {\n"
+              "    return summary.priority_items > 0\n"
+              "}\n"
+              "\n"
+              "func rollup_kind(summary: Summary) i32 {\n"
+              "    if total_items(summary) == 0 {\n"
+              "        return ROLLUP_EMPTY\n"
+              "    }\n"
+              "    if has_priority(summary) {\n"
+              "        return ROLLUP_ATTENTION\n"
+              "    }\n"
+              "    if summary.open_items > summary.closed_items {\n"
+              "        return ROLLUP_BUSY\n"
+              "    }\n"
+              "    return ROLLUP_STEADY\n"
+              "}\n"
+              "\n"
+              "func write_rollup(summary: Summary) i32 {\n"
+              "    kind: i32 = rollup_kind(summary)\n"
+              "    writer: func() i32 = LOCAL_WRITERS[usize(kind)]\n"
+              "    return writer()\n"
+              "}\n"
+              "\n"
+              "func main() i32 {\n"
+              "    total: i32 = write_rollup(Summary{ open_items: 0, closed_items: 0, blocked_items: 0, priority_items: 0 })\n"
+              "    total = total + write_rollup(Summary{ open_items: 1, closed_items: 1, blocked_items: 0, priority_items: 1 })\n"
+              "    total = total + write_rollup(Summary{ open_items: 3, closed_items: 1, blocked_items: 0, priority_items: 0 })\n"
+              "    total = total + write_rollup(Summary{ open_items: 1, closed_items: 3, blocked_items: 0, priority_items: 0 })\n"
+              "    return total\n"
+              "}\n");
+    RunBuiltProjectFixture(mc_path,
+                           imported_runtime_table_project_root / "build.toml",
+                           imported_runtime_table_project_root / "src/main.mc",
+                           work_root / "imported_runtime_table_project_build",
+                           100,
+                           {});
+
     RunBuiltProjectNetworkEchoFixture(mc_path,
                                       source_root / "examples/real/evented_echo/build.toml",
                                       source_root / "examples/real/evented_echo/src/main.mc",

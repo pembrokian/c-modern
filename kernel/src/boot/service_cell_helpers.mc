@@ -4,9 +4,9 @@ struct ServiceCell<T> {
 }
 
 func service_cell_with_state<T>(cell: ServiceCell<T>, state: T) ServiceCell<T> {
-    return ServiceCell<T>{ state: state, generation: cell.generation }
+    return ServiceCell<T>{ state:, generation: cell.generation }
 }
 
 func service_cell_restart<T>(cell: ServiceCell<T>, state: T) ServiceCell<T> {
-    return ServiceCell<T>{ state: state, generation: cell.generation + 1 }
+    return ServiceCell<T>{ state:, generation: cell.generation + 1 }
 }

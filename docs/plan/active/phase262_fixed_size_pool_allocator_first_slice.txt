@@ -1,0 +1,188 @@
+Phase 262 -- Fixed-Size Pool Allocator First Slice
+==================================================
+
+Status
+------
+PROPOSED
+
+Purpose
+-------
+Admit one explicit fixed-size pool allocator slice so the repository has one
+owned answer for repeated same-shape object allocation before launcher,
+bundle, and UI-adjacent code start inventing ad hoc storage patterns.
+
+This phase exists now because the repository already has heap-backed
+`Buffer<T>` and one arena seam in `stdlib/mem.mc`, but it still lacks a pool
+owner for bounded take-or-return allocation where object reuse and explicit
+invalidation matter more than arbitrary-capacity growth.
+
+Repository status note
+----------------------
+- `stdlib/mem.mc` already exposes `Allocator`, `Buffer<T>`, `buffer_new`, and
+  `Arena` plus `arena_new`.
+- `runtime/hosted/mc_hosted_runtime.c` already implements the hosted default
+  allocator, buffer allocation, and arena initialization.
+- `docs/arch/c-lang/stdlib/stdlib_design_principles.txt` already freezes the
+  rule that allocation policy must stay explicit and visible.
+- The repository still has no admitted pool-return boundary, no pool-specific
+  invalidation contract, and no maintained consumer for repeated fixed-size
+  object reuse.
+
+Problem being solved
+--------------------
+- The current memory surface has a gap between heap-backed owning buffers and
+  one-way arena allocation.
+- Later launcher, descriptor-cache, and UI-event work is likely to need one
+  bounded repeated-allocation shape where objects are recycled explicitly
+  rather than leaked until arena reset or kept in raw fixed arrays forever.
+- Without one honest pool owner now, those later phases will either smuggle
+  allocation policy into unrelated owners or distort their state around manual
+  slot reuse that should be a named memory boundary instead.
+
+Non-goals
+---------
+- no generic allocator trait hierarchy
+- no variable-size free-list allocator
+- no kernel-wide hidden heap or ambient allocation policy
+- no garbage collector, tracing runtime, or ownership automation
+- no compiler widening unless an ordinary library plus runtime surface proves
+  insufficient
+- no launcher, session, or UI framework work in the same phase
+
+Invariants
+----------
+- Allocation choice must remain explicit in API shape and call sites.
+- Pool take and pool return boundaries must make invalidation visible.
+- The first landing must stay on one fixed-size element family only.
+- `stdlib/mem.mc` remains the standard-library owner of allocation surfaces.
+- Parser, sema, and MIR stay closed unless the chosen pool API cannot be
+  expressed honestly as ordinary library or runtime calls.
+
+Required surface changes
+------------------------
+1. Add one explicit fixed-size pool surface under `stdlib/mem.mc` and the
+   hosted runtime implementation.
+2. Define one explicit take-or-return contract for pool-managed objects.
+3. Spend the first pool slice in one repository-owned consumer with repeated
+   same-shape allocation pressure.
+4. Add one focused executable proof and one real-consumer proof for the pool
+   contract.
+5. Document the invalidation boundary clearly enough that later Band B and
+   Band C work can reuse it without reinterpreting the contract.
+
+Forbidden changes
+-----------------
+- do not widen one fixed-size pool into a general memory-management framework
+- do not hide pool ownership behind convenience APIs that look non-allocating
+- do not move allocation policy into launcher, workflow, or kernel dispatch
+- do not add special compiler magic if ordinary library plus runtime lowering
+  can carry the first slice honestly
+- do not bundle pool admission with slab, page, or region allocation work
+
+Phase role in the larger sequence
+---------------------------------
+- This phase opens Band B by naming one reusable repeated-allocation owner
+  before the app-shaped substrate phases need it.
+- It prepares Phase 265 by separating fixed-size object reuse from later
+  small-object slab questions.
+- It also sharpens Phase 266, because the repository will then have heap,
+  arena, and pool choices that need an explicit selection rule.
+
+Relevant backlog items this phase intentionally brings under pressure
+--------------------------------------------------------------------
+- keep allocation policy explicit rather than ambient in stdlib and runtime
+- keep broader framework growth out of kernel and app planning until one real
+  repeated object family proves the narrower owner
+
+Questions this phase must answer
+--------------------------------
+1. What is the narrowest honest first consumer for fixed-size reuse: one real
+   app-local descriptor or row family, one launcher-adjacent slot owner, or
+   another repeated same-shape repository-owned object family?
+2. Should the first pool API return typed pointers directly, fixed slots plus
+   explicit accessors, or another bounded shape that keeps invalidation clear?
+3. Can the first pool contract stay entirely in `stdlib/mem.mc` plus the
+   hosted runtime, or is one compiler-visible follow-through actually forced?
+4. What is the smallest observable failure and exhaustion contract for the
+   pool slice?
+
+Preferred implementation shape
+------------------------------
+- Keep the first pool owner in `stdlib/mem.mc` with hosted runtime backing in
+  `runtime/hosted/mc_hosted_runtime.c`.
+- Prefer a single typed fixed-capacity pool contract over a configurable
+  family of pool strategies.
+- Spend the feature in one repository-owned hosted consumer rather than in the
+  reset-lane kernel hot path, because Band B is trying to prepare later app
+  growth without turning kernel services into allocator demonstrations.
+- Keep failure or exhaustion explicit in the API rather than hiding fallback
+  heap allocation behind the pool surface.
+
+Implementation accelerators
+---------------------------
+Main files and navigations
+~~~~~~~~~~~~~~~~~~~~~~~~~~
+- Primary controlling owners: `stdlib/mem.mc` and
+  `runtime/hosted/mc_hosted_runtime.c`.
+- First-hop adjacent files: `docs/arch/c-lang/stdlib/stdlib_design_principles.txt`,
+  `docs/arch/c-lang/stdlib/stdlib_spec.txt`, and the chosen first consumer,
+  preferably one bounded hosted example project.
+- Nearby accelerator docs: `docs/agent/prompts/patterns_cookbook.txt` and
+  `docs/agent/prompts/test_overview.txt`.
+- Expected first validation target when the owner changes: `Build debug`, then
+  the narrowest executable or real-project proof for the chosen consumer.
+
+Relevant cookbook patterns
+~~~~~~~~~~~~~~~~~~~~~~~~~~
+- No exact cookbook pattern fits perfectly because this is a stdlib-plus-
+  runtime memory surface rather than a parser, sema, or kernel-service slice.
+- Pattern 6 -- Add A Compiler Phase is not the right model; the phase should
+  avoid widening the compiler unless the library surface truly cannot land
+  otherwise.
+
+Relevant file-local invariants
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+- `stdlib/mem.mc` owns the public allocation vocabulary and must keep
+  ownership visible.
+- `runtime/hosted/mc_hosted_runtime.c` may implement the pool mechanics, but
+  it must not invent a second public allocation model separate from `mem`.
+- The first consumer should expose pool reuse as an owner-local memory choice,
+  not as hidden behavior behind a generic collection helper.
+
+Relevant test surfaces
+~~~~~~~~~~~~~~~~~~~~~~
+- Primary owning validation surface: the narrowest hosted executable or real-
+  project proof that spends the pool surface.
+- Narrowest expected first executable validation target: the chosen project-
+  scoped run or test workflow, likely in `examples/real/` plus the matching
+  `tests/tool/real_projects/` case if a shipped project is used.
+- Supporting validation: `mc_tool_real_project_.*_unit` if the first consumer
+  is one of the maintained real projects.
+
+Test obligations
+----------------
+- `Build debug`
+- one focused hosted executable proof for pool exhaustion, take, return, and
+  reuse
+- one repository-owned consumer proof using the pool surface in real code
+- if the chosen consumer is a maintained real project, run its narrow owning
+  `tests/tool/real_projects/<case>/test.cpp` path or the matching grouped real-
+  project unit
+
+Acceptance criteria
+-------------------
+- the repository has one explicit fixed-size pool owner with visible take and
+  return boundaries
+- one real repository-owned consumer uses the pool slice honestly
+- exhaustion and invalidation behavior are explicit and deterministic
+- the landing stays bounded to one fixed-size pool contract and does not widen
+  into allocator strategy frameworks
+
+Future follow-up
+----------------
+- Route broader small-object reuse pressure to Phase 265 rather than widening
+  this phase into a slab family.
+- Route any page- or region-scale storage pressure to Phase 264.
+- If a second materially different consumer needs a different pool contract,
+  record that in `docs/plan/backlog.txt` instead of silently generalizing the
+  first slice.

@@ -1,0 +1,168 @@
+Phase 265 -- Small Object Slab Probe
+====================================
+
+Status
+------
+PROPOSED
+
+Purpose
+-------
+Probe whether the repository actually needs one slab-style small-object owner
+after landing explicit pool, arena, and larger-run choices, and admit it only
+if one repeated small-object family still does not fit those earlier owners
+honestly.
+
+This phase exists now because Band B should not assume a slab allocator is
+needed merely because many systems have one. It should only land if the real
+repository pressure after Phases 262 through 264 still points at a distinct
+small-object reuse problem.
+
+Repository status note
+----------------------
+- Phase 262 is expected to admit one fixed-size pool owner.
+- Phase 263 is expected to spend the arena surface on one transient-work
+  consumer.
+- Phase 264 is expected to define one larger-granularity page or run owner.
+- The repository currently has no admitted slab or magazine or cache family,
+  and the roadmap explicitly wants to avoid allocator taxonomy for its own
+  sake.
+
+Problem being solved
+--------------------
+- Even after pool, arena, and run choices are explicit, the repository may
+  still discover one high-churn small-object family whose lifetime and reuse
+  pattern is not well modeled by any of those earlier owners.
+- If that pressure is real, the honest answer is to name it as one bounded
+  slab-style owner rather than making later launcher or UI code hand-roll small
+  object caching.
+- If that pressure is not real, the repository needs this phase to say so and
+  refuse the allocator widening.
+
+Non-goals
+---------
+- no general allocator taxonomy or tuning framework
+- no per-size-class family of slab caches
+- no hidden object lifetime management
+- no kernel or UI framework widening by way of allocator experimentation
+- no silent fallback to one giant generic allocator owner
+
+Invariants
+----------
+- A slab-style owner must only land if earlier Band B owners are demonstrably
+  insufficient for one repeated small-object family.
+- The first slab slice must stay on one concrete object family and one owner.
+- Object invalidation and reuse boundaries must remain explicit.
+- The phase must be allowed to conclude that no slab owner should land yet.
+- Allocation choice must remain visible rather than ambient.
+
+Required surface changes
+------------------------
+1. Audit the post-262 through 264 memory pressures for a real small-object
+   family that still lacks an honest owner.
+2. If that pressure is real, admit one slab-style small-object owner for that
+   family only.
+3. If that pressure is not real, document the non-landing explicitly and keep
+   the repository on pool, arena, and run owners only.
+4. Add focused validation for whichever of those two outcomes is honest.
+
+Forbidden changes
+-----------------
+- do not assume slab is required just because the title names it
+- do not land a generic per-size-class framework
+- do not move object-family ownership out of the consumer just to justify a
+  slab layer
+- do not use this phase to reopen all of Band B memory design at once
+
+Phase role in the larger sequence
+---------------------------------
+- This phase is the pressure gate between the concrete allocator slices and the
+  allocator-selection audit.
+- It ensures Phase 266 can classify slab honestly as either admitted or still
+  deferred.
+- It also protects Band C from inheriting an accidental allocator framework.
+
+Relevant backlog items this phase intentionally brings under pressure
+--------------------------------------------------------------------
+- keep allocator growth bounded to concrete repository-owned pressure
+- keep launcher and UI work from becoming the first place where small-object
+  reuse is decided by accident
+
+Questions this phase must answer
+--------------------------------
+1. After the earlier Band B slices, is there still one real small-object
+   family that does not fit pool, arena, or run ownership honestly?
+2. If so, which owner should host it: `stdlib/mem.mc`, one launcher-adjacent
+   helper, or another concrete consumer-local seam?
+3. If not, what exact evidence justifies deferring slab work completely?
+4. What is the smallest validation surface that proves the chosen answer?
+
+Preferred implementation shape
+------------------------------
+- Start with an audit against the real consumers landed in Phases 262 through
+  264.
+- Only add a slab-style owner if one object family still has clear repeated
+  churn that neither pool nor arena nor run ownership can model cleanly.
+- If a slab owner lands, keep it narrow, typed, and tied to that object family
+  instead of a general size-class framework.
+
+Implementation accelerators
+---------------------------
+Main files and navigations
+~~~~~~~~~~~~~~~~~~~~~~~~~~
+- Primary controlling owners: the landed Phase 262 through Phase 264 surfaces
+  plus the chosen consumer.
+- First-hop adjacent files: `stdlib/mem.mc`,
+  `runtime/hosted/mc_hosted_runtime.c`, and whichever example or launcher-
+  adjacent owner exposed the unresolved small-object pressure.
+- Nearby accelerator docs: `docs/plan/admin/speculative_roadmap_post_phase254.txt`,
+  `docs/arch/c-lang/stdlib/stdlib_design_principles.txt`, and
+  `docs/agent/prompts/test_overview.txt`.
+- Expected first validation target when the owner changes: none broader than
+  the narrowest consumer proof from the unresolved object family.
+
+Relevant cookbook patterns
+~~~~~~~~~~~~~~~~~~~~~~~~~~
+- No existing cookbook pattern is a strong fit because this phase is primarily
+  a bounded pressure probe.
+- The closest behavioral model is an audit with one optional additive owner,
+  not a framework landing.
+
+Relevant file-local invariants
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+- The earlier Band B owners are the truth for what pool, arena, and run mean;
+  this phase must not silently reinterpret them.
+- Any slab admission must remain subordinate to the consumer that proves the
+  need.
+- If no consumer wins, the audit result must keep slab deferred explicitly.
+
+Relevant test surfaces
+~~~~~~~~~~~~~~~~~~~~~~
+- Primary owning validation surface: the consumer-local proof that exposed the
+  unresolved small-object pressure.
+- Narrowest expected first executable validation target: that consumer's
+  project-scoped run, test, or grouped real-project case.
+- No broad compiler or reset-lane suite is justified unless the chosen consumer
+  actually lives there.
+
+Test obligations
+----------------
+- no new broad validation by default
+- if a slab owner lands, run `Build debug` plus the narrowest consumer-scoped
+  executable proof
+- if the phase concludes slab is still deferred, record the evidence in the
+  doc and rerun only the consumer proof that motivated the audit
+
+Acceptance criteria
+-------------------
+- the repository has an explicit honest answer on slab-style small-object
+  pressure
+- if slab lands, it stays tied to one concrete object family and one owner
+- if slab does not land, that deferral is explicit and evidence-based
+- Band B remains bounded and avoids allocator taxonomy drift
+
+Future follow-up
+----------------
+- Let Phase 266 incorporate the slab result into the allocator-selection
+  guidance.
+- Reopen slab only when a second materially different small-object family
+  emerges and the first answer no longer holds.

@@ -1,0 +1,161 @@
+Phase 273 -- App Substrate Pressure Audit
+=========================================
+
+Status
+------
+PROPOSED
+
+Purpose
+-------
+Close Band C by stating which app-facing pressures now belong to launcher,
+update, object-store, or other explicit owners, and which still remain too
+weak to justify broader packaging or app-framework work.
+
+This phase exists now because Band C intentionally mixes identity, launcher,
+install, restart, asset, and demo work. The repository should stop after that
+wave and classify what those slices actually proved before it starts first UI
+work.
+
+Repository status note
+----------------------
+- Phase 267 is expected to define runtime program identity.
+- Phase 268 is expected to define one launcher owner.
+- Phase 269 through Phase 271 are expected to define one installed slot,
+  restart-visible app truth, and one bounded asset or manifest path.
+- Phase 272 is expected to prove one visible installed workflow demo.
+- The repository still needs one explicit statement of whether those slices are
+  enough to justify starting Band D's first UI work.
+
+Problem being solved
+--------------------
+- Without an explicit closeout audit, the roadmap could slide from the first
+  app-shaped substrate slices straight into UI work without stating what the
+  app band actually solved.
+- The repository needs one honest answer on which pressures are now closed,
+  which remain deferred, and whether the strongest next owner is truly in the
+  UI band or still in app-facing substrate work.
+- This is a current planning problem, not generic roadmap hygiene.
+
+Non-goals
+---------
+- no new launcher, install, or UI feature landing by convenience
+- no broad packaging or app-framework proposal hidden inside the audit
+- no support statement broader than the actual Band C evidence
+- no silent reinterpretation of earlier phase outcomes
+
+Invariants
+----------
+- The audit must classify actual Band C outcomes only.
+- Closed surfaces must remain bounded to what the earlier phases really
+  proved.
+- Still-open app pressures must stay concrete and owner-local.
+- The audit must not claim UI readiness unless the Band C evidence actually
+  supports it.
+
+Required surface changes
+------------------------
+1. Re-audit the actual outcomes of Phases 267 through 272.
+2. Publish which app-substrate surfaces are now maintained truth.
+3. Publish which app-facing pressures remain deferred and why.
+4. State whether Band D UI work now honestly wins over further app-substrate
+   follow-through.
+5. Tighten backlog or decision-log entries only where the audit exposes a real
+   still-open pressure.
+
+Forbidden changes
+-----------------
+- do not land new app features inside the audit
+- do not treat one bounded installed workflow demo as proof of a full app
+  platform
+- do not bury still-open blockers under vague labels like "polish" or
+  "productization"
+- do not widen the audit into UI design beyond what is needed to classify the
+  next owner
+
+Phase role in the larger sequence
+---------------------------------
+- This phase closes Band C.
+- It determines whether the repository is ready to start Band D's first UI
+  surface honestly.
+- It preserves the repository's evidence-first planning style by stopping
+  after one mixed app-facing wave and stating what is actually true.
+
+Relevant backlog items this phase intentionally brings under pressure
+--------------------------------------------------------------------
+- keep app-facing owner growth bounded to explicit launcher, durable, and
+  workflow seams
+- keep broader packaging and app-framework work deferred until a real second
+  consumer demands it
+
+Questions this phase must answer
+--------------------------------
+1. Which Band C slices landed cleanly enough that later UI phases can rely on
+   them as maintained truth?
+2. Which still-open app-facing pressure, if any, remains stronger than the
+   first UI band?
+3. Did the installed workflow demo expose one missing owner that still belongs
+   to app substrate rather than UI?
+4. What exact evidence now supports starting Phase 274 and later UI work?
+
+Preferred implementation shape
+------------------------------
+- Keep the phase document-focused and evidence-based.
+- Reuse the repository's earlier plateau and frontier-audit style.
+- Prefer short explicit classifications over broad narrative summary.
+
+Implementation accelerators
+---------------------------
+Main files and navigations
+~~~~~~~~~~~~~~~~~~~~~~~~~~
+- Primary controlling owners: the Phase 267 through Phase 272 plan docs plus
+  the landed owners they name.
+- First-hop adjacent files: `docs/plan/backlog.txt`,
+  `docs/plan/decision_log.txt`, `kernel/README.md`, and the demo fixture from
+  Phase 272.
+- Nearby accelerator docs: `docs/plan/admin/speculative_roadmap_post_phase254.txt`,
+  `docs/agent/prompts/plan_spec.txt`, and `docs/agent/prompts/test_overview.txt`.
+- Expected first validation target when the owner changes: no new executable
+  target beyond the evidence already required by the earlier Band C phases.
+
+Relevant cookbook patterns
+~~~~~~~~~~~~~~~~~~~~~~~~~~
+- No direct cookbook pattern fits; this is a bounded planning audit.
+- The phase must remain an audit and not widen into implementation work.
+
+Relevant file-local invariants
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+- The earlier Band C phase docs remain the contract owners for what each slice
+  meant; the audit must not silently reinterpret them.
+- `docs/plan/backlog.txt` and `docs/plan/decision_log.txt` should only receive
+  bounded still-open pressures or deliberate deferrals.
+- The audit must classify UI readiness honestly from the Band C evidence.
+
+Relevant test surfaces
+~~~~~~~~~~~~~~~~~~~~~~
+- Primary owning validation surface: the executable and fixture evidence already
+  required by Phases 267 through 272.
+- Narrowest expected first executable validation target: none new unless one
+  earlier Band C result is still ambiguous.
+- If ambiguity remains, rerun only the narrowest owning reset-lane or real-
+  project proof from the ambiguous earlier phase.
+
+Test obligations
+----------------
+- no new executable validation by default
+- if one Band C slice remains ambiguous, rerun only its narrowest owning proof
+
+Acceptance criteria
+-------------------
+- the repository has one explicit closeout statement for the Band C app-
+  substrate wave
+- later phases can see clearly which app-facing surfaces are now maintained
+  truth and which remain deferred
+- the next stronger owner after Band C is classified honestly
+- no new feature work is smuggled into the audit
+
+Future follow-up
+----------------
+- If Band D now clearly wins, proceed to the first input and display owner
+  phases without reopening app-substrate planning immediately.
+- If one app-facing blocker still outranks UI work, record it explicitly as
+  the next phase instead of leaving it as narrative residue.

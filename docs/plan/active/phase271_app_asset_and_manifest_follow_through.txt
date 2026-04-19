@@ -1,0 +1,171 @@
+Phase 271 -- App Asset And Manifest Follow-Through
+==================================================
+
+Status
+------
+PROPOSED
+
+Purpose
+-------
+Admit one bounded asset or manifest family for one repository-owned program so
+the new app path can carry more than code and identity, without claiming a
+filesystem or broad resource API.
+
+This phase exists now because the launcher and install-slot work only become
+fully app-shaped when one program can load one declared non-code input or one
+small manifest family through an explicit owner-local path.
+
+Repository status note
+----------------------
+- The repository already has staged update bytes, durable named objects, and
+  compact program descriptors.
+- The launcher and install-slot phases are expected to define one foreground
+  installed program path.
+- `issue_rollup` and `review_board` already exist as real repository-owned
+  programs with richer than trivial structure.
+- The repository still has no admitted runtime asset or app-manifest contract
+  beyond the current update manifest and tool build manifests.
+
+Problem being solved
+--------------------
+- A user-facing program path that can only launch code and no declared assets
+  or runtime manifest data is still too thin to feel like an installed app
+  substrate.
+- Without one bounded asset or manifest follow-through, later UI and install
+  work would either widen into a filesystem by accident or bake app metadata
+  into launcher tables that are not supposed to own it.
+- The current gap is therefore one missing explicit owner-local path for a
+  small non-code program payload.
+
+Non-goals
+---------
+- no general filesystem or path API inside the kernel substrate
+- no arbitrary directory trees or package extraction
+- no generic resource manager
+- no broad content pipeline
+- no multi-app asset sharing framework
+
+Invariants
+----------
+- The first asset or manifest family must stay bounded to one program or one
+  program family.
+- Asset truth must remain owner-local and explicit.
+- The phase must not claim a general filesystem or package layout.
+- Launcher and install owners consume asset truth but do not become broad
+  resource managers.
+
+Required surface changes
+------------------------
+1. Choose one repository-owned program as the first asset or manifest consumer.
+2. Define one bounded asset or manifest family for that program.
+3. Bind that family to the narrowest honest owner in the install or launcher
+   path.
+4. Add one focused proof that the chosen program can access its admitted asset
+   or manifest data through the explicit path.
+
+Forbidden changes
+-----------------
+- do not add a filesystem, directory traversal, or general resource API
+- do not turn the launcher into the owner of arbitrary app content
+- do not widen update-store manifest truth into a full package schema
+- do not admit arbitrary per-app ad hoc loading mechanisms in multiple owners
+
+Phase role in the larger sequence
+---------------------------------
+- This phase gives the app substrate one explicit non-code payload path before
+  the first installed workflow demo.
+- It consumes the launch, install, and restart-aware app path from Phases 268
+  through 270.
+- It prepares Phase 272 by making the demo feel like a program with actual
+  packaged inputs instead of only a named entrypoint.
+
+Relevant backlog items this phase intentionally brings under pressure
+--------------------------------------------------------------------
+- keep install and app metadata bounded to explicit owners rather than a broad
+  packaging framework
+- keep filesystem-scale behavior deferred until a real admitted consumer needs
+  more than one bounded asset family
+
+Questions this phase must answer
+--------------------------------
+1. Which program is the narrowest honest first consumer: `issue_rollup`,
+   `review_board`, or another repository-owned app?
+2. What should the first admitted payload be: one compact manifest, one data
+   asset, or one similarly bounded family?
+3. Which owner should expose it to the program: install slot, launcher, or one
+   minimal app-local helper?
+4. What is the smallest user-visible proof that the program consumed the asset
+   or manifest honestly?
+
+Preferred implementation shape
+------------------------------
+- Prefer one explicit manifest or asset family tied to one existing real
+  program.
+- Keep the data flow narrow: install path owns durable bytes, launcher owns
+  selection, and one minimal consumer-facing helper exposes the admitted
+  payload.
+- Avoid creating a general-purpose resource API.
+
+Implementation accelerators
+---------------------------
+Main files and navigations
+~~~~~~~~~~~~~~~~~~~~~~~~~~
+- Primary controlling owners: the chosen program project under `examples/real/`,
+  the Phase 269 install-slot owner, and the Phase 268 launcher owner.
+- First-hop adjacent files: `kernel/src/services/update_store_service.mc`,
+  `kernel/src/services/object_store_service.mc` if needed for small metadata,
+  and the program's existing build or manifest files.
+- Nearby accelerator docs: `docs/agent/prompts/test_overview.txt`,
+  `docs/plan/admin/speculative_roadmap_post_phase254.txt`, and the earlier
+  update-store and launcher phase docs.
+- Expected first validation target when the owner changes: `Build debug`, then
+  the focused app-asset reset-lane proof plus the program's narrow real-project
+  validation if its hosted example is updated.
+
+Relevant cookbook patterns
+~~~~~~~~~~~~~~~~~~~~~~~~~~
+- Pattern 5 -- Add A Test File is likely relevant because the phase should add
+  one focused program proof rather than many broad tests.
+- Pattern 9 -- Add A New Runtime Service applies only if the chosen asset path
+  truly forces a new owner, which should be resisted by default.
+
+Relevant file-local invariants
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+- `update_store_service.mc` owns staged and applied bytes, not broad app
+  content policy.
+- `object_store_service.mc` may carry compact durable metadata if needed, but
+  it must not silently become a resource tree.
+- The chosen app should only receive the payload family explicitly admitted by
+  this phase.
+
+Relevant test surfaces
+~~~~~~~~~~~~~~~~~~~~~~
+- Primary owning validation surface: one focused reset-lane fixture for the
+  app asset or manifest path.
+- Narrowest expected first executable validation target: that fixture plus the
+  chosen app's narrow hosted run or real-project case if touched.
+- Supporting validation: `mc_tool_workflow_kernel_reset_lane_unit` and the
+  matching real-project unit for `issue_rollup` or `review_board` if updated.
+
+Test obligations
+----------------
+- `Build debug`
+- one focused app-asset or manifest reset-lane scenario and fixture
+- one narrow hosted program or real-project proof for the chosen consumer
+- `mc_tool_workflow_kernel_reset_lane_unit`
+
+Acceptance criteria
+-------------------
+- one repository-owned program now accesses one bounded asset or manifest
+  family through an explicit app path
+- the admitted payload stays owner-local and does not imply a filesystem
+- the launch or install path remains bounded and explicit
+- the phase prepares a credible first installed app demo without widening into
+  package or resource frameworks
+
+Future follow-up
+----------------
+- Phase 272 should spend the admitted app path in one user-facing installed
+  workflow demo.
+- If a second program needs a materially different asset family, record that in
+  `docs/plan/backlog.txt` rather than widening this slice.

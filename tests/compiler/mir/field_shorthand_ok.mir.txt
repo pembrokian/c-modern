@@ -1,0 +1,90 @@
+Module
+  TypeDecl kind=struct name=Inner
+    Field name=value type=i32
+    Field name=flag type=bool
+  TypeDecl kind=struct name=Pair
+    Field name=left type=i32
+    Field name=inner type=Inner
+  Function name=build returns=[Pair]
+    Local name=left type=i32 param readonly
+    Local name=value type=i32 param readonly
+    Local name=flag type=bool param readonly
+    Local name=inner type=Inner
+    Block label=entry0
+      load_local %v0:i32 target=value
+      load_local %v1:bool target=flag
+      aggregate_init %v2:Inner target=Inner operands=[%v0, %v1] fields=[value, flag]
+      store_local target=inner operands=[%v2]
+      load_local %v3:i32 target=left
+      load_local %v4:Inner target=inner
+      aggregate_init %v5:Pair target=Pair operands=[%v3, %v4] fields=[left, inner]
+      terminator return values=[%v5]
+  Function name=rewrite returns=[Pair]
+    Local name=left type=i32 param readonly
+    Local name=pair type=Pair param readonly
+    Block label=entry0
+      load_local %v0:Pair target=pair
+      load_local %v1:i32 target=left
+      field %v2:Inner target=inner target_kind=field target_name=inner target_base=Pair operands=[%v0]
+      aggregate_init %v3:Pair target=Pair operands=[%v1, %v2] fields=[left, inner]
+      terminator return values=[%v3]
+  Function name=main returns=[i32]
+    Local name=pair type=Pair
+    Local name=next type=Pair
+    Local name=%hidden.logical_and0 type=bool
+    Local name=%hidden.logical_and1 type=bool
+    Block label=entry0
+      const %v0:int_literal op=1
+      const %v1:int_literal op=2
+      const %v2:bool op=true
+      symbol_ref %v3:proc(i32, i32, bool)->Pair target=build target_kind=function target_name=build
+      call %v4:Pair target=build target_kind=function target_name=build operands=[%v3, %v0, %v1, %v2]
+      store_local target=pair operands=[%v4]
+      const %v5:int_literal op=7
+      load_local %v6:Pair target=pair
+      symbol_ref %v7:proc(i32, Pair)->Pair target=rewrite target_kind=function target_name=rewrite
+      call %v8:Pair target=rewrite target_kind=function target_name=rewrite operands=[%v7, %v5, %v6]
+      store_local target=next operands=[%v8]
+      load_local %v9:Pair target=next
+      field %v10:i32 target=left target_kind=field target_name=left target_display=next.left target_base=Pair operands=[%v9]
+      const %v11:int_literal op=7
+      convert_numeric %v12:i32 target=i32 operands=[%v11]
+      binary %v13:bool op=== operands=[%v10, %v12]
+      terminator cond value=%v13 true=logical_and_rhs1 false=logical_and_short2
+    Block label=logical_and_rhs1
+      load_local %v15:Pair target=next
+      load_local %v16:Pair target=next
+      field %v17:Inner target=inner target_kind=field target_name=inner target_display=next.inner target_base=Pair operands=[%v16]
+      field %v18:i32 target=value target_kind=field target_name=value target_display=next.inner.value target_base=Inner operands=[%v17]
+      const %v19:int_literal op=2
+      convert_numeric %v20:i32 target=i32 operands=[%v19]
+      binary %v21:bool op=== operands=[%v18, %v20]
+      store_local target=%hidden.logical_and1 operands=[%v21]
+      terminator branch target=logical_and_merge3
+    Block label=logical_and_short2
+      const %v14:bool op=false
+      store_local target=%hidden.logical_and1 operands=[%v14]
+      terminator branch target=logical_and_merge3
+    Block label=logical_and_merge3
+      load_local %v22:bool target=%hidden.logical_and1
+      terminator cond value=%v22 true=logical_and_rhs4 false=logical_and_short5
+    Block label=logical_and_rhs4
+      load_local %v24:Pair target=next
+      load_local %v25:Pair target=next
+      field %v26:Inner target=inner target_kind=field target_name=inner target_display=next.inner target_base=Pair operands=[%v25]
+      field %v27:bool target=flag target_kind=field target_name=flag target_display=next.inner.flag target_base=Inner operands=[%v26]
+      store_local target=%hidden.logical_and0 operands=[%v27]
+      terminator branch target=logical_and_merge6
+    Block label=logical_and_short5
+      const %v23:bool op=false
+      store_local target=%hidden.logical_and0 operands=[%v23]
+      terminator branch target=logical_and_merge6
+    Block label=logical_and_merge6
+      load_local %v28:bool target=%hidden.logical_and0
+      terminator cond value=%v28 true=if_then7 false=if_merge8
+    Block label=if_then7
+      const %v29:int_literal op=0
+      terminator return values=[%v29]
+    Block label=if_merge8
+      const %v30:int_literal op=1
+      terminator return values=[%v30]

@@ -1,0 +1,171 @@
+Phase 268 -- Bounded Launcher Service First Slice
+=================================================
+
+Status
+------
+PROPOSED
+
+Purpose
+-------
+Admit one explicit launcher-owned path that can enumerate or choose from a
+fixed program catalog and start exactly one foreground program, without
+widening into discovery, sessions, or a general process-management framework.
+
+This phase exists now because Phase 267 should already have defined what a
+launchable program is. The next honest move is to add one owner that can act
+on that descriptor truth rather than leaving launch behavior scattered across
+shell routing, workflow, and future install logic.
+
+Repository status note
+----------------------
+- The kernel currently has no launcher owner.
+- `kernel/src/identity/service_topology.mc` and the expected Phase 267 program
+  descriptor family provide the nearest explicit catalog pattern.
+- The active reset-lane tree already has boot wiring, shell command routing,
+  workflow scheduling, and durable owners, but none of those currently own
+  "which program is foreground" or "which program can be launched" truth.
+- The repository already has real program candidates such as
+  `issue_rollup` and `review_board`, but only in tool-facing form.
+
+Problem being solved
+--------------------
+- The repository can build and run programs through the toolchain, but it has
+  no runtime owner for foreground program choice or bounded launch requests.
+- Without a launcher owner, the next app-facing phases would either tunnel
+  launch requests through shell or workflow owners that are not responsible for
+  catalog or selection truth, or they would re-invent launch policy locally in
+  each app-shaped phase.
+- The real current-repo gap is therefore a missing owner, not missing broad
+  process semantics.
+
+Non-goals
+---------
+- no discovery scan, desktop shell, or menu system
+- no multi-session or multi-user model
+- no general scheduler or process-control framework
+- no background worker manager or supervisor
+- no install policy or asset loading in the same phase
+
+Invariants
+----------
+- Launcher truth must stay owner-local to the launcher surface.
+- Program identity remains owned by the descriptor family admitted in Phase
+  267.
+- Workflow, update, and durable owners keep their existing responsibilities.
+- The first launcher slice must remain single-foreground and fixed-catalog.
+- Shell and dispatch stay routing seams, not policy owners.
+
+Required surface changes
+------------------------
+1. Add one bounded launcher owner, likely `kernel/src/services/launcher_service.mc`.
+2. Wire that owner into boot, topology, dispatch, and shell only as needed for
+   one explicit launch request path.
+3. Keep the initial catalog fixed and repository-owned.
+4. Add one focused scenario and reset-lane fixture covering enumerate or choose
+   plus launch of one foreground program.
+
+Forbidden changes
+-----------------
+- do not turn the launcher into a session manager or process framework
+- do not move catalog truth out of the program-identity owner
+- do not hide launcher policy inside `shell_service` or `kernel_dispatch`
+- do not admit install-slot, asset, or UI-routing behavior before their owning
+  phases
+
+Phase role in the larger sequence
+---------------------------------
+- This phase is the first execution owner in Band C.
+- It consumes the program identity work from Phase 267.
+- It prepares Phase 269 and Phase 270 by establishing where launch selection
+  and foreground state live before install and restart truth are added.
+
+Relevant backlog items this phase intentionally brings under pressure
+--------------------------------------------------------------------
+- keep app-facing behavior owner-local rather than widening update or workflow
+  owners into an app framework
+- keep shell and dispatch narrow and avoid policy growth there
+
+Questions this phase must answer
+--------------------------------
+1. What is the narrowest honest launcher state: catalog view, selected id,
+   current foreground id, and one launch consequence only?
+2. Should launch requests route through one new shell command family, one
+   launcher endpoint, or another equally bounded surface?
+3. How much launch-visible truth belongs in the launcher versus the existing
+   workflow substrate?
+4. Which repository-owned program or programs should be the first launchable
+   catalog entries?
+
+Preferred implementation shape
+------------------------------
+- Add one new launcher service rather than widening workflow or shell.
+- Keep the service small, following the kernel four-section standard.
+- Consume the Phase 267 descriptor family directly instead of reconstructing
+  catalog metadata in the launcher.
+- Start with enumerate or select plus launch-one-foreground only.
+
+Implementation accelerators
+---------------------------
+Main files and navigations
+~~~~~~~~~~~~~~~~~~~~~~~~~~
+- Primary controlling owners: the new launcher service plus
+  `kernel/src/identity/service_topology.mc`, `kernel/src/boot/boot.mc`,
+  `kernel/src/kernel_dispatch.mc`, and `kernel/src/shell/shell_service.mc`.
+- First-hop adjacent files: `kernel/src/boot/boot_update.mc`,
+  `kernel/src/identity/program_*` from Phase 267, and the launcher scenario in
+  `kernel/src/scenarios/`.
+- Nearby accelerator docs: `docs/agent/prompts/kernel_file_invariants.txt`,
+  `docs/arch/veya/kernel_style_guide.txt`, and
+  `docs/agent/prompts/test_overview.txt`.
+- Expected first validation target when the owner changes: `Build debug`, then
+  the focused launcher reset-lane fixture, then the grouped reset-lane
+  workflow target.
+
+Relevant cookbook patterns
+~~~~~~~~~~~~~~~~~~~~~~~~~~
+- Pattern 9 -- Add A New Runtime Service is the nearest fit because this phase
+  should land one bounded new kernel owner.
+- The phase intentionally differs from a generic new-service landing because
+  the launcher must also consume an identity table from Phase 267.
+
+Relevant file-local invariants
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+- `kernel/src/identity/` remains the owner of stable program naming and
+  descriptor truth.
+- `kernel_dispatch.mc` routes work but must not become the launcher policy
+  owner.
+- `shell_service.mc` may decode launcher commands, but foreground selection and
+  launch state belong to the launcher service.
+
+Relevant test surfaces
+~~~~~~~~~~~~~~~~~~~~~~
+- Primary owning validation surface: one focused reset-lane system fixture for
+  the launcher path.
+- Narrowest expected first executable validation target: the launcher-specific
+  reset-lane fixture plus `mc_tool_workflow_kernel_reset_lane_unit`.
+- Supporting validation: `mc_tool_workflow_kernel_reset_lane_full_unit` after
+  the focused launcher proof is stable.
+
+Test obligations
+----------------
+- `Build debug`
+- one focused launcher reset-lane scenario and fixture
+- `mc_tool_workflow_kernel_reset_lane_unit`
+- `mc_tool_workflow_kernel_reset_lane_full_unit`
+
+Acceptance criteria
+-------------------
+- the repository has one explicit launcher owner
+- one fixed program catalog can be enumerated or selected and launched through
+  that owner
+- foreground launch truth is explicit and does not live in shell or dispatch
+- the landing stays bounded to one foreground path and avoids session or
+  process-framework growth
+
+Future follow-up
+----------------
+- Phase 269 should attach install-slot truth to the launcher-owned program
+  model.
+- Phase 270 should extend the same launcher path with restart-visible truth.
+- Any broader session, multitasking, or app-switching pressure belongs in
+  later backlog work, not this first slice.

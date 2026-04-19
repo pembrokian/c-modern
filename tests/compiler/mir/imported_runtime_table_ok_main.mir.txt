@@ -1,0 +1,134 @@
+Module
+  Import name=rollup_render_table_helper
+  TypeDecl kind=struct name=Summary
+    Field name=open_items type=usize
+    Field name=closed_items type=usize
+    Field name=blocked_items type=usize
+    Field name=priority_items type=usize
+  ConstGlobal names=[ROLLUP_EMPTY] type=i32
+    init 0
+  ConstGlobal names=[ROLLUP_STEADY] type=i32
+    init 1
+  ConstGlobal names=[ROLLUP_BUSY] type=i32
+    init 2
+  ConstGlobal names=[ROLLUP_ATTENTION] type=i32
+    init 3
+  ConstGlobal names=[LOCAL_WRITERS] type=[4]proc()->i32
+    init rollup_render_table_helper.ROLLUP_WRITERS
+  Function name=total_items returns=[usize]
+    Local name=summary type=Summary param readonly
+    Block label=entry0
+      load_local %v0:Summary target=summary
+      field %v1:usize target=open_items target_kind=field target_name=open_items target_display=summary.open_items target_base=Summary operands=[%v0]
+      load_local %v2:Summary target=summary
+      field %v3:usize target=closed_items target_kind=field target_name=closed_items target_display=summary.closed_items target_base=Summary operands=[%v2]
+      binary %v4:usize op=+ arithmetic=wrap operands=[%v1, %v3]
+      load_local %v5:Summary target=summary
+      field %v6:usize target=blocked_items target_kind=field target_name=blocked_items target_display=summary.blocked_items target_base=Summary operands=[%v5]
+      binary %v7:usize op=+ arithmetic=wrap operands=[%v4, %v6]
+      terminator return values=[%v7]
+  Function name=has_priority returns=[bool]
+    Local name=summary type=Summary param readonly
+    Block label=entry0
+      load_local %v0:Summary target=summary
+      field %v1:usize target=priority_items target_kind=field target_name=priority_items target_display=summary.priority_items target_base=Summary operands=[%v0]
+      const %v2:int_literal op=0
+      convert_numeric %v3:usize target=usize operands=[%v2]
+      binary %v4:bool op=> operands=[%v1, %v3]
+      terminator return values=[%v4]
+  Function name=rollup_kind returns=[i32]
+    Local name=summary type=Summary param readonly
+    Block label=entry0
+      load_local %v0:Summary target=summary
+      symbol_ref %v1:proc(Summary)->usize target=total_items target_kind=function target_name=total_items
+      call %v2:usize target=total_items target_kind=function target_name=total_items operands=[%v1, %v0]
+      const %v3:int_literal op=0
+      convert_numeric %v4:usize target=usize operands=[%v3]
+      binary %v5:bool op=== operands=[%v2, %v4]
+      terminator cond value=%v5 true=if_then1 false=if_merge2
+    Block label=if_then1
+      symbol_ref %v6:i32 target=ROLLUP_EMPTY target_kind=global target_name=ROLLUP_EMPTY
+      terminator return values=[%v6]
+    Block label=if_merge2
+      load_local %v7:Summary target=summary
+      symbol_ref %v8:proc(Summary)->bool target=has_priority target_kind=function target_name=has_priority
+      call %v9:bool target=has_priority target_kind=function target_name=has_priority operands=[%v8, %v7]
+      terminator cond value=%v9 true=if_then3 false=if_merge4
+    Block label=if_then3
+      symbol_ref %v10:i32 target=ROLLUP_ATTENTION target_kind=global target_name=ROLLUP_ATTENTION
+      terminator return values=[%v10]
+    Block label=if_merge4
+      load_local %v11:Summary target=summary
+      field %v12:usize target=open_items target_kind=field target_name=open_items target_display=summary.open_items target_base=Summary operands=[%v11]
+      load_local %v13:Summary target=summary
+      field %v14:usize target=closed_items target_kind=field target_name=closed_items target_display=summary.closed_items target_base=Summary operands=[%v13]
+      binary %v15:bool op=> operands=[%v12, %v14]
+      terminator cond value=%v15 true=if_then5 false=if_merge6
+    Block label=if_then5
+      symbol_ref %v16:i32 target=ROLLUP_BUSY target_kind=global target_name=ROLLUP_BUSY
+      terminator return values=[%v16]
+    Block label=if_merge6
+      symbol_ref %v17:i32 target=ROLLUP_STEADY target_kind=global target_name=ROLLUP_STEADY
+      terminator return values=[%v17]
+  Function name=write_rollup returns=[i32]
+    Local name=summary type=Summary param readonly
+    Local name=kind type=i32
+    Local name=writer type=proc()->i32
+    Block label=entry0
+      load_local %v0:Summary target=summary
+      symbol_ref %v1:proc(Summary)->i32 target=rollup_kind target_kind=function target_name=rollup_kind
+      call %v2:i32 target=rollup_kind target_kind=function target_name=rollup_kind operands=[%v1, %v0]
+      store_local target=kind operands=[%v2]
+      symbol_ref %v3:[4]proc()->i32 target=LOCAL_WRITERS target_kind=global target_name=LOCAL_WRITERS
+      load_local %v4:i32 target=kind
+      convert_numeric %v5:usize target=usize operands=[%v4]
+      const %v6:usize op=4
+      bounds_check op=index operands=[%v5, %v6]
+      index %v7:proc()->i32 target_kind=index target_display=LOCAL_WRITERS[usize(kind)] target_base=[4]proc()->i32 operands=[%v3, %v5] target_types=[usize]
+      store_local target=writer operands=[%v7]
+      load_local %v8:proc()->i32 target=writer
+      call %v9:i32 target=writer target_kind=other target_name=writer operands=[%v8]
+      terminator return values=[%v9]
+  Function name=main returns=[i32]
+    Local name=total type=i32
+    Block label=entry0
+      const %v0:int_literal op=0
+      const %v1:int_literal op=0
+      const %v2:int_literal op=0
+      const %v3:int_literal op=0
+      aggregate_init %v4:Summary target=Summary operands=[%v0, %v1, %v2, %v3] fields=[open_items, closed_items, blocked_items, priority_items]
+      symbol_ref %v5:proc(Summary)->i32 target=write_rollup target_kind=function target_name=write_rollup
+      call %v6:i32 target=write_rollup target_kind=function target_name=write_rollup operands=[%v5, %v4]
+      store_local target=total operands=[%v6]
+      load_local %v7:i32 target=total
+      const %v8:int_literal op=1
+      const %v9:int_literal op=1
+      const %v10:int_literal op=0
+      const %v11:int_literal op=1
+      aggregate_init %v12:Summary target=Summary operands=[%v8, %v9, %v10, %v11] fields=[open_items, closed_items, blocked_items, priority_items]
+      symbol_ref %v13:proc(Summary)->i32 target=write_rollup target_kind=function target_name=write_rollup
+      call %v14:i32 target=write_rollup target_kind=function target_name=write_rollup operands=[%v13, %v12]
+      binary %v15:i32 op=+ arithmetic=wrap operands=[%v7, %v14]
+      store_local target=total operands=[%v15]
+      load_local %v16:i32 target=total
+      const %v17:int_literal op=3
+      const %v18:int_literal op=1
+      const %v19:int_literal op=0
+      const %v20:int_literal op=0
+      aggregate_init %v21:Summary target=Summary operands=[%v17, %v18, %v19, %v20] fields=[open_items, closed_items, blocked_items, priority_items]
+      symbol_ref %v22:proc(Summary)->i32 target=write_rollup target_kind=function target_name=write_rollup
+      call %v23:i32 target=write_rollup target_kind=function target_name=write_rollup operands=[%v22, %v21]
+      binary %v24:i32 op=+ arithmetic=wrap operands=[%v16, %v23]
+      store_local target=total operands=[%v24]
+      load_local %v25:i32 target=total
+      const %v26:int_literal op=1
+      const %v27:int_literal op=3
+      const %v28:int_literal op=0
+      const %v29:int_literal op=0
+      aggregate_init %v30:Summary target=Summary operands=[%v26, %v27, %v28, %v29] fields=[open_items, closed_items, blocked_items, priority_items]
+      symbol_ref %v31:proc(Summary)->i32 target=write_rollup target_kind=function target_name=write_rollup
+      call %v32:i32 target=write_rollup target_kind=function target_name=write_rollup operands=[%v31, %v30]
+      binary %v33:i32 op=+ arithmetic=wrap operands=[%v25, %v32]
+      store_local target=total operands=[%v33]
+      load_local %v34:i32 target=total
+      terminator return values=[%v34]

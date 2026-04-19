@@ -3,7 +3,7 @@ Phase 260 -- Bounded Record-Construction Ergonomics Follow-Through
 
 Status
 ------
-PROPOSED
+COMPLETED
 
 Purpose
 -------
@@ -11,6 +11,17 @@ Admit one narrow source-level record-construction ergonomics slice that removes
 repeated repository-owned boilerplate in aggregate literals or record updates
 without widening into builder frameworks, hidden mutation, or general object-
 construction redesign.
+
+Implementation outcome
+----------------------
+- The landed shorthand is `field:` meaning `field: field` inside existing named
+  aggregate field lists and existing `with { ... }` record-update lists.
+- The shorthand is intentionally limited to simple field names; omitted values
+  on dotted record-update paths such as `outer.inner:` remain rejected.
+- Parser ownership stays local to field-init parsing, sema keeps field binding
+  and destination-type rules, and MIR still lowers through aggregate rebuild.
+- The real spend sites are `kernel/src/boot/service_cell_helpers.mc` and
+  `kernel/src/boot/boot_update.mc`.
 
 This phase exists now because the repository already admitted inferred brace
 aggregates plus shallow and nested record updates, but real owner code such as

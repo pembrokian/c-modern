@@ -1,0 +1,176 @@
+Phase 264 -- Page Or Run Tracking First Slice
+=============================================
+
+Status
+------
+PROPOSED
+
+Purpose
+-------
+Admit one larger-granularity memory owner so the repository can name a page-
+or run-sized allocation unit explicitly before installable bundles, program
+images, or display surfaces need more than object-at-a-time allocation.
+
+This phase exists now because Phases 262 and 263 cover repeated fixed-size
+objects and scratch work, but the roadmap still needs one honest larger unit
+for bundle-sized or surface-sized storage without jumping straight to a full
+virtual-memory or UI-compositor framework.
+
+Repository status note
+----------------------
+- The hosted runtime already exposes allocator-backed buffers and one arena
+  owner.
+- The reset-lane kernel tree intentionally does not yet carry MMU or page-
+  allocator complexity in the active hosted path.
+- `update_store_service` already owns one staged artifact slot, but it does
+  not define a reusable larger-granularity memory owner.
+- The repository still lacks one admitted surface for page- or run-like memory
+  tracking that later app-shaped and UI-shaped phases could build on honestly.
+
+Problem being solved
+--------------------
+- Later bundle, asset, and display work is likely to need larger blocks of
+  storage whose identity is not well modeled as either one pool object or one
+  scratch arena lifetime.
+- Today the repository would have to fake that need with raw buffers or with
+  owner-local fixed arrays, which hides the fact that those later phases are
+  really choosing a larger memory unit.
+- The phase therefore needs to name one honest larger-granularity owner before
+  Band C or Band D accidentally create it piecemeal.
+
+Non-goals
+---------
+- no virtual-memory subsystem or MMU framework
+- no generic filesystem cache or pager
+- no cross-owner memory-mapping API family
+- no UI compositor or framebuffer framework
+- no kernel reboot of the active hosted reset-lane architecture
+
+Invariants
+----------
+- The first larger-granularity owner must stay explicit and bounded.
+- Page or run identity must remain visible in API shape, not hidden behind raw
+  buffer allocation.
+- The phase must not imply full VM, protection, mapping, or eviction policy.
+- Any hosted implementation must remain deterministic and testable.
+- Existing durable and workflow owners keep their current ownership boundaries.
+
+Required surface changes
+------------------------
+1. Choose one larger-granularity memory owner shape: page, run, region block,
+   or another equally explicit bounded unit.
+2. Land that owner on the narrowest honest public surface, likely under
+   `stdlib/mem.mc` plus hosted runtime follow-through.
+3. Spend the first slice in one repository-owned consumer that genuinely needs
+   larger units than pool or scratch allocation can model cleanly.
+4. Add focused validation proving the chosen unit can be acquired, tracked,
+   and released deterministically.
+
+Forbidden changes
+-----------------
+- do not widen this phase into address spaces, mapping policy, or page faults
+- do not smuggle in a UI surface manager under the name of page tracking
+- do not redesign `update_store_service` or the durable owners into a storage
+  framework merely to spend a larger memory unit
+- do not add general caching, eviction, or residency policy
+
+Phase role in the larger sequence
+---------------------------------
+- This phase closes the third major memory question in Band B: what the
+  repository should use when one object and one arena lifetime are both the
+  wrong scale.
+- It prepares the install-slot, asset, and first-display phases by making the
+  larger memory unit explicit early.
+- It also sets up Phase 266, which must explain when later work should use
+  larger runs instead of pools, arenas, or raw buffers.
+
+Relevant backlog items this phase intentionally brings under pressure
+--------------------------------------------------------------------
+- keep memory policy explicit and owner-local rather than ambient
+- keep the active hosted reset-lane tree free of premature VM and MMU
+  framework growth
+
+Questions this phase must answer
+--------------------------------
+1. What is the narrowest honest larger-granularity memory unit for the current
+   repository pressure: a fixed page, a run of bytes, or another explicit
+   bounded region?
+2. Which near-future consumer actually needs this unit first: installable
+   bundle staging, asset loading, or one later display surface proof?
+3. Can the first slice stay entirely hosted and library-owned, or does a
+   kernel-facing owner become unavoidable immediately?
+4. What deterministic acquire or release or exhaustion behavior should the
+   first larger-granularity owner expose?
+
+Preferred implementation shape
+------------------------------
+- Keep the first larger-granularity owner hosted and library-backed unless a
+  concrete kernel consumer proves otherwise.
+- Prefer a run-style or fixed-page unit with explicit size and lifetime over a
+  highly abstract region taxonomy.
+- Spend the feature in one consumer only, likely adjacent to bundle or asset
+  staging.
+- Preserve the existing split where durable owners keep durable truth and the
+  memory owner only supplies storage shape.
+
+Implementation accelerators
+---------------------------
+Main files and navigations
+~~~~~~~~~~~~~~~~~~~~~~~~~~
+- Primary controlling owners: `stdlib/mem.mc` and
+  `runtime/hosted/mc_hosted_runtime.c`.
+- First-hop adjacent files: `kernel/src/services/update_store_service.mc`, the
+  chosen first consumer in `examples/real/` or a new app-bundle helper, and
+  `docs/arch/c-lang/stdlib/stdlib_design_principles.txt`.
+- Nearby accelerator docs: `docs/agent/prompts/test_overview.txt` and
+  `docs/agent/prompts/patterns_cookbook.txt`.
+- Expected first validation target when the owner changes: `Build debug`, then
+  the narrowest consumer-scoped executable proof.
+
+Relevant cookbook patterns
+~~~~~~~~~~~~~~~~~~~~~~~~~~
+- No existing cookbook pattern is a strong fit. The phase should stay on one
+  library-plus-runtime memory owner and one consumer.
+- Pattern 3 -- Add A Service State Field is only relevant if the chosen first
+  consumer truly lands in a kernel service rather than a hosted project.
+
+Relevant file-local invariants
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+- `stdlib/mem.mc` should remain the vocabulary owner if this becomes a public
+  memory surface.
+- `update_store_service` and other durable owners must not silently become the
+  memory-policy owner for larger units.
+- The first consumer should reveal why pool and arena were insufficient.
+
+Relevant test surfaces
+~~~~~~~~~~~~~~~~~~~~~~
+- Primary owning validation surface: one focused hosted executable or real-
+  project consumer proof.
+- Narrowest expected first executable validation target: the chosen consumer's
+  project-scoped run or test workflow.
+- Supporting validation: `mc_tool_real_project_.*_unit` if a maintained real
+  project becomes the spend site.
+
+Test obligations
+----------------
+- `Build debug`
+- one focused executable proof for acquire, use, and release of the larger-
+  granularity unit
+- one repository-owned consumer proof that genuinely needs the larger unit
+- narrow project or tool validation for the chosen consumer only
+
+Acceptance criteria
+-------------------
+- the repository can name one explicit page- or run-like memory owner
+- one real consumer uses that owner honestly instead of faking the need with
+  raw buffers or unrelated storage shapes
+- the phase does not widen into VM, mapping, or caching frameworks
+- later Band C and Band D work can cite a maintained larger-granularity memory
+  unit if they need one
+
+Future follow-up
+----------------
+- If later display or asset work needs a second materially different larger
+  unit, record that separately instead of widening this slice.
+- Route smaller repeated-allocation pressure back to Phase 262 or Phase 265.
+- Route purely transient staging pressure back to Phase 263.

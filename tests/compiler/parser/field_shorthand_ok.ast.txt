@@ -1,0 +1,65 @@
+SourceFile
+  ModuleKind=ordinary
+  StructDecl name=Inner
+    fields:
+      FieldDecl name=value
+        NamedType name=i32
+      FieldDecl name=flag
+        NamedType name=bool
+  StructDecl name=Pair
+    fields:
+      FieldDecl name=left
+        NamedType name=i32
+      FieldDecl name=inner
+        NamedType name=Inner
+  FuncDecl name=build
+    ParamDecl name=left
+      NamedType name=i32
+    ParamDecl name=value
+      NamedType name=i32
+    ParamDecl name=flag
+      NamedType name=bool
+    returns:
+      NamedType name=Pair
+    body:
+      BlockStmt
+        statements:
+          BindingStmt hasInitializer=true
+            NamePattern names=[inner]
+            exprs:
+              AggregateInitExpr
+                typeTarget:
+                  NamedType name=Inner
+                inits:
+                  FieldInit name=value
+                    NameExpr text=value
+                  FieldInit name=flag
+                    NameExpr text=flag
+          ReturnStmt
+            exprs:
+              AggregateInitExpr
+                typeTarget:
+                  NamedType name=Pair
+                inits:
+                  FieldInit name=left
+                    NameExpr text=left
+                  FieldInit name=inner
+                    NameExpr text=inner
+  FuncDecl name=rewrite
+    ParamDecl name=left
+      NamedType name=i32
+    ParamDecl name=pair
+      NamedType name=Pair
+    returns:
+      NamedType name=Pair
+    body:
+      BlockStmt
+        statements:
+          ReturnStmt
+            exprs:
+              RecordUpdateExpr
+                left:
+                  NameExpr text=pair
+                inits:
+                  FieldInit name=left
+                    NameExpr text=left

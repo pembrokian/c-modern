@@ -1,3 +1,3 @@
 func broken() {
-    cfg = Config{ path: }
+    cfg = Config{ path: + }
 }

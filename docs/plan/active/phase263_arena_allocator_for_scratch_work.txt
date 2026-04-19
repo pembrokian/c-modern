@@ -1,0 +1,182 @@
+Phase 263 -- Arena Allocator For Scratch Work
+=============================================
+
+Status
+------
+PROPOSED
+
+Purpose
+-------
+Spend the already-admitted arena seam on one real scratch-work consumer so the
+repository has one honest transient-allocation owner instead of treating the
+current `Arena` surface as a mostly unspent capability.
+
+This phase exists now because `stdlib/mem.mc` and the hosted runtime already
+admit arena construction and typed `arena_new<T>`, but the roadmap now needs a
+clear transient-allocation story before launcher, manifest, and app-facing
+state begin accumulating ad hoc temporary storage patterns.
+
+Repository status note
+----------------------
+- `stdlib/mem.mc` already exposes `Arena`, `arena_init`, `arena_deinit`, and
+  `arena_new<T>`.
+- The compiler and executable backend already recognize the arena special-call
+  path.
+- `examples/real/arena_expr/` already exists as a repository-owned real
+  project that names arena-backed expression parsing and normalization.
+- The repository still lacks one maintained planning contract that says where
+  arena-backed scratch allocation is the right fit and where it is not.
+
+Problem being solved
+--------------------
+- The current repo has an arena mechanism, but it does not yet have one clear
+  maintained consumer that establishes the transient lifetime boundary the rest
+  of the roadmap can trust.
+- Without that proof, later app-shaped work may either avoid the arena surface
+  entirely and duplicate scratch buffers manually, or misuse arena allocation
+  for longer-lived program state.
+- The real gap is therefore not arena syntax or lowering, but the absence of
+  one repository-owned scratch-work contract that other phases can cite.
+
+Non-goals
+---------
+- no general region hierarchy or nested lifetime framework
+- no implicit arena threading through unrelated APIs
+- no replacement of heap-backed `Buffer<T>` where owning returned storage is
+  still the honest model
+- no kernel reset-lane service rewrites just to spend the arena surface
+- no pool or slab widening in the same phase
+
+Invariants
+----------
+- Arena lifetime must stay explicit at initialization and release points.
+- Borrowed views or pointers from arena-backed storage must not outlive arena
+  reset or deinit.
+- Scratch allocation remains distinct from long-lived installed-program or UI
+  state.
+- Existing compiler special-call handling for arena operations remains
+  deterministic and narrowly scoped.
+- The first consumer must stay on one transient-work owner, not a framework.
+
+Required surface changes
+------------------------
+1. Choose one repository-owned scratch-work consumer that already has honest
+   transient allocation pressure.
+2. Land or harden that consumer's arena lifetime boundaries explicitly.
+3. Add focused executable or project validation that proves the scratch owner
+   does not leak arena-backed state across its intended boundary.
+4. Record the narrow rule for when later phases should prefer arena-backed
+   storage over pool or heap-backed owning storage.
+
+Forbidden changes
+-----------------
+- do not turn arena allocation into the default ambient storage model
+- do not let arena-backed pointers escape into durable or launcher-owned state
+- do not reopen parser, sema, or MIR unless the current arena surface is the
+  controlling blocker
+- do not use this phase to widen into general parser-framework or UI-framework
+  memory policy
+
+Phase role in the larger sequence
+---------------------------------
+- This phase gives Band B one concrete transient-allocation owner before the
+  later page, slab, and allocator-selection questions.
+- It complements Phase 262 by separating scratch-lifetime allocation from
+  reusable fixed-size object allocation.
+- It also prepares the app-shaped substrate phases by clarifying which helper
+  and staging work should remain transient.
+
+Relevant backlog items this phase intentionally brings under pressure
+--------------------------------------------------------------------
+- keep allocation policy explicit and owner-local in stdlib and hosted runtime
+- keep broader framework growth out of temporary storage and parsing helpers
+
+Questions this phase must answer
+--------------------------------
+1. Is `examples/real/arena_expr/` still the narrowest honest maintained arena
+   consumer, or has another transient-work owner overtaken it?
+2. Does the current arena API need one additive reset or clear surface, or is
+   init-plus-deinit still enough for the first maintained scratch proof?
+3. Which transient allocations in the chosen owner should stay arena-backed,
+   and which should remain heap-backed or stack-local?
+4. What is the smallest proof that arena-backed storage does not cross its
+   intended lifetime boundary?
+
+Preferred implementation shape
+------------------------------
+- Prefer `examples/real/arena_expr/` as the first maintained consumer unless a
+  nearer transient-work owner proves stronger pressure.
+- Keep the public surface in `stdlib/mem.mc` and the hosted implementation in
+  `runtime/hosted/mc_hosted_runtime.c`.
+- Reuse the existing arena special-call path rather than inventing a second
+  scratch allocator family.
+- Keep the chosen consumer's lifetime boundary local and explicit rather than
+  threading arena handles through large swaths of the repository.
+
+Implementation accelerators
+---------------------------
+Main files and navigations
+~~~~~~~~~~~~~~~~~~~~~~~~~~
+- Primary controlling owners: `stdlib/mem.mc`,
+  `runtime/hosted/mc_hosted_runtime.c`, and `examples/real/arena_expr/`.
+- First-hop adjacent files: `compiler/mir/mir.cpp`,
+  `compiler/mir/mir_lower.cpp`, `compiler/mir/mir_validate.cpp`, and the
+  executable memory lowering files if arena emission still needs follow-
+  through.
+- Nearby accelerator docs: `docs/agent/prompts/compiler_file_invariants.txt`,
+  `docs/agent/prompts/test_overview.txt`, and
+  `docs/arch/c-lang/stdlib/stdlib_design_principles.txt`.
+- Expected first validation target when the owner changes: the narrowest
+  `arena_expr` run or test workflow, then compiler or executable tests only if
+  the arena surface itself changes.
+
+Relevant cookbook patterns
+~~~~~~~~~~~~~~~~~~~~~~~~~~
+- No cookbook pattern maps exactly to a stdlib-plus-runtime memory surface.
+- Pattern 10 -- Parser + Sema + MIR Follow-Through applies only if the phase
+  exposes a compiler-side arena gap; otherwise the work should stay on the
+  library, runtime, and consumer owners.
+
+Relevant file-local invariants
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+- `stdlib/mem.mc` owns the public lifetime vocabulary for arena allocation.
+- `compiler/mir` and executable lowering already know about the arena special
+  call and should only change if the public surface truly changes.
+- The chosen consumer must keep arena-backed values transient and owner-local.
+
+Relevant test surfaces
+~~~~~~~~~~~~~~~~~~~~~~
+- Primary owning validation surface: `examples/real/arena_expr/` and its
+  project-scoped run or test workflows.
+- Narrowest expected first executable validation target: `mc run --project`
+  or `mc test --project` for `examples/real/arena_expr/build.toml`.
+- Supporting validation: `mc_tool_real_project_.*_unit` only if a maintained
+  real-project case is updated to cover the chosen consumer.
+
+Test obligations
+----------------
+- `Build debug`
+- one focused `arena_expr` run or test proof exercising arena-backed transient
+  allocation
+- compiler or executable validation only if the arena public surface or its
+  lowering changes
+- if a grouped real-project case is touched, the narrow owning real-project
+  unit for that case
+
+Acceptance criteria
+-------------------
+- one repository-owned consumer now carries an explicit maintained arena-
+  backed scratch-work contract
+- the chosen consumer's lifetime boundary is visible and deterministic
+- arena-backed transient work stays distinct from durable or app-long-lived
+  state
+- the phase does not widen into a general region or lifetime framework
+
+Future follow-up
+----------------
+- If later app-manifest parsing or bundle staging needs the same transient
+  pattern, reuse the landed arena contract rather than redefining it.
+- If the chosen consumer exposes pressure for fixed-size reuse instead of pure
+  transient work, route that to Phase 262 or Phase 265.
+- Record any missing additive arena API in `docs/plan/backlog.txt` rather than
+  widening this phase after the fact.

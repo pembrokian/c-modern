@@ -661,20 +661,20 @@ std::unique_ptr<Expr> Parser::ParsePostfixExpr() {
 
 std::vector<FieldInit> Parser::ParseFieldInitListUntil(TokenKind terminator, bool allow_dotted_name) {
     std::vector<FieldInit> result;
-    result.push_back(ParseFieldInit(allow_dotted_name));
+    result.push_back(ParseFieldInit(terminator, allow_dotted_name));
     SkipNewlines();
     while (Match(TokenKind::kComma)) {
         SkipNewlines();
         if (Check(terminator)) {
             break;
         }
-        result.push_back(ParseFieldInit(allow_dotted_name));
+        result.push_back(ParseFieldInit(terminator, allow_dotted_name));
         SkipNewlines();
     }
     return result;
 }
 
-FieldInit Parser::ParseFieldInit(bool allow_dotted_name) {
+FieldInit Parser::ParseFieldInit(TokenKind terminator, bool allow_dotted_name) {
     FieldInit init;
     init.span.begin = Current().span.begin;
     if (Check(TokenKind::kIdentifier) && Peek(1).kind == TokenKind::kColon) {
@@ -683,6 +683,16 @@ FieldInit Parser::ParseFieldInit(bool allow_dotted_name) {
         init.field_path.push_back(init.name);
         Advance();
         Advance();
+        if (Check(TokenKind::kComma) || Check(terminator)) {
+            auto value = std::make_unique<Expr>();
+            value->kind = Expr::Kind::kName;
+            value->span.begin = init.span.begin;
+            value->span.end = Previous().span.end;
+            value->text = init.name;
+            init.value = std::move(value);
+            init.span.end = init.value->span.end;
+            return init;
+        }
     } else if (allow_dotted_name && Check(TokenKind::kIdentifier)) {
         std::vector<std::string> path;
         path.push_back(Current().lexeme);
@@ -711,6 +721,17 @@ FieldInit Parser::ParseFieldInit(bool allow_dotted_name) {
                 break;
             }
             Advance();
+            if (Check(TokenKind::kComma) || Check(terminator)) {
+                ReportError(Previous(), "record update shorthand requires a simple field name");
+                auto value = std::make_unique<Expr>();
+                value->kind = Expr::Kind::kName;
+                value->span.begin = init.span.begin;
+                value->span.end = Previous().span.end;
+                value->text = path.back();
+                init.value = std::move(value);
+                init.span.end = init.value->span.end;
+                return init;
+            }
         }
     }
     init.value = ParseExpr();

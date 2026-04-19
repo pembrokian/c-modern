@@ -1,0 +1,166 @@
+Phase 270 -- App-Visible Restart And Resume Truth
+=================================================
+
+Status
+------
+PROPOSED
+
+Purpose
+-------
+Make one admitted program path distinguish fresh launch, resumed launch, and
+restart-invalidated state honestly, without widening into sessions, snapshots,
+or a retained UI framework.
+
+This phase exists now because launcher and install-slot work create the first
+credible user-facing program path. The next honest question is what that path
+should say after restart and reload rather than pretending every launch is
+fresh forever.
+
+Repository status note
+----------------------
+- The reset-lane kernel already has explicit restart and reload semantics for
+  services.
+- Durable owners already persist staged and named state across restart where
+  their own contracts require it.
+- The launcher and install-slot phases are expected to create one foreground
+  program path.
+- The repository still lacks one app-facing restart or resume vocabulary for
+  that path.
+
+Problem being solved
+--------------------
+- Once a program can be launched and installed, the repository needs one
+  explicit answer to whether that program is fresh, resumed, or invalidated by
+  restart-visible changes.
+- Without that answer, later user-facing workflows will either hide restart
+  consequences behind launcher behavior or force each app to invent its own
+  restart classification.
+- The current-repo problem is therefore one missing cross-owner contract on an
+  already-admitted app path.
+
+Non-goals
+---------
+- no session framework
+- no general save-state or document-restore framework
+- no process checkpointing or snapshots
+- no multi-app background resume policy
+- no UI routing or repaint work yet
+
+Invariants
+----------
+- Restart classification must stay explicit and deterministic.
+- Durable owners keep their own persisted truth; this phase only adds the
+  app-visible interpretation needed by the admitted program path.
+- Launcher state must not silently absorb durable-state policy.
+- The first vocabulary must stay bounded to fresh, resumed, and invalidated or
+  an equally small explicit family.
+
+Required surface changes
+------------------------
+1. Define one app-visible restart or resume classification for the installed
+   program path.
+2. Choose the narrowest owner for that classification, likely the launcher or
+   one adjacent identity helper rather than each app individually.
+3. Add one focused scenario showing fresh launch, restart-resumed launch, and
+   one invalidated condition if the path requires it.
+4. Keep the classification restart-visible and testable.
+
+Forbidden changes
+-----------------
+- do not widen into a save-state framework
+- do not add session graphs, process checkpoints, or retained UI state
+- do not move durable owner truth into the launcher just to simplify the user-
+  visible label
+- do not make each app invent its own restart contract in the first slice
+
+Phase role in the larger sequence
+---------------------------------
+- This phase makes the new app path restart-honest before asset and demo work
+  are added.
+- It consumes the installed program path from Phase 269.
+- It prepares Phase 272 by ensuring the first user-facing demo can say what
+  happened across restart.
+
+Relevant backlog items this phase intentionally brings under pressure
+--------------------------------------------------------------------
+- keep restart-visible truth owner-local and explicit
+- keep app-facing restart behavior bounded rather than drifting into a session
+  framework
+
+Questions this phase must answer
+--------------------------------
+1. Which owner should classify app-visible restart truth: launcher, install-
+   slot logic, or one narrow identity helper?
+2. What is the smallest useful user-facing classification family?
+3. Which durable changes should invalidate resume in the first slice?
+4. How should the first repository-owned program observe or report that truth?
+
+Preferred implementation shape
+------------------------------
+- Reuse the repository's existing explicit restart language and map it onto one
+  app-facing classification owner.
+- Keep the classification adjacent to launcher or program identity rather than
+  inside each app.
+- Spend the feature on one installed foreground path only.
+
+Implementation accelerators
+---------------------------
+Main files and navigations
+~~~~~~~~~~~~~~~~~~~~~~~~~~
+- Primary controlling owners: the Phase 268 launcher owner, the Phase 269
+  install-slot owner, and the existing restart-related boot helpers under
+  `kernel/src/boot/`.
+- First-hop adjacent files: `kernel/src/boot/init.mc`,
+  `kernel/src/boot/boot_identity.mc`, `kernel/src/kernel_dispatch.mc`, and the
+  app-restart scenario under `kernel/src/scenarios/`.
+- Nearby accelerator docs: `docs/agent/prompts/kernel_file_invariants.txt`,
+  `docs/arch/veya/kernel_style_guide.txt`, and the recent restart-aware phase
+  docs under `docs/plan/active/phase245_*` and `phase254_*`.
+- Expected first validation target when the owner changes: `Build debug`, then
+  the focused restart-truth fixture.
+
+Relevant cookbook patterns
+~~~~~~~~~~~~~~~~~~~~~~~~~~
+- Pattern 3 -- Add A Service State Field is the nearest fit if the launcher or
+  install path only needs one additional explicit classification field.
+- The phase should avoid wider service admissions unless a new owner is truly
+  forced.
+
+Relevant file-local invariants
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+- `boot/init.mc` owns restart execution semantics, not app-facing wording.
+- The launcher or adjacent app-identity owner should classify what the user-
+  facing program path should report.
+- Durable owners keep their persisted state truth; this phase consumes that
+  truth rather than redefining it.
+
+Relevant test surfaces
+~~~~~~~~~~~~~~~~~~~~~~
+- Primary owning validation surface: one focused reset-lane fixture for the
+  app restart or resume path.
+- Narrowest expected first executable validation target: that fixture plus
+  `mc_tool_workflow_kernel_reset_lane_unit`.
+- Supporting validation: `mc_tool_workflow_kernel_reset_lane_full_unit` if the
+  restart path becomes part of the maintained launcher flow.
+
+Test obligations
+----------------
+- `Build debug`
+- one focused restart-or-resume reset-lane scenario and fixture
+- `mc_tool_workflow_kernel_reset_lane_unit`
+- `mc_tool_workflow_kernel_reset_lane_full_unit`
+
+Acceptance criteria
+-------------------
+- one installed program path now reports fresh, resumed, or invalidated state
+  explicitly
+- the classification is deterministic and restart-visible
+- the landing stays bounded and avoids session or save-state framework growth
+- later app demos can reuse the contract without inventing new restart rules
+
+Future follow-up
+----------------
+- Phase 271 should add asset or manifest follow-through on top of the same app
+  path only if restart truth stays honest.
+- Phase 272 should spend the restart-aware path in one user-facing demo.
+- Any richer document or UI-state persistence belongs later in the roadmap.

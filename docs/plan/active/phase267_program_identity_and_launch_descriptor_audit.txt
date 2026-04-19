@@ -1,0 +1,184 @@
+Phase 267 -- Program Identity And Launch Descriptor Audit
+=========================================================
+
+Status
+------
+PROPOSED
+
+Purpose
+-------
+Admit one explicit program identity and launch descriptor shape so the
+repository can talk about launchable user-facing programs as owned artifacts
+rather than only as build-tool projects or raw staged bytes.
+
+This phase exists now because Band C should start by defining the identity of
+the thing later launcher, install, restart, and asset phases will act on.
+Without that descriptor shape, the app-facing work would widen into ad hoc
+manifest fields and one-off launch rules immediately.
+
+Repository status note
+----------------------
+- The repository already has real hosted projects such as
+  `examples/real/issue_rollup/` and `examples/real/review_board/`.
+- Phase 257 already established one maintained descriptor-table precedent in
+  `kernel/src/identity/service_topology.mc`.
+- The reset-lane kernel already has durable owners for staged update truth,
+  named durable objects, workflow execution, and completion reporting.
+- The kernel still has no `program_identity`, `program_catalog`, or launcher-
+  owned descriptor surface, and no explicit program id separate from build-time
+  tool targets.
+
+Problem being solved
+--------------------
+- The repository can build and run real projects through tooling, and it can
+  stage bytes durably through `update_store_service`, but it still lacks one
+  runtime-facing identity contract for a launchable program.
+- Without that contract, later launcher or install phases would have to decide
+  identity, entrypoint, version, and restart-visible naming on the fly.
+- The real gap is therefore not "how to launch" yet, but "what exactly is a
+  launchable program artifact inside the repository-owned system slice?"
+
+Non-goals
+---------
+- no launcher service yet
+- no process-management, session, or window-system policy
+- no package repository, discovery scan, or filesystem manifest framework
+- no broad resource or asset API in the same phase
+- no attempt to mirror the entire build-tool manifest inside the kernel
+
+Invariants
+----------
+- Program identity must be explicit and deterministic.
+- The first launch descriptor family must stay fixed-size and bounded.
+- Build-tool target discovery remains a tooling concern; runtime program
+  identity must not be inferred implicitly from the whole project graph.
+- Descriptor truth should live in a narrow identity or catalog owner, not in
+  workflow, update, or shell routing code.
+- The landing must not imply multi-user sessions, discovery frameworks, or a
+  filesystem.
+
+Required surface changes
+------------------------
+1. Define one bounded runtime-facing `ProgramDescriptor`-style shape for
+   repository-owned launchable programs.
+2. Choose the narrowest owner for that descriptor truth, likely under
+   `kernel/src/identity/`.
+3. Admit one fixed set of repository-owned programs into the first descriptor
+   family.
+4. Add one focused proof that later launcher phases can read or classify the
+   descriptor data without inventing new runtime identity rules.
+
+Forbidden changes
+-----------------
+- do not add a launcher service in this audit phase
+- do not make runtime program identity a shadow copy of the entire build-tool
+  manifest model
+- do not move descriptor truth into `shell_service`, `kernel_dispatch`, or
+  `workflow_service`
+- do not widen into package discovery, install policy, or UI routing
+
+Phase role in the larger sequence
+---------------------------------
+- This phase opens Band C by defining the runtime artifact that later launcher,
+  install, restart, and asset phases will manipulate.
+- It follows Band B so the descriptor family can assume an explicit memory
+  story if needed.
+- It prepares Phase 268 by giving the launcher a stable catalog instead of an
+  implicit list of tool targets.
+
+Relevant backlog items this phase intentionally brings under pressure
+--------------------------------------------------------------------
+- keep durable staged-update and named-object ownership bounded to their
+  current owners instead of widening them into an app framework
+- keep launcher, install, and packaging work owner-local and explicit
+
+Questions this phase must answer
+--------------------------------
+1. What is the narrowest honest program descriptor shape: id, label, entry,
+   version, and restart mode only, or one similarly compact family?
+2. Which existing real projects should be the first admitted program catalog
+   entries?
+3. Should the first descriptor table live beside `service_topology.mc` as an
+   identity owner, or does another narrow owner win?
+4. What descriptor fields are genuinely needed before Phase 268, and which
+   should stay deferred until install or asset pressure appears?
+
+Preferred implementation shape
+------------------------------
+- Prefer a fixed explicit descriptor table under `kernel/src/identity/`, using
+  Phase 257's descriptor-table precedent as the model.
+- Keep the first admitted program set tiny and repository-owned, likely built
+  around one or two existing real projects.
+- Keep the descriptor family runtime-facing and bounded instead of mirroring
+  the entire tool manifest.
+- Leave launch execution, install policy, and asset lookup to later phases.
+
+Implementation accelerators
+---------------------------
+Main files and navigations
+~~~~~~~~~~~~~~~~~~~~~~~~~~
+- Primary controlling owners: `kernel/src/identity/service_topology.mc`,
+  `kernel/build.toml`, `examples/real/issue_rollup/build.toml`, and
+  `examples/real/review_board/build.toml`.
+- First-hop adjacent files: `kernel/src/boot/boot.mc`, `kernel/src/shell/shell_service.mc`,
+  and any new `kernel/src/identity/program_*` module chosen for the landing.
+- Nearby accelerator docs: `docs/agent/prompts/kernel_file_invariants.txt`,
+  `docs/agent/prompts/test_overview.txt`, and
+  `docs/plan/active/phase257_const_evaluable_table_and_descriptor_follow_through.txt`.
+- Expected first validation target when the owner changes: `Build debug`, then
+  the narrowest descriptor-facing reset-lane or real-project proof.
+
+Relevant cookbook patterns
+~~~~~~~~~~~~~~~~~~~~~~~~~~
+- Pattern 9 -- Add A New Runtime Service does not fit yet because this phase is
+  intentionally pre-launcher.
+- The closest current pattern is the descriptor-table follow-through model from
+  Phase 257, but spent in a runtime program-identity owner rather than service
+  topology.
+
+Relevant file-local invariants
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+- `service_topology.mc` shows the current repository style for fixed explicit
+  descriptor tables.
+- `kernel/src/identity/` is the preferred place for stable naming and identity
+  truth.
+- Real-project build manifests remain tool-owned; runtime identity should only
+  extract the bounded fields the launcher actually needs.
+
+Relevant test surfaces
+~~~~~~~~~~~~~~~~~~~~~~
+- Primary owning validation surface: the narrowest reset-lane or real-project
+  proof that exercises descriptor lookup.
+- Narrowest expected first executable validation target: `Build debug` plus
+  one focused kernel scenario or real-project workflow case tied to the chosen
+  admitted program set.
+- Supporting validation: `mc_tool_workflow_kernel_reset_lane_unit` if a kernel
+  catalog entry becomes visible there, and `mc_tool_real_project_issue_rollup_unit`
+  or the matching `review-board` case if those projects become the initial
+  descriptors.
+
+Test obligations
+----------------
+- `Build debug`
+- one focused proof that the program descriptor table is explicit and
+  deterministic
+- one narrow validation path for the initial admitted program set
+- if the kernel surface changes, `mc_tool_workflow_kernel_reset_lane_unit`
+
+Acceptance criteria
+-------------------
+- the repository has one explicit runtime-facing program identity and launch
+  descriptor shape
+- at least one repository-owned program is admitted through that descriptor
+  surface
+- later launcher work can consume the descriptor data without inventing new
+  identity rules
+- the phase stays pre-launcher and avoids packaging or session-framework drift
+
+Future follow-up
+----------------
+- Phase 268 should consume the admitted program descriptor family directly.
+- Route install-slot identity pressure to Phase 269 instead of widening the
+  descriptor audit.
+- Route asset or manifest expansion to Phase 271 only if later phases prove
+  the compact descriptor shape insufficient.

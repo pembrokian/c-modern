@@ -141,7 +141,7 @@ class Parser {
     std::unique_ptr<Expr> ParseUnaryExpr();
     std::unique_ptr<Expr> ParsePostfixExpr();
     std::vector<FieldInit> ParseFieldInitListUntil(TokenKind terminator, bool allow_dotted_name = false);
-    FieldInit ParseFieldInit(bool allow_dotted_name = false);
+    FieldInit ParseFieldInit(TokenKind terminator, bool allow_dotted_name = false);
     std::unique_ptr<Expr> ParseAssignmentTarget();
     std::unique_ptr<Expr> NormalizeAssignmentTarget(std::unique_ptr<Expr> target);
     std::unique_ptr<Expr> ParsePrimaryExpr();

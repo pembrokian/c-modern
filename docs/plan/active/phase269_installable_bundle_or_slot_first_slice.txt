@@ -1,0 +1,168 @@
+Phase 269 -- Installable Bundle Or Slot First Slice
+===================================================
+
+Status
+------
+PROPOSED
+
+Purpose
+-------
+Make one install slot or app bundle path explicit so a repository-owned
+program can be staged, activated, and named as an app-shaped artifact instead
+of living only as raw update bytes or tool-managed project output.
+
+This phase exists now because the launcher can only stay honest if it can act
+on a bounded notion of installed program state. The repository already has a
+staged-update owner and durable owners; the next honest move is to tie one of
+those existing storage seams to one explicit installed-program slot.
+
+Repository status note
+----------------------
+- `update_store_service` already owns one staged artifact plus manifest truth
+  and one applied target.
+- `object_store_service` already owns bounded durable named objects.
+- Phase 268 is expected to introduce one launcher owner over a fixed catalog.
+- The repository still has no explicit install-slot or bundle owner for a
+  launchable program artifact.
+
+Problem being solved
+--------------------
+- A launchable program descriptor is not yet the same thing as an installed
+  program artifact with durable staged or applied bytes.
+- Without one explicit install slot, later app-facing phases would either
+  pretend staged update bytes are already an installed program contract or they
+  would widen the launcher into a storage owner.
+- The current-repo gap is therefore the lack of a single installed artifact
+  path that composes cleanly with the existing durable and update owners.
+
+Non-goals
+---------
+- no package manager, dependency graph, or repository sync
+- no multi-slot install framework
+- no rollback engine
+- no filesystem or directory tree abstraction
+- no broad asset API in the same phase
+
+Invariants
+----------
+- `update_store_service` remains the owner of staged and applied update truth
+  unless the phase explicitly proves a second owner is required.
+- The launcher remains a launch and selection owner, not a durable artifact
+  store.
+- The first install path must stay single-slot or equally bounded.
+- Install state must be explicit and restart-visible.
+- The landing must not imply a broad packaging framework.
+
+Required surface changes
+------------------------
+1. Choose one explicit installed bundle or slot shape.
+2. Bind that shape to the narrowest honest existing durable owner or to one
+   minimal new owner if the existing ones cannot carry it cleanly.
+3. Connect one repository-owned program descriptor to that installed slot.
+4. Add one focused scenario and fixture proving stage, activate, and identify
+   the installed program artifact.
+
+Forbidden changes
+-----------------
+- do not widen the phase into package queues, dependency management, or
+  repositories
+- do not move durable staged bytes into the launcher merely for convenience
+- do not silently treat the entire build manifest as the install contract
+- do not add multiple install lanes or policy engines in the first slice
+
+Phase role in the larger sequence
+---------------------------------
+- This phase gives Band C its first explicit installed-program storage path.
+- It consumes the descriptor and launcher work from Phases 267 and 268.
+- It prepares Phase 270 and Phase 272 by making launchable program state
+  durable and explicit.
+
+Relevant backlog items this phase intentionally brings under pressure
+--------------------------------------------------------------------
+- keep staged update, durable named state, and completion ownership bounded to
+  their current owners
+- keep install policy explicit rather than widening into an activation
+  framework too early
+
+Questions this phase must answer
+--------------------------------
+1. Can the first install slot stay on `update_store_service` plus the launcher
+  owner, or is one minimal additional durable owner required?
+2. What is the smallest durable slot shape that still feels like an app-shaped
+  artifact rather than raw bytes?
+3. Which program should become the first installed artifact proof?
+4. How much manifest truth is needed for the first slot beyond version and
+  identity?
+
+Preferred implementation shape
+------------------------------
+- Prefer composing existing owners before adding a new one: staged and applied
+  bytes in `update_store_service`, identity in the program descriptor family,
+  and selection in the launcher.
+- If a new owner is required, keep it to one narrow installed-slot service or
+  helper.
+- Admit one slot only in the first slice.
+- Keep the user-visible contract on stage, activate, and identify.
+
+Implementation accelerators
+---------------------------
+Main files and navigations
+~~~~~~~~~~~~~~~~~~~~~~~~~~
+- Primary controlling owners: `kernel/src/services/update_store_service.mc`,
+  the Phase 268 launcher owner, and the Phase 267 program descriptor owner.
+- First-hop adjacent files: `kernel/src/services/workflow_service.mc`,
+  `kernel/src/services/completion_mailbox_service.mc`,
+  `kernel/src/kernel_dispatch.mc`, and the new install-slot scenario.
+- Nearby accelerator docs: `docs/agent/prompts/kernel_file_invariants.txt`,
+  `docs/plan/active/phase242_update_manifest_and_staged_artifact_store_first_slice.txt`,
+  and `docs/plan/active/phase245_update_recovery_and_completion_reporting_pressure.txt`.
+- Expected first validation target when the owner changes: `Build debug`, then
+  the focused install-slot reset-lane fixture.
+
+Relevant cookbook patterns
+~~~~~~~~~~~~~~~~~~~~~~~~~~
+- Pattern 3 -- Add A Service State Field applies if the first install slot can
+  remain a bounded extension on an existing durable owner.
+- Pattern 9 -- Add A New Runtime Service applies only if the earlier owners
+  cannot carry the slot honestly and one minimal new owner is forced.
+
+Relevant file-local invariants
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+- `update_store_service.mc` owns staged and applied artifact bytes and must not
+  quietly become a broad packaging framework.
+- `workflow_service.mc` owns execution and completion follow-through, not the
+  durable identity of installed programs.
+- The launcher should consume install truth, not own the bytes.
+
+Relevant test surfaces
+~~~~~~~~~~~~~~~~~~~~~~
+- Primary owning validation surface: one focused reset-lane fixture for the
+  installed program path.
+- Narrowest expected first executable validation target: that fixture plus
+  `mc_tool_workflow_kernel_reset_lane_unit`.
+- Supporting validation: `mc_tool_workflow_kernel_reset_lane_full_unit` once
+  the install path is stable.
+
+Test obligations
+----------------
+- `Build debug`
+- one focused install-slot reset-lane scenario and fixture
+- `mc_tool_workflow_kernel_reset_lane_unit`
+- `mc_tool_workflow_kernel_reset_lane_full_unit`
+
+Acceptance criteria
+-------------------
+- the repository has one explicit install slot or bundle path for one
+  launchable program artifact
+- that path composes honestly with the existing durable and update owners
+- one repository-owned program can be staged, activated, and identified as an
+  installed artifact
+- the landing stays single-slot and avoids packaging-framework drift
+
+Future follow-up
+----------------
+- Phase 270 should make restart and resume truth explicit on the same path.
+- Phase 271 should add bounded manifest or asset follow-through only if the
+  first slot proves that pressure real.
+- Broader install policy belongs in `docs/plan/backlog.txt` until another real
+  installed-program consumer appears.

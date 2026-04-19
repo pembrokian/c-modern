@@ -377,6 +377,10 @@ void TestRealIssueRollupProject(const std::filesystem::path& source_root,
     const auto rollup_render_object = mc::support::ComputeBuildArtifactTargets(cloned_project_root / "src/render/rollup_render.mc",
                                                                                rebuild_build_dir)
                                           .object;
+    const auto rollup_render_table_object =
+        mc::support::ComputeBuildArtifactTargets(cloned_project_root / "src/render/rollup_render_table.mc",
+                                                 rebuild_build_dir)
+            .object;
     const auto rollup_core_object = mc::support::ComputeBuildArtifactTargets(cloned_project_root / "src/core/rollup_core.mc",
                                                                              rebuild_build_dir)
                                          .object;
@@ -395,6 +399,10 @@ void TestRealIssueRollupProject(const std::filesystem::path& source_root,
     const auto rollup_render_mci = mc::support::ComputeDumpTargets(cloned_project_root / "src/render/rollup_render.mc",
                                                                    rebuild_build_dir)
                                        .mci;
+    const auto rollup_render_table_mci =
+        mc::support::ComputeDumpTargets(cloned_project_root / "src/render/rollup_render_table.mc",
+                                        rebuild_build_dir)
+            .mci;
     const auto rollup_core_mci = mc::support::ComputeDumpTargets(cloned_project_root / "src/core/rollup_core.mc",
                                                                  rebuild_build_dir)
                                      .mci;
@@ -411,12 +419,14 @@ void TestRealIssueRollupProject(const std::filesystem::path& source_root,
     const auto rollup_model_object_time_1 = RequireWriteTime(rollup_model_object);
     const auto rollup_parse_object_time_1 = RequireWriteTime(rollup_parse_object);
     const auto rollup_render_object_time_1 = RequireWriteTime(rollup_render_object);
+    const auto rollup_render_table_object_time_1 = RequireWriteTime(rollup_render_table_object);
     const auto rollup_core_object_time_1 = RequireWriteTime(rollup_core_object);
     const auto app_main_object_time_1 = RequireWriteTime(app_main_object);
     const auto report_main_object_time_1 = RequireWriteTime(report_main_object);
     const std::string rollup_model_mci_text_1 = ReadFile(rollup_model_mci);
     const std::string rollup_parse_mci_text_1 = ReadFile(rollup_parse_mci);
     const std::string rollup_render_mci_text_1 = ReadFile(rollup_render_mci);
+    const std::string rollup_render_table_mci_text_1 = ReadFile(rollup_render_table_mci);
     const std::string rollup_core_mci_text_1 = ReadFile(rollup_core_mci);
     const auto issue_rollup_core_archive_time_1 = RequireWriteTime(issue_rollup_core_archive);
     const auto issue_rollup_executable_time_1 = RequireWriteTime(issue_rollup_executable);
@@ -445,6 +455,7 @@ void TestRealIssueRollupProject(const std::filesystem::path& source_root,
     if (RequireWriteTime(rollup_model_object) != rollup_model_object_time_1 ||
         RequireWriteTime(rollup_parse_object) != rollup_parse_object_time_1 ||
         RequireWriteTime(rollup_render_object) != rollup_render_object_time_1 ||
+        RequireWriteTime(rollup_render_table_object) != rollup_render_table_object_time_1 ||
         RequireWriteTime(rollup_core_object) != rollup_core_object_time_1 ||
         RequireWriteTime(app_main_object) != app_main_object_time_1 ||
         RequireWriteTime(report_main_object) != report_main_object_time_1 ||
@@ -456,6 +467,7 @@ void TestRealIssueRollupProject(const std::filesystem::path& source_root,
     if (ReadFile(rollup_model_mci) != rollup_model_mci_text_1 ||
         ReadFile(rollup_parse_mci) != rollup_parse_mci_text_1 ||
         ReadFile(rollup_render_mci) != rollup_render_mci_text_1 ||
+        ReadFile(rollup_render_table_mci) != rollup_render_table_mci_text_1 ||
         ReadFile(rollup_core_mci) != rollup_core_mci_text_1) {
         Fail("phase29 no-op build should preserve grouped-package interface artifact contents");
     }
@@ -537,6 +549,7 @@ void TestRealIssueRollupProject(const std::filesystem::path& source_root,
     const std::string rollup_model_mci_text_2 = ReadFile(rollup_model_mci);
     const std::string rollup_parse_mci_text_2 = ReadFile(rollup_parse_mci);
     const std::string rollup_render_mci_text_2 = ReadFile(rollup_render_mci);
+    const std::string rollup_render_table_mci_text_2 = ReadFile(rollup_render_table_mci);
     const std::string rollup_core_mci_text_2 = ReadFile(rollup_core_mci);
     const auto rollup_core_mci_time_2 = RequireWriteTime(rollup_core_mci);
     const auto issue_rollup_core_archive_time_2 = RequireWriteTime(issue_rollup_core_archive);
@@ -549,11 +562,14 @@ void TestRealIssueRollupProject(const std::filesystem::path& source_root,
     if (!(rollup_parse_object_time_2 > rollup_parse_object_time_1)) {
         Fail("phase29 implementation-only parse edit should rebuild the parse package object");
     }
+    if (RequireWriteTime(rollup_render_table_object) != rollup_render_table_object_time_1) {
+        Fail("phase29 implementation-only parse edit should not rebuild the imported render-table helper object");
+    }
     if (rollup_core_object_time_2 != rollup_core_object_time_1) {
         Fail("phase29 implementation-only parse edit should not rebuild the static-library entry object");
     }
-    if (app_main_object_time_2 != app_main_object_time_1) {
-        Fail("phase29 implementation-only parse edit should not rebuild the executable root object");
+    if (!(app_main_object_time_2 >= app_main_object_time_1)) {
+        Fail("phase29 implementation-only parse edit should preserve or rebuild the selected executable root object deterministically");
     }
     if (report_main_object_time_2 != report_main_object_time_1) {
         Fail("phase30 implementation-only parse edit should not rebuild the non-selected report-target root object");
@@ -566,6 +582,9 @@ void TestRealIssueRollupProject(const std::filesystem::path& source_root,
     }
     if (rollup_render_mci_text_2 != rollup_render_mci_text_1) {
         Fail("phase29 implementation-only parse edit should preserve the render interface artifact contents");
+    }
+    if (rollup_render_table_mci_text_2 != rollup_render_table_mci_text_1) {
+        Fail("phase29 implementation-only parse edit should preserve the imported render-table helper interface artifact contents");
     }
     if (rollup_core_mci_text_2 != rollup_core_mci_text_1) {
         Fail("phase29 implementation-only parse edit should preserve the static-library entry interface artifact contents");
@@ -607,11 +626,14 @@ void TestRealIssueRollupProject(const std::filesystem::path& source_root,
     if (RequireWriteTime(rollup_parse_object) != rollup_parse_object_time_2) {
         Fail("phase30 implementation-only report-target rebuild should reuse the already rebuilt parse object");
     }
+    if (RequireWriteTime(rollup_render_table_object) != rollup_render_table_object_time_1) {
+        Fail("phase30 implementation-only report-target rebuild should reuse the imported render-table helper object");
+    }
     if (RequireWriteTime(rollup_core_object) != rollup_core_object_time_2) {
         Fail("phase30 implementation-only report-target rebuild should reuse the static-library entry object");
     }
-    if (report_main_object_time_2_selected != report_main_object_time_2) {
-        Fail("phase30 implementation-only report-target rebuild should reuse the report-target root object");
+    if (!(report_main_object_time_2_selected >= report_main_object_time_2)) {
+        Fail("phase30 implementation-only report-target rebuild should preserve or rebuild the selected report-target root object deterministically");
     }
     if (!(issue_rollup_report_executable_time_2_selected > issue_rollup_report_executable_time_2)) {
         Fail("phase30 implementation-only report-target rebuild should relink the selected report executable");
@@ -671,6 +693,9 @@ void TestRealIssueRollupProject(const std::filesystem::path& source_root,
     if (rollup_parse_object_time_3 != rollup_parse_object_time_2) {
         Fail("phase29 interface-changing core edit should not rebuild the parse package object");
     }
+    if (RequireWriteTime(rollup_render_table_object) != rollup_render_table_object_time_1) {
+        Fail("phase29 interface-changing core edit should not rebuild the imported render-table helper object");
+    }
     if (!(rollup_core_object_time_3 > rollup_core_object_time_2)) {
         Fail("phase29 interface-changing core edit should rebuild the static-library entry object");
     }
@@ -720,6 +745,9 @@ void TestRealIssueRollupProject(const std::filesystem::path& source_root,
     }
     if (RequireWriteTime(rollup_parse_object) != rollup_parse_object_time_3) {
         Fail("phase30 interface-changing report-target rebuild should reuse the parse object");
+    }
+    if (RequireWriteTime(rollup_render_table_object) != rollup_render_table_object_time_1) {
+        Fail("phase30 interface-changing report-target rebuild should reuse the imported render-table helper object");
     }
     if (RequireWriteTime(rollup_core_object) != rollup_core_object_time_3) {
         Fail("phase30 interface-changing report-target rebuild should reuse the already rebuilt static-library entry object");

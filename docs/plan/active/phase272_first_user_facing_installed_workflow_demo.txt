@@ -1,0 +1,165 @@
+Phase 272 -- First User-Facing Installed Workflow Demo
+======================================================
+
+Status
+------
+PROPOSED
+
+Purpose
+-------
+Prove one small repository-owned user-facing program can be installed,
+launched, and observed through the current kernel substrate with explicit
+status and no hidden orchestration layer.
+
+This phase exists now because the earlier Band C slices only matter if they
+compose into one credible demo. The next honest move is to spend the launcher,
+install-slot, restart, and manifest work on one visible program path rather
+than planning them in isolation.
+
+Repository status note
+----------------------
+- Phases 267 through 271 are expected to admit program identity, a launcher
+  owner, one installed slot, restart-visible truth, and one bounded asset or
+  manifest family.
+- The repository already has real hosted programs such as `issue_rollup` and
+  `review_board` that can act as bounded user-facing candidates.
+- The kernel already has explicit durable, workflow, and completion owners.
+- The repository still has no single repo-owned demo that composes those app-
+  shaped pieces into one end-to-end installed workflow.
+
+Problem being solved
+--------------------
+- Without one integrated demo, Band C would risk ending as another bag of
+  owner-local mechanisms whose user-facing value remains implicit.
+- The repository needs one proof that a bounded installed program can be staged
+  or activated, launched, and observed through explicit kernel-visible status.
+- The demo must be small enough to stay honest, but real enough that it stops
+  the roadmap from drifting back into pure substrate work.
+
+Non-goals
+---------
+- no general app store, package manager, or distribution channel
+- no broad desktop or UI system
+- no multiple installed demo apps in the same phase
+- no hidden orchestration framework connecting launcher, workflow, and install
+  owners
+- no broad scripting or plugin system
+
+Invariants
+----------
+- The demo must reuse the owners admitted by earlier Band C phases.
+- User-visible status must stay explicit and deterministic.
+- The first demo must remain one small repository-owned program.
+- Workflow, completion, update, and launcher owners keep their existing
+  responsibilities.
+- The phase must not imply a broad app platform beyond the single demo path.
+
+Required surface changes
+------------------------
+1. Choose one repository-owned program as the first installed workflow demo.
+2. Wire that program through the admitted identity, launcher, install, and
+   restart path.
+3. Add one focused reset-lane scenario and fixture proving the end-to-end user-
+   facing flow.
+4. Add any narrow real-project validation needed for the chosen program.
+
+Forbidden changes
+-----------------
+- do not add a second orchestration layer above launcher, workflow, and update
+  owners
+- do not widen the demo into a general packaging or UI framework
+- do not switch consumers mid-phase just to aggregate more features
+- do not hide demo status behind implicit success or failure paths
+
+Phase role in the larger sequence
+---------------------------------
+- This phase is the outcome checkpoint for the first half of Band C.
+- It turns the app-shaped substrate into one visible result before the Phase
+  273 audit.
+- It also sets a concrete baseline for whether UI work is now becoming honest.
+
+Relevant backlog items this phase intentionally brings under pressure
+--------------------------------------------------------------------
+- keep app-shaped work tied to visible outcomes rather than isolated service
+  slices
+- keep framework growth explicit and deferred until a second real consumer
+  proves it necessary
+
+Questions this phase must answer
+--------------------------------
+1. Which repository-owned program is the smallest honest demo consumer?
+2. What user-visible status needs to be observable for the demo to count as a
+   real installed workflow?
+3. Which earlier Band C seams still feel awkward when composed end to end?
+4. Does the demo leave the repository ready for first UI work, or is one more
+   app-facing gap still stronger?
+
+Preferred implementation shape
+------------------------------
+- Pick one existing real program and keep the demo narrow.
+- Reuse the existing launcher, install, workflow, and completion seams instead
+  of adding a demo-specific orchestrator.
+- Keep the visible proof on explicit install or activate, launch, and status.
+
+Implementation accelerators
+---------------------------
+Main files and navigations
+~~~~~~~~~~~~~~~~~~~~~~~~~~
+- Primary controlling owners: the Phase 268 launcher owner, the Phase 269
+  install-slot owner, the Phase 270 restart-truth owner, the Phase 271 asset
+  or manifest path, and the chosen program under `examples/real/`.
+- First-hop adjacent files: `kernel/src/services/workflow_service.mc`,
+  `kernel/src/services/completion_mailbox_service.mc`,
+  `kernel/src/kernel_dispatch.mc`, and the program's real-project tests.
+- Nearby accelerator docs: `docs/agent/prompts/test_overview.txt`,
+  `kernel/README.md`, and the preceding Phase 267 through Phase 271 plan docs.
+- Expected first validation target when the owner changes: the focused demo
+  reset-lane fixture first, then the chosen program's narrow real-project
+  validation.
+
+Relevant cookbook patterns
+~~~~~~~~~~~~~~~~~~~~~~~~~~
+- Pattern 5 -- Add A Test File applies because this phase should culminate in
+  one focused end-to-end proof.
+- Pattern 9 -- Add A New Runtime Service is not the primary fit; the phase
+  should mostly compose already-admitted owners.
+
+Relevant file-local invariants
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+- `workflow_service.mc` and `completion_mailbox_service.mc` keep execution and
+  reporting truth; the demo should consume those owners, not replace them.
+- The chosen program remains an ordinary repository-owned program, not a new
+  framework anchor.
+- The launcher remains the foreground app policy owner.
+
+Relevant test surfaces
+~~~~~~~~~~~~~~~~~~~~~~
+- Primary owning validation surface: one focused reset-lane system fixture for
+  the full installed workflow demo.
+- Narrowest expected first executable validation target: that fixture plus
+  `mc_tool_workflow_kernel_reset_lane_unit`.
+- Supporting validation: the chosen program's narrow real-project case in
+  `tests/tool/real_projects/` and `mc_tool_workflow_kernel_reset_lane_full_unit`.
+
+Test obligations
+----------------
+- `Build debug`
+- one focused installed-workflow reset-lane scenario and fixture
+- `mc_tool_workflow_kernel_reset_lane_unit`
+- the narrow real-project validation for the chosen program
+- `mc_tool_workflow_kernel_reset_lane_full_unit`
+
+Acceptance criteria
+-------------------
+- one repository-owned user-facing program can be installed or activated,
+  launched, and observed through the admitted app substrate
+- the user-visible status path is explicit and deterministic
+- the demo reuses existing owners instead of inventing a hidden orchestrator
+- the phase leaves one concrete basis for the Phase 273 audit
+
+Future follow-up
+----------------
+- Phase 273 should classify what this demo proves and what still remains too
+  weak for broader app or UI claims.
+- If the demo still exposes a stronger app-substrate gap than UI work, record
+  it explicitly before starting Band D.

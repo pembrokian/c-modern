@@ -1,0 +1,164 @@
+Phase 266 -- Allocator Selection Guidelines And Audit
+=====================================================
+
+Status
+------
+PROPOSED
+
+Purpose
+-------
+Close Band B by stating which admitted memory owner should be used where and
+why, so later launcher, bundle, and UI phases do not silently reopen the same
+allocation-policy questions.
+
+This phase exists now because the roadmap deliberately admits several bounded
+memory owners in sequence. The repository should stop after that wave and turn
+the result into explicit guidance instead of carrying allocator choice as
+unwritten tribal knowledge.
+
+Repository status note
+----------------------
+- Phase 262 is expected to define one fixed-size pool owner.
+- Phase 263 is expected to define one maintained scratch-work arena contract.
+- Phase 264 is expected to define one larger-granularity page or run owner.
+- Phase 265 is expected to decide whether slab-style small-object reuse is real
+  pressure or still deferred.
+- The repo currently has strong library-design rules about explicit allocation
+  policy, but no consolidated post-Band-B guidance tying those rules to the
+  concrete admitted owners.
+
+Problem being solved
+--------------------
+- Without an explicit closeout audit, later phases will have to rediscover
+  when to choose heap-backed buffers, arenas, pools, runs, or a possible slab
+  slice.
+- That would make allocator choice drift back into owner-local habit rather
+  than an explicit repository rule, which is exactly what Band B was supposed
+  to prevent.
+- The repository needs one honest answer to which memory owners are now
+  maintained truth and which allocator-like pressures remain deferred.
+
+Non-goals
+---------
+- no new allocator landing by convenience
+- no hidden generalization of the admitted memory owners
+- no launcher or UI feature landing inside the audit
+- no broad stdlib redesign unrelated to Band B outcomes
+
+Invariants
+----------
+- The audit must classify actual landed or explicitly deferred Band B slices
+  only.
+- Allocation policy must remain explicit, owner-local, and visible in API
+  shapes.
+- Deferred allocator-like pressures must stay concrete rather than vague.
+- The audit must not turn one hosted proof into a claim of full platform
+  memory completion.
+
+Required surface changes
+------------------------
+1. Re-audit the actual outcomes of Phases 262 through 265.
+2. Publish a short explicit selection rule for each admitted memory owner.
+3. Publish which allocator-like pressures remain deferred and what would
+   justify reopening them.
+4. Tighten `docs/plan/backlog.txt` or `docs/plan/decision_log.txt` only where
+   the Band B evidence reveals a real still-open pressure.
+
+Forbidden changes
+-----------------
+- do not land a new allocator family inside the audit
+- do not convert bounded hosted proofs into a platform-wide memory framework
+- do not bury the real remaining pressure under vague terms like
+  "performance" or "memory ergonomics"
+- do not widen the audit into launcher or UI design beyond the minimum needed
+  to explain the handoff
+
+Phase role in the larger sequence
+---------------------------------
+- This phase closes Band B and prepares Band C.
+- It should give the launcher and app-substrate phases a stable memory-choice
+  baseline.
+- It also preserves the repository's habit of stopping after a mixed follow-
+  through wave and stating what is actually true.
+
+Relevant backlog items this phase intentionally brings under pressure
+--------------------------------------------------------------------
+- keep allocation policy explicit rather than ambient
+- keep framework-scale memory management deferred until one concrete later
+  blocker proves it necessary
+
+Questions this phase must answer
+--------------------------------
+1. Which Band B memory owners are now maintained truth the rest of the roadmap
+   may rely on?
+2. Which allocator-like pressures remain deferred, and what exact trigger
+   would reopen them?
+3. Does any later launcher or UI phase still need a memory owner that Band B
+   did not honestly admit?
+4. What should the repository now say about heap-backed buffers versus pools
+   versus arenas versus larger runs?
+
+Preferred implementation shape
+------------------------------
+- Keep the phase document-focused.
+- Reuse the repository's earlier frontier-audit style: classify admitted
+  owners, classify deferred owners, and state the handoff cleanly.
+- Prefer short explicit selection rules over a narrative essay.
+
+Implementation accelerators
+---------------------------
+Main files and navigations
+~~~~~~~~~~~~~~~~~~~~~~~~~~
+- Primary controlling owners: the Phase 262 through Phase 265 plan docs and
+  the landed memory surfaces they name.
+- First-hop adjacent files: `stdlib/mem.mc`,
+  `runtime/hosted/mc_hosted_runtime.c`, `docs/plan/backlog.txt`, and
+  `docs/plan/decision_log.txt`.
+- Nearby accelerator docs: `docs/arch/c-lang/stdlib/stdlib_design_principles.txt`,
+  `docs/agent/prompts/plan_spec.txt`, and
+  `docs/plan/admin/speculative_roadmap_post_phase254.txt`.
+- Expected first validation target when the owner changes: none beyond the
+  focused evidence already required by the earlier Band B phases.
+
+Relevant cookbook patterns
+~~~~~~~~~~~~~~~~~~~~~~~~~~
+- No direct cookbook pattern fits; this is a bounded planning audit.
+- The phase should remain an audit and not smuggle in new implementation work.
+
+Relevant file-local invariants
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+- `stdlib/mem.mc` remains the public vocabulary owner for admitted library-side
+  allocation surfaces.
+- `docs/plan/backlog.txt` should keep deferred allocator pressure concrete and
+  bounded.
+- The audit must not reinterpret the earlier Band B landings more broadly than
+  their actual acceptance criteria justify.
+
+Relevant test surfaces
+~~~~~~~~~~~~~~~~~~~~~~
+- Primary owning validation surface: the executable and project evidence
+  already required by Phases 262 through 265.
+- Narrowest expected first executable validation target: none new unless one
+  earlier memory slice remains ambiguous.
+- If ambiguity remains, rerun only the narrowest consumer proof from the
+  ambiguous earlier phase.
+
+Test obligations
+----------------
+- no new executable validation by default
+- if one Band B result is still ambiguous, rerun only that phase's narrowest
+  owning proof
+
+Acceptance criteria
+-------------------
+- the repository has one explicit post-Band-B memory selection statement
+- later phases can see clearly which memory owners are admitted and maintained
+- deferred allocator-like pressures remain visible and bounded
+- no new allocator family is smuggled into the audit
+
+Future follow-up
+----------------
+- Proceed to Phase 267 and later app-shaped work using the landed memory
+  guidance instead of reopening allocation policy immediately.
+- Reopen allocator design only when a later launcher or UI phase hits a
+  concrete new blocker that Band B did not solve.

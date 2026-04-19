@@ -44,7 +44,9 @@ If forced to choose, prefer:
 2. Basic Model
 
 The language already assumes:
-- one source file equals one module in v0.2
+- direct-source workflows use one source file per module in v0.2
+- project mode may assemble one ordinary logical module from an explicit
+	`module_sets.<name>.files = [...]` source list
 - imports are explicit and acyclic
 - top-level initialization is static and requires no hidden initialization hooks
 - there are no hidden init hooks
@@ -54,8 +56,10 @@ The build tool should lean on those facts.
 Basic model:
 - a build target is a named artifact such as an executable, static library, shared library, or test binary
 - each target has an explicit root module or explicit set of source roots
+- a target may additionally declare explicit logical ordinary-module source
+	sets through `module_sets.<module>.files = [...]`
 - imports determine compilation order inside a target
-- the build tool tracks file-level dependencies and rebuilds only what changed
+- the build tool tracks logical-module dependencies and rebuilds only what changed
 - linking is an ordinary final phase, not a hidden side effect of compilation
 
 3. Canonical Command Shape
@@ -122,6 +126,7 @@ Per project:
 Per target:
 - target kind: `exe`, `staticlib`, `sharedlib`, `test`
 - root module or source file list
+- optional logical-module source sets for ordinary modules in project mode
 - import roots if more than one source root is allowed
 - explicit package identity for the target-owned source roots
 - optional additional package identities and the roots assigned to them
@@ -155,6 +160,12 @@ links = ["c"]
 [targets.grep.search_paths]
 modules = ["src", "vendor"]
 
+[targets.grep.module_sets.main]
+files = ["src/main.mc", "src/main_logic.mc"]
+
+[targets.grep.module_sets.argparse]
+files = ["vendor/argparse/api.mc", "vendor/argparse/parse.mc"]
+
 [targets.grep.packages.vendor_argparse]
 roots = ["vendor/argparse"]
 
@@ -184,6 +195,8 @@ Suggested meanings:
 - `link.inputs`: explicit extra prebuilt object or archive inputs for
 	executable targets
 - `search_paths.modules`: explicit source or vendored module roots
+- `module_sets.<module>.files`: explicit file list for one logical ordinary
+	module in project mode; the table key is the canonical import name
 - `packages.<name>.roots`: explicit source roots that belong to package
 	identity `<name>` instead of the target's default `package`
 - `runtime.startup`: `default` or a named replacement shim
@@ -197,6 +210,16 @@ Syntax rule:
 
 Schema version 1 rule:
 - these field names and nesting rules are the canonical v0.2 starting point, not just illustrative pseudocode
+
+Schema version 1 additive Phase 127 rule:
+- `module_sets.<module>.files` is admitted only in project mode
+- each listed file belongs to exactly one module source set
+- file-list order carries no semantic meaning; paths are normalized and
+	processed deterministically
+- if the entry module's source set is declared, it must contain the target
+	`root` file
+- explicit module sets in Phase 127 are ordinary-module only; multi-file
+	`internal` modules remain deferred
 
 Package identity rules for schema version 1:
 - every target must declare one explicit default `package` identity
@@ -227,7 +250,8 @@ If those ever exist, they should be layered outside the core build model.
 Because the module system is explicit and acyclic, the build tool can stay simple.
 
 Canonical behavior:
-- each module compiles independently to an object file plus a small interface artifact
+- each logical module compiles independently to an object file plus a small
+	interface artifact
 - the interface artifact records the non-private import-visible surface and
 	enough type information for downstream checking
 - importing a module should not require reparsing the entire upstream source tree every time
@@ -242,7 +266,7 @@ This gives a simple and fast separate-compilation story without requiring a gian
 The compiler should likely emit a small machine-readable interface file per compiled module.
 
 Canonical artifact model:
-- each compiled module emits one object file and one interface artifact
+- each compiled logical module emits one object file and one interface artifact
 - the interface artifact is for compiler consumption, not for hand authoring
 - the canonical extension is `.mci` for "Modern C Interface"
 - v0.2 uses a deterministic text encoding for `.mci`
@@ -254,6 +278,8 @@ Suggested contents:
 - source module name
 - module kind: ordinary or `internal`
 - source file path or stable module identity
+- when a project-mode multi-file module set is used, one canonical source file
+	path plus the stable logical module identity
 - import-visible non-private declarations
 - fully resolved type signatures for import-visible non-private declarations
 - distinct-type identities needed by legal importers

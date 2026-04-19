@@ -3,14 +3,14 @@ Phase 259 -- Imported Constant Surface Follow-Through For Runtime Tables
 
 Status
 ------
-PROPOSED
+COMPLETED
 
 Purpose
 -------
 Admit one bounded imported-constant follow-through for runtime-facing tables so
-the descriptor and procedure-table shapes proven in Phases 257 and 258 can
-cross a real module boundary without reopening broad imported constant or
-generic execution work.
+the procedure-table shape proven in Phase 258 crosses one real module boundary
+without reopening broad imported constant, descriptor, or generic execution
+work.
 
 This phase exists now because the repository already has imported structural
 constant proofs in narrower families, but Band A needs one explicit plan for
@@ -22,24 +22,24 @@ Repository status note
 - The repository already admits imported structural aggregate constants in
   sema-focused proof surfaces such as `DEFAULT_SUMMARY_COPY`.
 - Phase 230b also admitted imported aggregates containing procedure values.
-- The current tests do not yet maintain one runtime-table proof that combines
-  imported constant aggregates with the later descriptor- or callable-table
-  families expected by Band B.
-- The repository therefore still lacks one explicit imported follow-through
-  plan for runtime-facing tables rather than only sema-local imported constant
-  examples.
+- Phase 259 now spends that imported callable-constant path in one maintained
+  runtime-table owner, `examples/real/issue_rollup/src/render/rollup_render_table.mc`.
+- The repository now carries focused sema, MIR, executable, and real-project
+  coverage for that imported procedure-valued fixed table shape.
+- Imported descriptor transport and descriptor-plus-procedure table composition
+  remain explicitly deferred.
 
 Problem being solved
 --------------------
-- The repository has imported constant transport in narrower slices, but later
-  app-facing work will need a maintained imported runtime-table proof rather
-  than ad hoc confidence from unrelated constant examples.
+- The repository had imported constant transport in narrower slices, but later
+  app-facing work still needed one maintained imported runtime-table proof
+  rather than ad hoc confidence from unrelated constant examples.
 - Without that proof, later launcher or UI work could rediscover `.mci`, MIR,
   or executable gaps only after depending on imported tables for user-facing
   behavior.
-- The current-repo problem is not imported constants in general. It is one
+- The current-repo problem was not imported constants in general. It was one
   imported runtime-table family that should already be expressible if the
-  surrounding Band A work is truly honest.
+  surrounding Band A work was truly honest.
 
 Non-goals
 ---------
@@ -56,7 +56,7 @@ Invariants
 - `.mci` remains the artifact owner for imported constant truth.
 - MIR and backend follow-through must preserve admitted imported constant facts
   rather than reconstructing them from source text.
-- The phase must stay on explicit imported tables and descriptors; no dynamic
+- The phase stays on one explicit imported fixed procedure table; no dynamic
   loading or registry semantics are implied.
 - Constant transport and emitted output remain deterministic.
 
@@ -72,6 +72,46 @@ Required surface changes
    table family.
 5. Spend the feature in one repository-owned imported consumer that Band B can
    later reuse.
+
+Implemented shape
+-----------------
+1. Chose the narrowest honest imported runtime-table family: one fixed
+  procedure-valued render table, `ROLLUP_WRITERS: [4]func() i32`, owned by
+  `examples/real/issue_rollup/src/render/rollup_render_table.mc`.
+2. Reused the existing imported constant transport path already owned by
+  `compiler/sema/module_resolver.cpp` and `compiler/mci/mci.cpp`; no compiler
+  ownership changed because the imported procedure-table path was already
+  landed.
+3. Spent the phase in the maintained issue-rollup consumer by importing that
+  table from `examples/real/issue_rollup/src/render/rollup_render.mc`.
+4. Added focused sema, MIR, and project executable regressions proving a local
+  copy of an imported procedure-valued fixed table survives the full compiler
+  path.
+5. Updated the issue-rollup real-project incremental-build test to track the
+  new imported helper owner explicitly while preserving the strict shared-
+  object and `.mci` reuse checks.
+
+Questions answered
+------------------
+1. The narrowest honest imported runtime-table family for the current tree is
+  an imported fixed procedure-valued table, not a descriptor-plus-procedure
+  composite.
+2. No owner failed first: sema import rewriting, `.mci` transport, MIR, and
+  executable lowering already handled the admitted shape.
+3. The admitted table needed procedure values only. Labels and richer
+  descriptor metadata remain deferred.
+4. The smallest repository-owned consumer is the issue-rollup render selection
+  owner, now split between `rollup_render.mc` and `rollup_render_table.mc`.
+
+Non-decisions and deferred edges
+--------------------------------
+- No descriptor-plus-procedure runtime table was admitted.
+- No imported mutable table state, registry semantics, or dynamic discovery was
+  admitted.
+- No kernel dispatch, shell routing, or boot topology table conversion was
+  justified by this phase.
+- No new language feature or compiler framework was required; broader imported
+  descriptor transport remains a separate deferred wave.
 
 Forbidden changes
 -----------------
@@ -179,6 +219,13 @@ Acceptance criteria
   earlier Band A table phases
 - imported mutable or dynamic table surfaces remain explicitly out of scope
 - `.mci`, MIR, and executable output remain deterministic
+
+Validation
+----------
+- `mc_sema_fixture_unit`
+- `mc_mir_fixture_unit`
+- `mc_codegen_executable_project_unit`
+- `mc_tool_real_project_issue_rollup_unit`
 
 Future follow-up
 ----------------
