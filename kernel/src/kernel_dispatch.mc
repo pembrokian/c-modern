@@ -346,8 +346,14 @@ func dispatch_connection(state: *boot.KernelBootState, msg: service_effect.Messa
 
 func dispatch_launcher(state: *boot.KernelBootState, msg: service_effect.Message) service_effect.Effect {
     current: boot.KernelBootState = *state
-    result := launcher_service.handle(current.launcher.state, msg)
-    *state = boot.bootwith_launcher(current, result.state)
+    result := launcher_service.handle(current.launcher.state, current.update_store.state, current.launcher.generation, msg)
+    if update_store_service.update_store_changed(current.update_store.state, result.update_store) {
+        if !update_store_service.update_store_persist(result.update_store) {
+            return service_effect.effect_reply(syscall.SyscallStatus.Closed, 0, primitives.zero_payload())
+        }
+    }
+    next := boot.bootwith_launcher(current, result.state)
+    *state = boot.bootwith_update_store(next, result.update_store)
     return result.effect
 }
 

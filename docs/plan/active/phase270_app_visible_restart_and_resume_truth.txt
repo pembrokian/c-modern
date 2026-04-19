@@ -3,7 +3,7 @@ Phase 270 -- App-Visible Restart And Resume Truth
 
 Status
 ------
-PROPOSED
+COMPLETED
 
 Purpose
 -------
@@ -95,6 +95,19 @@ Questions this phase must answer
 3. Which durable changes should invalidate resume in the first slice?
 4. How should the first repository-owned program observe or report that truth?
 
+Answered implementation shape
+-----------------------------
+1. `launcher_service` classifies app-visible restart truth because it already
+  owns the installed foreground launch surface, while `update_store_service`
+  remains the durable owner of the persisted comparison record.
+2. The first useful classification family is exactly `fresh`, `resumed`, and
+  `invalidated`.
+3. The first invalidation boundary is one installed-program mismatch against
+  the last launched installed record: program id, installed version, or
+  installed length changing breaks resume.
+4. The first repository-owned program observes that truth on the existing
+  launcher launch reply as one additive fourth payload byte.
+
 Preferred implementation shape
 ------------------------------
 - Reuse the repository's existing explicit restart language and map it onto one
@@ -157,6 +170,47 @@ Acceptance criteria
 - the classification is deterministic and restart-visible
 - the landing stays bounded and avoids session or save-state framework growth
 - later app demos can reuse the contract without inventing new restart rules
+
+Implementation summary
+----------------------
+- `kernel/src/services/update_store_service.mc` now persists one bounded
+  `InstalledLaunchRecord` beside the existing staged artifact, manifest, and
+  installed-slot truth. The record stores only the last launched installed
+  program id, installed version, installed length, and launcher generation;
+  it does not widen into a session object, save-state payload, or package
+  framework.
+- `kernel/src/services/launcher_service.mc` now classifies successful launch
+  replies as `fresh`, `resumed`, or `invalidated` using the existing installed
+  slot plus that persisted launch record. The launcher still owns only
+  selection, foreground, launch count, and app-facing wording; it does not
+  become the durable owner of installed bytes.
+- `kernel/src/kernel_dispatch.mc` only gained the minimal extra routing needed
+  to persist launcher-caused update-store changes on the existing update-store
+  owner.
+- The focused proof stays on the admitted launcher path in
+  `kernel/src/scenarios/scenario_launcher_service.mc` and is exposed through
+  the new reset-lane fixture `tests/system/kernel_reset_lane_phase270_app_restart_truth/`.
+
+Validation
+----------
+- `Build debug`
+- `mc_tool_workflow_kernel_reset_lane_unit`
+
+Phase review against the spec
+-----------------------------
+- Restart classification remains explicit and deterministic: the launcher now
+  returns one additive class byte instead of inferring restart policy from
+  hidden state.
+- Durable owners still keep their own truth. `update_store_service` persists
+  only the minimal comparison record needed for resume versus invalidation;
+  launcher still consumes rather than owns durable bytes.
+- `boot/init` still own restart execution semantics only. No app-facing wording
+  or classification policy moved into restart enactment.
+- No session graph, save-state framework, snapshot store, or UI-routing layer
+  emerged. The landing stays on one installed foreground path and one bounded
+  persisted launch marker.
+- Ownership boundaries remain intact: launcher classifies, update-store
+  persists, boot/init restart, topology names, and dispatch routes.
 
 Future follow-up
 ----------------

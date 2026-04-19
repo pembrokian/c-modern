@@ -502,7 +502,7 @@ void RunKernelRepoLiveReceiveScenario(const std::filesystem::path& source_root,
     }
 }
 
-constexpr std::array<ResetLaneScenario, 65> kResetLaneScenarios = {{
+constexpr std::array<ResetLaneScenario, 67> kResetLaneScenarios = {{
     {.label = "repo project", .scenario_key = "repo", .target_name = "kernel", .include_in_fast = true, .build_warn_ms = 2000},
     {.label = "smoke", .fixture_relative_path = "tests/smoke/kernel_reset_lane_serial_round_trip", .scenario_key = "smoke", .target_name = "app", .include_in_fast = true},
     {.label = "retained state", .fixture_relative_path = "tests/system/kernel_reset_lane_retained_log", .scenario_key = "retained_state", .context_label = "retained-state", .target_name = "app", .include_in_fast = true},
@@ -560,6 +560,8 @@ constexpr std::array<ResetLaneScenario, 65> kResetLaneScenarios = {{
     {.label = "object version conflict", .fixture_relative_path = "tests/system/kernel_reset_lane_phase254_object_version_conflict", .scenario_key = "phase254_object_version_conflict", .context_label = "phase 254 object version conflict", .target_name = "app", .include_in_fast = true, .build_warn_ms = 1000},
     {.label = "connection service", .fixture_relative_path = "tests/system/kernel_reset_lane_phase238_connection_service", .scenario_key = "phase238_connection_service", .context_label = "phase 238 connection service", .target_name = "app", .include_in_fast = true, .build_warn_ms = 1000},
     {.label = "launcher service", .fixture_relative_path = "tests/system/kernel_reset_lane_phase268_launcher", .scenario_key = "phase268_launcher", .context_label = "phase 268 launcher service", .target_name = "app", .include_in_fast = true, .build_warn_ms = 1000},
+    {.label = "install slot", .fixture_relative_path = "tests/system/kernel_reset_lane_phase269_install_slot", .scenario_key = "phase269_install_slot", .context_label = "phase 269 install slot", .target_name = "app", .include_in_fast = true, .build_warn_ms = 1000},
+    {.label = "app restart truth", .fixture_relative_path = "tests/system/kernel_reset_lane_phase270_app_restart_truth", .scenario_key = "phase270_app_restart_truth", .context_label = "phase 270 app restart truth", .target_name = "app", .include_in_fast = true, .build_warn_ms = 1000},
     {.label = "connection backed workflow", .fixture_relative_path = "tests/system/kernel_reset_lane_phase239_connection_backed_workflow", .scenario_key = "phase239_connection_backed_workflow", .context_label = "phase 239 connection backed workflow", .target_name = "app", .include_in_fast = true, .build_warn_ms = 1000},
     {.label = "external ingress completion pressure", .fixture_relative_path = "tests/system/kernel_reset_lane_phase240_external_ingress_completion_pressure", .scenario_key = "phase240_external_ingress_completion_pressure", .context_label = "phase 240 external ingress completion pressure", .target_name = "app", .include_in_fast = true, .build_warn_ms = 1000},
     {.label = "delegated external request handling", .fixture_relative_path = "tests/system/kernel_reset_lane_phase241_delegated_external_request_handling", .scenario_key = "phase241_delegated_external_request_handling", .context_label = "phase 241 delegated external request handling", .target_name = "app", .include_in_fast = true, .build_warn_ms = 1000},

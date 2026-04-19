@@ -3,7 +3,7 @@ Phase 269 -- Installable Bundle Or Slot First Slice
 
 Status
 ------
-PROPOSED
+COMPLETED
 
 Purpose
 -------
@@ -19,11 +19,12 @@ those existing storage seams to one explicit installed-program slot.
 Repository status note
 ----------------------
 - `update_store_service` already owns one staged artifact plus manifest truth
-  and one applied target.
+  and one applied target record that can carry a bounded installed-program
+  slot.
 - `object_store_service` already owns bounded durable named objects.
-- Phase 268 is expected to introduce one launcher owner over a fixed catalog.
-- The repository still has no explicit install-slot or bundle owner for a
-  launchable program artifact.
+- Phase 268 introduced one launcher owner over a fixed catalog.
+- Before this phase, the repository still had no explicit install-slot or
+  bundle owner for a launchable program artifact.
 
 Problem being solved
 --------------------
@@ -94,6 +95,18 @@ Questions this phase must answer
 4. How much manifest truth is needed for the first slot beyond version and
   identity?
 
+Answered implementation shape
+-----------------------------
+1. The first install slot stays on `update_store_service`; no new durable owner
+  was required.
+2. The smallest honest slot shape is one fixed installed-program record
+  carrying `present`, `version`, `len`, and artifact bytes, with identity
+  supplied by the fixed `program_catalog` entry rather than a new manifest or
+  package schema.
+3. The first installed artifact proof is `issue_rollup`.
+4. The first slot still needs only version plus fixed program identity; broader
+  manifest truth stays deferred.
+
 Preferred implementation shape
 ------------------------------
 - Prefer composing existing owners before adding a new one: staged and applied
@@ -159,10 +172,49 @@ Acceptance criteria
   installed artifact
 - the landing stays single-slot and avoids packaging-framework drift
 
+Implementation summary
+----------------------
+- `kernel/src/services/update_store_service.mc` now makes installed-program
+  truth explicit through one `InstalledProgramSlot` record while keeping
+  staged bytes, manifest truth, apply behavior, and durable persistence on the
+  same owner.
+- `kernel/src/services/launcher_service.mc` now consumes installed-program
+  truth from `update_store_service` instead of owning bytes; it adds one
+  compact identify query and allows launch only when the selected catalog entry
+  matches the installed program id.
+- The first installed slot is intentionally fixed to the repository-owned
+  `issue_rollup` descriptor so the phase stays honest on the existing four-byte
+  shell protocol and avoids widening into package or manifest identity
+  frameworks.
+- `workflow_service` and the existing `update_apply(...)` path remain the
+  activation owner; this phase does not add a second install or activation
+  workflow.
+- `shell_service`, `serial_protocol`, `scenario_transport`, and
+  `kernel_dispatch` only gained the minimal routing needed for the launcher
+  identify query and update-store-fed launch gating.
+- The focused proof is `tests/system/kernel_reset_lane_phase269_install_slot/`,
+  and the grouped reset-lane suite now includes that fixture.
+
+Validation
+----------
+- `Build debug`
+- `mc_tool_workflow_kernel_reset_lane_unit`
+
+Phase review against the spec
+-----------------------------
+- one explicit install slot now exists for one launchable program artifact
+- the slot composes with the existing durable staged-update owner instead of
+  widening the launcher into storage ownership
+- `issue_rollup` can now be staged, activated through the retained update apply
+  lane, and identified through the launcher owner as an installed artifact
+- the landing stays single-slot, restart-visible, and avoids package-manager or
+  activation-framework drift
+
 Future follow-up
 ----------------
 - Phase 270 should make restart and resume truth explicit on the same path.
 - Phase 271 should add bounded manifest or asset follow-through only if the
   first slot proves that pressure real.
-- Broader install policy belongs in `docs/plan/backlog.txt` until another real
-  installed-program consumer appears.
+- Broader install policy, multi-program slots, and richer installed-artifact
+  identity belong in `docs/plan/backlog.txt` until another real installed-
+  program consumer appears.
