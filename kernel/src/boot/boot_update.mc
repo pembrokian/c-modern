@@ -4,6 +4,7 @@ import echo_service
 import file_service
 import journal_service
 import kv_service
+import launcher_service
 import lease_service
 import log_service
 import object_store_service
@@ -163,8 +164,20 @@ func bootwith_connection_restart_outcome(s: KernelBootState, connection_restart_
     return s with { connection_restart_outcome: }
 }
 
+func bootwith_launcher(s: KernelBootState, launcher: launcher_service.LauncherServiceState) KernelBootState {
+    return s with { launcher: service_cell_helpers.service_cell_with_state<launcher_service.LauncherServiceState>(s.launcher, launcher) }
+}
+
+func bootwith_launcher_restart_outcome(s: KernelBootState, launcher_restart_outcome: RestartOutcome) KernelBootState {
+    return s with { launcher_restart_outcome: }
+}
+
 func bootrestart_connection(s: KernelBootState, connection: connection_service.ConnectionServiceState) KernelBootState {
     return s with { connection: service_cell_helpers.service_cell_restart<connection_service.ConnectionServiceState>(s.connection, connection) }
+}
+
+func bootrestart_launcher(s: KernelBootState, launcher: launcher_service.LauncherServiceState) KernelBootState {
+    return s with { launcher: service_cell_helpers.service_cell_restart<launcher_service.LauncherServiceState>(s.launcher, launcher) }
 }
 
 func bootrestart_task(s: KernelBootState, task: task_service.TaskServiceState) KernelBootState {

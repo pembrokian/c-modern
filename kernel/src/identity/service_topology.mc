@@ -46,6 +46,7 @@ const COMPLETION_MAILBOX_ENDPOINT_ID: u32 = 24
 const OBJECT_STORE_ENDPOINT_ID: u32 = 25
 const CONNECTION_ENDPOINT_ID: u32 = 26
 const UPDATE_STORE_ENDPOINT_ID: u32 = 27
+const LAUNCHER_ENDPOINT_ID: u32 = 28
 
 // ServiceSlot records the static wiring for one boot service: which endpoint
 // it occupies and which pid owns it.  Both values are fixed at kernel_init
@@ -95,8 +96,9 @@ const COMPLETION_MAILBOX_SLOT: ServiceSlot = { endpoint: COMPLETION_MAILBOX_ENDP
 const OBJECT_STORE_SLOT: ServiceSlot = { endpoint: OBJECT_STORE_ENDPOINT_ID, pid: 16 }
 const CONNECTION_SLOT: ServiceSlot = { endpoint: CONNECTION_ENDPOINT_ID, pid: 17 }
 const UPDATE_STORE_SLOT: ServiceSlot = { endpoint: UPDATE_STORE_ENDPOINT_ID, pid: 18 }
+const LAUNCHER_SLOT: ServiceSlot = { endpoint: LAUNCHER_ENDPOINT_ID, pid: 19 }
 
-const SERVICE_SLOTS: [18]ServiceSlot = {
+const SERVICE_SLOTS: [19]ServiceSlot = {
     SERIAL_SLOT,
     SHELL_SLOT,
     LOG_SLOT,
@@ -114,7 +116,8 @@ const SERVICE_SLOTS: [18]ServiceSlot = {
     COMPLETION_MAILBOX_SLOT,
     OBJECT_STORE_SLOT,
     CONNECTION_SLOT,
-    UPDATE_STORE_SLOT
+    UPDATE_STORE_SLOT,
+    LAUNCHER_SLOT
 }
 
 const INVALID_SERVICE_DESCRIPTOR: ServiceDescriptor = {
@@ -124,7 +127,7 @@ const INVALID_SERVICE_DESCRIPTOR: ServiceDescriptor = {
     authority: ServiceAuthorityClass.None
 }
 
-const SERVICE_DESCRIPTORS: [18]ServiceDescriptor = {
+const SERVICE_DESCRIPTORS: [19]ServiceDescriptor = {
     { label: "serial", slot: SERIAL_SLOT, restart: ServiceRestartMode.None, authority: ServiceAuthorityClass.PublicEndpoint },
     { label: "shell", slot: SHELL_SLOT, restart: ServiceRestartMode.None, authority: ServiceAuthorityClass.ShellControl },
     { label: "log", slot: LOG_SLOT, restart: ServiceRestartMode.Reload, authority: ServiceAuthorityClass.RetainedOwner },
@@ -142,12 +145,13 @@ const SERVICE_DESCRIPTORS: [18]ServiceDescriptor = {
     { label: "completion_mailbox", slot: COMPLETION_MAILBOX_SLOT, restart: ServiceRestartMode.Reload, authority: ServiceAuthorityClass.RetainedOwner },
     { label: "object_store", slot: OBJECT_STORE_SLOT, restart: ServiceRestartMode.Reload, authority: ServiceAuthorityClass.DurableOwner },
     { label: "connection", slot: CONNECTION_SLOT, restart: ServiceRestartMode.Reset, authority: ServiceAuthorityClass.PublicEndpoint },
-    { label: "update_store", slot: UPDATE_STORE_SLOT, restart: ServiceRestartMode.Reload, authority: ServiceAuthorityClass.DurableOwner }
+    { label: "update_store", slot: UPDATE_STORE_SLOT, restart: ServiceRestartMode.Reload, authority: ServiceAuthorityClass.DurableOwner },
+    { label: "launcher", slot: LAUNCHER_SLOT, restart: ServiceRestartMode.Reset, authority: ServiceAuthorityClass.PublicEndpoint }
 }
 
 // SERVICE_COUNT is the number of boot-wired services in the static topology.
 // Increment this when a new slot constant is added above.
-const SERVICE_COUNT: u32 = 18
+const SERVICE_COUNT: u32 = 19
 
 func service_count() usize {
     return usize(SERVICE_COUNT)

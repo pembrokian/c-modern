@@ -4,6 +4,7 @@ import identity_taxonomy
 import file_service
 import journal_service
 import kv_service
+import launcher_service
 import lease_service
 import log_service
 import object_store_service
@@ -73,6 +74,8 @@ func bootstate_metadata_for_target(s: KernelBootState, target: u8) u8 {
         return u8(task_service.task_active_count(s.task.state))
     case serial_protocol.TARGET_CONNECTION:
         return u8(connection_service.connection_active_count(s.connection.state))
+    case serial_protocol.TARGET_LAUNCHER:
+        return launcher_service.launcher_foreground_id(s.launcher.state)
     case serial_protocol.TARGET_JOURNAL:
         return u8(journal_service.journal_count(s.journal.state))
     case serial_protocol.TARGET_WORKFLOW:
@@ -176,6 +179,8 @@ func bootrestart_outcome_for_endpoint(s: KernelBootState, endpoint: u32) Restart
         return s.task_restart_outcome
     case service_topology.CONNECTION_ENDPOINT_ID:
         return s.connection_restart_outcome
+    case service_topology.LAUNCHER_ENDPOINT_ID:
+        return s.launcher_restart_outcome
     case service_topology.JOURNAL_ENDPOINT_ID:
         return s.journal_restart_outcome
     case service_topology.LEASE_ENDPOINT_ID:
@@ -243,6 +248,10 @@ func boot_connection_mark(s: KernelBootState) service_identity.ServiceMark {
     return service_identity.service_mark(service_topology.CONNECTION_ENDPOINT_ID, s.connection.state.pid, s.connection.generation)
 }
 
+func boot_launcher_mark(s: KernelBootState) service_identity.ServiceMark {
+    return service_identity.service_mark(service_topology.LAUNCHER_ENDPOINT_ID, s.launcher.state.pid, s.launcher.generation)
+}
+
 func boot_journal_mark(s: KernelBootState) service_identity.ServiceMark {
     return service_identity.service_mark(service_topology.JOURNAL_ENDPOINT_ID, s.journal.state.pid, s.journal.generation)
 }
@@ -289,6 +298,8 @@ func bootmark_for_endpoint(s: KernelBootState, endpoint: u32) service_identity.S
         return boot_task_mark(s)
     case service_topology.CONNECTION_ENDPOINT_ID:
         return boot_connection_mark(s)
+    case service_topology.LAUNCHER_ENDPOINT_ID:
+        return boot_launcher_mark(s)
     case service_topology.JOURNAL_ENDPOINT_ID:
         return boot_journal_mark(s)
     case service_topology.WORKFLOW_ENDPOINT_ID:

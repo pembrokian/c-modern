@@ -3,7 +3,7 @@ Phase 267 -- Program Identity And Launch Descriptor Audit
 
 Status
 ------
-PROPOSED
+COMPLETED
 
 Purpose
 -------
@@ -24,9 +24,9 @@ Repository status note
   `kernel/src/identity/service_topology.mc`.
 - The reset-lane kernel already has durable owners for staged update truth,
   named durable objects, workflow execution, and completion reporting.
-- The kernel still has no `program_identity`, `program_catalog`, or launcher-
-  owned descriptor surface, and no explicit program id separate from build-time
-  tool targets.
+- The kernel now has one explicit `program_catalog` owner under
+  `kernel/src/identity/program_catalog.mc`, with fixed repository-owned
+  descriptors for `issue_rollup` and `review_board`.
 
 Problem being solved
 --------------------

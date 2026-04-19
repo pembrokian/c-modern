@@ -13,6 +13,7 @@ import scenario_coordination
 import scenario_delegated_object_processing
 import scenario_durability
 import scenario_journal_service
+import scenario_launcher_service
 import scenario_lease_service
 import scenario_named_object_delivery_pressure
 import scenario_lifecycle
@@ -100,6 +101,10 @@ func run(state: *boot.KernelBootState) i32 {
         return result
     }
     result = scenario_connection_service.run_connection_service_probe()
+    if result != 0 {
+        return result
+    }
+    result = scenario_launcher_service.run_launcher_service_probe()
     if result != 0 {
         return result
     }

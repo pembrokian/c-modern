@@ -30,8 +30,8 @@ Source tree layout (Phase 219)
 
 - `src/` root: `main.mc` (entry), `kernel_dispatch.mc` (routing), `event_codes.mc` (shared shell-event constants)
 - `src/boot/`: `boot.mc`, `boot_identity.mc`, `boot_update.mc`, `service_cell_helpers.mc`, `init.mc`
-- `src/identity/`: `service_identity.mc`, `service_state.mc`, `service_topology.mc`, `identity_taxonomy.mc`
-- `src/services/`: `completion_mailbox_service.mc`, `connection_service.mc`, `echo_service.mc`, `file_service.mc`, `journal_service.mc`, `kv_service.mc`, `lease_service.mc`, `log_service.mc`, `object_store_service.mc`, `queue_service.mc`, `task_service.mc`, `ticket_service.mc`, `timer_service.mc`, `transfer_grant.mc`, `transfer_service.mc`, `update_store_service.mc`, `workflow_service.mc`
+- `src/identity/`: `identity_taxonomy.mc`, `program_catalog.mc`, `service_identity.mc`, `service_state.mc`, `service_topology.mc`
+- `src/services/`: `completion_mailbox_service.mc`, `connection_service.mc`, `echo_service.mc`, `file_service.mc`, `journal_service.mc`, `kv_service.mc`, `launcher_service.mc`, `lease_service.mc`, `log_service.mc`, `object_store_service.mc`, `queue_service.mc`, `task_service.mc`, `ticket_service.mc`, `timer_service.mc`, `transfer_grant.mc`, `transfer_service.mc`, `update_store_service.mc`, `workflow_service.mc`
 - `src/shell/`: `serial_protocol.mc`, `serial_service.mc`, `serial_shell_event_log.mc`, `serial_shell_path.mc`, `shell_service.mc`
 - `src/scenarios/`: `scenarios.mc` and all `scenario_*.mc` files
 - `src/transport/`: `primitives.mc`, `syscall.mc`, `ipc.mc`, `service_effect.mc`
@@ -49,6 +49,14 @@ The following modules are deferred until the named phase boundary forces them:
 - `mmu` — probably never in this tree; hosted execution makes MMU stubs meaningless
 
 Recent service targets
+
+- Phase 268 (landed): bounded launcher service first slice. `program_catalog.mc`
+  now owns one fixed launch descriptor table for `issue_rollup` and
+  `review_board`, while `launcher_service.mc` owns explicit selection,
+  foreground, and launch-count truth over that catalog. The launcher remains
+  boot-wired, restart-reset, and single-foreground; shell and dispatch stay
+  thin routing seams. The focused reset-lane fixture is
+  `tests/system/kernel_reset_lane_phase268_launcher`.
 
 - Phase 245 (landed): update recovery and completion reporting pressure.
   Delegated update apply now proves one composed backlog-plus-restart path on

@@ -10,6 +10,7 @@ import echo_service
 import file_service
 import journal_service
 import kv_service
+import launcher_service
 import lease_service
 import log_service
 import object_store_service
@@ -70,6 +71,8 @@ struct KernelBootState {
     task_restart_outcome: RestartOutcome
     connection: service_cell_helpers.ServiceCell<connection_service.ConnectionServiceState>
     connection_restart_outcome: RestartOutcome
+    launcher: service_cell_helpers.ServiceCell<launcher_service.LauncherServiceState>
+    launcher_restart_outcome: RestartOutcome
     journal: service_cell_helpers.ServiceCell<journal_service.JournalServiceState>
     journal_restart_outcome: RestartOutcome
     workflow: service_cell_helpers.ServiceCell<workflow_core.WorkflowServiceState>
@@ -97,6 +100,7 @@ func kernel_init() KernelBootState {
     timer_slot := service_topology.TIMER_SLOT
     task_slot := service_topology.TASK_SLOT
     connection_slot := service_topology.CONNECTION_SLOT
+    launcher_slot := service_topology.LAUNCHER_SLOT
     journal_slot := service_topology.JOURNAL_SLOT
     workflow_slot := service_topology.WORKFLOW_SLOT
     lease_slot := service_topology.LEASE_SLOT
@@ -115,6 +119,7 @@ func kernel_init() KernelBootState {
     timer_cell := service_cell_helpers.ServiceCell<timer_service.TimerServiceState>{ state: timer_service.timer_init(timer_slot.pid, 1), generation: 1 }
     task_cell := service_cell_helpers.ServiceCell<task_service.TaskServiceState>{ state: task_service.task_init(task_slot.pid, 1), generation: 1 }
     connection_cell := service_cell_helpers.ServiceCell<connection_service.ConnectionServiceState>{ state: connection_service.connection_init(connection_slot.pid, 1), generation: 1 }
+    launcher_cell := service_cell_helpers.ServiceCell<launcher_service.LauncherServiceState>{ state: launcher_service.launcher_init(launcher_slot.pid, 1), generation: 1 }
     journal_cell := service_cell_helpers.ServiceCell<journal_service.JournalServiceState>{ state: journal_service.journal_load(journal_slot.pid, 1), generation: 1 }
     workflow_cell := service_cell_helpers.ServiceCell<workflow_core.WorkflowServiceState>{ state: workflow_core.workflow_state_init(workflow_slot.pid), generation: 1 }
     lease_cell := service_cell_helpers.ServiceCell<lease_service.LeaseServiceState>{ state: lease_service.lease_init(lease_slot.pid, 1), generation: 1 }
@@ -148,6 +153,8 @@ func kernel_init() KernelBootState {
         task_restart_outcome: RestartOutcome.None,
         connection: connection_cell,
         connection_restart_outcome: RestartOutcome.None,
+        launcher: launcher_cell,
+        launcher_restart_outcome: RestartOutcome.None,
         journal: journal_cell,
         journal_restart_outcome: RestartOutcome.None,
         workflow: workflow_cell,

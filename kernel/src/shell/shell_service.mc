@@ -127,6 +127,8 @@ func lifecycle_target_endpoint(target: u8) u32 {
         return service_topology.CONNECTION_ENDPOINT_ID
     case serial_protocol.TARGET_UPDATE_STORE:
         return service_topology.UPDATE_STORE_ENDPOINT_ID
+    case serial_protocol.TARGET_LAUNCHER:
+        return service_topology.LAUNCHER_ENDPOINT_ID
     default:
         return 0
     }
@@ -326,6 +328,40 @@ func queue_peek(s: ShellServiceState, m: service_effect.Message) service_effect.
 
 func queue_wait(s: ShellServiceState, m: service_effect.Message) service_effect.Effect {
     return forward(s, service_topology.QUEUE_ENDPOINT_ID, 2, serial_protocol.CMD_W, serial_protocol.CMD_BANG, 0)
+}
+
+func launcher_list(s: ShellServiceState, m: service_effect.Message) service_effect.Effect {
+    return forward(s, service_topology.LAUNCHER_ENDPOINT_ID, 1, serial_protocol.CMD_L, 0, 0)
+}
+
+func launcher_select(s: ShellServiceState, m: service_effect.Message) service_effect.Effect {
+    return forward(s, service_topology.LAUNCHER_ENDPOINT_ID, 2, serial_protocol.CMD_S, m.payload[2], 0)
+}
+
+func launcher_launch(s: ShellServiceState, m: service_effect.Message) service_effect.Effect {
+    return forward(s, service_topology.LAUNCHER_ENDPOINT_ID, 1, serial_protocol.CMD_A, 0, 0)
+}
+
+func route_launcher(s: ShellServiceState, m: service_effect.Message, op: u8) service_effect.Effect {
+    switch op {
+    case serial_protocol.CMD_L:
+        if !bang23(m) {
+            return invalid_effect(SHELL_INVALID_SHAPE)
+        }
+        return launcher_list(s, m)
+    case serial_protocol.CMD_S:
+        if !bang3(m) {
+            return invalid_effect(SHELL_INVALID_SHAPE)
+        }
+        return launcher_select(s, m)
+    case serial_protocol.CMD_A:
+        if !bang23(m) {
+            return invalid_effect(SHELL_INVALID_SHAPE)
+        }
+        return launcher_launch(s, m)
+    default:
+        return invalid_effect(SHELL_INVALID_COMMAND)
+    }
 }
 
 func route_queue(s: ShellServiceState, m: service_effect.Message, op: u8) service_effect.Effect {
@@ -851,6 +887,10 @@ func handle(s: ShellServiceState, m: service_effect.Message) service_effect.Effe
 
     case serial_protocol.CMD_H:
         return route_connection(s, m, op)
+
+    case serial_protocol.CMD_P:
+        return route_launcher(s, m, op)
+
     case serial_protocol.CMD_B:
         return route_update_store(s, m, op)
     default:

@@ -3,7 +3,7 @@ Phase 268 -- Bounded Launcher Service First Slice
 
 Status
 ------
-PROPOSED
+COMPLETED
 
 Purpose
 -------
@@ -18,14 +18,16 @@ shell routing, workflow, and future install logic.
 
 Repository status note
 ----------------------
-- The kernel currently has no launcher owner.
-- `kernel/src/identity/service_topology.mc` and the expected Phase 267 program
-  descriptor family provide the nearest explicit catalog pattern.
+- The kernel now has one bounded launcher owner at
+  `kernel/src/services/launcher_service.mc`.
+- `kernel/src/identity/program_catalog.mc` now provides the fixed descriptor
+  table the launcher consumes directly.
 - The active reset-lane tree already has boot wiring, shell command routing,
   workflow scheduling, and durable owners, but none of those currently own
   "which program is foreground" or "which program can be launched" truth.
-- The repository already has real program candidates such as
-  `issue_rollup` and `review_board`, but only in tool-facing form.
+- The repository now has one launcher-facing fixed catalog of
+  `issue_rollup` and `review_board`, while install, restart-visible resume,
+  and real execution policy remain deferred.
 
 Problem being solved
 --------------------

@@ -76,6 +76,7 @@ const TARGET_LEASE: u8 = 90     // 'Z'
 const TARGET_COMPLETION: u8 = 66  // 'B'
 const TARGET_CONNECTION: u8 = 67  // 'C'
 const TARGET_UPDATE_STORE: u8 = 68  // 'D'
+const TARGET_LAUNCHER: u8 = 71  // 'G'
 
 const PARTICIPANT_NONE: u8 = 78  // 'N'
 const POLICY_CLEAR: u8 = 67      // 'C'
@@ -186,6 +187,18 @@ func encode_queue_count() [4]u8 {
 
 func encode_queue_peek() [4]u8 {
     return encode_no_args(CMD_Q, CMD_P)
+}
+
+func encode_launcher_list() [4]u8 {
+    return encode_no_args(CMD_P, CMD_L)
+}
+
+func encode_launcher_select(id: u8) [4]u8 {
+    return encode_one_arg(CMD_P, CMD_S, id)
+}
+
+func encode_launcher_launch() [4]u8 {
+    return encode_no_args(CMD_P, CMD_A)
 }
 
 func encode_queue_stall_count() [4]u8 {

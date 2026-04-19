@@ -16,6 +16,7 @@ import init
 import identity_taxonomy
 import event_codes
 import kv_service
+import launcher_service
 import lease_service
 import log_service
 import object_store_service
@@ -343,6 +344,13 @@ func dispatch_connection(state: *boot.KernelBootState, msg: service_effect.Messa
     return connection_result.effect
 }
 
+func dispatch_launcher(state: *boot.KernelBootState, msg: service_effect.Message) service_effect.Effect {
+    current: boot.KernelBootState = *state
+    result := launcher_service.handle(current.launcher.state, msg)
+    *state = boot.bootwith_launcher(current, result.state)
+    return result.effect
+}
+
 func dispatch_journal(state: *boot.KernelBootState, msg: service_effect.Message) service_effect.Effect {
     current: boot.KernelBootState = *state
     journal_result: journal_service.JournalResult = journal_service.handle(current.journal.state, msg)
@@ -502,6 +510,8 @@ func leaf_route(endpoint: u32) LeafRoute {
         return LeafRoute{ endpoint: endpoint, reply: dispatch_task }
     case service_topology.CONNECTION_ENDPOINT_ID:
         return LeafRoute{ endpoint: endpoint, reply: dispatch_connection }
+    case service_topology.LAUNCHER_ENDPOINT_ID:
+        return LeafRoute{ endpoint: endpoint, reply: dispatch_launcher }
     case service_topology.JOURNAL_ENDPOINT_ID:
         return LeafRoute{ endpoint: endpoint, reply: dispatch_journal }
     case service_topology.WORKFLOW_ENDPOINT_ID:

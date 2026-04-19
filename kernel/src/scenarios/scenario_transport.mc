@@ -91,6 +91,18 @@ func cmd_queue_peek() syscall.ReceiveObservation {
     return serial_obs(DEFAULT_SERIAL_ROUTE.endpoint, DEFAULT_SERIAL_ROUTE.pid, serial_protocol.encode_queue_peek())
 }
 
+func cmd_launcher_list() syscall.ReceiveObservation {
+    return serial_obs(DEFAULT_SERIAL_ROUTE.endpoint, DEFAULT_SERIAL_ROUTE.pid, serial_protocol.encode_launcher_list())
+}
+
+func cmd_launcher_select(id: u8) syscall.ReceiveObservation {
+    return serial_obs(DEFAULT_SERIAL_ROUTE.endpoint, DEFAULT_SERIAL_ROUTE.pid, serial_protocol.encode_launcher_select(id))
+}
+
+func cmd_launcher_launch() syscall.ReceiveObservation {
+    return serial_obs(DEFAULT_SERIAL_ROUTE.endpoint, DEFAULT_SERIAL_ROUTE.pid, serial_protocol.encode_launcher_launch())
+}
+
 func cmd_queue_stall_count() syscall.ReceiveObservation {
     return serial_obs(DEFAULT_SERIAL_ROUTE.endpoint, DEFAULT_SERIAL_ROUTE.pid, serial_protocol.encode_queue_stall_count())
 }

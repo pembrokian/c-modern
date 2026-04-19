@@ -20,6 +20,7 @@ import echo_service
 import file_service
 import journal_service
 import kv_service
+import launcher_service
 import lease_service
 import log_service
 import object_store_service
@@ -76,6 +77,8 @@ func restart_policy_for_target(target: u8) RestartPolicyInfo {
         return restart_policy_single(target, serial_protocol.POLICY_CLEAR)
     case serial_protocol.TARGET_CONNECTION:
         return restart_policy_single(target, serial_protocol.POLICY_CLEAR)
+    case serial_protocol.TARGET_LAUNCHER:
+        return restart_policy_single(target, serial_protocol.POLICY_CLEAR)
     case serial_protocol.TARGET_JOURNAL:
         return restart_policy_single(target, serial_protocol.POLICY_KEEP)
     case serial_protocol.TARGET_WORKFLOW:
@@ -128,6 +131,8 @@ func restart(state: boot.KernelBootState, endpoint: u32) boot.KernelBootState {
         return restart_task(state)
     case service_topology.CONNECTION_ENDPOINT_ID:
         return restart_connection(state)
+    case service_topology.LAUNCHER_ENDPOINT_ID:
+        return restart_launcher(state)
     case service_topology.JOURNAL_ENDPOINT_ID:
         return restart_journal(state)
     case service_topology.WORKFLOW_ENDPOINT_ID:
@@ -241,6 +246,12 @@ func restart_connection(state: boot.KernelBootState) boot.KernelBootState {
     slot := service_topology.CONNECTION_SLOT
     next := boot.bootrestart_connection(state, connection_service.connection_init(slot.pid, 1))
     return boot.bootwith_connection_restart_outcome(next, boot.RestartOutcome.OrdinaryReplaced)
+}
+
+func restart_launcher(state: boot.KernelBootState) boot.KernelBootState {
+    slot := service_topology.LAUNCHER_SLOT
+    next := boot.bootrestart_launcher(state, launcher_service.launcher_init(slot.pid, 1))
+    return boot.bootwith_launcher_restart_outcome(next, boot.RestartOutcome.OrdinaryReplaced)
 }
 
 func restart_journal(state: boot.KernelBootState) boot.KernelBootState {

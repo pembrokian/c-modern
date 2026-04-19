@@ -59,6 +59,8 @@ func state_class(target: u8) u8 {
         return STATE_CLASS_ORDINARY
     case serial_protocol.TARGET_CONNECTION:
         return STATE_CLASS_ORDINARY
+    case serial_protocol.TARGET_LAUNCHER:
+        return STATE_CLASS_ORDINARY
     case serial_protocol.TARGET_ECHO:
         return STATE_CLASS_ORDINARY
     case serial_protocol.TARGET_TRANSFER:

@@ -42,6 +42,7 @@ func smoke_slot_endpoints_match_constants() bool {
     completion_slot: service_topology.ServiceSlot = service_topology.COMPLETION_MAILBOX_SLOT
     object_store_slot: service_topology.ServiceSlot = service_topology.OBJECT_STORE_SLOT
     update_store_slot: service_topology.ServiceSlot = service_topology.UPDATE_STORE_SLOT
+    launcher_slot: service_topology.ServiceSlot = service_topology.LAUNCHER_SLOT
 
     if serial_slot.endpoint != service_topology.SERIAL_ENDPOINT_ID {
         return false
@@ -97,12 +98,15 @@ func smoke_slot_endpoints_match_constants() bool {
     if update_store_slot.endpoint != service_topology.UPDATE_STORE_ENDPOINT_ID {
         return false
     }
+    if launcher_slot.endpoint != service_topology.LAUNCHER_ENDPOINT_ID {
+        return false
+    }
     return true
 }
 
-// B: SERVICE_COUNT must equal 18 — the number of boot-wired slots.
-func smoke_service_count_is_eighteen() bool {
-    if service_topology.SERVICE_COUNT != 18 {
+// B: SERVICE_COUNT must equal 19 — the number of boot-wired slots.
+func smoke_service_count_is_nineteen() bool {
+    if service_topology.SERVICE_COUNT != 19 {
         return false
     }
     return true
@@ -129,6 +133,9 @@ func smoke_descriptor_table_is_consistent() bool {
     if service_topology.service_label_for_endpoint(service_topology.UPDATE_STORE_ENDPOINT_ID).len != 12 {
         return false
     }
+    if service_topology.service_label_for_endpoint(service_topology.LAUNCHER_ENDPOINT_ID).len != 8 {
+        return false
+    }
     if service_topology.service_label_for_endpoint(99).len != 0 {
         return false
     }
@@ -151,7 +158,7 @@ func main() i32 {
     if smoke_slot_endpoints_match_constants() == false {
         return 1
     }
-    if smoke_service_count_is_eighteen() == false {
+    if smoke_service_count_is_nineteen() == false {
         return 2
     }
     if smoke_descriptor_table_is_consistent() == false {
