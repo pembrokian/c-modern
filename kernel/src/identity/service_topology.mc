@@ -47,6 +47,7 @@ const OBJECT_STORE_ENDPOINT_ID: u32 = 25
 const CONNECTION_ENDPOINT_ID: u32 = 26
 const UPDATE_STORE_ENDPOINT_ID: u32 = 27
 const LAUNCHER_ENDPOINT_ID: u32 = 28
+const DISPLAY_ENDPOINT_ID: u32 = 29
 
 // ServiceSlot records the static wiring for one boot service: which endpoint
 // it occupies and which pid owns it.  Both values are fixed at kernel_init
@@ -97,8 +98,9 @@ const OBJECT_STORE_SLOT: ServiceSlot = { endpoint: OBJECT_STORE_ENDPOINT_ID, pid
 const CONNECTION_SLOT: ServiceSlot = { endpoint: CONNECTION_ENDPOINT_ID, pid: 17 }
 const UPDATE_STORE_SLOT: ServiceSlot = { endpoint: UPDATE_STORE_ENDPOINT_ID, pid: 18 }
 const LAUNCHER_SLOT: ServiceSlot = { endpoint: LAUNCHER_ENDPOINT_ID, pid: 19 }
+const DISPLAY_SLOT: ServiceSlot = { endpoint: DISPLAY_ENDPOINT_ID, pid: 20 }
 
-const SERVICE_SLOTS: [19]ServiceSlot = {
+const SERVICE_SLOTS: [20]ServiceSlot = {
     SERIAL_SLOT,
     SHELL_SLOT,
     LOG_SLOT,
@@ -117,7 +119,8 @@ const SERVICE_SLOTS: [19]ServiceSlot = {
     OBJECT_STORE_SLOT,
     CONNECTION_SLOT,
     UPDATE_STORE_SLOT,
-    LAUNCHER_SLOT
+    LAUNCHER_SLOT,
+    DISPLAY_SLOT
 }
 
 const INVALID_SERVICE_DESCRIPTOR: ServiceDescriptor = {
@@ -127,7 +130,7 @@ const INVALID_SERVICE_DESCRIPTOR: ServiceDescriptor = {
     authority: ServiceAuthorityClass.None
 }
 
-const SERVICE_DESCRIPTORS: [19]ServiceDescriptor = {
+const SERVICE_DESCRIPTORS: [20]ServiceDescriptor = {
     { label: "serial", slot: SERIAL_SLOT, restart: ServiceRestartMode.None, authority: ServiceAuthorityClass.PublicEndpoint },
     { label: "shell", slot: SHELL_SLOT, restart: ServiceRestartMode.None, authority: ServiceAuthorityClass.ShellControl },
     { label: "log", slot: LOG_SLOT, restart: ServiceRestartMode.Reload, authority: ServiceAuthorityClass.RetainedOwner },
@@ -146,12 +149,13 @@ const SERVICE_DESCRIPTORS: [19]ServiceDescriptor = {
     { label: "object_store", slot: OBJECT_STORE_SLOT, restart: ServiceRestartMode.Reload, authority: ServiceAuthorityClass.DurableOwner },
     { label: "connection", slot: CONNECTION_SLOT, restart: ServiceRestartMode.Reset, authority: ServiceAuthorityClass.PublicEndpoint },
     { label: "update_store", slot: UPDATE_STORE_SLOT, restart: ServiceRestartMode.Reload, authority: ServiceAuthorityClass.DurableOwner },
-    { label: "launcher", slot: LAUNCHER_SLOT, restart: ServiceRestartMode.Reset, authority: ServiceAuthorityClass.PublicEndpoint }
+    { label: "launcher", slot: LAUNCHER_SLOT, restart: ServiceRestartMode.Reset, authority: ServiceAuthorityClass.PublicEndpoint },
+    { label: "display", slot: DISPLAY_SLOT, restart: ServiceRestartMode.Reset, authority: ServiceAuthorityClass.PublicEndpoint }
 }
 
 // SERVICE_COUNT is the number of boot-wired services in the static topology.
 // Increment this when a new slot constant is added above.
-const SERVICE_COUNT: u32 = 19
+const SERVICE_COUNT: u32 = 20
 
 func service_count() usize {
     return usize(SERVICE_COUNT)
@@ -205,6 +209,20 @@ func service_can_restart(endpoint: u32) bool {
 
 func service_restart_reloads_state(endpoint: u32) bool {
     if service_restart_mode(endpoint) == ServiceRestartMode.Reload {
+        return true
+    }
+    return false
+}
+
+// Retained-summary participation is a topology fact for boot-wired services:
+// retained owners and durable owners carry state across the current admitted
+// lifecycle surfaces, while ordinary public endpoints do not.
+func service_is_retained(endpoint: u32) bool {
+    class: ServiceAuthorityClass = service_authority_class(endpoint)
+    if class == ServiceAuthorityClass.RetainedOwner {
+        return true
+    }
+    if class == ServiceAuthorityClass.DurableOwner {
         return true
     }
     return false

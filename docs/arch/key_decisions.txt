@@ -1,0 +1,20 @@
+Key Decisions
+=============
+
+Purpose
+-------
+This file records settled architecture decisions with short rationale.
+
+Use this file for:
+- durable architectural choices that later work should treat as current truth
+- settled ownership boundaries whose rationale should stay easy to find
+
+Do not use this file for:
+- unresolved questions that belong in `docs/arch/open_decisions.txt`
+- provisional implementation stop points that belong in
+  `docs/plan/decision_log.txt`
+- ordinary progress notes
+
+Entries
+-------
+- 2026-04-19 | area: kernel | decision: keep `KernelBootState` on named typed `ServiceCell<T>` fields plus explicit parallel restart-outcome fields rather than moving now to a stronger uniform boot-service slot or table abstraction | rationale: the remaining repetition in `boot_identity.mc`, `boot_update.mc`, and `init.mc` is no longer just syntax noise, but the cross-service work is still genuinely heterogeneous: restart enactment needs per-service reload or init constructors and snapshot logic, read-side metadata queries call service-local accessors with different meanings, and endpoint-target projection remains coupled to fixed shell and lifecycle targets; a uniform table would remove some endpoint-to-field mapping code, but only by either erasing service-local state or adding a second metadata framework beside the existing typed fields, topology descriptors, and service-local owners | revisit trigger: reopen only when future boot growth produces repeated endpoint-to-field mapping plus repeated action shape across multiple boot owners strongly enough that one explicit boot-local metadata owner can stay typed and owner-local without duplicating topology or hiding service behavior

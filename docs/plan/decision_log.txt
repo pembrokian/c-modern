@@ -1,3 +1,21 @@
+Phase 275 -- display surface owner first slice
+----------------------------------------------
+- Kept the first display surface to one fixed four-cell owner,
+	`display_surface.mc`, instead of widening immediately into repaint loops,
+	composition, windows, or dashboard UI.
+- Reused `launcher_service.mc` only for foreground-program truth. The visible
+	handoff stays one bounded launch-time route in `kernel_dispatch.mc`, which
+	avoids turning launcher into a second drawing-policy owner.
+- Kept app render policy app-local by using one tiny foreground token from
+	`program_catalog.mc` rather than importing `issue_rollup` render code into
+	the kernel.
+- Kept restart semantics explicit and flat: the display owner is boot-wired,
+	public, and reset-on-restart, so visible state clears without adding retained
+	or durable surface policy.
+- Deferred repaint scheduling, app-driven present payloads, multi-surface
+	routing, composition, and shell-visible dashboards until a later admitted
+	consumer proves one of them is stronger than the current fixed-surface path.
+
 Phase 274 -- input-event owner first slice
 -----------------------------------------
 - Kept the first UI input contract at one admitted key-event family,

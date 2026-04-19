@@ -1,0 +1,23 @@
+Open Decisions
+==============
+
+Purpose
+-------
+This file records unresolved architecture, language, or packaging questions
+that are active enough to deserve explicit repository tracking but are not yet
+settled design decisions.
+
+Use this file for:
+- unresolved architecture questions that need a bounded decision phase
+- unresolved language or packaging questions that affect planning
+- questions whose answer will change which owner should absorb future work
+
+Do not use this file for:
+- ordinary progress notes
+- landed decisions that belong in `docs/arch/key_decisions.txt`
+- implementation limits that already have an accepted stop point in
+  `docs/plan/decision_log.txt`
+
+Entries
+-------
+- none currently recorded

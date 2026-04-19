@@ -1,5 +1,6 @@
 import completion_mailbox_service
 import connection_service
+import display_surface
 import identity_taxonomy
 import file_service
 import journal_service
@@ -76,6 +77,8 @@ func bootstate_metadata_for_target(s: KernelBootState, target: u8) u8 {
         return u8(connection_service.connection_active_count(s.connection.state))
     case serial_protocol.TARGET_LAUNCHER:
         return launcher_service.launcher_foreground_id(s.launcher.state)
+    case serial_protocol.TARGET_DISPLAY:
+        return display_surface.display_nonzero_count(s.display.state)
     case serial_protocol.TARGET_JOURNAL:
         return u8(journal_service.journal_count(s.journal.state))
     case serial_protocol.TARGET_WORKFLOW:
@@ -181,6 +184,8 @@ func bootrestart_outcome_for_endpoint(s: KernelBootState, endpoint: u32) Restart
         return s.connection_restart_outcome
     case service_topology.LAUNCHER_ENDPOINT_ID:
         return s.launcher_restart_outcome
+    case service_topology.DISPLAY_ENDPOINT_ID:
+        return s.display_restart_outcome
     case service_topology.JOURNAL_ENDPOINT_ID:
         return s.journal_restart_outcome
     case service_topology.LEASE_ENDPOINT_ID:
@@ -198,7 +203,7 @@ func bootrestart_outcome_for_endpoint(s: KernelBootState, endpoint: u32) Restart
 
 func bootsummary_payload_for_endpoint(s: KernelBootState, endpoint: u32) [4]u8 {
     participation: RetainedSummaryParticipation = RetainedSummaryParticipation.None
-    if endpoint == service_topology.LOG_ENDPOINT_ID || endpoint == service_topology.KV_ENDPOINT_ID || endpoint == service_topology.QUEUE_ENDPOINT_ID || endpoint == service_topology.FILE_ENDPOINT_ID || endpoint == service_topology.TIMER_ENDPOINT_ID || endpoint == service_topology.JOURNAL_ENDPOINT_ID || endpoint == service_topology.WORKFLOW_ENDPOINT_ID || endpoint == service_topology.LEASE_ENDPOINT_ID || endpoint == service_topology.COMPLETION_MAILBOX_ENDPOINT_ID || endpoint == service_topology.OBJECT_STORE_ENDPOINT_ID || endpoint == service_topology.UPDATE_STORE_ENDPOINT_ID {
+    if service_topology.service_is_retained(endpoint) {
         participation = RetainedSummaryParticipation.Service
     }
     mark: service_identity.ServiceMark = bootmark_for_endpoint(s, endpoint)
@@ -252,6 +257,10 @@ func boot_launcher_mark(s: KernelBootState) service_identity.ServiceMark {
     return service_identity.service_mark(service_topology.LAUNCHER_ENDPOINT_ID, s.launcher.state.pid, s.launcher.generation)
 }
 
+func boot_display_mark(s: KernelBootState) service_identity.ServiceMark {
+    return service_identity.service_mark(service_topology.DISPLAY_ENDPOINT_ID, s.display.state.pid, s.display.generation)
+}
+
 func boot_journal_mark(s: KernelBootState) service_identity.ServiceMark {
     return service_identity.service_mark(service_topology.JOURNAL_ENDPOINT_ID, s.journal.state.pid, s.journal.generation)
 }
@@ -300,6 +309,8 @@ func bootmark_for_endpoint(s: KernelBootState, endpoint: u32) service_identity.S
         return boot_connection_mark(s)
     case service_topology.LAUNCHER_ENDPOINT_ID:
         return boot_launcher_mark(s)
+    case service_topology.DISPLAY_ENDPOINT_ID:
+        return boot_display_mark(s)
     case service_topology.JOURNAL_ENDPOINT_ID:
         return boot_journal_mark(s)
     case service_topology.WORKFLOW_ENDPOINT_ID:

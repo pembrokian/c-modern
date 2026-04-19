@@ -90,7 +90,16 @@ What is still intentionally absent is just as important:
 - no broad device tree or driver framework yet
 - no broad namespace or service-discovery layer yet
 - no full trap, MMU, or multicore architecture split yet
+- no compositor, window stack, or in-kernel UI policy framework; the first
+  display path remains one bounded surface owner only
 - no claim that the current flat file tree should be reorganized immediately
+
+Recent staged pressure also fits this direction cleanly:
+
+- the first human-facing UI anchors now exist as explicit small owners rather
+  than shell shortcuts: one input owner and one fixed display-surface owner
+- foreground-program policy remains on launcher-owned state, while the display
+  owner stays a surface owner only and does not absorb app render policy
 
 Architectural stance
 --------------------

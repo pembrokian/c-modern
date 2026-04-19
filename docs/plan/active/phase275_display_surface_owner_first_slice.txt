@@ -3,7 +3,7 @@ Phase 275 -- Display Surface Owner First Slice
 
 Status
 ------
-PROPOSED
+LANDED
 
 Purpose
 -------
@@ -146,8 +146,6 @@ Test obligations
 - `Build debug`
 - one focused reset-lane fixture for the first display surface
 - `mc_tool_workflow_kernel_reset_lane_unit`
-- one narrow real-project build or run for the first admitted consumer when
-  the app contract changes
 - `mc_tool_workflow_kernel_reset_lane_full_unit`
 
 Acceptance criteria
@@ -163,3 +161,33 @@ Future follow-up
   on the new surface.
 - Reopen broader display work only when multiple regions, layers, or a second
   display target become stronger than the foreground-routing and repaint slices.
+
+Implementation summary
+----------------------
+- Added `kernel/src/services/display_surface.mc` as the explicit first UI
+  display owner.
+- Kept the surface contract fixed and bounded: one present path that accepts
+  exactly four visible cells and one direct query path that returns the current
+  four visible cells.
+- Reused `launcher_service.mc` only for foreground-program truth and kept the
+  display handoff in `kernel_dispatch.mc` to one launch-time route rather than
+  widening launcher into composition or drawing.
+- Kept app-local render policy app-local by using one fixed foreground token
+  from `program_catalog.mc` instead of importing `issue_rollup` render policy
+  into the kernel.
+- Added `tests/system/kernel_reset_lane_phase275_display_surface_owner` as the
+  focused reset-lane proof and wired the scenario into the maintained grouped
+  reset-lane workflow suite.
+
+Implemented decisions
+---------------------
+1. The smallest honest first display target is one fixed four-cell surface on a
+   boot-wired public endpoint rather than stdout reuse, a window stack, or a
+   compositor.
+2. `display_surface.mc` owns present/query semantics; `program_catalog.mc`
+   owns the tiny foreground display tokens; `launcher_service.mc` remains only
+   the foreground-policy owner.
+3. The first visible-state proof is one launch-time foreground handoff for the
+   admitted `issue_rollup` path plus one explicit reset-to-clear check.
+4. The phase intentionally stops short of real app render payloads, repaint,
+   multi-surface regions, and dashboard-style shell output.

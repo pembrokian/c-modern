@@ -3,6 +3,10 @@ enum ProgramLaunchKind {
     HostedExe,
 }
 
+const PROGRAM_DISPLAY_NONE: [4]u8 = { 0, 0, 0, 0 }
+const ISSUE_ROLLUP_DISPLAY: [4]u8 = { 73, 82, 85, 80 }
+const REVIEW_BOARD_DISPLAY: [4]u8 = { 82, 66, 82, 68 }
+
 struct ProgramLaunchDescriptor {
     package: str
     target: str
@@ -90,5 +94,16 @@ func program_launch_kind_code(desc: ProgramDescriptor) u8 {
         return PROGRAM_KIND_CODE_HOSTED_EXE
     default:
         return PROGRAM_KIND_CODE_NONE
+    }
+}
+
+func program_display_cells(id: u8) [4]u8 {
+    switch id {
+    case PROGRAM_ID_ISSUE_ROLLUP:
+        return ISSUE_ROLLUP_DISPLAY
+    case PROGRAM_ID_REVIEW_BOARD:
+        return REVIEW_BOARD_DISPLAY
+    default:
+        return PROGRAM_DISPLAY_NONE
     }
 }

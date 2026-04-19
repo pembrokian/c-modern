@@ -16,6 +16,7 @@
 import boot
 import completion_mailbox_service
 import connection_service
+import display_surface
 import echo_service
 import file_service
 import journal_service
@@ -79,6 +80,8 @@ func restart_policy_for_target(target: u8) RestartPolicyInfo {
         return restart_policy_single(target, serial_protocol.POLICY_CLEAR)
     case serial_protocol.TARGET_LAUNCHER:
         return restart_policy_single(target, serial_protocol.POLICY_CLEAR)
+    case serial_protocol.TARGET_DISPLAY:
+        return restart_policy_single(target, serial_protocol.POLICY_CLEAR)
     case serial_protocol.TARGET_JOURNAL:
         return restart_policy_single(target, serial_protocol.POLICY_KEEP)
     case serial_protocol.TARGET_WORKFLOW:
@@ -133,6 +136,8 @@ func restart(state: boot.KernelBootState, endpoint: u32) boot.KernelBootState {
         return restart_connection(state)
     case service_topology.LAUNCHER_ENDPOINT_ID:
         return restart_launcher(state)
+    case service_topology.DISPLAY_ENDPOINT_ID:
+        return restart_display(state)
     case service_topology.JOURNAL_ENDPOINT_ID:
         return restart_journal(state)
     case service_topology.WORKFLOW_ENDPOINT_ID:
@@ -252,6 +257,12 @@ func restart_launcher(state: boot.KernelBootState) boot.KernelBootState {
     slot := service_topology.LAUNCHER_SLOT
     next := boot.bootrestart_launcher(state, launcher_service.launcher_init(slot.pid, 1))
     return boot.bootwith_launcher_restart_outcome(next, boot.RestartOutcome.OrdinaryReplaced)
+}
+
+func restart_display(state: boot.KernelBootState) boot.KernelBootState {
+    slot := service_topology.DISPLAY_SLOT
+    next := boot.bootrestart_display(state, display_surface.display_init(slot.pid, 1))
+    return boot.bootwith_display_restart_outcome(next, boot.RestartOutcome.OrdinaryReplaced)
 }
 
 func restart_journal(state: boot.KernelBootState) boot.KernelBootState {

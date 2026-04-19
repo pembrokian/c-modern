@@ -354,7 +354,8 @@ Band D - Start The First Human-Facing Surface Conservatively
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 Phases 274 through 281 are the earliest honest place to start basic UI work,
 and even here the right target is still small: one input owner, one display
-owner, one presentation contract, and one or two app proofs.
+owner, one presentation contract, and one or two app proofs. Phases 274 and
+275 are now landed as the first two explicit UI anchors.
 
 Likely themes:
 - convert live input from shell-only decode into explicit event ownership
@@ -380,11 +381,18 @@ Phase 274 -- Input Event Owner First Slice
 - Exit criterion: one service or user-space owner turns live keyboard or serial
   or equivalent input into explicit events instead of shell-command-only decode,
   without widening into a general event broker.
+- Landed result: `input_event.mc` now owns the first `I K <byte> !` event
+  vocabulary and routes it toward the current launcher-owned foreground app
+  without widening shell into a broker.
 
 Phase 275 -- Display Surface Owner First Slice
 - Exit criterion: one bounded display owner exposes one fixed target surface
   such as a text grid or fixed framebuffer with explicit present semantics and
   no compositor framework.
+- Landed result: `display_surface.mc` now owns one fixed four-cell visible
+  target with explicit present/query semantics, while `launcher_service.mc`
+  remains foreground-policy only and `program_catalog.mc` supplies one tiny
+  foreground display token per admitted program.
 
 Phase 276 -- Foreground App Input Routing
 - Exit criterion: one launcher or UI owner can route input to exactly one
@@ -415,7 +423,7 @@ Phase 281 -- First UI Slice Audit
   keeping windows, widgets, mouse, and graphics acceleration explicitly
   deferred.
 
-Outcome checkpoint after Band C:
+Outcome checkpoint after Band D:
 - the repository should now have touched genuine UI work, but only through one
   deliberately narrow human-facing path.
 

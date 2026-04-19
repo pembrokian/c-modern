@@ -9,6 +9,7 @@
 import boot
 import completion_mailbox_service
 import connection_service
+import display_surface
 import echo_service
 import file_service
 import input_event
@@ -22,6 +23,7 @@ import lease_service
 import log_service
 import object_store_service
 import primitives
+import program_catalog
 import queue_service
 import serial_protocol
 import serial_shell_path
@@ -342,6 +344,17 @@ func dispatch_launcher(state: *boot.KernelBootState, msg: service_effect.Message
     }
     next := boot.bootwith_launcher(current, result.state)
     *state = boot.bootwith_update_store(next, result.update_store)
+    if msg.payload_len == 1 && msg.payload[0] == launcher_service.LAUNCHER_OP_LAUNCH && service_effect.effect_reply_status(result.effect) == syscall.SyscallStatus.Ok {
+        display_msg := service_effect.message(current.launcher.state.pid, service_topology.DISPLAY_ENDPOINT_ID, 4, program_catalog.program_display_cells(launcher_service.launcher_foreground_id(result.state)))
+        _ = dispatch_display(state, display_msg)
+    }
+    return result.effect
+}
+
+func dispatch_display(state: *boot.KernelBootState, msg: service_effect.Message) service_effect.Effect {
+    current: boot.KernelBootState = *state
+    result := display_surface.handle(current.display.state, msg)
+    *state = boot.bootwith_display(current, result.state)
     return result.effect
 }
 
@@ -526,6 +539,8 @@ func leaf_route(endpoint: u32) LeafRoute {
         return LeafRoute{ endpoint: endpoint, reply: dispatch_connection }
     case service_topology.LAUNCHER_ENDPOINT_ID:
         return LeafRoute{ endpoint: endpoint, reply: dispatch_launcher }
+    case service_topology.DISPLAY_ENDPOINT_ID:
+        return LeafRoute{ endpoint: endpoint, reply: dispatch_display }
     case service_topology.JOURNAL_ENDPOINT_ID:
         return LeafRoute{ endpoint: endpoint, reply: dispatch_journal }
     case service_topology.WORKFLOW_ENDPOINT_ID:

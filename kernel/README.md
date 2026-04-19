@@ -13,7 +13,7 @@ Rules
 - Keep compiler, sema, MIR, backend, ABI, target, runtime, and `hal` surfaces closed unless a narrow blocker forces a local change.
 - Add modules only when a specific phase boundary needs them, at the lean behavioral minimum the four-section standard allows.
 
-Current scope (through Phase 273)
+Current scope (through Phase 275)
 
 - All three canonical service shapes are present: forwarding (`serial_service`, `shell_service`, `serial_shell_path`), append/tail (`log_service`), and key/value (`kv_service`).
 - The compact shell route now reaches `log_service` and `kv_service` over the real reset-lane path instead of stopping at shell-local echo behavior.
@@ -27,13 +27,15 @@ Current scope (through Phase 273)
 - The lane is wired into the build through the repo-project entry plus the table-driven reset-lane workflow suite in `mc_tool_workflow_kernel_reset_lane_unit`.
 - The current app-facing slice now includes one bounded launcher-owned installed-workflow status query over the admitted `issue_rollup` path; durable installed bytes and launch-record comparison truth remain on `update_store_service`, launcher exposes only the admitted app-facing policy surfaces, and the lane still does not claim a filesystem, package manager, or general asset API.
 - Phase 273 then closes Band C as a planning audit and classifies the first UI input/display owners as the stronger next move rather than another launcher/update/object-store follow-through.
+- Phase 274 adds one explicit `input_event.mc` owner for the first `I K <byte> !` foreground-input path.
+- Phase 275 adds one explicit `display_surface.mc` owner for one fixed four-cell visible target and one bounded launcher-triggered foreground present handoff.
 
 Source tree layout (Phase 219)
 
 - `src/` root: `main.mc` (entry), `kernel_dispatch.mc` (routing), `event_codes.mc` (shared shell-event constants)
 - `src/boot/`: `boot.mc`, `boot_identity.mc`, `boot_update.mc`, `service_cell_helpers.mc`, `init.mc`
 - `src/identity/`: `identity_taxonomy.mc`, `program_catalog.mc`, `service_identity.mc`, `service_state.mc`, `service_topology.mc`
-- `src/services/`: `completion_mailbox_service.mc`, `connection_service.mc`, `echo_service.mc`, `file_service.mc`, `journal_service.mc`, `kv_service.mc`, `launcher_service.mc`, `lease_service.mc`, `log_service.mc`, `object_store_service.mc`, `queue_service.mc`, `task_service.mc`, `ticket_service.mc`, `timer_service.mc`, `transfer_grant.mc`, `transfer_service.mc`, `update_store_service.mc`, `workflow/service.mc`
+- `src/services/`: `completion_mailbox_service.mc`, `connection_service.mc`, `display_surface.mc`, `echo_service.mc`, `file_service.mc`, `journal_service.mc`, `kv_service.mc`, `launcher_service.mc`, `lease_service.mc`, `log_service.mc`, `object_store_service.mc`, `queue_service.mc`, `task_service.mc`, `ticket_service.mc`, `timer_service.mc`, `transfer_grant.mc`, `transfer_service.mc`, `update_store_service.mc`, `workflow/service.mc`
 - `src/shell/`: `serial_protocol.mc`, `serial_service.mc`, `serial_shell_event_log.mc`, `serial_shell_path.mc`, `shell_service.mc`
 - `src/scenarios/`: `scenarios.mc` and all `scenario_*.mc` files
 - `src/transport/`: `primitives.mc`, `syscall.mc`, `ipc.mc`, `service_effect.mc`
@@ -51,6 +53,14 @@ The following modules are deferred until the named phase boundary forces them:
 - `mmu` — probably never in this tree; hosted execution makes MMU stubs meaningless
 
 Recent service targets
+
+- Phase 275 (landed): display surface owner first slice.
+  `display_surface.mc` now owns one fixed four-cell visible target with one
+  explicit present contract and one direct query path, while `launcher_service.mc`
+  still owns only foreground-program truth and `kernel_dispatch.mc` performs one
+  bounded launch-time handoff using fixed program display cells from
+  `program_catalog.mc`. The focused reset-lane fixture is
+  `tests/system/kernel_reset_lane_phase275_display_surface_owner`.
 
 - Phase 273 (completed): app substrate pressure audit. Band C is now
   explicitly closed for its admitted slice: `program_catalog.mc`,

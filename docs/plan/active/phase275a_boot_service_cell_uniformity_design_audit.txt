@@ -1,0 +1,247 @@
+Phase 275A -- Boot Service Cell Uniformity Design Audit
+=======================================================
+
+Status
+------
+COMPLETED (2026-04-19)
+
+Purpose
+-------
+Decide whether the current boot-state shape should stay as named typed
+`ServiceCell<T>` fields plus explicit per-service restart-outcome fields, or
+whether later boot growth now justifies a stronger uniform boot-service
+abstraction for cross-service read and update paths.
+
+This phase exists now because the remaining repetition in `boot_identity.mc`,
+`boot_update.mc`, and `init.mc` has reappeared on both the read and write
+side after additional service growth. The next honest move is to classify that
+pressure explicitly rather than either forcing a local refactor or continuing
+to claim without review that the repetition is settled truth.
+
+Repository status note
+----------------------
+- `kernel/src/boot/boot.mc` already groups restartable service state and
+  generation through typed `ServiceCell<T>` fields.
+- Earlier phases removed the most distortive whole-record and nested-record
+  rebuild boilerplate from `boot_update.mc`.
+- `boot_identity.mc` still contains one function-per-service mark family and
+  one endpoint switch for mark and restart-outcome projection.
+- `init.mc` and adjacent boot helpers still carry one service-at-a-time restart
+  enactment and outcome wiring.
+- Phase 275 display-service growth exposed the same manual case-per-service
+  pressure again on the read side.
+
+Problem being solved
+--------------------
+- The repository currently has two competing interpretations of the remaining
+  boot-layer repetition: either it is the honest cost of typed per-service boot
+  state, or it is evidence that the next stronger abstraction is no longer the
+  current named-field shape.
+- Leaving that question implicit is destabilizing because future boot-wired
+  service growth will keep touching the same read and update switches without a
+  shared standard for when that growth becomes too distortive.
+- A local cleanup inside `boot_identity.mc` or `boot_update.mc` would decide a
+  larger architecture question accidentally and without reviewing the type,
+  ownership, and lifecycle tradeoffs across the full boot layer.
+
+Non-goals
+---------
+- no runtime behavior change in the reset-lane kernel
+- no erased or dynamically typed service-state framework
+- no generated boot helpers or external code-generation step
+- no topology rewrite or dynamic service discovery model
+- no dispatcher, shell, or lifecycle protocol redesign
+- no compiler or language work unless the audit proves one concrete blocked
+  language feature is the narrowest next step
+
+Invariants
+----------
+- `boot_identity.mc` remains a pure query and payload-projection owner until a
+  reviewed design explicitly moves part of that work elsewhere.
+- `boot_update.mc` and `init.mc` remain the boot-state mutation and restart
+  enactment owners; this audit does not quietly move policy into topology or
+  dispatch.
+- Service-local state stays strongly typed unless the phase explicitly proves
+  that a more uniform abstraction can preserve the same owner-local honesty.
+- Topology facts stay on `service_topology.mc`; boot-state layout and payload
+  projection do not absorb static service classification by convenience.
+- Any proposed replacement must keep deterministic fixed-target lifecycle and
+  identity payloads.
+
+Required surface changes
+------------------------
+1. Audit the current read-side and write-side repetition across
+   `kernel/src/boot/boot.mc`, `kernel/src/boot/boot_update.mc`,
+   `kernel/src/boot/boot_identity.mc`, and `kernel/src/boot/init.mc`.
+2. State the strongest honest next owner boundary explicitly: preserve the
+   current typed named-field shape, admit a stronger boot-local slot or table
+   abstraction, or name another narrower alternative.
+3. Record the tradeoff between per-service type discipline and cross-service
+   mechanical repetition explicitly enough that later service growth can reuse
+   the decision.
+4. Update planning and architecture docs so future work does not treat the
+   current shape as settled truth if it is only a provisional stop point.
+
+Forbidden changes
+-----------------
+- do not land a runtime refactor to uniform service tables inside this audit
+- do not erase typed service state just to remove switches
+- do not claim that generated helpers or frameworks are justified unless the
+  audit proves they are the narrowest honest next move
+- do not widen the question into broader kernel architecture, supervisor,
+  discovery, or UI/service-topology work
+
+Phase role in the larger sequence
+---------------------------------
+- This phase is a local boot-architecture design checkpoint, not a new product
+  capability.
+- It reopens the earlier assumption that the remaining `boot_*` repetition is
+  mostly honest cost and tests whether later service growth has invalidated
+  that assumption.
+- It should leave a reusable answer for later boot-wired service additions and
+  any future kernel ownership audit.
+
+Relevant backlog items this phase intentionally brings under pressure
+--------------------------------------------------------------------
+- keep boot-state update pressure bounded through explicit service cells rather
+  than wider framework growth
+
+Questions this phase must answer
+--------------------------------
+1. Is the current combination of typed `ServiceCell<T>` fields and parallel
+   restart-outcome fields still the smallest honest boot-state shape?
+2. If not, what stronger uniform abstraction can reduce case-per-service boot
+   repetition without hiding service-local type or lifecycle truth?
+3. Which boot-layer files would actually benefit from that stronger abstraction,
+   and which should remain explicit even if a new helper or slot owner lands?
+4. Does the next step belong in kernel source only, or is one specific language
+   or compiler limitation now the true blocker?
+
+Preferred implementation shape
+------------------------------
+- Start from the concrete repetition sites in `boot_identity.mc`,
+  `boot_update.mc`, and `init.mc` rather than from a generic architecture wish.
+- Compare at least these explicit options:
+  a. preserve the current typed named-field shape and document why the
+     repetition is still honest
+  b. introduce one stronger boot-local field-or-slot abstraction while
+     preserving typed service state
+  c. name one concrete blocked language feature only if that feature is the
+     narrowest barrier to the chosen option
+- Prefer a written decision with a small explicit follow-up plan over a mixed
+  audit-plus-refactor landing.
+
+Implementation accelerators
+---------------------------
+Main files and navigations
+~~~~~~~~~~~~~~~~~~~~~~~~~~
+- Primary controlling files: `kernel/src/boot/boot.mc`,
+  `kernel/src/boot/boot_update.mc`, `kernel/src/boot/boot_identity.mc`, and
+  `kernel/src/boot/init.mc`.
+- Adjacent helper owners: `kernel/src/boot/service_cell_helpers.mc` and
+  `kernel/src/identity/service_topology.mc`.
+- Key existing context: `docs/plan/backlog.txt`, `docs/plan/decision_log.txt`,
+  and `docs/arch/veya/veya_restartable_service_identity_taxonomy_v0.txt`.
+
+Relevant cookbook patterns
+~~~~~~~~~~~~~~~~~~~~~~~~~~
+- The existing `ServiceCell<T>` grouping is the baseline pattern to evaluate;
+  this phase is about whether that grouping should stay the end-state for boot
+  structure or become one layer inside a stronger boot-local owner.
+
+Relevant file-local invariants
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+- `boot_identity.mc` must stay query-only.
+- `boot_update.mc` must stay mutation-only and not become a policy or
+  classification layer.
+- `init.mc` must keep restart enactment explicit.
+- `service_topology.mc` must keep static service facts local.
+
+Relevant test surfaces
+~~~~~~~~~~~~~~~~~~~~~~
+- Primary validation is document and owner-boundary coherence.
+- If the audit adds a code probe or narrow spike, validate with `Build debug`
+  and the narrowest owning reset-lane workflow suite only.
+
+Test obligations
+----------------
+- document the decision and its owner boundaries explicitly
+- if any exploratory code lands, run `Build debug`
+- if behavior changes, run the narrowest owning reset-lane workflow coverage
+
+Acceptance criteria
+-------------------
+- the repository records one explicit answer to whether the current boot-state
+  shape remains the honest boundary
+- the answer names the type-safety versus uniformity tradeoff concretely
+- later contributors can tell whether a new boot-wired service should extend
+  the current explicit switches or reopen a stronger abstraction
+- the phase does not smuggle in a runtime refactor under the name of an audit
+
+Future follow-up
+----------------
+- Keep the current typed named-field shape and extend it explicitly when new
+  boot-wired services land.
+- Continue moving static classification facts to `service_topology.mc` when
+  they are topology truth rather than boot-state projection truth.
+- Reopen only when future boot growth produces repeated endpoint-to-field
+  mapping plus repeated action shape across multiple boot owners strongly
+  enough that one explicit boot-local metadata owner can stay typed and local
+  without becoming a second framework.
+
+Audit conclusion
+----------------
+The current combination of named typed `ServiceCell<T>` fields and explicit
+parallel restart-outcome fields remains the smallest honest boot-state shape.
+The audit does not justify a stronger uniform boot-service slot or table
+abstraction at this time.
+
+Audit findings
+--------------
+1. `boot_update.mc` still repeats one helper per service, but the repeated
+   bodies are already reduced to the smallest honest mutation shape: each
+   helper either replaces one typed service state through
+   `service_cell_with_state<T>(...)`, bumps one generation through
+   `service_cell_restart<T>(...)`, or records one explicit restart outcome.
+2. `init.mc` looks repetitive for a stronger reason than syntax alone: each
+   restart path still needs service-local reload or init behavior, and those
+   behaviors are materially different across retained, durable, coordinated,
+   and reset-style owners.
+3. `boot_identity.mc` carries the clearest cross-service query pressure, but
+   even there the file mixes three different families of work: endpoint-to-mark
+   projection, endpoint-to-restart-outcome projection, and target-indexed
+   metadata queries whose per-service accessors have different meanings.
+4. A stronger uniform table would remove some endpoint-to-field mapping, but it
+   would not remove the heterogeneous service-local constructors, snapshots,
+   restart consequences, or metadata accessors. The likely result would be a
+   second metadata framework layered beside the existing typed boot fields and
+   topology descriptors rather than a real simplification.
+5. The one clear non-boot fact discovered during the audit was already moved to
+   the correct owner: retained-service classification now lives on
+   `service_topology.service_is_retained(...)` rather than as a hardcoded list
+   in `boot_identity.mc`.
+
+Decision
+--------
+- Keep `KernelBootState` on named typed `ServiceCell<T>` fields.
+- Keep restart outcomes as explicit parallel fields on boot state rather than
+  moving them into a uniform table now.
+- Treat future case-per-service additions in `boot_update.mc`, `boot_identity.mc`,
+  and `init.mc` as honest unless they introduce both repeated endpoint-to-field
+  mapping and repeated action shape that can be captured by one typed boot-local
+  owner without duplicating topology or erasing service-local state.
+
+Why the stronger abstraction is not justified now
+-------------------------------------------------
+- The current boot layer already has one useful uniformity boundary:
+  `ServiceCell<T>` groups state plus generation and removes unrelated
+  bookkeeping. The remaining pressure is not the same problem that Phase 182
+  solved.
+- Read-side and write-side call sites are still dominated by service-local
+  semantics, not just by field access. A uniform slot table would centralize
+  mapping but would still need per-service reload, init, snapshot, and query
+  functions somewhere else.
+- The repository already has `service_topology.mc` for static service facts and
+  service-local modules for state semantics. Adding another boot-level uniform
+  metadata structure now would risk creating a second center of gravity rather
+  than simplifying ownership.

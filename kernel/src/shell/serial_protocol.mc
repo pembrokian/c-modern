@@ -79,6 +79,7 @@ const TARGET_COMPLETION: u8 = 66  // 'B'
 const TARGET_CONNECTION: u8 = 67  // 'C'
 const TARGET_UPDATE_STORE: u8 = 68  // 'D'
 const TARGET_LAUNCHER: u8 = 71  // 'G'
+const TARGET_DISPLAY: u8 = 89  // 'Y'
 
 const PARTICIPANT_NONE: u8 = 78  // 'N'
 const POLICY_CLEAR: u8 = 67      // 'C'

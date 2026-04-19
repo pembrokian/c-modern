@@ -129,6 +129,8 @@ func lifecycle_target_endpoint(target: u8) u32 {
         return service_topology.UPDATE_STORE_ENDPOINT_ID
     case serial_protocol.TARGET_LAUNCHER:
         return service_topology.LAUNCHER_ENDPOINT_ID
+    case serial_protocol.TARGET_DISPLAY:
+        return service_topology.DISPLAY_ENDPOINT_ID
     default:
         return 0
     }
