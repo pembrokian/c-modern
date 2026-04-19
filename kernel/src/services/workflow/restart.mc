@@ -8,7 +8,7 @@ import task_service
 import ticket_service
 import timer_service
 import update_store_service
-import workflow_core
+import workflow/core
 
 func workflow_sync_journal(journal: journal_service.JournalServiceState, s: workflow_core.WorkflowServiceState) journal_service.JournalServiceState {
     lane := journal_service.lane_init(journal_service.JOURNAL_LANE_B)
@@ -18,8 +18,9 @@ func workflow_sync_journal(journal: journal_service.JournalServiceState, s: work
     return journal_service.journalwith(journal, journal.lane0, lane)
 }
 
-func workflow_step_with_synced_journal(workflow: workflow_core.WorkflowServiceState, timer: timer_service.TimerServiceState, task: task_service.TaskServiceState, object_store: object_store_service.ObjectStoreServiceState, update_store: update_store_service.UpdateStoreServiceState, journal: journal_service.JournalServiceState, lease: lease_service.LeaseServiceState, ticket: ticket_service.TicketServiceState, completion: completion_mailbox_service.CompletionMailboxServiceState, effect: service_effect.Effect) workflow_core.WorkflowStepResult {
-    return workflow_core.workflow_step_result(workflow, timer, task, object_store, update_store, workflow_sync_journal(journal, workflow), lease, ticket, completion, effect)
+func workflow_step_with_synced_journal(workflow: workflow_core.WorkflowServiceState, step: workflow_core.WorkflowStepContext, effect: service_effect.Effect) workflow_core.WorkflowStepResult {
+    synced := step with { journal: workflow_sync_journal(step.journal, workflow) }
+    return workflow_core.workflow_step_result(workflow, synced.runtime.timer, synced.runtime.task, synced.runtime.object_store, synced.runtime.update_store, synced.journal, synced.runtime.lease, synced.runtime.ticket, synced.runtime.completion, effect)
 }
 
 func workflow_lane_matches(s: workflow_core.WorkflowServiceState, lane: journal_service.JournalLane) bool {

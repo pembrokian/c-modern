@@ -157,7 +157,7 @@ Notes from implementation
   framework expansion.
 - Validation exposed one current compiler limitation around same-name local
   bindings in disjoint sibling branches. The phase kept the workaround local by
-  using distinct temporary names in `workflow_service.mc` and records the
+  using distinct temporary names in `workflow/service.mc` and records the
   language follow-up in `docs/plan/backlog.txt` under Potential language
   features instead of widening compiler work here.
 

@@ -8,7 +8,7 @@ import service_effect
 import service_topology
 import syscall
 import update_store_service
-import workflow_core
+import workflow/core
 
 const FAIL_UPDATE_PRESSURE_SETUP: i32 = 24501
 const FAIL_UPDATE_PRESSURE_FILL_SCHEDULE_BASE: i32 = 24502

@@ -8,7 +8,7 @@ import serial_protocol
 import service_effect
 import service_topology
 import syscall
-import workflow_core
+import workflow/core
 
 const FIRST_SUBMISSION_ID: u8 = 1
 

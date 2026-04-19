@@ -7,9 +7,17 @@ namespace mc::parse {
 ImportDecl Parser::ParseImportDecl(mc::support::SourcePosition start) {
     ImportDecl decl;
     decl.span.begin = start;
-    const auto name = ParseIdentifier("expected module name after import");
+        const auto name = ParseIdentifier("expected module name after import (slash-separated paths allowed)");
     if (name.has_value()) {
         decl.module_name = *name;
+        while (Match(TokenKind::kSlash)) {
+            const auto segment = ParseIdentifier("expected module path segment after '/' in import");
+            if (!segment.has_value()) {
+                break;
+            }
+            decl.module_name += '/';
+            decl.module_name += *segment;
+        }
     }
     decl.span.end = Previous().span.end;
     return decl;

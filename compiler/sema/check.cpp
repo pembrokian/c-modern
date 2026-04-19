@@ -2828,13 +2828,22 @@ CheckResult CheckProgramInternal(const ast::SourceFile& source_file,
     visit_state[normalized_path] = VisitState::kVisiting;
 
     ImportedModules imported_modules;
+    const auto record_imported_module = [&](std::string_view module_name, Module visible_module) {
+        const std::string raw_name(module_name);
+        imported_modules[raw_name] = visible_module;
+        const std::string qualifier = ImportedModuleQualifier(module_name);
+        if (qualifier != raw_name) {
+            imported_modules[qualifier] = std::move(visible_module);
+        }
+    };
     if (options.imported_modules != nullptr) {
         for (const auto& import_decl : source_file.imports) {
             const auto found = options.imported_modules->find(import_decl.module_name);
             if (found == options.imported_modules->end()) {
                 continue;
             }
-            imported_modules[import_decl.module_name] = RewriteImportedModuleSurfaceTypes(found->second, import_decl.module_name);
+            record_imported_module(import_decl.module_name,
+                                   RewriteImportedModuleSurfaceTypes(found->second, import_decl.module_name));
         }
     } else {
         // Bootstrap direct-source checking still owns the fallback filesystem
@@ -2885,7 +2894,8 @@ CheckResult CheckProgramInternal(const ast::SourceFile& source_file,
                 }
             }
 
-            imported_modules[import_decl.module_name] = RewriteImportedModuleSurfaceTypes(visible_module, import_decl.module_name);
+            record_imported_module(import_decl.module_name,
+                                   RewriteImportedModuleSurfaceTypes(visible_module, import_decl.module_name));
         }
     }
 

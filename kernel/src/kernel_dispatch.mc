@@ -35,9 +35,9 @@ import timer_service
 import transfer_grant
 import transfer_service
 import update_store_service
-import workflow_core
-import workflow_protocol
-import workflow_service
+import workflow/core
+import workflow/protocol
+import workflow/service
 
 // MAX_EFFECT_CHAIN_DEPTH guards against send loops between services.
 // If the chain exceeds this depth the original caller receives Exhausted.
@@ -62,6 +62,11 @@ func effect_to_message(effect: service_effect.Effect) service_effect.Message {
         service_effect.effect_send_payload_len(effect),
         service_effect.effect_send_payload(effect)
     )
+}
+
+func workflow_dispatch_step_context(state: boot.KernelBootState) workflow_core.WorkflowStepContext {
+    runtime := workflow_core.workflow_runtime_context(state.timer.state, state.task.state, state.object_store.state, state.update_store.state, state.lease.state, state.ticket.state, state.completion.state, state.connection.state, u8(state.workset_generation), u8(state.ticket.generation))
+    return workflow_core.workflow_step_context(runtime, state.journal.state)
 }
 
 func lifecycle_is_lane_target(target: u8) bool {
@@ -303,11 +308,12 @@ func dispatch_task(state: *boot.KernelBootState, msg: service_effect.Message) se
 func dispatch_connection(state: *boot.KernelBootState, msg: service_effect.Message) service_effect.Effect {
     current: boot.KernelBootState = *state
     if msg.payload_len == 2 && msg.payload[0] == connection_service.CONNECTION_OP_EXECUTE {
+        step_context := workflow_dispatch_step_context(current)
         prepared := connection_service.connection_execute_prepare(current.connection.state, msg.payload[1])
         if service_effect.effect_has_reply(prepared.effect) == 1 {
             return prepared.effect
         }
-        step := workflow_protocol.workflow_step_schedule_connection(current.workflow.state, current.timer.state, current.task.state, current.object_store.state, current.update_store.state, current.journal.state, current.lease.state, current.ticket.state, current.completion.state, prepared.request, msg.payload[1], prepared.opcode, u8(current.workset_generation))
+        step := workflow_protocol.workflow_step_schedule_connection(current.workflow.state, step_context, prepared.request, msg.payload[1], prepared.opcode)
         if object_store_service.object_store_changed(current.object_store.state, step.object_store) {
             if !object_store_service.object_store_persist(step.object_store) {
                 return service_effect.effect_reply(syscall.SyscallStatus.Closed, 0, primitives.zero_payload())
@@ -346,7 +352,8 @@ func dispatch_connection(state: *boot.KernelBootState, msg: service_effect.Messa
 
 func dispatch_launcher(state: *boot.KernelBootState, msg: service_effect.Message) service_effect.Effect {
     current: boot.KernelBootState = *state
-    result := launcher_service.handle(current.launcher.state, current.update_store.state, current.launcher.generation, msg)
+    context := launcher_service.launcher_context(current.update_store.state, current.launcher.generation)
+    result := launcher_service.handle(current.launcher.state, context, msg)
     if update_store_service.update_store_changed(current.update_store.state, result.update_store) {
         if !update_store_service.update_store_persist(result.update_store) {
             return service_effect.effect_reply(syscall.SyscallStatus.Closed, 0, primitives.zero_payload())
@@ -402,7 +409,8 @@ func dispatch_completion_mailbox(state: *boot.KernelBootState, msg: service_effe
 
 func dispatch_lease(state: *boot.KernelBootState, msg: service_effect.Message) service_effect.Effect {
     current: boot.KernelBootState = *state
-    lease_result := lease_service.handle(current.lease.state, current.object_store.state, msg, u8(current.completion.generation), u8(current.workset_generation), u8(current.ticket.generation))
+    context := lease_service.lease_context(current.object_store.state, u8(current.completion.generation), u8(current.workset_generation), u8(current.ticket.generation))
+    lease_result := lease_service.handle(current.lease.state, context, msg)
     next := boot.bootwith_lease(current, lease_result.state)
     if lease_result.op == lease_service.LEASE_OP_NONE {
         *state = next
@@ -429,7 +437,8 @@ func dispatch_lease(state: *boot.KernelBootState, msg: service_effect.Message) s
 func dispatch_workflow(state: *boot.KernelBootState, msg: service_effect.Message) service_effect.Effect {
     current: boot.KernelBootState = *state
     previous_workflow := current.workflow.state
-    step := workflow_protocol.step(current.workflow.state, current.timer.state, current.task.state, current.object_store.state, current.update_store.state, current.journal.state, current.lease.state, current.ticket.state, current.completion.state, current.connection.state, msg, u8(current.workset_generation), u8(current.ticket.generation))
+    step_context := workflow_dispatch_step_context(current)
+    step := workflow_protocol.step(current.workflow.state, step_context, msg)
     if object_store_service.object_store_changed(current.object_store.state, step.object_store) {
         if !object_store_service.object_store_persist(step.object_store) {
             return service_effect.effect_reply(syscall.SyscallStatus.Closed, 0, primitives.zero_payload())

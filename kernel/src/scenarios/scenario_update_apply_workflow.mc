@@ -7,7 +7,7 @@ import service_effect
 import service_topology
 import syscall
 import update_store_service
-import workflow_core
+import workflow/core
 
 const FAIL_UPDATE_APPLY_SETUP: i32 = 24301
 const FAIL_UPDATE_APPLY_STAGE0: i32 = 24302

@@ -9,6 +9,7 @@
 
 namespace mc::sema {
 
+std::string ImportedModuleQualifier(std::string_view module_name);
 std::string QualifyImportedName(std::string_view module_name, std::string_view name);
 TypeDeclSummary RewriteImportedTypeDecl(const TypeDeclSummary& type_decl,
                                         std::string_view module_name,

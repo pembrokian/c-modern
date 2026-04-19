@@ -270,7 +270,7 @@ std::filesystem::path ComputeModuleStatePath(const std::filesystem::path& source
 
 std::filesystem::path ComputeLogicalModuleStatePath(std::string_view artifact_key,
                                                     const std::filesystem::path& build_dir) {
-    return build_dir / "state" / (support::SanitizeArtifactStem(std::filesystem::path(std::string(artifact_key))) + ".state.txt");
+    return build_dir / "state" / (support::SanitizeLogicalArtifactStem(artifact_key) + ".state.txt");
 }
 
 std::filesystem::path ComputeRuntimeObjectPath(const std::filesystem::path& entry_source_path,

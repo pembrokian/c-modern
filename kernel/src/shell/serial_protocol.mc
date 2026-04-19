@@ -197,6 +197,10 @@ func encode_launcher_identify() [4]u8 {
     return encode_no_args(CMD_P, CMD_I)
 }
 
+func encode_launcher_manifest(index: u8) [4]u8 {
+    return encode_one_arg(CMD_P, CMD_M, index)
+}
+
 func encode_launcher_select(id: u8) [4]u8 {
     return encode_one_arg(CMD_P, CMD_S, id)
 }

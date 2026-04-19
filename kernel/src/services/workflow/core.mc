@@ -112,6 +112,24 @@ struct WorkflowStepResult {
     effect: service_effect.Effect
 }
 
+struct WorkflowRuntimeContext {
+    timer: timer_service.TimerServiceState
+    task: task_service.TaskServiceState
+    object_store: object_store_service.ObjectStoreServiceState
+    update_store: update_store_service.UpdateStoreServiceState
+    lease: lease_service.LeaseServiceState
+    ticket: ticket_service.TicketServiceState
+    completion: completion_mailbox_service.CompletionMailboxServiceState
+    connection: connection_service.ConnectionServiceState
+    workset_generation: u8
+    ticket_generation: u8
+}
+
+struct WorkflowStepContext {
+    runtime: WorkflowRuntimeContext
+    journal: journal_service.JournalServiceState
+}
+
 struct WorkflowDeliveryResult {
     workflow: WorkflowServiceState
     completion: completion_mailbox_service.CompletionMailboxServiceState
@@ -163,6 +181,14 @@ struct WorkflowDelegatedUpdateApplyResult {
 
 func workflow_advance_result(workflow: WorkflowServiceState, timer: timer_service.TimerServiceState, task: task_service.TaskServiceState, object_store: object_store_service.ObjectStoreServiceState, update_store: update_store_service.UpdateStoreServiceState, lease: lease_service.LeaseServiceState, ticket: ticket_service.TicketServiceState, completion: completion_mailbox_service.CompletionMailboxServiceState) WorkflowAdvanceResult {
     return WorkflowAdvanceResult{ workflow: workflow, timer: timer, task: task, object_store: object_store, update_store: update_store, lease: lease, ticket: ticket, completion: completion }
+}
+
+func workflow_runtime_context(timer: timer_service.TimerServiceState, task: task_service.TaskServiceState, object_store: object_store_service.ObjectStoreServiceState, update_store: update_store_service.UpdateStoreServiceState, lease: lease_service.LeaseServiceState, ticket: ticket_service.TicketServiceState, completion: completion_mailbox_service.CompletionMailboxServiceState, connection: connection_service.ConnectionServiceState, workset_generation: u8, ticket_generation: u8) WorkflowRuntimeContext {
+    return WorkflowRuntimeContext{ timer: timer, task: task, object_store: object_store, update_store: update_store, lease: lease, ticket: ticket, completion: completion, connection: connection, workset_generation: workset_generation, ticket_generation: ticket_generation }
+}
+
+func workflow_step_context(runtime: WorkflowRuntimeContext, journal: journal_service.JournalServiceState) WorkflowStepContext {
+    return WorkflowStepContext{ runtime: runtime, journal: journal }
 }
 
 func workflow_step_result(workflow: WorkflowServiceState, timer: timer_service.TimerServiceState, task: task_service.TaskServiceState, object_store: object_store_service.ObjectStoreServiceState, update_store: update_store_service.UpdateStoreServiceState, journal: journal_service.JournalServiceState, lease: lease_service.LeaseServiceState, ticket: ticket_service.TicketServiceState, completion: completion_mailbox_service.CompletionMailboxServiceState, effect: service_effect.Effect) WorkflowStepResult {

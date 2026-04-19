@@ -5,7 +5,7 @@ import scenario_transport
 import service_effect
 import service_topology
 import syscall
-import workflow_core
+import workflow/core
 
 const FAIL_OBJECT_VERSION_SETUP: i32 = 25401
 const FAIL_OBJECT_VERSION_CREATE: i32 = 25402

@@ -104,8 +104,14 @@ bool EquivalentVariantSummary(const VariantSummary& left, const VariantSummary& 
 
 }  // namespace
 
+std::string ImportedModuleQualifier(std::string_view module_name) {
+    std::string qualifier(module_name);
+    std::replace(qualifier.begin(), qualifier.end(), '/', '_');
+    return qualifier;
+}
+
 std::string QualifyImportedName(std::string_view module_name, std::string_view name) {
-    return std::string(module_name) + "." + std::string(name);
+    return ImportedModuleQualifier(module_name) + "." + std::string(name);
 }
 
 TypeDeclSummary RewriteImportedTypeDecl(const TypeDeclSummary& type_decl,

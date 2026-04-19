@@ -13,7 +13,7 @@ Rules
 - Keep compiler, sema, MIR, backend, ABI, target, runtime, and `hal` surfaces closed unless a narrow blocker forces a local change.
 - Add modules only when a specific phase boundary needs them, at the lean behavioral minimum the four-section standard allows.
 
-Current scope (Phase 153)
+Current scope (through Phase 271)
 
 - All three canonical service shapes are present: forwarding (`serial_service`, `shell_service`, `serial_shell_path`), append/tail (`log_service`), and key/value (`kv_service`).
 - The compact shell route now reaches `log_service` and `kv_service` over the real reset-lane path instead of stopping at shell-local echo behavior.
@@ -25,13 +25,14 @@ Current scope (Phase 153)
 - The kernel image entry is [`kernel/src/main.mc`](src/main.mc): thin init-plus-loop entry owned by the active reset-lane tree rather than the retired proof-shaped predecessor.
 - The repo-owned project manifest is [`kernel/build.toml`](build.toml): direct workflow builds can target the active reset-lane tree without copying a fixture-local manifest.
 - The lane is wired into the build through the repo-project entry plus the table-driven reset-lane workflow suite in `mc_tool_workflow_kernel_reset_lane_unit`.
+- The current app-facing slice now includes one bounded launcher-visible manifest family for `issue_rollup`; durable installed bytes remain on `update_store_service`, launcher exposes only the admitted query surface, and the lane still does not claim a filesystem or general asset API.
 
 Source tree layout (Phase 219)
 
 - `src/` root: `main.mc` (entry), `kernel_dispatch.mc` (routing), `event_codes.mc` (shared shell-event constants)
 - `src/boot/`: `boot.mc`, `boot_identity.mc`, `boot_update.mc`, `service_cell_helpers.mc`, `init.mc`
 - `src/identity/`: `identity_taxonomy.mc`, `program_catalog.mc`, `service_identity.mc`, `service_state.mc`, `service_topology.mc`
-- `src/services/`: `completion_mailbox_service.mc`, `connection_service.mc`, `echo_service.mc`, `file_service.mc`, `journal_service.mc`, `kv_service.mc`, `launcher_service.mc`, `lease_service.mc`, `log_service.mc`, `object_store_service.mc`, `queue_service.mc`, `task_service.mc`, `ticket_service.mc`, `timer_service.mc`, `transfer_grant.mc`, `transfer_service.mc`, `update_store_service.mc`, `workflow_service.mc`
+- `src/services/`: `completion_mailbox_service.mc`, `connection_service.mc`, `echo_service.mc`, `file_service.mc`, `journal_service.mc`, `kv_service.mc`, `launcher_service.mc`, `lease_service.mc`, `log_service.mc`, `object_store_service.mc`, `queue_service.mc`, `task_service.mc`, `ticket_service.mc`, `timer_service.mc`, `transfer_grant.mc`, `transfer_service.mc`, `update_store_service.mc`, `workflow/service.mc`
 - `src/shell/`: `serial_protocol.mc`, `serial_service.mc`, `serial_shell_event_log.mc`, `serial_shell_path.mc`, `shell_service.mc`
 - `src/scenarios/`: `scenarios.mc` and all `scenario_*.mc` files
 - `src/transport/`: `primitives.mc`, `syscall.mc`, `ipc.mc`, `service_effect.mc`
@@ -50,6 +51,15 @@ The following modules are deferred until the named phase boundary forces them:
 
 Recent service targets
 
+- Phase 271 (landed): bounded app asset and manifest follow-through. The first
+  admitted non-code app payload stays on the existing installed-program bytes
+  owned by `update_store_service`, while `launcher_service.mc` exposes one
+  additive manifest query for the selected and installed `issue_rollup` entry.
+  The hosted `issue_rollup` project now keeps render policy explicitly
+  manifest-backed through an app-local helper without changing its default
+  behavior. The focused reset-lane fixture is
+  `tests/system/kernel_reset_lane_phase271_app_manifest`.
+
 - Phase 268 (landed): bounded launcher service first slice. `program_catalog.mc`
   now owns one fixed launch descriptor table for `issue_rollup` and
   `review_board`, while `launcher_service.mc` owns explicit selection,
@@ -60,7 +70,7 @@ Recent service targets
 
 - Phase 245 (landed): update recovery and completion reporting pressure.
   Delegated update apply now proves one composed backlog-plus-restart path on
-  the existing owners: `workflow_service.mc` keeps the pending update outcome
+  the existing owners: `workflow/service.mc` keeps the pending update outcome
   on `WORKFLOW_STATE_DELIVERING`, `completion_mailbox_service.mc` still owns
   first-full `Exhausted` then repeated-full `WouldBlock`,
   `update_store_service.mc` keeps durable applied-target truth visible while
@@ -82,7 +92,7 @@ Recent service targets
   connection-backed workflow results now keep request occupancy truth in
   `connection_service` until completion delivery actually succeeds, so
   mailbox-full retry does not falsely free the ingress slot early.
-  `workflow_service.mc` still owns bounded retry and terminal-outcome truth,
+  `workflow/service.mc` still owns bounded retry and terminal-outcome truth,
   `completion_mailbox_service.mc` still owns queue-full `Exhausted` then
   `WouldBlock`, and the phase proves one external backlog-plus-stall lane
   through `scenario_connection_completion_pressure.mc`. The focused reset-lane
@@ -90,7 +100,7 @@ Recent service targets
   `tests/system/kernel_reset_lane_phase240_external_ingress_completion_pressure`.
 
 - Phase 239 (landed): connection-backed workflow execution. `connection_service.mc`,
-  `workflow_service.mc`, and `kernel_dispatch.mc` now admit one explicit
+  `workflow/service.mc`, and `kernel_dispatch.mc` now admit one explicit
   `connection execute` handoff that keeps connection lifetime truth owner-local
   while routing one bounded ingress request shape into the retained workflow
   substrate. The workflow path delivers explicit executed, cancelled, and
@@ -99,7 +109,7 @@ Recent service targets
   reset-lane fixture is
   `tests/system/kernel_reset_lane_phase239_connection_backed_workflow`.
 
-- Phase 235 (landed): restart-safe named object update workflow. `workflow_service.mc`
+- Phase 235 (landed): restart-safe named object update workflow. `workflow/service.mc`
   now admits one compact `OW<name><value>` path that waits on the existing
   restart-safe workflow substrate, applies one owner-local update through
   `object_store_service.object_update(...)`, and delivers explicit updated,

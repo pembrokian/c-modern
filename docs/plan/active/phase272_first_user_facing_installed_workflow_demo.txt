@@ -108,7 +108,7 @@ Main files and navigations
 - Primary controlling owners: the Phase 268 launcher owner, the Phase 269
   install-slot owner, the Phase 270 restart-truth owner, the Phase 271 asset
   or manifest path, and the chosen program under `examples/real/`.
-- First-hop adjacent files: `kernel/src/services/workflow_service.mc`,
+- First-hop adjacent files: `kernel/src/services/workflow/service.mc`,
   `kernel/src/services/completion_mailbox_service.mc`,
   `kernel/src/kernel_dispatch.mc`, and the program's real-project tests.
 - Nearby accelerator docs: `docs/agent/prompts/test_overview.txt`,
@@ -126,7 +126,7 @@ Relevant cookbook patterns
 
 Relevant file-local invariants
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-- `workflow_service.mc` and `completion_mailbox_service.mc` keep execution and
+- `workflow/service.mc` and `completion_mailbox_service.mc` keep execution and
   reporting truth; the demo should consume those owners, not replace them.
 - The chosen program remains an ordinary repository-owned program, not a new
   framework anchor.

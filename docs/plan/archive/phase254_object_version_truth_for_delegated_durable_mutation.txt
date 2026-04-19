@@ -54,7 +54,7 @@ Invariants
 ----------
 - `object_store_service` remains the owner of durable named-object truth.
 - `lease_service` remains the owner of temporary delegated authority.
-- `workflow_core.mc` remains the owner of workflow state meaning.
+- `workflow/core.mc` remains the owner of workflow state meaning.
 - Restart and reload semantics remain explicit and owner-local.
 - The four-byte shell frame stays fixed unless a later phase proves it is the
   controlling blocker.
@@ -150,10 +150,10 @@ Main files and navigations
 - Primary controlling owners: `kernel/src/services/object_store_service.mc`
   for durable object truth and `kernel/src/services/lease_service.mc` for the
   delegated stale boundary.
-- First-hop adjacent files: `kernel/src/services/workflow_core.mc`,
-  `kernel/src/services/workflow_protocol.mc`,
-  `kernel/src/services/workflow_advance.mc`,
-  `kernel/src/services/workflow_restart.mc`, and the existing delegated object
+- First-hop adjacent files: `kernel/src/services/workflow/core.mc`,
+  `kernel/src/services/workflow/protocol.mc`,
+  `kernel/src/services/workflow/advance.mc`,
+  `kernel/src/services/workflow/restart.mc`, and the existing delegated object
   scenario plus fixture.
 - Nearby accelerator docs: `docs/plan/active/phase236_delegated_named_object_processing_lane.txt`
   and `docs/agent/prompts/kernel_file_invariants.txt` for the object-store,
@@ -179,8 +179,8 @@ Relevant file-local invariants
 - `kernel/src/services/lease_service.mc` owns lease ids, kinds, and generation-
   aware delegation coupling; it may capture object version for stale checks,
   but it must not redefine object ownership.
-- `kernel/src/services/workflow_core.mc` owns workflow state meaning, while
-  `workflow_protocol.mc`, `workflow_advance.mc`, and `workflow_restart.mc` own
+- `kernel/src/services/workflow/core.mc` owns workflow state meaning, while
+  `workflow/protocol.mc`, `workflow/advance.mc`, and `workflow/restart.mc` own
   message orchestration, progression, and restart sync respectively; version
   work should respect that split.
 - Narrow validation should start on the delegated object path before any wider

@@ -9,6 +9,24 @@ FUNCTION_DECL: identity_target_has_direct_generation
    Return: bool
    Param: u8 target
 
+==== kernel/src/identity/program_catalog.mc ====
+STRUCT_DECL: ProgramLaunchDescriptor
+STRUCT_DECL: ProgramDescriptor
+FUNCTION_DECL: program_count
+   Return: usize
+FUNCTION_DECL: program_descriptor_at
+   Return: ProgramDescriptor
+   Param: usize index
+FUNCTION_DECL: program_descriptor_for_id
+   Return: ProgramDescriptor
+   Param: u8 id
+FUNCTION_DECL: program_descriptor_is_valid
+   Return: bool
+   Param: ProgramDescriptor desc
+FUNCTION_DECL: program_launch_kind_code
+   Return: u8
+   Param: ProgramDescriptor desc
+
 ==== kernel/src/identity/service_identity.mc ====
 STRUCT_DECL: ServiceRef
 STRUCT_DECL: ServiceMark

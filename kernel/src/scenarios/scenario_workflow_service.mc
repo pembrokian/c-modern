@@ -5,7 +5,7 @@ import scenario_transport
 import serial_protocol
 import service_effect
 import syscall
-import workflow_core
+import workflow/core
 
 const FAIL_WORKFLOW_SCHEDULE: i32 = 2312
 const FAIL_WORKFLOW_WAITING: i32 = 2313

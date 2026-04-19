@@ -32,9 +32,9 @@ import ticket_service
 import timer_service
 import transfer_service
 import update_store_service
-import workflow_core
-import workflow_restart
-import workflow_service
+import workflow/core
+import workflow/restart
+import workflow/service
 
 struct RestartPolicyInfo {
     target: u8

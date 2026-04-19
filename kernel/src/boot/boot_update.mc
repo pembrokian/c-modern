@@ -18,7 +18,7 @@ import timer_service
 import transfer_grant
 import transfer_service
 import update_store_service
-import workflow_core
+import workflow/core
 
 func bootwith_log(s: KernelBootState, log: log_service.LogServiceState) KernelBootState {
     return s with { log: service_cell_helpers.service_cell_with_state<log_service.LogServiceState>(s.log, log) }

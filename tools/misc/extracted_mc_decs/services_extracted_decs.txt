@@ -337,6 +337,65 @@ FUNCTION_DECL: kv_count
    Return: usize
    Param: KvServiceState s
 
+==== kernel/src/services/launcher_service.mc ====
+STRUCT_DECL: LauncherServiceState
+STRUCT_DECL: LauncherResult
+FUNCTION_DECL: launcher_result
+   Return: LauncherResult
+   Param: LauncherServiceState state
+   Param: update_store_service.UpdateStoreServiceState update_store
+   Param: service_effect.Effect effect
+FUNCTION_DECL: launcher_init
+   Return: LauncherServiceState
+   Param: u32 pid
+   Param: u32 slot
+FUNCTION_DECL: launcherwith
+   Return: LauncherServiceState
+   Param: LauncherServiceState s
+   Param: u8 selected
+   Param: u8 foreground
+   Param: u8 launches
+FUNCTION_DECL: launcher_reply
+   Return: service_effect.Effect
+   Param: syscall.SyscallStatus status
+   Param: usize len
+   Param: u8 b0
+   Param: u8 b1
+   Param: u8 b2
+   Param: u8 b3
+FUNCTION_DECL: launcher_list
+   Return: LauncherResult
+   Param: LauncherServiceState s
+   Param: update_store_service.UpdateStoreServiceState update_store
+FUNCTION_DECL: launcher_identify
+   Return: LauncherResult
+   Param: LauncherServiceState s
+   Param: update_store_service.UpdateStoreServiceState update_store
+FUNCTION_DECL: launcher_select
+   Return: LauncherResult
+   Param: LauncherServiceState s
+   Param: update_store_service.UpdateStoreServiceState update_store
+   Param: u8 id
+FUNCTION_DECL: launcher_launch_classification
+   Return: u8
+   Param: update_store_service.UpdateStoreServiceState update_store
+   Param: u8 program
+   Param: u32 launcher_generation
+FUNCTION_DECL: launcher_launch
+   Return: LauncherResult
+   Param: LauncherServiceState s
+   Param: update_store_service.UpdateStoreServiceState update_store
+   Param: u32 launcher_generation
+FUNCTION_DECL: handle
+   Return: LauncherResult
+   Param: LauncherServiceState s
+   Param: update_store_service.UpdateStoreServiceState update_store
+   Param: u32 launcher_generation
+   Param: service_effect.Message m
+FUNCTION_DECL: launcher_foreground_id
+   Return: u8
+   Param: LauncherServiceState s
+
 ==== kernel/src/services/lease_service.mc ====
 STRUCT_DECL: LeaseServiceState
 STRUCT_DECL: LeaseResult
@@ -863,13 +922,16 @@ FUNCTION_DECL: handle
 
 ==== kernel/src/services/update_store_service.mc ====
 STRUCT_DECL: UpdateManifest
-STRUCT_DECL: AppliedUpdateTarget
+STRUCT_DECL: InstalledProgramSlot
+STRUCT_DECL: InstalledLaunchRecord
 STRUCT_DECL: UpdateStoreServiceState
 STRUCT_DECL: UpdateStoreResult
 FUNCTION_DECL: update_manifest_init
    Return: UpdateManifest
-FUNCTION_DECL: update_applied_init
-   Return: AppliedUpdateTarget
+FUNCTION_DECL: update_installed_init
+   Return: InstalledProgramSlot
+FUNCTION_DECL: update_launch_init
+   Return: InstalledLaunchRecord
 FUNCTION_DECL: update_store_init
    Return: UpdateStoreServiceState
    Param: u32 pid
@@ -880,19 +942,40 @@ FUNCTION_DECL: update_storewith
    Param: usize len
    Param: [UPDATE_ARTIFACT_CAPACITY]u8 data
    Param: UpdateManifest manifest
-   Param: AppliedUpdateTarget applied
+   Param: InstalledProgramSlot installed
+   Param: InstalledLaunchRecord launched
 FUNCTION_DECL: update_manifest_equal
    Return: bool
    Param: UpdateManifest left
    Param: UpdateManifest right
-FUNCTION_DECL: update_applied_equal
+FUNCTION_DECL: update_installed_equal
    Return: bool
-   Param: AppliedUpdateTarget left
-   Param: AppliedUpdateTarget right
+   Param: InstalledProgramSlot left
+   Param: InstalledProgramSlot right
+FUNCTION_DECL: update_launch_equal
+   Return: bool
+   Param: InstalledLaunchRecord left
+   Param: InstalledLaunchRecord right
 FUNCTION_DECL: update_store_changed
    Return: bool
    Param: UpdateStoreServiceState before
    Param: UpdateStoreServiceState after
+FUNCTION_DECL: update_installed_present
+   Return: bool
+   Param: UpdateStoreServiceState s
+FUNCTION_DECL: update_installed_program_id
+   Return: u8
+   Param: UpdateStoreServiceState s
+FUNCTION_DECL: update_installed_version
+   Return: u8
+   Param: UpdateStoreServiceState s
+FUNCTION_DECL: update_installed_len
+   Return: usize
+   Param: UpdateStoreServiceState s
+FUNCTION_DECL: update_installed_byte
+   Return: u8
+   Param: UpdateStoreServiceState s
+   Param: usize idx
 FUNCTION_DECL: update_applied_present
    Return: bool
    Param: UpdateStoreServiceState s
@@ -906,6 +989,24 @@ FUNCTION_DECL: update_applied_byte
    Return: u8
    Param: UpdateStoreServiceState s
    Param: usize idx
+FUNCTION_DECL: update_launched_present
+   Return: bool
+   Param: UpdateStoreServiceState s
+FUNCTION_DECL: update_launched_program_id
+   Return: u8
+   Param: UpdateStoreServiceState s
+FUNCTION_DECL: update_launched_generation
+   Return: u32
+   Param: UpdateStoreServiceState s
+FUNCTION_DECL: update_launch_matches_installed_program
+   Return: bool
+   Param: UpdateStoreServiceState s
+   Param: u8 program
+FUNCTION_DECL: update_record_launch
+   Return: UpdateStoreServiceState
+   Param: UpdateStoreServiceState s
+   Param: u8 program
+   Param: u32 launcher_generation
 FUNCTION_DECL: update_manifest_classification
    Return: u8
    Param: UpdateStoreServiceState s
@@ -914,6 +1015,9 @@ FUNCTION_DECL: update_artifact_len
    Param: UpdateStoreServiceState s
 FUNCTION_DECL: update_store_artifact_bytes
    Return: [UPDATE_STORE_ARTIFACT_SIZE]u8
+   Param: UpdateStoreServiceState s
+FUNCTION_DECL: update_store_launch_bytes
+   Return: [UPDATE_STORE_LAUNCH_RECORD_SIZE]u8
    Param: UpdateStoreServiceState s
 FUNCTION_DECL: update_store_persist
    Return: bool

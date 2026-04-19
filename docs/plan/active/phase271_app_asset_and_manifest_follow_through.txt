@@ -3,7 +3,7 @@ Phase 271 -- App Asset And Manifest Follow-Through
 
 Status
 ------
-PROPOSED
+COMPLETED
 
 Purpose
 -------
@@ -162,6 +162,37 @@ Acceptance criteria
 - the launch or install path remains bounded and explicit
 - the phase prepares a credible first installed app demo without widening into
   package or resource frameworks
+
+Implementation outcome
+----------------------
+- The chosen first consumer is `issue_rollup`.
+- The admitted payload is one compact three-byte manifest family carried by the
+  existing installed-program bytes on `update_store_service`.
+- `update_store_service` remains the durable owner of installed bytes and
+  installed-program identity.
+- `launcher_service` exposes one bounded manifest query for the selected and
+  installed `issue_rollup` entry instead of widening into a resource API.
+- `issue_rollup` now consumes an app-local manifest helper that keeps default
+  hosted behavior stable while making render policy explicitly manifest-backed.
+- Validation landed as one focused reset-lane fixture plus the existing
+  `issue_rollup` real-project test surface.
+
+Phase review
+------------
+- Preserved invariants: no filesystem, no arbitrary package/resource API, no
+  launcher-owned app content, and no widening of update-store into a general
+  package schema.
+- Ownership stayed explicit: durable bytes remain on `update_store_service`,
+  app-facing manifest access remains on `launcher_service`, and app policy stays
+  app-local inside `issue_rollup`.
+- Important non-decisions: no second app consumer, no manifest discovery
+  surface, no general asset loader, no shell-visible manifest API, and no
+  broader install metadata family.
+- Deferred follow-through: admit a second manifest or asset family only when a
+  real second consumer appears and cannot stay honest on the current bounded
+  `issue_rollup`-only path.
+- Accidental centers of gravity were avoided: neither launcher nor update-store
+  became a package manager, filesystem, or resource registry.
 
 Future follow-up
 ----------------

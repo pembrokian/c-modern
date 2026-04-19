@@ -7,7 +7,7 @@ import scenario_transport
 import serial_protocol
 import service_effect
 import syscall
-import workflow_core
+import workflow/core
 
 const FAIL_EXTERNAL_TICKET_OPEN_0: i32 = 24101
 const FAIL_EXTERNAL_TICKET_OPEN_1: i32 = 24135

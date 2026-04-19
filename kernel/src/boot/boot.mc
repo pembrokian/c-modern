@@ -29,7 +29,7 @@ import timer_service
 import transfer_grant
 import transfer_service
 import update_store_service
-import workflow_core
+import workflow/core
 
 enum RetainedSummaryParticipation {
     None,

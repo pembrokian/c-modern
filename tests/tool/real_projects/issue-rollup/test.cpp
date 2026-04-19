@@ -37,7 +37,7 @@ void ExpectIssueRollupTestOutput(std::string_view output,
                          "testing target issue-rollup",
                          context_prefix + ": should announce the grouped-root target under test");
     ExpectOutputContains(output,
-                         "ordinary tests target issue-rollup: 3 cases, mode=checked, timeout=5000 ms",
+                         "ordinary tests target issue-rollup: 4 cases, mode=checked, timeout=5000 ms",
                          context_prefix + ": should print the ordinary test scope");
     ExpectOutputContains(output,
                          "PASS model_total_items_test.test_model_total_items",
@@ -46,13 +46,16 @@ void ExpectIssueRollupTestOutput(std::string_view output,
                          "PASS parse_summary_test.test_parse_summary",
                          context_prefix + ": should include parse-package coverage");
     ExpectOutputContains(output,
+                         "PASS manifest_profile_test.test_manifest_profile",
+                         context_prefix + ": should include manifest-package coverage");
+    ExpectOutputContains(output,
                          "PASS render_kind_test.test_render_kind",
                          context_prefix + ": should include render-package coverage");
     ExpectOutputContains(output,
-                         "3 tests, 3 passed, 0 failed",
+                         "4 tests, 4 passed, 0 failed",
                          context_prefix + ": should print the deterministic summary");
     ExpectOutputContains(output,
-                         "PASS ordinary tests for target issue-rollup (3 cases)",
+                         "PASS ordinary tests for target issue-rollup (4 cases)",
                          context_prefix + ": should print the ordinary-test verdict");
     ExpectOutputContains(output,
                          "PASS target issue-rollup",

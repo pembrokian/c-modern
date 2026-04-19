@@ -613,15 +613,15 @@ Usual validation:
 - lease, delegated installer, delegated object, or delegated external request
   fixtures
 
-File: `kernel/src/services/workflow_core.mc`
+File: `kernel/src/services/workflow/core.mc`
 Owns:
 - the canonical workflow state model
 - workflow constants, state encodings, record helpers, snapshot and lane bytes
 - schedule, query, cancel, and core state-transition helpers
 
 Local invariants:
-- workflow semantic truth lives here, not in `workflow_protocol.mc` or
-  `workflow_advance.mc`
+- workflow semantic truth lives here, not in `workflow/protocol.mc` or
+  `workflow/advance.mc`
 - snapshot and restart-visible workflow representation stay explicit here
 - workflow state and restart code bytes are canonical and reused across the
   workflow family
@@ -644,7 +644,7 @@ Usual validation:
 - workflow service, connection-backed workflow, object-update workflow, update-
   apply workflow, and pressure fixtures as applicable
 
-File: `kernel/src/services/workflow_protocol.mc`
+File: `kernel/src/services/workflow/protocol.mc`
 Owns:
 - message-level workflow command handling
 - orchestration of schedule, cancel, and step flow across workflow, timer,
@@ -656,9 +656,9 @@ Local invariants:
 - it owns the order in which workflow stepping touches other services
 
 Do not move into this file:
-- canonical workflow state encoding from `workflow_core.mc`
-- low-level advance helpers that belong in `workflow_advance.mc`
-- restart synchronization that belongs in `workflow_restart.mc`
+- canonical workflow state encoding from `workflow/core.mc`
+- low-level advance helpers that belong in `workflow/advance.mc`
+- restart synchronization that belongs in `workflow/restart.mc`
 
 Safe editing rules:
 - if the bug is about how a workflow message is executed through the service
@@ -669,7 +669,7 @@ Safe editing rules:
 Usual validation:
 - owning workflow fixture for the message family being changed
 
-File: `kernel/src/services/workflow_advance.mc`
+File: `kernel/src/services/workflow/advance.mc`
 Owns:
 - automatic workflow progression from waiting or running or delivering states
 - delegated connection and delegated update-apply execution helpers
@@ -677,7 +677,7 @@ Owns:
 Local invariants:
 - progression on timer or task or delegated execution boundaries is owned here
 - this file advances workflow state using other services, but workflow state
-  meaning still comes from `workflow_core.mc`
+  meaning still comes from `workflow/core.mc`
 - delegated object-version checks fire here at commit time by calling back into
   `object_store_service`, not by moving durable object truth into workflow
 
@@ -696,7 +696,7 @@ Usual validation:
 - connection-backed workflow, delegated request, update apply, or recovery
   pressure fixtures
 
-File: `kernel/src/services/workflow_restart.mc`
+File: `kernel/src/services/workflow/restart.mc`
 Owns:
 - workflow restart synchronization with the journal lane
 - workflow reload and restart-resume helpers
@@ -714,7 +714,7 @@ Safe editing rules:
 - restart-resume or journal-sync bugs start here when core state shape is
   already correct
 - preserve the explicit restart seam rather than spreading restart logic across
-  `workflow_protocol.mc` and `workflow_advance.mc`
+  `workflow/protocol.mc` and `workflow/advance.mc`
 
 Usual validation:
 - restart, retained-summary, delegated workflow, or update recovery fixtures
@@ -776,7 +776,7 @@ Editing rule:
   or workflow surfaces unless the feature truly crosses that boundary
 
 File group: thin or naming-only helpers such as `event_codes.mc`,
-`identity_taxonomy.mc`, `workflow_service.mc`, and most individual
+`identity_taxonomy.mc`, `workflow/service.mc`, and most individual
 `scenario_*.mc` files
 Status:
 - important to callers, but not major multi-owner control surfaces
@@ -805,12 +805,12 @@ If the task is mainly about:
 - runtime routing or effect chasing: start in `kernel/src/kernel_dispatch.mc`
 - one bounded service state machine: start in the owning file under
   `kernel/src/services`
-- workflow state meaning: start in `kernel/src/services/workflow_core.mc`
+- workflow state meaning: start in `kernel/src/services/workflow/core.mc`
 - workflow message handling or multi-service orchestration: start in
-  `kernel/src/services/workflow_protocol.mc`
+  `kernel/src/services/workflow/protocol.mc`
 - workflow automatic progression or delegated execution: start in
-  `kernel/src/services/workflow_advance.mc`
+  `kernel/src/services/workflow/advance.mc`
 - workflow restart or journal sync: start in
-  `kernel/src/services/workflow_restart.mc`
+  `kernel/src/services/workflow/restart.mc`
 - scenario registration or repo-owned probe sequencing: start in
   `kernel/src/scenarios/scenarios.mc`

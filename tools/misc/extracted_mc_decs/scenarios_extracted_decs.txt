@@ -262,6 +262,25 @@ FUNCTION_DECL: expect_replay
 FUNCTION_DECL: run_journal_service_probe
    Return: i32
 
+==== kernel/src/scenarios/scenario_launcher_service.mc ====
+FUNCTION_DECL: expect_reply
+   Return: bool
+   Param: service_effect.Effect effect
+   Param: syscall.SyscallStatus status
+   Param: usize len
+   Param: u8 b0
+   Param: u8 b1
+   Param: u8 b2
+   Param: u8 b3
+FUNCTION_DECL: expect_workflow
+   Return: bool
+   Param: service_effect.Effect effect
+   Param: syscall.SyscallStatus status
+   Param: u8 state
+   Param: u8 restart
+FUNCTION_DECL: run_launcher_service_probe
+   Return: i32
+
 ==== kernel/src/scenarios/scenario_lease_service.mc ====
 FUNCTION_DECL: expect_workflow
    Return: bool
@@ -572,6 +591,15 @@ FUNCTION_DECL: cmd_queue_dequeue
 FUNCTION_DECL: cmd_queue_count
    Return: syscall.ReceiveObservation
 FUNCTION_DECL: cmd_queue_peek
+   Return: syscall.ReceiveObservation
+FUNCTION_DECL: cmd_launcher_list
+   Return: syscall.ReceiveObservation
+FUNCTION_DECL: cmd_launcher_identify
+   Return: syscall.ReceiveObservation
+FUNCTION_DECL: cmd_launcher_select
+   Return: syscall.ReceiveObservation
+   Param: u8 id
+FUNCTION_DECL: cmd_launcher_launch
    Return: syscall.ReceiveObservation
 FUNCTION_DECL: cmd_queue_stall_count
    Return: syscall.ReceiveObservation

@@ -17,8 +17,8 @@ import shell_service
 import task_service
 import timer_service
 import update_store_service
-import workflow_core
-import workflow_service
+import workflow/core
+import workflow/service
 
 // Named ServiceRef constants for the boot-wired services.
 // These refs are stable across restart -- the endpoint_id never changes after

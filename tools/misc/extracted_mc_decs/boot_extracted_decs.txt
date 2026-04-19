@@ -85,6 +85,9 @@ FUNCTION_DECL: boot_task_mark
 FUNCTION_DECL: boot_connection_mark
    Return: service_identity.ServiceMark
    Param: KernelBootState s
+FUNCTION_DECL: boot_launcher_mark
+   Return: service_identity.ServiceMark
+   Param: KernelBootState s
 FUNCTION_DECL: boot_journal_mark
    Return: service_identity.ServiceMark
    Param: KernelBootState s
@@ -251,10 +254,22 @@ FUNCTION_DECL: bootwith_connection_restart_outcome
    Return: KernelBootState
    Param: KernelBootState s
    Param: RestartOutcome connection_restart_outcome
+FUNCTION_DECL: bootwith_launcher
+   Return: KernelBootState
+   Param: KernelBootState s
+   Param: launcher_service.LauncherServiceState launcher
+FUNCTION_DECL: bootwith_launcher_restart_outcome
+   Return: KernelBootState
+   Param: KernelBootState s
+   Param: RestartOutcome launcher_restart_outcome
 FUNCTION_DECL: bootrestart_connection
    Return: KernelBootState
    Param: KernelBootState s
    Param: connection_service.ConnectionServiceState connection
+FUNCTION_DECL: bootrestart_launcher
+   Return: KernelBootState
+   Param: KernelBootState s
+   Param: launcher_service.LauncherServiceState launcher
 FUNCTION_DECL: bootrestart_task
    Return: KernelBootState
    Param: KernelBootState s
@@ -384,6 +399,9 @@ FUNCTION_DECL: restart_task
    Return: boot.KernelBootState
    Param: boot.KernelBootState state
 FUNCTION_DECL: restart_connection
+   Return: boot.KernelBootState
+   Param: boot.KernelBootState state
+FUNCTION_DECL: restart_launcher
    Return: boot.KernelBootState
    Param: boot.KernelBootState state
 FUNCTION_DECL: restart_journal

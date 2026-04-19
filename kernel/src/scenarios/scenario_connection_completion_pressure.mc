@@ -6,7 +6,7 @@ import primitives
 import scenario_transport
 import service_effect
 import syscall
-import workflow_core
+import workflow/core
 
 const FAIL_FILL_SCHEDULE_BASE: i32 = 24001
 const FAIL_FILL_RUNNING_BASE: i32 = 24005

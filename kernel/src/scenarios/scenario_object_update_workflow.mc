@@ -7,7 +7,7 @@ import serial_protocol
 import service_effect
 import service_topology
 import syscall
-import workflow_core
+import workflow/core
 
 const FAIL_UPDATE_SETUP: i32 = 23501
 const FAIL_UPDATE_CREATE: i32 = 23502

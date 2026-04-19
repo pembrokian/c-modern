@@ -6,7 +6,7 @@ import scenario_transport
 import serial_protocol
 import service_effect
 import syscall
-import workflow_core
+import workflow/core
 
 const FAIL_EXECUTE_OPEN: i32 = 23901
 const FAIL_EXECUTE_RECEIVE: i32 = 23902

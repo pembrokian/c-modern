@@ -68,6 +68,15 @@ FUNCTION_DECL: encode_queue_count
    Return: [4]u8
 FUNCTION_DECL: encode_queue_peek
    Return: [4]u8
+FUNCTION_DECL: encode_launcher_list
+   Return: [4]u8
+FUNCTION_DECL: encode_launcher_identify
+   Return: [4]u8
+FUNCTION_DECL: encode_launcher_select
+   Return: [4]u8
+   Param: u8 id
+FUNCTION_DECL: encode_launcher_launch
+   Return: [4]u8
 FUNCTION_DECL: encode_queue_stall_count
    Return: [4]u8
 FUNCTION_DECL: encode_ticket_issue
@@ -464,6 +473,27 @@ FUNCTION_DECL: queue_wait
    Return: service_effect.Effect
    Param: ShellServiceState s
    Param: service_effect.Message m
+FUNCTION_DECL: launcher_list
+   Return: service_effect.Effect
+   Param: ShellServiceState s
+   Param: service_effect.Message m
+FUNCTION_DECL: launcher_identify
+   Return: service_effect.Effect
+   Param: ShellServiceState s
+   Param: service_effect.Message m
+FUNCTION_DECL: launcher_select
+   Return: service_effect.Effect
+   Param: ShellServiceState s
+   Param: service_effect.Message m
+FUNCTION_DECL: launcher_launch
+   Return: service_effect.Effect
+   Param: ShellServiceState s
+   Param: service_effect.Message m
+FUNCTION_DECL: route_launcher
+   Return: service_effect.Effect
+   Param: ShellServiceState s
+   Param: service_effect.Message m
+   Param: u8 op
 FUNCTION_DECL: route_queue
    Return: service_effect.Effect
    Param: ShellServiceState s

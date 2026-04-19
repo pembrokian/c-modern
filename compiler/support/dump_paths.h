@@ -33,6 +33,7 @@ BuildArtifactTargets ComputeLogicalBuildArtifactTargets(std::string_view artifac
                                                         const std::filesystem::path& build_dir);
 
 std::string SanitizeArtifactStem(const std::filesystem::path& source_path);
+std::string SanitizeLogicalArtifactStem(std::string_view artifact_key);
 
 }  // namespace mc::support
 

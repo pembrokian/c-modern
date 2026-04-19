@@ -224,7 +224,9 @@ mc::parse::ParseResult MergeParsedModuleSources(std::vector<mc::parse::ParseResu
 
 std::string QualifyImportedSymbol(std::string_view module_name,
                                   std::string_view symbol_name) {
-    return std::string(module_name) + "." + std::string(symbol_name);
+    std::string qualifier(module_name);
+    std::replace(qualifier.begin(), qualifier.end(), '/', '_');
+    return qualifier + "." + std::string(symbol_name);
 }
 
 mc::mir::TypeDecl ConvertImportedTypeDecl(const mc::sema::TypeDeclSummary& type_decl) {

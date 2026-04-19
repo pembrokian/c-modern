@@ -4,7 +4,7 @@ import kernel_dispatch
 import scenario_transport
 import service_effect
 import syscall
-import workflow_core
+import workflow/core
 
 const FIRST_SUBMISSION_ID: u8 = 1
 

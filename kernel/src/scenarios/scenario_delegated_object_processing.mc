@@ -8,7 +8,7 @@ import serial_protocol
 import service_effect
 import service_topology
 import syscall
-import workflow_core
+import workflow/core
 
 const FAIL_DELEGATED_SETUP: i32 = 23601
 const FAIL_DELEGATED_CREATE: i32 = 23602

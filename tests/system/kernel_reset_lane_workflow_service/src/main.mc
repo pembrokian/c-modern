@@ -4,7 +4,7 @@ import scenario_transport
 import serial_protocol
 import service_effect
 import syscall
-import workflow_core
+import workflow/core
 
 func expect_state(effect: service_effect.Effect, state: u8, restart: u8) bool {
     if service_effect.effect_reply_status(effect) != syscall.SyscallStatus.Ok {

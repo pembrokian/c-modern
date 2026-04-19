@@ -7,7 +7,7 @@ import service_effect
 import service_topology
 import serial_protocol
 import syscall
-import workflow_core
+import workflow/core
 
 const FAIL_LEASE_SCHEDULE_7: i32 = 23301
 const FAIL_LEASE_RUNNING_7: i32 = 23302

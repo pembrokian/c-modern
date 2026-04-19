@@ -6,7 +6,7 @@ import serial_protocol
 import service_effect
 import syscall
 import update_store_service
-import workflow_core
+import workflow/core
 
 const FAIL_INSTALLER_SETUP: i32 = 24401
 const FAIL_INSTALLER_STAGE0: i32 = 24402

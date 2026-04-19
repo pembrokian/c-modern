@@ -49,8 +49,19 @@ struct LeaseResult {
     third: u8
 }
 
+struct LeaseContext {
+    object_store: object_store_service.ObjectStoreServiceState
+    completion_generation: u8
+    workset_generation: u8
+    ticket_generation: u8
+}
+
 func lease_init(pid: u32, slot: u32) LeaseServiceState {
     return LeaseServiceState{ pid: pid, slot: slot, next: 1, ids: primitives.zero_payload(), kinds: primitives.zero_payload(), firsts: primitives.zero_payload(), seconds: primitives.zero_payload(), thirds: primitives.zero_payload(), gens: primitives.zero_payload(), len: 0 }
+}
+
+func lease_context(object_store: object_store_service.ObjectStoreServiceState, completion_generation: u8, workset_generation: u8, ticket_generation: u8) LeaseContext {
+    return LeaseContext{ object_store: object_store, completion_generation: completion_generation, workset_generation: workset_generation, ticket_generation: ticket_generation }
 }
 
 func leasewith(s: LeaseServiceState, next: u8, ids: [LEASE_CAPACITY]u8, kinds: [LEASE_CAPACITY]u8, firsts: [LEASE_CAPACITY]u8, seconds: [LEASE_CAPACITY]u8, thirds: [LEASE_CAPACITY]u8, gens: [LEASE_CAPACITY]u8, len: usize) LeaseServiceState {
@@ -222,7 +233,7 @@ func lease_consume_external_ticket(s: LeaseServiceState, id: u8, generation: u8)
     return LeaseResult{ state: s, effect: lease_failure(LEASE_INVALID), op: LEASE_OP_NONE, first: 0, second: 0, third: 0 }
 }
 
-func handle(s: LeaseServiceState, object_store: object_store_service.ObjectStoreServiceState, m: service_effect.Message, completion_generation: u8, workset_generation: u8, ticket_generation: u8) LeaseResult {
+func handle(s: LeaseServiceState, ctx: LeaseContext, m: service_effect.Message) LeaseResult {
     if m.payload_len == 0 {
         return LeaseResult{ state: s, effect: lease_failure(LEASE_INVALID), op: LEASE_OP_NONE, first: 0, second: 0, third: 0 }
     }
@@ -232,32 +243,32 @@ func handle(s: LeaseServiceState, object_store: object_store_service.ObjectStore
         if m.payload_len != 2 {
             return LeaseResult{ state: s, effect: lease_failure(LEASE_INVALID), op: LEASE_OP_NONE, first: 0, second: 0, third: 0 }
         }
-        return lease_issue_completion(s, m.payload[1], completion_generation)
+        return lease_issue_completion(s, m.payload[1], ctx.completion_generation)
     case LEASE_CMD_ISSUE_INSTALLER_APPLY:
         if m.payload_len != 1 {
             return LeaseResult{ state: s, effect: lease_failure(LEASE_INVALID), op: LEASE_OP_NONE, first: 0, second: 0, third: 0 }
         }
-        return lease_issue_installer_apply(s, workset_generation)
+        return lease_issue_installer_apply(s, ctx.workset_generation)
     case LEASE_CMD_CONSUME_COMPLETION:
         if m.payload_len != 3 {
             return LeaseResult{ state: s, effect: lease_failure(LEASE_INVALID), op: LEASE_OP_NONE, first: 0, second: 0, third: 0 }
         }
-        return lease_consume_completion(s, m.payload[1], m.payload[2], completion_generation)
+        return lease_consume_completion(s, m.payload[1], m.payload[2], ctx.completion_generation)
     case LEASE_CMD_ISSUE_OBJECT_UPDATE:
         if m.payload_len != 3 {
             return LeaseResult{ state: s, effect: lease_failure(LEASE_INVALID), op: LEASE_OP_NONE, first: 0, second: 0, third: 0 }
         }
-        return lease_issue_object_update(s, object_store, m.payload[1], m.payload[2], workset_generation)
+        return lease_issue_object_update(s, ctx.object_store, m.payload[1], m.payload[2], ctx.workset_generation)
     case LEASE_CMD_ISSUE_EXTERNAL_TICKET:
         if m.payload_len != 3 {
             return LeaseResult{ state: s, effect: lease_failure(LEASE_INVALID), op: LEASE_OP_NONE, first: 0, second: 0, third: 0 }
         }
-        return lease_issue_external_ticket(s, m.payload[1], m.payload[2], ticket_generation)
+        return lease_issue_external_ticket(s, m.payload[1], m.payload[2], ctx.ticket_generation)
     case LEASE_CMD_CONSUME_OBJECT_UPDATE:
         if m.payload_len != 2 {
             return LeaseResult{ state: s, effect: lease_failure(LEASE_INVALID), op: LEASE_OP_NONE, first: 0, second: 0, third: 0 }
         }
-        return lease_consume_object_update(s, m.payload[1], workset_generation)
+        return lease_consume_object_update(s, m.payload[1], ctx.workset_generation)
     default:
         return LeaseResult{ state: s, effect: lease_failure(LEASE_INVALID), op: LEASE_OP_NONE, first: 0, second: 0, third: 0 }
     }

@@ -517,7 +517,14 @@ class FunctionLowerer {
     }
 
     bool IsImportedModuleName(std::string_view name) const {
-        return std::find(sema_module_.imports.begin(), sema_module_.imports.end(), name) != sema_module_.imports.end();
+        const auto normalized_import_name = [](std::string_view import_name) {
+            std::string normalized(import_name);
+            std::replace(normalized.begin(), normalized.end(), '/', '_');
+            return normalized;
+        };
+        return std::any_of(sema_module_.imports.begin(), sema_module_.imports.end(), [&](std::string_view import_name) {
+            return import_name == name || normalized_import_name(import_name) == name;
+        });
     }
 
     const sema::Module* FindImportedModule(std::string_view name) const {
