@@ -1,0 +1,154 @@
+Phase 277 -- Explicit Repaint Or Present Contract
+=================================================
+
+Status
+------
+PROPOSED
+
+Purpose
+-------
+Define one explicit repaint or present contract between the first foreground UI
+app and the first display owner so visible updates happen through a maintained
+surface contract rather than implicit redraw behavior.
+
+This phase exists now because input, display, and foreground routing should be
+explicit before the repository spends effort on richer rendering. The next
+honest move is one tiny redraw contract, not invalidation machinery or a scene
+graph.
+
+Repository status note
+----------------------
+- Phase 275 should admit one explicit display owner and one fixed surface.
+- Phase 276 should route one admitted input path to one foreground app.
+- `examples/real/issue_rollup/src/render/` already contains app-local render
+  selection logic, but not a maintained repaint contract with a display owner.
+- The repository still has no explicit answer to when or how the first UI app
+  asks the surface to refresh.
+
+Problem being solved
+--------------------
+- A first UI surface is incomplete without one explicit way to make a changed
+  app state visible.
+- Without a repaint or present contract, later rendering work would either be
+  hidden inside the display owner or duplicated as app-local redraw policy.
+- The first human-facing path needs one honest redraw boundary before the
+  repository can claim a usable app proof.
+
+Non-goals
+---------
+- no invalidation tree, dirty-region system, or scene graph
+- no animation framework or frame scheduler
+- no retained widget hierarchy or control toolkit
+- no shell-triggered redraw dashboard
+- no general render queue or compositor protocol
+
+Invariants
+----------
+- The repaint contract must stay explicit and bounded.
+- The display owner remains a surface owner, not an app-state owner.
+- The foreground app remains responsible for deciding what content to draw.
+- Launcher remains the foreground-policy owner only.
+- No hidden redraw loops, scene graphs, or retained UI frameworks may appear.
+
+Required surface changes
+------------------------
+1. Admit one explicit repaint or present request contract.
+2. Define which owner accepts that request and how it reports success or
+   bounded failure.
+3. Spend the contract on exactly one foreground app path.
+4. Add one fixture proving that visible updates happen through the explicit
+   contract rather than implicit redraw side effects.
+
+Forbidden changes
+-----------------
+- do not introduce dirty-region engines or animation loops
+- do not move app-local drawing policy into the display owner
+- do not widen launcher into redraw or render coordination
+- do not hide repaint behavior inside scenarios or ad hoc debug hooks
+
+Phase role in the larger sequence
+---------------------------------
+- This phase turns the first routed UI path into one explicit visible-update
+  loop.
+- It prepares the later fixed-font or cell-rendering path by making the app-
+  to-surface contract concrete.
+- It is the narrowest honest redraw slice before a human-facing app proof.
+
+Relevant backlog items this phase intentionally brings under pressure
+--------------------------------------------------------------------
+- keep presentation mechanics explicit and owner-local
+- keep the first UI slice out of retained-widget or compositor territory
+
+Questions this phase must answer
+--------------------------------
+1. What is the smallest honest present contract for the first surface?
+2. Which owner should accept repaint requests and which owner should keep app
+   render policy?
+3. What bounded failure or no-op outcome is needed when a present cannot occur?
+4. What proof demonstrates that repaint is explicit rather than accidental?
+
+Preferred implementation shape
+------------------------------
+- Keep the foreground app responsible for choosing when it needs a visible
+  refresh.
+- Keep the display owner responsible for surface update or present semantics.
+- Prefer one direct request-and-present path over any invalidation or retained
+  redraw layer.
+- Spend the contract on one app and one surface only.
+
+Implementation accelerators
+---------------------------
+Main files and navigations
+~~~~~~~~~~~~~~~~~~~~~~~~~~
+- Primary controlling owners: the Phase 275 display owner and the first app's
+  render entry under `examples/real/issue_rollup/src/render/`.
+- First-hop adjacent files: `kernel/src/services/launcher_service.mc`, the
+  Phase 276 foreground-routing seam, and `examples/real/issue_rollup/src/app/`.
+- Nearby accelerator docs: `docs/arch/veya/kernel_style_guide.txt`,
+  `docs/agent/prompts/kernel_file_invariants.txt`, and
+  `docs/agent/prompts/test_overview.txt`.
+- Expected first validation target when the owner changes: one repaint-contract
+  reset-lane fixture.
+
+Relevant cookbook patterns
+~~~~~~~~~~~~~~~~~~~~~~~~~~
+- No exact cookbook pattern fits; the phase is a contract-shaping slice between
+  one app and one display owner.
+
+Relevant file-local invariants
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+- The display owner owns surface update semantics only.
+- App-local render code under `examples/real/issue_rollup/src/render/` stays
+  the source of content policy.
+- Launcher and foreground routing must not become redraw coordinators.
+
+Relevant test surfaces
+~~~~~~~~~~~~~~~~~~~~~~
+- Primary owning validation surface: one reset-lane system fixture for the
+  repaint or present contract.
+- Narrowest expected first executable validation target: the Phase 277 fixture.
+- Supporting validation: `mc_tool_workflow_kernel_reset_lane_unit` and one
+  narrow app-consumer build or run if the contract changes app code.
+
+Test obligations
+----------------
+- `Build debug`
+- one focused reset-lane fixture for explicit repaint or present behavior
+- `mc_tool_workflow_kernel_reset_lane_unit`
+- one narrow app-consumer validation when render entrypoints change
+- `mc_tool_workflow_kernel_reset_lane_full_unit`
+
+Acceptance criteria
+-------------------
+- one explicit repaint or present contract exists between app and surface
+- visible refresh happens through that contract and not through implicit redraw
+  behavior
+- the first foreground app can exercise the contract deterministically
+- no retained invalidation or animation framework is introduced
+
+Future follow-up
+----------------
+- Phase 278 should spend the contract on one fixed-font text or cell-rendering
+  path.
+- Reopen broader present machinery only when repeated app-visible redraw logic
+  proves stronger than the first rendering slice.

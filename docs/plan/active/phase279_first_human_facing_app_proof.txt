@@ -1,0 +1,163 @@
+Phase 279 -- First Human-Facing App Proof
+=========================================
+
+Status
+------
+PROPOSED
+
+Purpose
+-------
+Make one repository-owned app directly usable through the first admitted UI
+surface so Band D proves a real human-facing outcome rather than isolated UI
+mechanisms.
+
+This phase exists now because the prior Band D slices should establish input,
+display, routing, repaint, and one bounded rendering path. The next honest move
+is to spend those owners on one app, not to widen the UI stack further.
+
+Repository status note
+----------------------
+- `issue_rollup` is already the bounded app consumer used by the Band C
+  installed-workflow demo.
+- The app already has app-local parse, model, core, and render code under
+  `examples/real/issue_rollup/src/`.
+- Earlier Band D phases should establish the explicit UI path it needs.
+- The repository still lacks one directly usable human-facing app proof on that
+  path.
+
+Problem being solved
+--------------------
+- Without one directly usable app, the first UI band would risk ending as a set
+  of owner-local surface experiments.
+- The repository needs one concrete user-facing proof that input, display,
+  routing, repaint, and rendering compose into something legible.
+- A bounded app proof is also the honest way to expose which UI pressures are
+  still real before restart or audit work lands.
+
+Non-goals
+---------
+- no second UI app in the same phase
+- no widget library or shared control family
+- no window manager, panels, or region splitting
+- no broader app platform or session model
+- no new package-management or multi-app install work
+
+Invariants
+----------
+- The first app proof must remain one small repository-owned app.
+- Launcher remains the foreground-app policy owner.
+- The UI surface remains bounded to the earlier Band D contracts.
+- The app proof must not claim a general toolkit or desktop framework.
+- Band C install, manifest, and restart truths remain bounded to the admitted
+  `issue_rollup` path.
+
+Required surface changes
+------------------------
+1. Choose one repository-owned app as the first human-facing UI proof.
+2. Wire that app through the admitted Band D input, display, routing, repaint,
+   and rendering contracts.
+3. Add one focused reset-lane fixture proving direct human-facing usability.
+4. Add any narrow real-project validation needed for the chosen app.
+
+Forbidden changes
+-----------------
+- do not admit a second app to justify framework growth
+- do not widen the proof into widgets, menus, or a dashboard family
+- do not move app-local state or render policy into launcher or the display
+  owner
+- do not use the app proof as a pretext for package or session work
+
+Phase role in the larger sequence
+---------------------------------
+- This phase is the outcome checkpoint for the first half of Band D.
+- It proves whether the admitted UI path is already strong enough to support a
+  real app before restart-follow-through and audit work.
+- It sets the baseline for the later UI audit.
+
+Relevant backlog items this phase intentionally brings under pressure
+--------------------------------------------------------------------
+- keep first-UI work tied to one concrete app result rather than framework
+  growth
+- keep the post-Phase-273 app path bounded to the admitted `issue_rollup`
+  consumer unless a second real consumer proves otherwise
+
+Questions this phase must answer
+--------------------------------
+1. Is `issue_rollup` still the smallest honest first UI app proof?
+2. What visible interaction is sufficient for the app to count as directly
+   usable?
+3. Which app-local code must stay app-local rather than becoming UI framework
+   surface?
+4. What remaining friction becomes visible once the first app is actually
+   usable on the admitted surface?
+
+Preferred implementation shape
+------------------------------
+- Reuse `issue_rollup` as the first UI app proof unless a smaller existing app
+  is clearly stronger.
+- Keep the proof narrow: one app, one surface, one foreground path.
+- Reuse the Band C install and launcher path instead of inventing another app
+  activation story.
+- Keep app logic inside `examples/real/issue_rollup/`; only the explicit UI
+  contracts should be shared.
+
+Implementation accelerators
+---------------------------
+Main files and navigations
+~~~~~~~~~~~~~~~~~~~~~~~~~~
+- Primary controlling owners: `examples/real/issue_rollup/src/app/main.mc`,
+  `examples/real/issue_rollup/src/core/rollup_core.mc`, and the Band D input,
+  display, and repaint owners.
+- First-hop adjacent files: `examples/real/issue_rollup/src/render/rollup_render.mc`,
+  `kernel/src/services/launcher_service.mc`, and
+  `kernel/src/services/update_store_service.mc`.
+- Nearby accelerator docs: `docs/agent/prompts/test_overview.txt`,
+  `docs/agent/prompts/repo_map.md`, and the Phase 272 and Phase 273 plan docs.
+- Expected first validation target when the owner changes: one focused
+  human-facing reset-lane fixture, then one narrow `issue_rollup` real-project
+  validation.
+
+Relevant cookbook patterns
+~~~~~~~~~~~~~~~~~~~~~~~~~~
+- Pattern 5 -- Add A Test File is the closest fit because the phase should end
+  in one explicit outcome proof.
+
+Relevant file-local invariants
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+- `issue_rollup` remains an ordinary repository-owned app, not a shared UI
+  framework owner.
+- `launcher_service.mc` remains the app-facing policy owner.
+- `update_store_service.mc` remains the durable owner for installed bytes and
+  launch-record truth.
+
+Relevant test surfaces
+~~~~~~~~~~~~~~~~~~~~~~
+- Primary owning validation surface: one focused reset-lane system fixture for
+  the first human-facing app.
+- Narrowest expected first executable validation target: the Phase 279 fixture.
+- Supporting validation: one narrow `issue_rollup` real-project case and
+  `mc_tool_workflow_kernel_reset_lane_unit`.
+
+Test obligations
+----------------
+- `Build debug`
+- one focused reset-lane fixture for the first human-facing app proof
+- one narrow `issue_rollup` real-project validation
+- `mc_tool_workflow_kernel_reset_lane_unit`
+- `mc_tool_workflow_kernel_reset_lane_full_unit`
+
+Acceptance criteria
+-------------------
+- one repository-owned app is directly usable through the admitted UI path
+- the app proof reuses the bounded Band C and Band D owners instead of
+  inventing a new framework layer
+- the proof remains single-app and deterministic
+- the phase leaves one concrete basis for restart-follow-through and the UI
+  audit
+
+Future follow-up
+----------------
+- Phase 280 should prove that the first UI app remains honest under restart or
+  update or relaunch pressure.
+- Any repeated UI friction discovered here should be recorded narrowly rather
+  than widened into framework work by convenience.

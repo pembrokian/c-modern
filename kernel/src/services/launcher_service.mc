@@ -8,6 +8,7 @@ const LAUNCHER_OP_LAUNCH: u8 = 65
 const LAUNCHER_OP_IDENTIFY: u8 = 73
 const LAUNCHER_OP_LIST: u8 = 76
 const LAUNCHER_OP_MANIFEST: u8 = 77
+const LAUNCHER_OP_QUERY: u8 = 81
 const LAUNCHER_OP_SELECT: u8 = 83
 
 const ISSUE_ROLLUP_MANIFEST_LEN: usize = 3
@@ -15,6 +16,8 @@ const ISSUE_ROLLUP_MANIFEST_LEN: usize = 3
 const LAUNCHER_RESUME_FRESH: u8 = 70
 const LAUNCHER_RESUME_RESUMED: u8 = 82
 const LAUNCHER_RESUME_INVALIDATED: u8 = 73
+const LAUNCHER_STATUS_NONE: u8 = 78
+const LAUNCHER_STATUS_ACTIVATED: u8 = 65
 
 struct LauncherServiceState {
     pid: u32
@@ -22,6 +25,7 @@ struct LauncherServiceState {
     selected: u8
     foreground: u8
     launches: u8
+    status: u8
 }
 
 struct LauncherResult {
@@ -44,11 +48,11 @@ func launcher_context(update_store: update_store_service.UpdateStoreServiceState
 }
 
 func launcher_init(pid: u32, slot: u32) LauncherServiceState {
-    return LauncherServiceState{ pid: pid, slot: slot, selected: 0, foreground: 0, launches: 0 }
+    return LauncherServiceState{ pid: pid, slot: slot, selected: 0, foreground: 0, launches: 0, status: LAUNCHER_STATUS_NONE }
 }
 
-func launcherwith(s: LauncherServiceState, selected: u8, foreground: u8, launches: u8) LauncherServiceState {
-    return LauncherServiceState{ pid: s.pid, slot: s.slot, selected: selected, foreground: foreground, launches: launches }
+func launcherwith(s: LauncherServiceState, selected: u8, foreground: u8, launches: u8, status: u8) LauncherServiceState {
+    return LauncherServiceState{ pid: s.pid, slot: s.slot, selected: selected, foreground: foreground, launches: launches, status: status }
 }
 
 func launcher_reply(status: syscall.SyscallStatus, len: usize, b0: u8, b1: u8, b2: u8, b3: u8) service_effect.Effect {
@@ -92,8 +96,31 @@ func launcher_select(s: LauncherServiceState, ctx: LauncherContext, id: u8) Laun
     if !program_catalog.program_descriptor_is_valid(desc) {
         return launcher_result(s, ctx.update_store, launcher_reply(syscall.SyscallStatus.InvalidArgument, 0, 0, 0, 0, 0))
     }
-    next := launcherwith(s, id, s.foreground, s.launches)
+    next := launcherwith(s, id, s.foreground, s.launches, s.status)
     return launcher_result(next, ctx.update_store, launcher_reply(syscall.SyscallStatus.Ok, 2, next.selected, next.foreground, 0, 0))
+}
+
+func launcher_visible_status(s: LauncherServiceState, ctx: LauncherContext) u8 {
+    if !update_store_service.update_installed_present(ctx.update_store) {
+        return LAUNCHER_STATUS_NONE
+    }
+    if s.foreground == program_catalog.PROGRAM_ID_NONE {
+        return LAUNCHER_STATUS_ACTIVATED
+    }
+    return s.status
+}
+
+func launcher_query(s: LauncherServiceState, ctx: LauncherContext) LauncherResult {
+    return launcher_result(
+        s,
+        ctx.update_store,
+        launcher_reply(
+            syscall.SyscallStatus.Ok,
+            4,
+            update_store_service.update_installed_program_id(ctx.update_store),
+            update_store_service.update_installed_version(ctx.update_store),
+            s.foreground,
+            launcher_visible_status(s, ctx)))
 }
 
 func launcher_launch_classification(update_store: update_store_service.UpdateStoreServiceState, program: u8, launcher_generation: u32) u8 {
@@ -117,8 +144,9 @@ func launcher_launch(s: LauncherServiceState, ctx: LauncherContext) LauncherResu
     if update_store_service.update_installed_program_id(ctx.update_store) != s.selected {
         return launcher_result(s, ctx.update_store, launcher_reply(syscall.SyscallStatus.InvalidArgument, 0, 0, 0, 0, 0))
     }
-    next := launcherwith(s, s.selected, s.selected, s.launches + 1)
-    classification := launcher_launch_classification(ctx.update_store, next.foreground, ctx.generation)
+    next_foreground := s.selected
+    classification := launcher_launch_classification(ctx.update_store, next_foreground, ctx.generation)
+    next := launcherwith(s, s.selected, next_foreground, s.launches + 1, classification)
     next_update_store := update_store_service.update_record_launch(ctx.update_store, next.foreground, ctx.generation)
     return launcher_result(next, next_update_store, launcher_reply(syscall.SyscallStatus.Ok, 4, next.foreground, program_catalog.program_launch_kind_code(desc), next.launches, classification))
 }
@@ -159,6 +187,11 @@ func handle(s: LauncherServiceState, ctx: LauncherContext, m: service_effect.Mes
             return launcher_result(s, ctx.update_store, launcher_reply(syscall.SyscallStatus.InvalidArgument, 0, 0, 0, 0, 0))
         }
         return launcher_identify(s, ctx)
+    case LAUNCHER_OP_QUERY:
+        if m.payload_len != 1 {
+            return launcher_result(s, ctx.update_store, launcher_reply(syscall.SyscallStatus.InvalidArgument, 0, 0, 0, 0, 0))
+        }
+        return launcher_query(s, ctx)
     case LAUNCHER_OP_LIST:
         if m.payload_len != 1 {
             return launcher_result(s, ctx.update_store, launcher_reply(syscall.SyscallStatus.InvalidArgument, 0, 0, 0, 0, 0))

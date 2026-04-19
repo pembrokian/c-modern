@@ -279,9 +279,10 @@ Memory band guardrails
 
 Band C - Turn The Current Kernel Into An App-Shaped System Substrate
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-Phases 267 through 273 should spend the current workflow or durable or update
-owners on something closer to applications and installable behavior rather than
-on another long run of isolated service-local features.
+Phases 267 through 273 are now landed as the bounded app-substrate wave that
+spent the current workflow or durable or update owners on something closer to
+applications and installable behavior rather than on another long run of
+isolated service-local features.
 
 Likely themes:
 - explicit app or program identity on top of the current durable and update
@@ -334,9 +335,20 @@ Phase 273 -- App Substrate Pressure Audit
   launcher or update or object-store owners, and which still remain too weak to
   justify broader packaging or app-framework work.
 
-Outcome checkpoint after Band B:
-- the repository should have one believable app-shaped path, not just a bag of
-  services.
+- Landed result: Band C is now explicitly closed. The maintained truths are
+  one bounded program catalog, one single-foreground launcher owner, one fixed
+  installed-program slot, one bounded fresh-versus-resumed-versus-invalidated
+  launch classification, one `issue_rollup`-only manifest family, and one
+  explicit installed-workflow demo. Phase 273 also classifies Band D's first
+  input/display owner as the stronger next move, while keeping second-app
+  install policy, richer app status, broader execution semantics, and broader
+  asset families explicitly deferred until a later real consumer proves one of
+  them stronger.
+
+Outcome checkpoint after Band C:
+- the repository now has one believable app-shaped path, not just a bag of
+  services, and the next stronger owner is the first UI band rather than
+  another launcher/update/object-store follow-through.
 
 Band D - Start The First Human-Facing Surface Conservatively
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -356,8 +368,8 @@ Why this band comes here:
   outcome rather than a disconnected graphics experiment.
 
 Earliest honest UI answer:
-- if the roadmap is followed roughly as written, basic UI work can probably
-  start around Phase 269 through Phase 272.
+- after the completed Phase 273 audit, basic UI work now starts honestly at
+  Phase 274 rather than being anticipated earlier inside Band C.
 - the first honest UI should be a hosted reset-lane proof such as a text-grid
   surface, fixed framebuffer, or equally bounded display owner, not a window
   manager or widget library.

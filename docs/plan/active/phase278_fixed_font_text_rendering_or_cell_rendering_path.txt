@@ -1,0 +1,158 @@
+Phase 278 -- Fixed-Font Text Rendering Or Cell Rendering Path
+=============================================================
+
+Status
+------
+PROPOSED
+
+Purpose
+-------
+Admit one stable text-or-cell rendering path for the first display surface so a
+human-facing app can present deterministic readable state without widening into
+font systems, rich text, or layout engines.
+
+This phase exists now because the first UI slice needs one visible rendering
+path after input, display, routing, and repaint are explicit. The smallest
+honest move is one fixed rendering contract, not a general graphics stack.
+
+Repository status note
+----------------------
+- `examples/real/issue_rollup/src/render/rollup_render.mc` and
+  `rollup_render_table.mc` already own app-local render selection.
+- Phase 275 and Phase 277 should establish one explicit surface and present
+  contract.
+- The repository still lacks one maintained text-or-cell rendering path tied to
+  that surface.
+- Current hosted app output remains closer to ordinary program output than to a
+  UI-owned rendering contract.
+
+Problem being solved
+--------------------
+- A first human-facing app proof needs a stable way to render readable content
+  on the admitted display surface.
+- Without one owned rendering path, the first UI app would rely on ad hoc
+  output or app-local formatting that the display owner cannot interpret.
+- The repository needs one rendering contract strong enough for a first app but
+  still too small to justify font, layout, or widget machinery.
+
+Non-goals
+---------
+- no proportional fonts, font loading, or font fallback
+- no rich text, markup, or layout engine
+- no graphics primitives beyond the admitted text-or-cell path
+- no image decoding or asset-family widening
+- no second rendering backend or acceleration layer
+
+Invariants
+----------
+- The first rendering path must stay fixed and deterministic.
+- App-local render policy remains app-local; the rendering path does not become
+  a toolkit.
+- The display owner remains the surface owner, not the global text-layout owner.
+- The first rendering path is admitted for one surface and one initial app
+  proof.
+- No font system, layout engine, or general graphics API may be introduced.
+
+Required surface changes
+------------------------
+1. Define one bounded text-or-cell rendering payload or contract.
+2. Connect the first app's render path to the admitted display owner.
+3. Add one deterministic visible-state fixture for the rendering path.
+4. Add any narrow real-project validation needed for the first app consumer.
+
+Forbidden changes
+-----------------
+- do not widen rendering into a font or layout framework
+- do not treat the first app's renderer as a general widget library
+- do not move manifest or app-state truth into the display owner
+- do not add a second rendering family in the same phase
+
+Phase role in the larger sequence
+---------------------------------
+- This phase is the last preparatory rendering slice before the first
+  human-facing app proof.
+- It turns the explicit repaint contract into one readable visible result.
+- It keeps the first UI surface honest by staying text-or-cell bounded.
+
+Relevant backlog items this phase intentionally brings under pressure
+--------------------------------------------------------------------
+- keep render policy app-local and surface ownership explicit
+- keep asset and manifest growth deferred until a real second family appears
+
+Questions this phase must answer
+--------------------------------
+1. Is fixed-font text or fixed-cell rendering the more honest first contract?
+2. What payload shape keeps the rendering path deterministic and testable?
+3. What part of the current `issue_rollup` render code should remain app-local?
+4. What focused proof shows readable output on the admitted surface without
+   implying a richer graphics stack?
+
+Preferred implementation shape
+------------------------------
+- Reuse the first app's existing render classification as the consumer-side
+  decision point.
+- Introduce one fixed rendering contract that the display owner can consume.
+- Prefer cells or equally bounded fixed-font text because they are easier to
+  validate deterministically than richer drawing primitives.
+- Keep manifest and render-policy decisions inside the app.
+
+Implementation accelerators
+---------------------------
+Main files and navigations
+~~~~~~~~~~~~~~~~~~~~~~~~~~
+- Primary controlling owners: `examples/real/issue_rollup/src/render/rollup_render.mc`,
+  `examples/real/issue_rollup/src/render/rollup_render_table.mc`, and the
+  Phase 275 display owner.
+- First-hop adjacent files: `examples/real/issue_rollup/src/render/rollup_manifest.mc`,
+  the Phase 277 present contract owner, and
+  `examples/real/issue_rollup/src/app/main.mc`.
+- Nearby accelerator docs: `docs/agent/prompts/test_overview.txt`,
+  `docs/agent/prompts/repo_map.md`, and `kernel/README.md`.
+- Expected first validation target when the owner changes: one rendering-path
+  reset-lane fixture, then one narrow real-project build or run for
+  `issue_rollup`.
+
+Relevant cookbook patterns
+~~~~~~~~~~~~~~~~~~~~~~~~~~
+- No exact cookbook pattern fits; the key is to spend the existing app-local
+  render code on one explicit surface contract instead of widening into a
+  toolkit.
+
+Relevant file-local invariants
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+- `rollup_render.mc` and `rollup_render_table.mc` already own app-local render
+  choice and should keep that policy.
+- The display owner remains the only surface owner.
+- Manifest-driven render tuning in `rollup_manifest.mc` must not become a
+  general graphics or asset framework.
+
+Relevant test surfaces
+~~~~~~~~~~~~~~~~~~~~~~
+- Primary owning validation surface: one reset-lane system fixture proving the
+  fixed rendering path.
+- Narrowest expected first executable validation target: the Phase 278 fixture.
+- Supporting validation: one narrow `issue_rollup` real-project build or run
+  and `mc_tool_workflow_kernel_reset_lane_unit`.
+
+Test obligations
+----------------
+- `Build debug`
+- one focused reset-lane fixture for fixed text-or-cell rendering
+- one narrow `issue_rollup` real-project validation
+- `mc_tool_workflow_kernel_reset_lane_unit`
+- `mc_tool_workflow_kernel_reset_lane_full_unit`
+
+Acceptance criteria
+-------------------
+- one stable text-or-cell rendering path exists on the admitted surface
+- the first app can render readable deterministic state through that path
+- app-local render policy remains app-local and the display owner remains a
+  surface owner
+- no font, layout, or graphics framework is introduced
+
+Future follow-up
+----------------
+- Phase 279 should spend the full Band D stack on one directly usable
+  human-facing app proof.
+- Reopen broader rendering work only when a second app or second rendering need
+  proves stronger than the first app proof.

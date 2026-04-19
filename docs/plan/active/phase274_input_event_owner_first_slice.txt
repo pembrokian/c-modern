@@ -1,0 +1,167 @@
+Phase 274 -- Input Event Owner First Slice
+==========================================
+
+Status
+------
+PROPOSED
+
+Purpose
+-------
+Admit one explicit input-event owner that converts the current hosted live
+receive path into bounded foreground-app input events instead of shell-command-
+only decode.
+
+This phase exists now because Phase 273 classified first UI work as the next
+stronger owner. The smallest honest move is to turn the existing live byte path
+into one explicit event seam for one foreground app rather than jumping to a
+broker, widget toolkit, or multi-input framework.
+
+Repository status note
+----------------------
+- `kernel/src/live_receive.mc` already owns hosted stdin polling and four-byte
+  frame assembly for the live reset-lane path.
+- `kernel/src/kernel_entry.mc` already selects scripted versus live input.
+- `kernel/src/shell/shell_service.mc` still treats incoming live frames as
+  shell protocol, not app-visible input events.
+- `kernel/src/services/launcher_service.mc` already owns one bounded
+  foreground-program truth, but nothing yet converts live input into explicit
+  foreground-app events.
+
+Problem being solved
+--------------------
+- The repository cannot start honest UI work while live input remains only a
+  shell command stream.
+- A first human-facing app needs one explicit event source that later phases
+  can route, present, and test without reusing shell decode as a fake UI API.
+- Leaving input implicit would force later UI phases either to widen shell into
+  an event broker or to invent presentation work without a real interaction
+  owner.
+
+Non-goals
+---------
+- no general event broker or event subscription framework
+- no pointer, mouse, gestures, or multi-device support
+- no window manager, compositor, or focus stack
+- no launcher-owned input history or durable input recording
+- no shell protocol redesign beyond what one bounded event seam requires
+
+Invariants
+----------
+- `live_receive.mc` remains the hosted poll and frame-assembly owner.
+- `shell_service.mc` remains the shell-command decode owner for the existing
+  shell path.
+- `launcher_service.mc` remains the bounded foreground-app policy owner.
+- The first input slice must stay single-foreground and deterministic.
+- No generic event bus, callback registry, or UI framework may be introduced.
+
+Required surface changes
+------------------------
+1. Admit one explicit owner-local input-event vocabulary for the first UI path.
+2. Convert the live receive path into that vocabulary without making shell the
+   general UI input owner.
+3. Route the new input path toward the current foreground app or one explicit
+   no-foreground outcome.
+4. Add one focused reset-lane fixture that proves the event path is explicit
+   and not shell-only decode.
+
+Forbidden changes
+-----------------
+- do not widen `shell_service.mc` into a general app-event broker
+- do not move foreground-app policy out of `launcher_service.mc`
+- do not add dynamic device discovery, queues, or subscriptions
+- do not claim pointer or text-editing semantics in the first input slice
+
+Phase role in the larger sequence
+---------------------------------
+- This is the first Band D implementation phase.
+- It consumes Phase 273's decision that UI work now outranks more app-
+  substrate follow-through.
+- It prepares the first display owner and later foreground routing by making
+  input explicit first.
+
+Relevant backlog items this phase intentionally brings under pressure
+--------------------------------------------------------------------
+- keep the post-Phase-273 app path bounded while admitting one real first UI
+  owner
+- keep launcher as the single foreground policy owner instead of spreading app
+  truth across shell or dispatch
+
+Questions this phase must answer
+--------------------------------
+1. What is the narrowest honest event vocabulary for the first UI path?
+2. Which owner should distinguish shell-command input from foreground-app input
+   without creating a broker layer?
+3. How should no-foreground or unsupported-input cases stay explicit?
+4. What focused reset-lane proof demonstrates that later UI phases can now rely
+   on a real event seam?
+
+Preferred implementation shape
+------------------------------
+- Keep hosted polling in `live_receive.mc` and keep shell-command decode in
+  `shell_service.mc`.
+- Introduce one nearby owner that classifies the first admitted app-input
+  events and hands them to the current foreground path.
+- Reuse `launcher_service.mc` for current foreground truth rather than
+  inventing another focus owner.
+- Keep the first event vocabulary tiny and app-local in spirit: one bounded
+  family sufficient for the first UI proof.
+
+Implementation accelerators
+---------------------------
+Main files and navigations
+~~~~~~~~~~~~~~~~~~~~~~~~~~
+- Primary controlling owners: `kernel/src/live_receive.mc`,
+  `kernel/src/kernel_entry.mc`, and `kernel/src/services/launcher_service.mc`.
+- First-hop adjacent files: `kernel/src/kernel_dispatch.mc`,
+  `kernel/src/shell/shell_service.mc`, `kernel/src/shell/serial_protocol.mc`,
+  and `kernel/src/scenarios/scenarios.mc`.
+- Nearby accelerator docs: `docs/arch/veya/kernel_style_guide.txt`,
+  `docs/agent/prompts/kernel_file_invariants.txt`, and
+  `docs/agent/prompts/test_overview.txt`.
+- Expected first validation target when the owner changes: one new focused
+  reset-lane system fixture, then `mc_tool_workflow_kernel_reset_lane_unit`.
+
+Relevant cookbook patterns
+~~~~~~~~~~~~~~~~~~~~~~~~~~
+- No exact existing cookbook pattern is a clean fit; this phase is primarily a
+  bounded owner admission and routing split on top of the existing live-input
+  path.
+
+Relevant file-local invariants
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+- `live_receive.mc` owns fd polling and four-byte frame assembly only.
+- `kernel_entry.mc` stays a thin mode selector rather than an input-policy
+  owner.
+- `kernel_dispatch.mc` may route the new input work, but it must not absorb
+  app-event semantics that belong in the new input owner or launcher.
+- `launcher_service.mc` remains the source of single-foreground truth.
+
+Relevant test surfaces
+~~~~~~~~~~~~~~~~~~~~~~
+- Primary owning validation surface: a new reset-lane system fixture under
+  `tests/system/` plus the grouped kernel reset-lane workflow suite.
+- Narrowest expected first executable validation target: the new Phase 274
+  reset-lane case.
+- Supporting validation: `mc_tool_workflow_kernel_reset_lane_unit` and the
+  maintained `mc_tool_workflow_kernel_reset_lane_full_unit`.
+
+Test obligations
+----------------
+- `Build debug`
+- one focused reset-lane fixture for explicit foreground-app input events
+- `mc_tool_workflow_kernel_reset_lane_unit`
+- `mc_tool_workflow_kernel_reset_lane_full_unit`
+
+Acceptance criteria
+-------------------
+- one explicit input-event owner exists for the first UI path
+- live input is no longer only a shell-command decode surface
+- input can target exactly one foreground app or return one explicit bounded
+  non-delivery result
+- no broker, pointer stack, or multi-app routing framework is introduced
+
+Future follow-up
+----------------
+- Phase 275 should spend the new input seam on one explicit display owner.
+- Reopen broader input work only when a second input family or richer event
+  vocabulary proves stronger than the display or foreground-routing slices.

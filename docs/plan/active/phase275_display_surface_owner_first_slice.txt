@@ -1,0 +1,165 @@
+Phase 275 -- Display Surface Owner First Slice
+==============================================
+
+Status
+------
+PROPOSED
+
+Purpose
+-------
+Admit one bounded display-surface owner for the first human-facing UI path so
+the repository can present visible state on an explicit target instead of
+reusing stdout-style app output.
+
+This phase exists now because Phase 274 should make input explicit. The next
+honest move is one fixed display target with clear present semantics, not a
+compositor, window system, or general rendering framework.
+
+Repository status note
+----------------------
+- `examples/real/issue_rollup/` already has app-local render selection and
+  manifest-driven rendering policy.
+- The current hosted programs still render through ordinary program output,
+  not through a maintained display owner.
+- `launcher_service.mc` already owns one bounded foreground-app path that can
+  serve as the consumer boundary for a first visible surface.
+- The repository still lacks one explicit kernel- or runtime-owned display
+  target for Band D.
+
+Problem being solved
+--------------------
+- Without an explicit surface owner, later UI work would be forced to treat
+  stdout or shell replies as a fake display API.
+- The first human-facing app proof needs one admitted visible target so later
+  repaint and rendering work has a real owner.
+- If the display boundary stays implicit, the repository will either widen app-
+  local rendering into surface ownership or jump prematurely to a larger UI
+  stack.
+
+Non-goals
+---------
+- no compositor, scene graph, or window manager
+- no multiple surfaces, panes, or layers
+- no GPU, acceleration, or graphics backend abstraction
+- no rich text, proportional font, or layout engine
+- no shell-owned dashboard or operator console framework
+
+Invariants
+----------
+- The first surface must be one fixed target with explicit present semantics.
+- `launcher_service.mc` remains the foreground-app policy owner.
+- App-local render policy remains app-local; the surface owner does not become
+  a manifest or application policy owner.
+- The first surface stays deterministic and bounded for reset-lane testing.
+- No compositor or region-management framework may be introduced.
+
+Required surface changes
+------------------------
+1. Admit one explicit display-surface owner for the first UI path.
+2. Define one fixed present contract for that owner.
+3. Connect one foreground app proof to the surface without widening launcher
+   into display policy.
+4. Add one focused fixture that proves visible-state presentation through the
+   new owner.
+
+Forbidden changes
+-----------------
+- do not widen `launcher_service.mc` into display composition or drawing
+- do not make `issue_rollup` the global display owner just because it is the
+  first consumer
+- do not introduce multi-surface stacking, regions, or windows
+- do not hide present semantics behind stdout or shell reply shortcuts
+
+Phase role in the larger sequence
+---------------------------------
+- This phase pairs with Phase 274 to establish the two minimal UI anchors:
+  input and display.
+- It prepares the later repaint contract and text-or-cell rendering path.
+- It ensures the first human-facing app proof can rely on one maintained
+  surface rather than an app-local workaround.
+
+Relevant backlog items this phase intentionally brings under pressure
+--------------------------------------------------------------------
+- keep the first UI answer bounded to one explicit owner instead of a shell-
+  visible dashboard or UI framework
+- keep app-local rendering separate from surface ownership
+
+Questions this phase must answer
+--------------------------------
+1. What is the smallest honest display target for the hosted reset-lane path?
+2. Which owner should define present semantics without becoming a compositor?
+3. What visible-state proof is sufficient before repaint and richer rendering
+   are introduced?
+4. How does the first surface stay explicit without widening launcher or the
+   first app into global UI policy?
+
+Preferred implementation shape
+------------------------------
+- Introduce one bounded display owner with one fixed target surface.
+- Keep launcher responsible only for foreground-app policy and routing.
+- Keep app-local render selection inside the app; the display owner should
+  accept one explicit present payload or cell/surface update contract.
+- Prefer a text-grid or equally fixed hosted surface that can be validated
+  deterministically in reset-lane tests.
+
+Implementation accelerators
+---------------------------
+Main files and navigations
+~~~~~~~~~~~~~~~~~~~~~~~~~~
+- Primary controlling owners: the new display owner plus
+  `kernel/src/services/launcher_service.mc` and the first admitted app's render
+  path under `examples/real/issue_rollup/src/render/`.
+- First-hop adjacent files: `kernel/src/kernel_dispatch.mc`,
+  `kernel/src/kernel_entry.mc`, `kernel/src/live_receive.mc`, and
+  `examples/real/issue_rollup/src/app/main.mc`.
+- Nearby accelerator docs: `docs/arch/veya/kernel_style_guide.txt`,
+  `docs/agent/prompts/kernel_file_invariants.txt`, and
+  `docs/agent/prompts/test_overview.txt`.
+- Expected first validation target when the owner changes: one focused display-
+  surface reset-lane fixture.
+
+Relevant cookbook patterns
+~~~~~~~~~~~~~~~~~~~~~~~~~~
+- No exact existing cookbook pattern fits; the important constraint is to keep
+  surface ownership explicit and singular.
+
+Relevant file-local invariants
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+- `launcher_service.mc` stays a foreground-app policy owner, not a drawing or
+  composition owner.
+- `issue_rollup` render files remain the first consumer, not the display-owner
+  truth source.
+- `kernel_dispatch.mc` may route display messages but must not absorb render or
+  surface policy.
+
+Relevant test surfaces
+~~~~~~~~~~~~~~~~~~~~~~
+- Primary owning validation surface: one new reset-lane system fixture for the
+  display owner.
+- Narrowest expected first executable validation target: the Phase 275 fixture.
+- Supporting validation: `mc_tool_workflow_kernel_reset_lane_unit` and one
+  narrow real-project build for the first consumer if the public contract
+  touches app code.
+
+Test obligations
+----------------
+- `Build debug`
+- one focused reset-lane fixture for the first display surface
+- `mc_tool_workflow_kernel_reset_lane_unit`
+- one narrow real-project build or run for the first admitted consumer when
+  the app contract changes
+- `mc_tool_workflow_kernel_reset_lane_full_unit`
+
+Acceptance criteria
+-------------------
+- one explicit display-surface owner exists for the first UI path
+- one fixed present contract is visible and testable
+- one foreground app can target that surface without app-local stdout tricks
+- no compositor, multi-surface, or graphics framework is introduced
+
+Future follow-up
+----------------
+- Phase 276 should route the explicit input path to the admitted foreground app
+  on the new surface.
+- Reopen broader display work only when multiple regions, layers, or a second
+  display target become stronger than the foreground-routing and repaint slices.

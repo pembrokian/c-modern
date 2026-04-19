@@ -1,0 +1,159 @@
+Phase 276 -- Foreground App Input Routing
+=========================================
+
+Status
+------
+PROPOSED
+
+Purpose
+-------
+Route the newly explicit input path to exactly one foreground app on the first
+display path with one honest focus truth and no multi-window or session
+framework.
+
+This phase exists now because Band D should not leave input and display as
+parallel mechanisms. The next honest slice is one explicit foreground-routing
+owner that spends the current launcher truth on one human-facing app path.
+
+Repository status note
+----------------------
+- Phase 268 already admitted one bounded launcher owner with single-foreground
+  truth.
+- Phase 274 should admit one explicit input-event path.
+- Phase 275 should admit one explicit display owner.
+- The repository still has no explicit routing seam that binds those two paths
+  to exactly one foreground UI app.
+
+Problem being solved
+--------------------
+- Input and display remain disconnected unless one owner decides where live UI
+  events go.
+- The first human-facing path needs one explicit focus or foreground answer so
+  later repaint and app proof work do not invent hidden routing policy.
+- Without this slice, later UI phases would either widen launcher into a
+  general window manager or duplicate focus policy in app-local code.
+
+Non-goals
+---------
+- no multi-window focus stack
+- no background app input delivery
+- no session manager or task-switching framework
+- no pointer capture, selection graph, or modal routing framework
+- no launcher-owned UI persistence beyond current bounded foreground truth
+
+Invariants
+----------
+- `launcher_service.mc` remains the single foreground policy owner.
+- Input routing stays single-foreground and explicit.
+- The display owner remains a surface owner, not a focus-policy owner.
+- Shell and dispatch remain routing seams only.
+- No multi-app routing, sessions, or windows may be introduced.
+
+Required surface changes
+------------------------
+1. Define one explicit route from the Phase 274 input owner to the current
+   foreground app.
+2. Reuse `launcher_service.mc` for the foreground-app decision.
+3. Define one bounded no-foreground or unsupported-target outcome.
+4. Add one fixture proving that only the foreground app receives the admitted
+   input path.
+
+Forbidden changes
+-----------------
+- do not introduce a second focus owner beside `launcher_service.mc`
+- do not widen the display owner into routing policy
+- do not add background delivery, subscriptions, or app registries
+- do not push app-routing truth into `kernel_entry.mc` or scenarios by
+  convenience
+
+Phase role in the larger sequence
+---------------------------------
+- This phase composes the first two Band D anchors into one real UI path.
+- It prepares the explicit repaint contract by defining which app may request
+  or receive visible updates.
+- It is the narrowest honest focus slice before any richer composition or
+  second-input family is considered.
+
+Relevant backlog items this phase intentionally brings under pressure
+--------------------------------------------------------------------
+- keep launcher as the bounded app-facing policy seam
+- keep the first UI path single-foreground and framework-free
+
+Questions this phase must answer
+--------------------------------
+1. Where should the foreground-routing decision live without duplicating
+   launcher truth?
+2. What is the bounded failure or idle outcome when no foreground app is
+   available?
+3. What is the narrowest proof that input is reaching the right foreground app
+   and no other consumer?
+4. What later repaint or present contract does this routing slice need to make
+   explicit?
+
+Preferred implementation shape
+------------------------------
+- Keep `launcher_service.mc` as the source of current foreground-app truth.
+- Keep event parsing or event-shape ownership in the Phase 274 input owner.
+- Add one thin routing seam that asks launcher for the foreground target and
+  forwards the event to exactly that app path.
+- Keep the first route flat and explicit rather than introducing queues,
+  registries, or modal routing state.
+
+Implementation accelerators
+---------------------------
+Main files and navigations
+~~~~~~~~~~~~~~~~~~~~~~~~~~
+- Primary controlling owners: `kernel/src/services/launcher_service.mc`, the
+  Phase 274 input owner, and `kernel/src/kernel_dispatch.mc`.
+- First-hop adjacent files: `kernel/src/live_receive.mc`, the Phase 275
+  display owner, `kernel/src/scenarios/scenarios.mc`, and the first admitted
+  app under `examples/real/issue_rollup/src/app/`.
+- Nearby accelerator docs: `docs/arch/veya/kernel_style_guide.txt`,
+  `docs/agent/prompts/kernel_file_invariants.txt`, and
+  `docs/agent/prompts/test_overview.txt`.
+- Expected first validation target when the owner changes: one focused
+  foreground-routing reset-lane fixture.
+
+Relevant cookbook patterns
+~~~~~~~~~~~~~~~~~~~~~~~~~~
+- No exact cookbook pattern fits; the key is to preserve the existing launcher
+  ownership while spending it on one routed UI path.
+
+Relevant file-local invariants
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+- `launcher_service.mc` already owns single-foreground truth and should not be
+  split.
+- `kernel_dispatch.mc` may forward to the foreground app but must not become a
+  new policy owner.
+- The input owner remains responsible for event shape, not focus policy.
+- The display owner remains responsible for surface presentation, not routing.
+
+Relevant test surfaces
+~~~~~~~~~~~~~~~~~~~~~~
+- Primary owning validation surface: one new reset-lane system fixture for
+  foreground routing.
+- Narrowest expected first executable validation target: the Phase 276 fixture.
+- Supporting validation: `mc_tool_workflow_kernel_reset_lane_unit` and one
+  narrow real-project or system proof for the chosen UI app consumer.
+
+Test obligations
+----------------
+- `Build debug`
+- one focused reset-lane fixture for single-foreground input routing
+- `mc_tool_workflow_kernel_reset_lane_unit`
+- one narrow app-consumer validation if the app-visible contract changes
+- `mc_tool_workflow_kernel_reset_lane_full_unit`
+
+Acceptance criteria
+-------------------
+- one explicit foreground-routing path exists from input to app
+- exactly one foreground app receives the admitted input events
+- one bounded no-foreground or unsupported outcome is explicit and testable
+- no multi-window, session, or background-routing framework is introduced
+
+Future follow-up
+----------------
+- Phase 277 should define one explicit repaint or present contract on top of
+  the routed foreground path.
+- Reopen broader routing work only when a second simultaneous consumer or
+  richer focus model becomes stronger than the repaint slice.

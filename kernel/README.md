@@ -13,7 +13,7 @@ Rules
 - Keep compiler, sema, MIR, backend, ABI, target, runtime, and `hal` surfaces closed unless a narrow blocker forces a local change.
 - Add modules only when a specific phase boundary needs them, at the lean behavioral minimum the four-section standard allows.
 
-Current scope (through Phase 271)
+Current scope (through Phase 273)
 
 - All three canonical service shapes are present: forwarding (`serial_service`, `shell_service`, `serial_shell_path`), append/tail (`log_service`), and key/value (`kv_service`).
 - The compact shell route now reaches `log_service` and `kv_service` over the real reset-lane path instead of stopping at shell-local echo behavior.
@@ -25,7 +25,8 @@ Current scope (through Phase 271)
 - The kernel image entry is [`kernel/src/main.mc`](src/main.mc): thin init-plus-loop entry owned by the active reset-lane tree rather than the retired proof-shaped predecessor.
 - The repo-owned project manifest is [`kernel/build.toml`](build.toml): direct workflow builds can target the active reset-lane tree without copying a fixture-local manifest.
 - The lane is wired into the build through the repo-project entry plus the table-driven reset-lane workflow suite in `mc_tool_workflow_kernel_reset_lane_unit`.
-- The current app-facing slice now includes one bounded launcher-visible manifest family for `issue_rollup`; durable installed bytes remain on `update_store_service`, launcher exposes only the admitted query surface, and the lane still does not claim a filesystem or general asset API.
+- The current app-facing slice now includes one bounded launcher-owned installed-workflow status query over the admitted `issue_rollup` path; durable installed bytes and launch-record comparison truth remain on `update_store_service`, launcher exposes only the admitted app-facing policy surfaces, and the lane still does not claim a filesystem, package manager, or general asset API.
+- Phase 273 then closes Band C as a planning audit and classifies the first UI input/display owners as the stronger next move rather than another launcher/update/object-store follow-through.
 
 Source tree layout (Phase 219)
 
@@ -50,6 +51,22 @@ The following modules are deferred until the named phase boundary forces them:
 - `mmu` — probably never in this tree; hosted execution makes MMU stubs meaningless
 
 Recent service targets
+
+- Phase 273 (completed): app substrate pressure audit. Band C is now
+  explicitly closed for its admitted slice: `program_catalog.mc`,
+  `launcher_service.mc`, and `update_store_service.mc` remain the maintained
+  app-substrate owners for the current path, while second-app install policy,
+  richer app-facing status, broader execution semantics, and broader asset
+  families stay deferred until a later real consumer proves one of them
+  stronger than Phase 274's first UI input owner.
+
+- Phase 272 (landed): first user-facing installed workflow demo.
+  `launcher_service.mc` now exposes one explicit status query reporting
+  `(installed program id, installed version, foreground program id, visible
+  status)` for the admitted `issue_rollup` path, while durable installed bytes
+  and launch-record comparison truth remain on `update_store_service.mc`. The
+  focused reset-lane fixture is
+  `tests/system/kernel_reset_lane_phase272_installed_workflow_demo`.
 
 - Phase 271 (landed): bounded app asset and manifest follow-through. The first
   admitted non-code app payload stays on the existing installed-program bytes

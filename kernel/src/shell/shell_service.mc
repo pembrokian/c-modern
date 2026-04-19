@@ -338,6 +338,10 @@ func launcher_identify(s: ShellServiceState, m: service_effect.Message) service_
     return forward(s, service_topology.LAUNCHER_ENDPOINT_ID, 1, serial_protocol.CMD_I, 0, 0)
 }
 
+func launcher_status(s: ShellServiceState, m: service_effect.Message) service_effect.Effect {
+    return forward(s, service_topology.LAUNCHER_ENDPOINT_ID, 1, serial_protocol.CMD_Q, 0, 0)
+}
+
 func launcher_manifest(s: ShellServiceState, m: service_effect.Message) service_effect.Effect {
     return forward(s, service_topology.LAUNCHER_ENDPOINT_ID, 2, serial_protocol.CMD_M, m.payload[2], 0)
 }
@@ -362,6 +366,11 @@ func route_launcher(s: ShellServiceState, m: service_effect.Message, op: u8) ser
             return invalid_effect(SHELL_INVALID_SHAPE)
         }
         return launcher_identify(s, m)
+    case serial_protocol.CMD_Q:
+        if !bang23(m) {
+            return invalid_effect(SHELL_INVALID_SHAPE)
+        }
+        return launcher_status(s, m)
     case serial_protocol.CMD_M:
         if !bang3(m) {
             return invalid_effect(SHELL_INVALID_SHAPE)

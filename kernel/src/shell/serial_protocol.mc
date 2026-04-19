@@ -13,6 +13,7 @@
 //   Q D ! !         — queue dequeue
 //   Q C ! !         — queue count (returns count as reply_payload_len)
 //   Q P ! !         — queue peek
+//   P Q ! !         — launcher status
 //   X A <target> !  — authority inspection query
 //   X C <target> !  — compact service-state query
 //   X D <target> !  — retained-vs-durable boundary query
@@ -195,6 +196,10 @@ func encode_launcher_list() [4]u8 {
 
 func encode_launcher_identify() [4]u8 {
     return encode_no_args(CMD_P, CMD_I)
+}
+
+func encode_launcher_status() [4]u8 {
+    return encode_no_args(CMD_P, CMD_Q)
 }
 
 func encode_launcher_manifest(index: u8) [4]u8 {

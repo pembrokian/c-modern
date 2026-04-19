@@ -1,0 +1,164 @@
+Phase 280 -- UI App Restart And Update Follow-Through
+=====================================================
+
+Status
+------
+PROPOSED
+
+Purpose
+-------
+Prove that the first human-facing app remains honest under restart, update, or
+relaunch pressure on the admitted UI surface without requiring a retained UI
+framework.
+
+This phase exists now because the first human-facing app proof only matters if
+the existing Band C restart and update truths still compose once the app is
+visible. The smallest honest follow-through is one bounded restart-or-update
+proof, not a session or document-persistence system.
+
+Repository status note
+----------------------
+- Phase 270 already admits one launcher-visible fresh-versus-resumed-versus-
+  invalidated classification over one installed path.
+- Phase 272 already spends that truth on one installed-workflow demo.
+- Phase 279 should produce one directly usable human-facing app on the same
+  bounded path.
+- The repository still lacks one proof that the visible app path remains honest
+  under restart or update pressure.
+
+Problem being solved
+--------------------
+- A visible app path can still be misleading if restart or update breaks the
+  admitted UI contract or hides recovery consequences.
+- The repository needs one honest answer on whether the first UI app can reuse
+  the existing Band C restart and update seams without a retained UI framework.
+- Without this slice, the later audit would have to guess whether the first UI
+  band remains stable under the already-admitted product-shaped lifecycle.
+
+Non-goals
+---------
+- no session framework or document restore system
+- no background execution or multi-app lifecycle policy
+- no retained widget tree or UI-state persistence layer
+- no richer update framework than the current launcher-plus-update-store path
+- no broader package or install semantics
+
+Invariants
+----------
+- `launcher_service.mc` remains the app-facing restart-classification owner.
+- `update_store_service.mc` remains the durable owner of installed bytes and
+  launch-record comparison truth.
+- The human-facing app remains one bounded consumer of those owners.
+- The phase must not imply process-resume or document-restore semantics beyond
+  the admitted fresh/resumed/invalidated path.
+- No retained UI-state framework may be introduced.
+
+Required surface changes
+------------------------
+1. Spend the existing restart or update truth on the first human-facing app.
+2. Make the caller-visible UI consequence of fresh, resumed, or invalidated
+   explicit on the admitted surface.
+3. Add one focused reset-lane fixture proving the restart-or-update path.
+4. Add any narrow real-project validation needed for the first app consumer.
+
+Forbidden changes
+-----------------
+- do not widen restart truth into sessions, save-state, or document restore
+- do not move durable install or launch-record truth out of
+  `update_store_service.mc`
+- do not widen launcher into durable UI-state ownership
+- do not add a second lifecycle framework just for UI follow-through
+
+Phase role in the larger sequence
+---------------------------------
+- This phase finishes the first honest durability and lifecycle follow-through
+  for the Band D app proof.
+- It prepares the UI audit by showing whether the admitted UI slice survives
+  restart or update pressure honestly.
+- It is the narrowest honest follow-through before Band D closeout.
+
+Relevant backlog items this phase intentionally brings under pressure
+--------------------------------------------------------------------
+- keep restart-visible app truth bounded to launcher classification over one
+  update-store-owned durable seam
+- keep richer app status and broader execution semantics deferred until a real
+  second pressure proves stronger
+
+Questions this phase must answer
+--------------------------------
+1. What visible UI consequence should correspond to fresh, resumed, or
+   invalidated launch on the admitted surface?
+2. Does the first human-facing app need anything stronger than the current
+   launcher-plus-update-store split?
+3. What focused proof shows honest UI behavior across restart or update?
+4. Which pressures, if any, remain too weak to justify a retained UI framework?
+
+Preferred implementation shape
+------------------------------
+- Reuse the existing Band C restart and install seams rather than inventing
+  UI-specific lifecycle storage.
+- Keep the visible consequence explicit in the app or surface contract.
+- Prefer one restart-or-update proof on the existing `issue_rollup` path.
+- Keep any new status surface additive and bounded to the admitted app path.
+
+Implementation accelerators
+---------------------------
+Main files and navigations
+~~~~~~~~~~~~~~~~~~~~~~~~~~
+- Primary controlling owners: `kernel/src/services/launcher_service.mc`,
+  `kernel/src/services/update_store_service.mc`, and the first human-facing app
+  under `examples/real/issue_rollup/src/`.
+- First-hop adjacent files: the Band D display and repaint owners,
+  `kernel/src/kernel_dispatch.mc`, and the Phase 272 installed-workflow demo
+  fixture.
+- Nearby accelerator docs: `docs/agent/prompts/test_overview.txt`,
+  `docs/agent/prompts/repo_map.md`, and the Phase 270, Phase 272, and Phase 273
+  plan docs.
+- Expected first validation target when the owner changes: one focused restart-
+  or-update UI reset-lane fixture.
+
+Relevant cookbook patterns
+~~~~~~~~~~~~~~~~~~~~~~~~~~
+- Pattern 5 -- Add A Test File is again the closest fit because the phase is a
+  bounded follow-through proof on existing owners.
+
+Relevant file-local invariants
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+- `launcher_service.mc` owns the visible fresh/resumed/invalidated
+  classification.
+- `update_store_service.mc` owns installed bytes and launch-record comparison
+  truth.
+- The UI app remains a consumer and must not become a lifecycle framework owner.
+
+Relevant test surfaces
+~~~~~~~~~~~~~~~~~~~~~~
+- Primary owning validation surface: one reset-lane system fixture for UI app
+  restart or update follow-through.
+- Narrowest expected first executable validation target: the Phase 280 fixture.
+- Supporting validation: one narrow `issue_rollup` real-project case,
+  `mc_tool_workflow_kernel_reset_lane_unit`, and the full reset-lane grouped
+  case.
+
+Test obligations
+----------------
+- `Build debug`
+- one focused reset-lane fixture for UI app restart or update follow-through
+- one narrow `issue_rollup` real-project validation if app-visible status
+  changes
+- `mc_tool_workflow_kernel_reset_lane_unit`
+- `mc_tool_workflow_kernel_reset_lane_full_unit`
+
+Acceptance criteria
+-------------------
+- the first human-facing app remains honest under one admitted restart or
+  update or relaunch path
+- the visible consequence reuses existing launcher and update-store truth
+- no session, save-state, or retained UI framework is introduced
+- the phase leaves one concrete basis for the first UI audit
+
+Future follow-up
+----------------
+- Phase 281 should audit what the first UI slice actually proved and what still
+  remains deferred.
+- Reopen broader UI lifecycle work only when a real admitted app needs richer
+  retained state than the current restart classification can express honestly.

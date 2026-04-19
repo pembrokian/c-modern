@@ -3,7 +3,7 @@ Phase 272 -- First User-Facing Installed Workflow Demo
 
 Status
 ------
-PROPOSED
+COMPLETED
 
 Purpose
 -------
@@ -156,6 +156,59 @@ Acceptance criteria
 - the user-visible status path is explicit and deterministic
 - the demo reuses existing owners instead of inventing a hidden orchestrator
 - the phase leaves one concrete basis for the Phase 273 audit
+
+Implementation summary
+----------------------
+- `issue_rollup` is the chosen first installed-workflow demo consumer.
+- `launcher_service` now exposes one explicit status query for the installed
+  workflow path.
+- The status reply reports `(installed program id, installed version,
+  foreground program id, visible status)`.
+- Visible status stays bounded to the current single-demo path:
+  `N` = none, `A` = activated, `F` = fresh, `R` = resumed, `I` = invalidated.
+- Durable installed bytes and durable launch-record comparison truth remain on
+  `update_store_service`; launcher stores only the last launch classification
+  needed to make the status query explicit after launch.
+- The kernel scenario owner now includes one dedicated
+  `run_launcher_installed_workflow_demo_probe()` path and one distinct
+  reset-lane fixture at
+  `tests/system/kernel_reset_lane_phase272_installed_workflow_demo/`.
+
+Validation
+----------
+- `Build debug`
+- `build/debug/bin/mc_tool_workflow_tests "$PWD" "$PWD/build/debug" kernel-reset-lane`
+
+Notes on real-project validation
+--------------------------------
+- No new `issue_rollup` real-project test was required in this phase.
+- Phase 272 composes already-landed launcher, install-slot, restart-truth, and
+  manifest owners around the existing `issue_rollup` program.
+- Existing `issue_rollup` real-project and app-local manifest coverage remain
+  the owning program-side validation surfaces.
+
+Post-implementation review
+--------------------------
+- Preserved invariants:
+  - launcher remains the app-facing policy owner
+  - update-store remains the durable owner for installed bytes and launch
+    comparison truth
+  - shell and serial protocol remain compact forwarding owners
+  - `issue_rollup` remains the only admitted installed demo consumer
+- Ownership boundaries did not weaken:
+  - no second orchestration layer was added
+  - no package manager, UI framework, or status registry was introduced
+  - no launcher-owned durable storage was added
+- Important non-decisions:
+  - no second installed demo app in this phase
+  - no shell-visible dashboard or general metadata surface
+  - no real process execution, session, or document-restore semantics
+- Deferred work:
+  - broader app-platform claims stay deferred to Phase 273
+  - any richer app status or second-app pressure must prove a new owner rather
+    than stretching the current single-demo launcher path
+- Newly discovered language limitations:
+  - none
 
 Future follow-up
 ----------------

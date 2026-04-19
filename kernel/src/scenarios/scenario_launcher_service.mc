@@ -64,6 +64,36 @@ const FAIL_LAUNCHER_MANIFEST_RANGE: i32 = 27114
 const FAIL_LAUNCHER_MANIFEST_STORE_RESTART: i32 = 27115
 const FAIL_LAUNCHER_MANIFEST_AFTER_STORE_RESTART: i32 = 27116
 
+const FAIL_LAUNCHER_DEMO_SETUP: i32 = 27201
+const FAIL_LAUNCHER_DEMO_STATUS_EMPTY: i32 = 27202
+const FAIL_LAUNCHER_DEMO_STAGE0: i32 = 27203
+const FAIL_LAUNCHER_DEMO_STAGE1: i32 = 27204
+const FAIL_LAUNCHER_DEMO_STAGE2: i32 = 27205
+const FAIL_LAUNCHER_DEMO_MANIFEST: i32 = 27206
+const FAIL_LAUNCHER_DEMO_APPLY_SCHEDULE: i32 = 27207
+const FAIL_LAUNCHER_DEMO_APPLY_WAITING: i32 = 27208
+const FAIL_LAUNCHER_DEMO_APPLY_DONE: i32 = 27209
+const FAIL_LAUNCHER_DEMO_STATUS_ACTIVATED: i32 = 27210
+const FAIL_LAUNCHER_DEMO_SELECT: i32 = 27211
+const FAIL_LAUNCHER_DEMO_LAUNCH_FRESH: i32 = 27212
+const FAIL_LAUNCHER_DEMO_STATUS_FRESH: i32 = 27213
+const FAIL_LAUNCHER_DEMO_RESTART: i32 = 27214
+const FAIL_LAUNCHER_DEMO_STATUS_AFTER_RESTART: i32 = 27215
+const FAIL_LAUNCHER_DEMO_LAUNCH_RESUMED: i32 = 27216
+const FAIL_LAUNCHER_DEMO_STATUS_RESUMED: i32 = 27217
+const FAIL_LAUNCHER_DEMO_CLEAR: i32 = 27218
+const FAIL_LAUNCHER_DEMO_RESTAGE0: i32 = 27219
+const FAIL_LAUNCHER_DEMO_RESTAGE1: i32 = 27220
+const FAIL_LAUNCHER_DEMO_RESTAGE2: i32 = 27221
+const FAIL_LAUNCHER_DEMO_REMANIFEST: i32 = 27222
+const FAIL_LAUNCHER_DEMO_REAPPLY_SCHEDULE: i32 = 27223
+const FAIL_LAUNCHER_DEMO_REAPPLY_WAITING: i32 = 27224
+const FAIL_LAUNCHER_DEMO_REAPPLY_DONE: i32 = 27225
+const FAIL_LAUNCHER_DEMO_RESTART_INVALIDATED: i32 = 27226
+const FAIL_LAUNCHER_DEMO_STATUS_REACTIVATED: i32 = 27227
+const FAIL_LAUNCHER_DEMO_LAUNCH_INVALIDATED: i32 = 27228
+const FAIL_LAUNCHER_DEMO_STATUS_INVALIDATED: i32 = 27229
+
 func expect_reply(effect: service_effect.Effect, status: syscall.SyscallStatus, len: usize, b0: u8, b1: u8, b2: u8, b3: u8) bool {
     if service_effect.effect_reply_status(effect) != status {
         return false
@@ -352,6 +382,152 @@ func run_launcher_manifest_probe() i32 {
     effect = kernel_dispatch.kernel_dispatch_step(&state, scenario_transport.cmd_launcher_manifest(1))
     if !expect_reply(effect, syscall.SyscallStatus.Ok, 4, program_catalog.PROGRAM_ID_ISSUE_ROLLUP, 7, 3, 22) {
         return FAIL_LAUNCHER_MANIFEST_AFTER_STORE_RESTART
+    }
+
+    return 0
+}
+
+func run_launcher_installed_workflow_demo_probe() i32 {
+    if !update_store_service.update_store_persist(update_store_service.update_store_init(service_topology.UPDATE_STORE_SLOT.pid, 1)) {
+        return FAIL_LAUNCHER_DEMO_SETUP
+    }
+
+    state := boot.kernel_init()
+
+    effect := kernel_dispatch.kernel_dispatch_step(&state, scenario_transport.cmd_launcher_status())
+    if !expect_reply(effect, syscall.SyscallStatus.Ok, 4, 0, 0, 0, launcher_service.LAUNCHER_STATUS_NONE) {
+        return FAIL_LAUNCHER_DEMO_STATUS_EMPTY
+    }
+
+    effect = kernel_dispatch.kernel_dispatch_step(&state, scenario_transport.cmd_update_stage(11))
+    if service_effect.effect_reply_status(effect) != syscall.SyscallStatus.Ok {
+        return FAIL_LAUNCHER_DEMO_STAGE0
+    }
+    effect = kernel_dispatch.kernel_dispatch_step(&state, scenario_transport.cmd_update_stage(22))
+    if service_effect.effect_reply_status(effect) != syscall.SyscallStatus.Ok {
+        return FAIL_LAUNCHER_DEMO_STAGE1
+    }
+    effect = kernel_dispatch.kernel_dispatch_step(&state, scenario_transport.cmd_update_stage(33))
+    if service_effect.effect_reply_status(effect) != syscall.SyscallStatus.Ok {
+        return FAIL_LAUNCHER_DEMO_STAGE2
+    }
+    effect = kernel_dispatch.kernel_dispatch_step(&state, scenario_transport.cmd_update_manifest(7, 3))
+    if service_effect.effect_reply_status(effect) != syscall.SyscallStatus.Ok {
+        return FAIL_LAUNCHER_DEMO_MANIFEST
+    }
+
+    effect = kernel_dispatch.kernel_dispatch_step(&state, scenario_transport.cmd_workflow_apply_update())
+    if service_effect.effect_reply_status(effect) != syscall.SyscallStatus.Ok || service_effect.effect_reply_payload_len(effect) != 2 {
+        return FAIL_LAUNCHER_DEMO_APPLY_SCHEDULE
+    }
+    apply_id := service_effect.effect_reply_payload(effect)[0]
+
+    effect = kernel_dispatch.kernel_dispatch_step(&state, scenario_transport.cmd_workflow_query(apply_id))
+    if !expect_workflow(effect, syscall.SyscallStatus.Ok, workflow_core.WORKFLOW_STATE_WAITING, workflow_core.WORKFLOW_RESTART_NONE) {
+        return FAIL_LAUNCHER_DEMO_APPLY_WAITING
+    }
+    effect = kernel_dispatch.kernel_dispatch_step(&state, scenario_transport.cmd_workflow_query(apply_id))
+    if !expect_workflow(effect, syscall.SyscallStatus.Ok, workflow_core.WORKFLOW_STATE_UPDATE_APPLIED, workflow_core.WORKFLOW_RESTART_NONE) {
+        return FAIL_LAUNCHER_DEMO_APPLY_DONE
+    }
+
+    effect = kernel_dispatch.kernel_dispatch_step(&state, scenario_transport.cmd_launcher_status())
+    if !expect_reply(effect, syscall.SyscallStatus.Ok, 4, program_catalog.PROGRAM_ID_ISSUE_ROLLUP, 7, 0, launcher_service.LAUNCHER_STATUS_ACTIVATED) {
+        return FAIL_LAUNCHER_DEMO_STATUS_ACTIVATED
+    }
+
+    effect = kernel_dispatch.kernel_dispatch_step(&state, scenario_transport.cmd_launcher_select(program_catalog.PROGRAM_ID_ISSUE_ROLLUP))
+    if !expect_reply(effect, syscall.SyscallStatus.Ok, 2, program_catalog.PROGRAM_ID_ISSUE_ROLLUP, 0, 0, 0) {
+        return FAIL_LAUNCHER_DEMO_SELECT
+    }
+
+    effect = kernel_dispatch.kernel_dispatch_step(&state, scenario_transport.cmd_launcher_launch())
+    if !expect_reply(effect, syscall.SyscallStatus.Ok, 4, program_catalog.PROGRAM_ID_ISSUE_ROLLUP, program_catalog.PROGRAM_KIND_CODE_HOSTED_EXE, 1, launcher_service.LAUNCHER_RESUME_FRESH) {
+        return FAIL_LAUNCHER_DEMO_LAUNCH_FRESH
+    }
+    effect = kernel_dispatch.kernel_dispatch_step(&state, scenario_transport.cmd_launcher_status())
+    if !expect_reply(effect, syscall.SyscallStatus.Ok, 4, program_catalog.PROGRAM_ID_ISSUE_ROLLUP, 7, program_catalog.PROGRAM_ID_ISSUE_ROLLUP, launcher_service.LAUNCHER_RESUME_FRESH) {
+        return FAIL_LAUNCHER_DEMO_STATUS_FRESH
+    }
+
+    effect = kernel_dispatch.kernel_dispatch_step(&state, scenario_transport.cmd_lifecycle_restart(serial_protocol.TARGET_LAUNCHER))
+    if !scenario_assert.expect_lifecycle(effect, syscall.SyscallStatus.Ok, serial_protocol.TARGET_LAUNCHER, serial_protocol.LIFECYCLE_RESET) {
+        return FAIL_LAUNCHER_DEMO_RESTART
+    }
+    effect = kernel_dispatch.kernel_dispatch_step(&state, scenario_transport.cmd_launcher_status())
+    if !expect_reply(effect, syscall.SyscallStatus.Ok, 4, program_catalog.PROGRAM_ID_ISSUE_ROLLUP, 7, 0, launcher_service.LAUNCHER_STATUS_ACTIVATED) {
+        return FAIL_LAUNCHER_DEMO_STATUS_AFTER_RESTART
+    }
+
+    effect = kernel_dispatch.kernel_dispatch_step(&state, scenario_transport.cmd_launcher_select(program_catalog.PROGRAM_ID_ISSUE_ROLLUP))
+    if !expect_reply(effect, syscall.SyscallStatus.Ok, 2, program_catalog.PROGRAM_ID_ISSUE_ROLLUP, 0, 0, 0) {
+        return FAIL_LAUNCHER_DEMO_SELECT
+    }
+    effect = kernel_dispatch.kernel_dispatch_step(&state, scenario_transport.cmd_launcher_launch())
+    if !expect_reply(effect, syscall.SyscallStatus.Ok, 4, program_catalog.PROGRAM_ID_ISSUE_ROLLUP, program_catalog.PROGRAM_KIND_CODE_HOSTED_EXE, 1, launcher_service.LAUNCHER_RESUME_RESUMED) {
+        return FAIL_LAUNCHER_DEMO_LAUNCH_RESUMED
+    }
+    effect = kernel_dispatch.kernel_dispatch_step(&state, scenario_transport.cmd_launcher_status())
+    if !expect_reply(effect, syscall.SyscallStatus.Ok, 4, program_catalog.PROGRAM_ID_ISSUE_ROLLUP, 7, program_catalog.PROGRAM_ID_ISSUE_ROLLUP, launcher_service.LAUNCHER_RESUME_RESUMED) {
+        return FAIL_LAUNCHER_DEMO_STATUS_RESUMED
+    }
+
+    effect = kernel_dispatch.kernel_dispatch_step(&state, scenario_transport.cmd_update_clear())
+    if service_effect.effect_reply_status(effect) != syscall.SyscallStatus.Ok {
+        return FAIL_LAUNCHER_DEMO_CLEAR
+    }
+    effect = kernel_dispatch.kernel_dispatch_step(&state, scenario_transport.cmd_update_stage(44))
+    if service_effect.effect_reply_status(effect) != syscall.SyscallStatus.Ok {
+        return FAIL_LAUNCHER_DEMO_RESTAGE0
+    }
+    effect = kernel_dispatch.kernel_dispatch_step(&state, scenario_transport.cmd_update_stage(55))
+    if service_effect.effect_reply_status(effect) != syscall.SyscallStatus.Ok {
+        return FAIL_LAUNCHER_DEMO_RESTAGE1
+    }
+    effect = kernel_dispatch.kernel_dispatch_step(&state, scenario_transport.cmd_update_stage(66))
+    if service_effect.effect_reply_status(effect) != syscall.SyscallStatus.Ok {
+        return FAIL_LAUNCHER_DEMO_RESTAGE2
+    }
+    effect = kernel_dispatch.kernel_dispatch_step(&state, scenario_transport.cmd_update_manifest(8, 3))
+    if service_effect.effect_reply_status(effect) != syscall.SyscallStatus.Ok {
+        return FAIL_LAUNCHER_DEMO_REMANIFEST
+    }
+
+    effect = kernel_dispatch.kernel_dispatch_step(&state, scenario_transport.cmd_workflow_apply_update())
+    if service_effect.effect_reply_status(effect) != syscall.SyscallStatus.Ok || service_effect.effect_reply_payload_len(effect) != 2 {
+        return FAIL_LAUNCHER_DEMO_REAPPLY_SCHEDULE
+    }
+    apply_id = service_effect.effect_reply_payload(effect)[0]
+
+    effect = kernel_dispatch.kernel_dispatch_step(&state, scenario_transport.cmd_workflow_query(apply_id))
+    if !expect_workflow(effect, syscall.SyscallStatus.Ok, workflow_core.WORKFLOW_STATE_WAITING, workflow_core.WORKFLOW_RESTART_NONE) {
+        return FAIL_LAUNCHER_DEMO_REAPPLY_WAITING
+    }
+    effect = kernel_dispatch.kernel_dispatch_step(&state, scenario_transport.cmd_workflow_query(apply_id))
+    if !expect_workflow(effect, syscall.SyscallStatus.Ok, workflow_core.WORKFLOW_STATE_UPDATE_APPLIED, workflow_core.WORKFLOW_RESTART_NONE) {
+        return FAIL_LAUNCHER_DEMO_REAPPLY_DONE
+    }
+
+    effect = kernel_dispatch.kernel_dispatch_step(&state, scenario_transport.cmd_lifecycle_restart(serial_protocol.TARGET_LAUNCHER))
+    if !scenario_assert.expect_lifecycle(effect, syscall.SyscallStatus.Ok, serial_protocol.TARGET_LAUNCHER, serial_protocol.LIFECYCLE_RESET) {
+        return FAIL_LAUNCHER_DEMO_RESTART_INVALIDATED
+    }
+    effect = kernel_dispatch.kernel_dispatch_step(&state, scenario_transport.cmd_launcher_status())
+    if !expect_reply(effect, syscall.SyscallStatus.Ok, 4, program_catalog.PROGRAM_ID_ISSUE_ROLLUP, 8, 0, launcher_service.LAUNCHER_STATUS_ACTIVATED) {
+        return FAIL_LAUNCHER_DEMO_STATUS_REACTIVATED
+    }
+
+    effect = kernel_dispatch.kernel_dispatch_step(&state, scenario_transport.cmd_launcher_select(program_catalog.PROGRAM_ID_ISSUE_ROLLUP))
+    if !expect_reply(effect, syscall.SyscallStatus.Ok, 2, program_catalog.PROGRAM_ID_ISSUE_ROLLUP, 0, 0, 0) {
+        return FAIL_LAUNCHER_DEMO_SELECT
+    }
+    effect = kernel_dispatch.kernel_dispatch_step(&state, scenario_transport.cmd_launcher_launch())
+    if !expect_reply(effect, syscall.SyscallStatus.Ok, 4, program_catalog.PROGRAM_ID_ISSUE_ROLLUP, program_catalog.PROGRAM_KIND_CODE_HOSTED_EXE, 1, launcher_service.LAUNCHER_RESUME_INVALIDATED) {
+        return FAIL_LAUNCHER_DEMO_LAUNCH_INVALIDATED
+    }
+    effect = kernel_dispatch.kernel_dispatch_step(&state, scenario_transport.cmd_launcher_status())
+    if !expect_reply(effect, syscall.SyscallStatus.Ok, 4, program_catalog.PROGRAM_ID_ISSUE_ROLLUP, 8, program_catalog.PROGRAM_ID_ISSUE_ROLLUP, launcher_service.LAUNCHER_RESUME_INVALIDATED) {
+        return FAIL_LAUNCHER_DEMO_STATUS_INVALIDATED
     }
 
     return 0

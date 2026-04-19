@@ -104,7 +104,7 @@ func run(state: *boot.KernelBootState) i32 {
     if result != 0 {
         return result
     }
-    result = scenario_launcher_service.run_launcher_service_probe()
+    result = scenario_launcher_service.run_launcher_installed_workflow_demo_probe()
     if result != 0 {
         return result
     }

@@ -1,0 +1,160 @@
+Phase 281 -- First UI Slice Audit
+=================================
+
+Status
+------
+PROPOSED
+
+Purpose
+-------
+Close the first Band D UI wave by stating which input, display, routing,
+presentation, rendering, and app-proof pressures are now maintained truth and
+which still remain too weak to justify broader UI framework work.
+
+This phase exists now because the repository should stop after one deliberately
+narrow human-facing wave and classify what it actually proved before starting a
+second layer of UI composition or alternate input work.
+
+Repository status note
+----------------------
+- Phase 273 already classified the first UI band as the stronger next owner.
+- Phases 274 through 280 are expected to admit one bounded input owner, one
+  display owner, one single-foreground input route, one explicit present
+  contract, one fixed rendering path, one directly usable app proof, and one
+  restart-or-update follow-through on that path.
+- The repository will then have touched genuine UI work, but only through one
+  narrow human-facing lane.
+- The remaining question is whether any stronger still-open pressure outranks a
+  second UI layer or whether Band E now honestly wins.
+
+Problem being solved
+--------------------
+- Without an explicit UI closeout audit, the repository could slide from the
+  first human-facing proof into windows, widgets, pointer input, or editor-like
+  work without stating what the first UI slice actually solved.
+- The repository needs one honest answer on which UI surfaces are now admitted
+  truth and which remain explicitly deferred.
+- This is a current planning problem, not a generic product-roadmap summary.
+
+Non-goals
+---------
+- no new UI feature landing by convenience
+- no implicit promotion of the first UI slice into a desktop or toolkit claim
+- no hidden Band E planning inside the audit
+- no silent reinterpretation of earlier Band D outcomes
+
+Invariants
+----------
+- The audit must classify actual landed Band D outcomes only.
+- Closed UI surfaces must remain bounded to what Phases 274 through 280 really
+  proved.
+- Still-open UI pressures must stay concrete and owner-local.
+- The audit must not claim windows, widgets, pointer input, or composition
+  layers unless the landed evidence actually supports them.
+
+Required surface changes
+------------------------
+1. Re-audit the actual outcomes of Phases 274 through 280.
+2. Publish which first-UI surfaces are now maintained truth.
+3. Publish which still-open UI pressures remain deferred and why.
+4. State whether Band E now honestly wins over more follow-through inside the
+   first UI slice.
+5. Tighten backlog or decision-log entries only where the audit exposes a real
+   still-open pressure.
+
+Forbidden changes
+-----------------
+- do not land new input, display, or widget features inside the audit
+- do not treat one bounded human-facing app proof as a desktop or toolkit
+- do not bury still-open blockers under vague polish language
+- do not widen the audit into speculative graphics or product strategy
+
+Phase role in the larger sequence
+---------------------------------
+- This phase closes the first Band D UI wave.
+- It determines whether the repository is ready for Band E's next UI layer
+  honestly.
+- It preserves the evidence-first planning style by stopping after one narrow
+  visible path and stating what is actually true.
+
+Relevant backlog items this phase intentionally brings under pressure
+--------------------------------------------------------------------
+- keep first-UI growth bounded to explicit input, display, and foreground-app
+  seams
+- keep composition, alternate input, and control-family growth deferred until a
+  second real UI pressure demands them
+
+Questions this phase must answer
+--------------------------------
+1. Which first-UI slices landed cleanly enough that later UI phases can rely on
+   them as maintained truth?
+2. Which still-open UI pressure, if any, remains stronger than Band E's next
+   owner?
+3. Did the first human-facing app proof expose one missing owner that still
+   belongs in Band D rather than Band E?
+4. What exact evidence now supports starting the next UI layer honestly?
+
+Preferred implementation shape
+------------------------------
+- Keep the phase document-focused and evidence-based.
+- Reuse the plateau and frontier-audit style already used by the repository.
+- Prefer short explicit classifications over broad UI narrative.
+
+Implementation accelerators
+---------------------------
+Main files and navigations
+~~~~~~~~~~~~~~~~~~~~~~~~~~
+- Primary controlling owners: the Phase 274 through Phase 280 plan docs plus
+  the landed owners they name.
+- First-hop adjacent files: `docs/plan/backlog.txt`,
+  `docs/plan/decision_log.txt`, `kernel/README.md`, and the first UI app
+  fixture from Phase 279 or Phase 280.
+- Nearby accelerator docs: `docs/plan/admin/speculative_roadmap_post_phase254.txt`,
+  `docs/agent/prompts/plan_spec.txt`, and `docs/agent/prompts/test_overview.txt`.
+- Expected first validation target when the owner changes: no new executable
+  target beyond the evidence already required by the earlier Band D phases.
+
+Relevant cookbook patterns
+~~~~~~~~~~~~~~~~~~~~~~~~~~
+- No direct cookbook pattern fits; this is a bounded planning audit.
+
+Relevant file-local invariants
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+- The earlier Band D phase docs remain the contract owners for what each slice
+  meant; the audit must not silently reinterpret them.
+- `docs/plan/backlog.txt` and `docs/plan/decision_log.txt` should only receive
+  bounded still-open pressures or deliberate deferrals.
+- The audit must classify UI readiness for Band E honestly from the landed Band
+  D evidence.
+
+Relevant test surfaces
+~~~~~~~~~~~~~~~~~~~~~~
+- Primary owning validation surface: the executable and fixture evidence already
+  required by Phases 274 through 280.
+- Narrowest expected first executable validation target: none new unless one
+  earlier Band D result is still ambiguous.
+- If ambiguity remains, rerun only the narrowest owning reset-lane or
+  real-project proof from the ambiguous earlier phase.
+
+Test obligations
+----------------
+- no new executable validation by default
+- if one Band D slice remains ambiguous, rerun only its narrowest owning proof
+
+Acceptance criteria
+-------------------
+- the repository has one explicit closeout statement for the first Band D UI
+  wave
+- later phases can see clearly which first-UI surfaces are now maintained truth
+  and which remain deferred
+- the next stronger owner after the first UI wave is classified honestly
+- no new feature work is smuggled into the audit
+
+Future follow-up
+----------------
+- If the audit confirms that the first UI slice is complete for its admitted
+  path, proceed to Band E and keep the next work on one bounded composition,
+  alternate-input, or control-family owner rather than reopening Band D by
+  convenience.
+- Reopen Band D only when a concrete still-open pressure proves stronger than
+  the next Band E slice.

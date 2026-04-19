@@ -3,7 +3,7 @@ Phase 273 -- App Substrate Pressure Audit
 
 Status
 ------
-PROPOSED
+COMPLETED
 
 Purpose
 -------
@@ -18,13 +18,17 @@ work.
 
 Repository status note
 ----------------------
-- Phase 267 is expected to define runtime program identity.
-- Phase 268 is expected to define one launcher owner.
-- Phase 269 through Phase 271 are expected to define one installed slot,
-  restart-visible app truth, and one bounded asset or manifest path.
-- Phase 272 is expected to prove one visible installed workflow demo.
-- The repository still needs one explicit statement of whether those slices are
-  enough to justify starting Band D's first UI work.
+- Phase 267 landed one explicit runtime `program_catalog` owner for bounded
+  launch descriptors.
+- Phase 268 landed one bounded `launcher_service` owner for fixed-catalog
+  selection and one foreground launch consequence.
+- Phase 269 through Phase 271 landed one fixed installed-program slot, one
+  launcher-visible fresh-versus-resumed-versus-invalidated launch
+  classification, and one `issue_rollup`-only manifest family.
+- Phase 272 landed one visible installed-workflow demo path with one explicit
+  launcher-owned status query over the admitted `issue_rollup` path.
+- The remaining question was whether that evidence already makes Band D's
+  first input/display owner stronger than another app-substrate follow-through.
 
 Problem being solved
 --------------------
@@ -153,9 +157,75 @@ Acceptance criteria
 - the next stronger owner after Band C is classified honestly
 - no new feature work is smuggled into the audit
 
+Implementation outcome
+----------------------
+- Band C is now classified as complete for its admitted slice.
+- The maintained app-substrate truths are:
+  - one fixed runtime program catalog owned by `program_catalog`
+  - one bounded single-foreground launcher owner for selection, identify,
+    launch, restart classification, manifest query, and installed-workflow
+    status on the admitted path
+  - one update-store-owned installed-program slot plus one minimal persisted
+    launch-record comparison seam
+  - one `issue_rollup`-only manifest family carried on the installed bytes
+    instead of a broader package or filesystem surface
+  - one explicit end-to-end installed-workflow demo proving that those owners
+    compose without a hidden orchestrator
+- The audit found no stronger still-open app-substrate owner than Phase 274's
+  first input-event work.
+- The still-open app-facing pressures remain real but weaker than Band D's
+  first slice:
+  - a second installed-program consumer
+  - richer app-facing status than the current compact launcher query
+  - broader app execution semantics than the current launcher-plus-update-store
+    split can honestly express
+  - a second asset or manifest family that cannot stay on the current
+    `issue_rollup`-only path
+- The installed-workflow demo did not expose a missing launcher, update,
+  object-store, or workflow owner. It instead confirmed that the current
+  bounded app path is sufficient for one first UI consumer to sit on top of it.
+
+Validation
+----------
+- no new executable validation was required because Phase 273 is a bounded
+  planning audit and the earlier Band C phases already carried the owning
+  executable evidence
+
+Phase review against the spec
+-----------------------------
+- Preserved invariants:
+  - the audit classifies only the landed Phase 267 through Phase 272 outcomes
+  - closed surfaces stay bounded to one catalog, one launcher owner, one fixed
+    installed slot, one bounded restart classification, one `issue_rollup`-
+    only manifest family, and one explicit installed-workflow demo
+  - deferred pressures remain concrete and owner-local instead of being buried
+    under generic productization language
+- Ownership boundaries did not weaken:
+  - launcher remains the app-facing policy owner
+  - `update_store_service` remains the durable owner of installed bytes and the
+    minimal launch-record comparison truth
+  - `object_store_service`, `workflow_service`, and
+    `completion_mailbox_service` were not widened into a package or app
+    framework
+  - shell and dispatch remain routing seams only
+- Accidental centers of gravity were avoided:
+  - no package manager, app framework, status registry, filesystem, or second
+    orchestrator was introduced by the audit
+  - no new launcher-owned durable storage or update-store-owned app policy was
+    claimed
+- Honest non-decisions and deferred work:
+  - no second installed demo consumer yet
+  - no broader process-execution semantics yet
+  - no richer manifest or asset family yet
+  - no session, document-restore, or save-state framework yet
+  - no shell-visible dashboard or broader app metadata surface yet
+
 Future follow-up
 ----------------
-- If Band D now clearly wins, proceed to the first input and display owner
-  phases without reopening app-substrate planning immediately.
-- If one app-facing blocker still outranks UI work, record it explicitly as
-  the next phase instead of leaving it as narrative residue.
+- Band D now clearly wins. Proceed to Phase 274 and keep the first UI work on
+  one explicit input-event owner plus one later display owner rather than
+  reopening app-substrate planning immediately.
+- Reopen Band C only when a second real installed-program consumer, richer
+  app-facing status requirement, broader execution semantic, or materially
+  different asset family proves that one of the current bounded owners is no
+  longer sufficient.
