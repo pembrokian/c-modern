@@ -1,0 +1,195 @@
+Phase 256 -- Imported Generic Helper Follow-Through
+===================================================
+
+Status
+------
+PROPOSED
+
+Purpose
+-------
+Admit one bounded imported follow-through for the value-shaped generic helper
+family closed in Phase 255 so one already-admitted helper can cross a real
+module boundary without reopening general imported generic-body support.
+
+This phase exists now because Phase 255 should close the same-module direct
+consumer, but the repository already knows the next plausible pressure: the
+same helper shape becomes more useful once it can live in a small shared module
+instead of only beside the caller.
+
+Repository status note
+----------------------
+- Phase 49 already closed the erased-ABI imported generic procedure-call slice
+  for one narrow admitted family.
+- Phase 252 and Phase 255 together define the next narrower frontier beyond
+  that older slice: imported value-shaped generic helper bodies, not just
+  erased-ABI generic calls.
+- The decision log for Phase 252 explicitly kept imported or cross-module
+  value-shaped generic bodies out of scope.
+- The repository still lacks one explicit plan that says how imported generic
+  helper follow-through should stay narrow after the same-module case lands.
+
+Problem being solved
+--------------------
+- The same-module helper closure still leaves one obvious source distortion:
+  helper families that should live in a shared boot or support module would
+  still need to remain caller-local solely because imported value-shaped generic
+  bodies are outside the current executable path.
+- Leaving that frontier unspecified risks either stalling on needless local
+  duplication or widening imported generic execution too broadly when the next
+  shared helper pressure appears.
+- The current-repo problem is not "generic imports in general". It is one
+  already-admitted helper family that needs one honest module boundary.
+
+Non-goals
+---------
+- no general imported generic-body completion
+- no generic call-site inference
+- no indirect-call-only imported generic support
+- no closures, callback registries, or generic procedure constants
+- no broader `.mci` redesign beyond what the admitted helper family requires
+- no same-phase widening to app-local generic helper libraries beyond one real
+  consumer
+
+Invariants
+----------
+- Imported module surface rewriting remains sema-owned and `.mci`-visible.
+- Any executable specialization remains MIR-owned.
+- Deterministic import-surface naming and artifact identity must remain stable.
+- The erased-ABI imported generic family from Phase 49 remains correct.
+- Unsupported broader imported generic bodies must continue to fail explicitly.
+
+Required surface changes
+------------------------
+1. Admit one imported value-shaped generic helper family whose source and body
+   live in a different module from the direct caller.
+2. Keep the admitted slice to direct imported calls with concrete type
+   arguments and concrete procedure metadata already available at the call
+   site.
+3. Thread any required imported-surface, `.mci`, MIR, and executable follow-
+   through only for that narrow family.
+4. Add focused sema, MIR, and executable regressions for the imported helper
+   path.
+5. Spend the feature in one repository-owned shared helper module rather than
+   inventing a synthetic cross-module generic benchmark.
+
+Forbidden changes
+-----------------
+- do not reopen the whole imported generic procedure-call frontier
+- do not accept imported value-shaped generic bodies without concrete type
+  arguments or concrete direct-call metadata
+- do not move imported-symbol or interface-artifact truth into the driver
+- do not bundle procedure tables, descriptor tables, or record-construction
+  syntax into this phase
+- do not weaken module-surface determinism or artifact naming to make imported
+  specialization easier
+
+Phase role in the larger sequence
+---------------------------------
+- This phase follows Phase 255 and consumes the most obvious remaining generic
+  helper follow-through surface.
+- It prepares later descriptor-table and app-support work by allowing small
+  shared helper modules instead of forcing every value-shaped helper to remain
+  local.
+- It still leaves broader generic-body completion explicit and deferred.
+
+Relevant backlog items this phase intentionally brings under pressure
+--------------------------------------------------------------------
+- keep broader generic-function monomorphization explicit after the Phase 171
+  deferral audit
+- keep broader imported generic procedure-call lowering explicit beyond the
+  already-admitted erased-ABI family
+
+Questions this phase must answer
+--------------------------------
+1. Which imported-surface owner fails first for the admitted helper family:
+   sema imported rewriting, `.mci` serialization, MIR specialization, or
+   executable emission?
+2. What is the narrowest honest shared-helper consumer the repository can use
+   without inventing a new library family solely for the phase?
+3. Can the imported helper stay on the same direct-call metadata path as Phase
+   255, or does imported specialization require one extra explicit MIR hook?
+4. How should unsupported imported generic-body shapes remain visibly out of
+   scope after the admitted family lands?
+
+Preferred implementation shape
+------------------------------
+- Reuse the Phase 255 specialization path rather than designing a second
+  imported-only specialization framework.
+- Keep sema and `.mci` ownership explicit for imported surface truth.
+- Keep the consumer to one small shared helper module, ideally adjacent to the
+  current boot-state support family rather than a new generic-utilities wave.
+- Require explicit type arguments at the spend site.
+- Keep the first imported slice on direct calls only.
+
+Implementation accelerators
+---------------------------
+Main files and navigations
+- Primary controlling owners: `compiler/sema/module_resolver.cpp` for imported
+  surface rewriting, `compiler/mci/mci.cpp` for interface-artifact transport,
+  and `compiler/mir/mir.cpp` for imported specialization follow-through.
+- First-hop adjacent files: `compiler/sema/check.cpp`,
+  `compiler/mir/mir_lower.cpp`, `compiler/codegen_llvm/backend.cpp`, and the
+  repository-owned imported helper consumer chosen for the phase.
+- Nearby accelerator docs: `docs/agent/prompts/patterns_cookbook.txt`,
+  `docs/agent/prompts/compiler_file_invariants.txt`, the Phase 49 archived
+  imported generic call closure note, and the Phase 252 decision-log entry.
+- Expected first validation target when the owner changes:
+  `mc_sema_fixture_unit`, then `mc_mir_fixture_unit`, then
+  `mc_codegen_executable_project_unit`.
+
+Relevant cookbook patterns
+- Pattern 6 -- Add A Compiler Phase applies because this is a bounded imported
+  compiler follow-through slice.
+- The phase intentionally differs from the default pattern by spanning sema,
+  `.mci`, MIR, and executable follow-through while still keeping one narrow
+  imported consumer family.
+
+Relevant file-local invariants
+- `compiler/sema/module_resolver.cpp` remains the owner of imported-surface
+  rewriting; imported generic truth must not be reconstructed ad hoc in MIR.
+- `compiler/mci/mci.cpp` owns imported constant and declaration transport;
+  imported specialization must respect its deterministic artifact format.
+- `compiler/mir/mir.cpp` may specialize admitted imported generic bodies, but
+  only from already-checked direct-call metadata.
+- Narrow validation should start with imported sema and MIR surfaces before any
+  executable project run.
+
+Relevant test surfaces
+~~~~~~~~~~~~~~~~~~~~~~
+- Primary owning test family: `tests/compiler/sema/` and
+  `tests/compiler/mir/` imported-module fixtures, followed by
+  `tests/compiler/codegen/` project or imported-module executable coverage.
+- Narrowest expected first executable validation target:
+  `mc_sema_fixture_unit`.
+- Follow-on validation targets: `mc_mir_fixture_unit` and
+  `mc_codegen_executable_project_unit`.
+- Fixture convention note: imported-module compiler fixtures in sema and MIR
+  already carry explicit import-root metadata rather than hiding imports behind
+  discovery.
+
+Test obligations
+----------------
+- `Build debug`
+- `mc_sema_fixture_unit`
+- `mc_mir_fixture_unit`
+- one focused imported executable regression in `mc_codegen_executable_project_unit`
+- one repository-owned imported helper spend site proving the shared helper no
+  longer needs caller-local duplication
+
+Acceptance criteria
+-------------------
+- one imported value-shaped generic helper family now works through the full
+  compiler path
+- the admitted slice remains limited to direct imported calls with explicit
+  type arguments and concrete metadata
+- broader imported generic-body completion remains explicitly deferred
+- import-surface and artifact determinism remain intact
+
+Future follow-up
+----------------
+- If another imported generic consumer appears with a materially different
+  shape, record it separately in `docs/plan/backlog.txt`.
+- If this phase exposes a cleaner imported specialization seam, record that in
+  `docs/plan/decision_log.txt`.
+- Broader imported generic-body execution still belongs to a later dedicated
+  compiler phase rather than to this helper-specific follow-through.

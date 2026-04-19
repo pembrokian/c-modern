@@ -1,0 +1,190 @@
+Phase 259 -- Imported Constant Surface Follow-Through For Runtime Tables
+========================================================================
+
+Status
+------
+PROPOSED
+
+Purpose
+-------
+Admit one bounded imported-constant follow-through for runtime-facing tables so
+the descriptor and procedure-table shapes proven in Phases 257 and 258 can
+cross a real module boundary without reopening broad imported constant or
+generic execution work.
+
+This phase exists now because the repository already has imported structural
+constant proofs in narrower families, but Band A needs one explicit plan for
+how launcher- or app-adjacent runtime tables will remain honest once they move
+out of the caller module.
+
+Repository status note
+----------------------
+- The repository already admits imported structural aggregate constants in
+  sema-focused proof surfaces such as `DEFAULT_SUMMARY_COPY`.
+- Phase 230b also admitted imported aggregates containing procedure values.
+- The current tests do not yet maintain one runtime-table proof that combines
+  imported constant aggregates with the later descriptor- or callable-table
+  families expected by Band B.
+- The repository therefore still lacks one explicit imported follow-through
+  plan for runtime-facing tables rather than only sema-local imported constant
+  examples.
+
+Problem being solved
+--------------------
+- The repository has imported constant transport in narrower slices, but later
+  app-facing work will need a maintained imported runtime-table proof rather
+  than ad hoc confidence from unrelated constant examples.
+- Without that proof, later launcher or UI work could rediscover `.mci`, MIR,
+  or executable gaps only after depending on imported tables for user-facing
+  behavior.
+- The current-repo problem is not imported constants in general. It is one
+  imported runtime-table family that should already be expressible if the
+  surrounding Band A work is truly honest.
+
+Non-goals
+---------
+- no broad imported constant redesign
+- no general interface-artifact overhaul
+- no imported generic-body completion beyond what Phase 256 already admits
+- no reflection or discovery metadata framework
+- no driver or build-graph redesign
+- no app or launcher framework admission in the same phase
+
+Invariants
+----------
+- Imported surface rewriting remains sema-owned.
+- `.mci` remains the artifact owner for imported constant truth.
+- MIR and backend follow-through must preserve admitted imported constant facts
+  rather than reconstructing them from source text.
+- The phase must stay on explicit imported tables and descriptors; no dynamic
+  loading or registry semantics are implied.
+- Constant transport and emitted output remain deterministic.
+
+Required surface changes
+------------------------
+1. Choose one imported runtime-table family that directly reuses the
+   descriptor- or procedure-table surfaces proven earlier in Band A.
+2. Prove that imported constant surface through sema, `.mci`, MIR, and
+   executable lowering.
+3. Keep the admitted slice to explicit imported constants, not imported mutable
+   state or runtime-built tables.
+4. Add focused sema, MIR, and executable regressions for the imported runtime-
+   table family.
+5. Spend the feature in one repository-owned imported consumer that Band B can
+   later reuse.
+
+Forbidden changes
+-----------------
+- do not widen into general interface-artifact redesign
+- do not treat imported runtime tables as a justification for dynamic
+  discovery, registries, or reflection
+- do not blur imported constant truth with imported mutable globals
+- do not reopen imported generic-body execution unless the chosen table shape
+  truly depends on the Phase 256 surface
+- do not move imported-surface rewriting into MIR or the driver
+
+Phase role in the larger sequence
+---------------------------------
+- This phase closes the imported follow-through for the constant-table and
+  procedure-table families before Band B depends on shared launcher or app
+  metadata.
+- It follows Phases 257 and 258 so the imported proof can reuse already-proven
+  same-module shapes.
+- It should leave broader imported constant and artifact policy explicit and
+  deferred.
+
+Relevant backlog items this phase intentionally brings under pressure
+--------------------------------------------------------------------
+- keep broader imported-surface and artifact widening explicit outside admitted
+  structural constant families
+- keep broader callable-feature widening deferred after Phase 230b
+
+Questions this phase must answer
+--------------------------------
+1. What is the narrowest honest imported runtime-table family for the current
+   tree?
+2. Which owner fails first for that family: sema import rewriting, `.mci`
+   serialization, MIR lowering, or executable global emission?
+3. Does the imported table need procedure values, string labels, or both?
+4. What is the smallest repository-owned consumer that proves Band B can depend
+   on imported runtime tables honestly afterward?
+
+Preferred implementation shape
+------------------------------
+- Reuse the imported structural constant path already admitted in sema and
+  `.mci` rather than designing a special imported-table mechanism.
+- Keep the first imported runtime-table family explicit, fixed-size, and
+  typed.
+- If procedure values are part of the table, keep them inside the already-
+  admitted exact-signature named-procedure boundary.
+- Prefer one imported table copied or projected into a local constant consumer
+  over multiple independent imported-table proofs.
+
+Implementation accelerators
+---------------------------
+Main files and navigations
+- Primary controlling owners: `compiler/sema/module_resolver.cpp` for imported
+  surface rewriting and `compiler/mci/mci.cpp` for imported constant transport.
+- First-hop adjacent files: `compiler/sema/check_const_eval.cpp`,
+  `compiler/mir/mir_lower.cpp`, `compiler/codegen_llvm/backend.cpp`, and
+  `tests/compiler/sema/import_aggregate_const_ok_main.mc` as the nearest current
+  imported-constant proof anchor.
+- Nearby accelerator docs: `docs/agent/prompts/patterns_cookbook.txt`,
+  `docs/agent/prompts/compiler_file_invariants.txt`, the structural aggregate
+  constant notes, and the Phase 230b archived plan.
+- Expected first validation target when the owner changes:
+  `mc_sema_fixture_unit`, then `mc_mir_fixture_unit`, then
+  `mc_codegen_executable_project_unit`.
+
+Relevant cookbook patterns
+- Pattern 6 -- Add A Compiler Phase applies because this is a bounded imported
+  compiler follow-through slice.
+- Pattern 5 -- Add A Test File also applies because imported constant fixtures
+  will likely be the narrowest protection surface.
+
+Relevant file-local invariants
+- `compiler/sema/module_resolver.cpp` remains the owner of imported-surface
+  rewriting.
+- `compiler/mci/mci.cpp` is the single owner of imported constant artifact
+  encoding and must stay deterministic.
+- `compiler/mir/mir_lower.cpp` and the executable backend consume imported
+  constant truth; they must not guess or reparse table structure from source.
+- Imported mutable globals remain explicitly non-const and must stay rejected.
+
+Relevant test surfaces
+~~~~~~~~~~~~~~~~~~~~~~
+- Primary owning test family: `tests/compiler/sema/` imported-constant
+  fixtures.
+- Narrowest expected first executable validation target: `mc_sema_fixture_unit`.
+- Follow-on validation targets: `mc_mir_fixture_unit` and
+  `mc_codegen_executable_project_unit`.
+- Existing fixture anchors: `tests/compiler/sema/import_aggregate_const_ok_main.mc`
+  and its companions already prove the basic imported aggregate-constant path
+  and should be extended rather than bypassed.
+
+Test obligations
+----------------
+- `Build debug`
+- `mc_sema_fixture_unit`
+- `mc_mir_fixture_unit`
+- one focused executable or project-mode imported-table regression in
+  `mc_codegen_executable_project_unit`
+- one repository-owned imported-table spend site proving later runtime-table
+  consumers can rely on the admitted path
+
+Acceptance criteria
+-------------------
+- one imported runtime-table family now survives the full compiler path
+- the imported proof reuses the same explicit typed data model admitted in the
+  earlier Band A table phases
+- imported mutable or dynamic table surfaces remain explicitly out of scope
+- `.mci`, MIR, and executable output remain deterministic
+
+Future follow-up
+----------------
+- If later runtime-table work needs broader imported artifact semantics, record
+  that separately in `docs/plan/backlog.txt`.
+- If the admitted imported table exposes a better `.mci` helper seam, record
+  it in `docs/plan/decision_log.txt`.
+- Broader interface-artifact support remains a later explicit compiler wave,
+  not implied by this runtime-table slice.

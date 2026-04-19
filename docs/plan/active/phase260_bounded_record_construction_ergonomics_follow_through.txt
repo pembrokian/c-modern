@@ -1,0 +1,200 @@
+Phase 260 -- Bounded Record-Construction Ergonomics Follow-Through
+==================================================================
+
+Status
+------
+PROPOSED
+
+Purpose
+-------
+Admit one narrow source-level record-construction ergonomics slice that removes
+repeated repository-owned boilerplate in aggregate literals or record updates
+without widening into builder frameworks, hidden mutation, or general object-
+construction redesign.
+
+This phase exists now because the repository already admitted inferred brace
+aggregates plus shallow and nested record updates, but real owner code such as
+`kernel/src/boot/boot_update.mc` and related boot-state files still carries a
+large amount of repeated field-name boilerplate that has become more visible as
+the compiler fronts above it have closed.
+
+Repository status note
+----------------------
+- Phase 191 admitted explicit typed aggregate tables.
+- Phase 192 admitted inferred brace aggregates in expected-type contexts.
+- Phase 195 admitted shallow `with { field: value }` record updates.
+- Phase 199 admitted nested record-update paths like `base with { outer.inner:
+  value }`.
+- The decision log after Phase 182 explicitly recorded remaining repeated
+  record-update pressure as a possible later language follow-through once the
+  stronger generic-helper boundary was settled.
+
+Problem being solved
+--------------------
+- Repository-owned record literals and record updates still repeat obvious
+  field names and wrapper shapes in places where the destination type is
+  already explicit and the source intent is mechanically clear.
+- That repetition is no longer just aesthetic noise. It obscures the real
+  state change in files such as `kernel/src/boot/boot_update.mc` and makes the
+  compiler look less expressive than the surrounding admitted aggregate and
+  update surfaces suggest.
+- The current-repo problem is therefore one bounded ergonomic gap in record
+  construction, not a need for builders, mutation frameworks, or broader object
+  semantics.
+
+Non-goals
+---------
+- no builder or object-construction framework
+- no hidden mutation or in-place update semantics
+- no dynamic field iteration or reflection
+- no array or slice element update widening
+- no broad record-pattern or destructuring redesign
+- no general aggregate inference beyond owners that already carry an explicit
+  destination type
+
+Invariants
+----------
+- Aggregate and record meaning remain explicit and sema-owned.
+- MIR continues to lower admitted record construction by rebuilding aggregates,
+  not by inventing mutation instructions.
+- Any new shorthand must require either an explicit destination type or an
+  already-admitted expected-type owner.
+- The phase must remove real repository-owned boilerplate at one or more spend
+  sites.
+- Existing record-update determinism and diagnostics remain stable.
+
+Required surface changes
+------------------------
+1. Choose one narrow source-level shorthand for repeated record-construction or
+   record-update boilerplate in already-admitted typed contexts.
+2. Keep the shorthand bounded to owners where destination type and field
+   identity remain explicit and reviewable.
+3. Add focused parser, sema, and MIR regressions for the admitted shorthand.
+4. Spend the feature in one or more real repository-owned source sites such as
+   `kernel/src/boot/boot_update.mc`.
+5. Preserve explicit rejection for broader builder-like or hidden-mutation
+   interpretations.
+
+Forbidden changes
+-----------------
+- do not widen into a record-builder DSL or helper framework
+- do not introduce hidden mutation, partial object initialization, or default-
+  filling semantics that are not already explicit
+- do not reopen unrelated aggregate or collection inference work
+- do not treat one shorthand as permission for pattern matching or reflection
+- do not skip parser or sema diagnostics if the chosen shorthand introduces a
+  new syntactic form
+
+Phase role in the larger sequence
+---------------------------------
+- This phase converts one explicitly recorded source-noise frontier into a real
+  language improvement after the stronger generic-helper phases have landed.
+- It prepares Band B and later app-local code by making state and descriptor
+  records cheaper to express without creating a new center of gravity.
+- It should still leave broader source-level construction work explicitly
+  deferred.
+
+Relevant backlog items this phase intentionally brings under pressure
+--------------------------------------------------------------------
+- repeated record-update pressure across owners may justify a narrow follow-
+  through slice once stronger compiler frontiers are closed
+
+Questions this phase must answer
+--------------------------------
+1. What is the narrowest honest shorthand for current-repo pressure: field-name
+   shorthand inside record literals, field-name shorthand inside `with` blocks,
+   or another similarly explicit form?
+2. Which owner rejects the shorthand first: parser syntax, sema field binding,
+   or MIR aggregate rebuild lowering?
+3. Which repository-owned spend sites demonstrate the gain most clearly without
+   inventing synthetic examples?
+4. How can the phase keep builder-like or hidden-mutation interpretations
+   explicitly closed?
+
+Preferred implementation shape
+------------------------------
+- Prefer a small shorthand that reuses the existing aggregate-init or record-
+  update model rather than inventing a second construction system.
+- Keep parser ownership limited to the new source form if one is required.
+- Keep sema ownership explicit for field resolution and destination-type rules.
+- Keep MIR lowering on the existing aggregate rebuild path.
+- Spend the feature immediately in `kernel/src/boot/boot_update.mc` and any
+  equally strong adjacent owner sites.
+
+Implementation accelerators
+---------------------------
+Main files and navigations
+- Primary controlling owners: `compiler/parse/parser_expr.cpp` for any new
+  record-construction syntax, `compiler/sema/check.cpp` for field binding and
+  expected-type rules, and `compiler/mir/mir_lower.cpp` for aggregate rebuild
+  follow-through.
+- First-hop adjacent files: `compiler/ast/ast.h`, `compiler/ast/ast.cpp`,
+  `kernel/src/boot/boot_update.mc`, `kernel/src/boot/boot.mc`, and
+  `kernel/src/shell/serial_shell_path.mc` as a smaller existing record-update
+  spend site.
+- Nearby accelerator docs: `docs/agent/prompts/patterns_cookbook.txt`,
+  `docs/agent/prompts/compiler_file_invariants.txt`,
+  `/memories/repo/phase195_shallow_record_update_boundary.md`, and
+  `/memories/repo/phase199_nested_record_update_boundary.md`.
+- Expected first validation target when the owner changes:
+  `mc_parser_fixture_unit`, then `mc_sema_fixture_unit`, then `mc_mir_fixture_unit`.
+
+Relevant cookbook patterns
+- Pattern 10 -- Parser + Sema + MIR Follow-Through applies because the feature
+  is syntax-owned but only meaningful through sema and aggregate-lowering
+  follow-through.
+- Pattern 1 -- Add A New AST Node applies only if the shorthand genuinely needs
+  a stored syntax shape; otherwise prefer extending the existing aggregate-init
+  or record-update AST forms.
+
+Relevant file-local invariants
+- `compiler/parse/parser_expr.cpp` owns aggregate-init and record-update syntax
+  recognition and must not decide semantic admissibility by itself.
+- `compiler/sema/check.cpp` owns field validation and destination-type rules for
+  record updates.
+- `compiler/mir/mir_lower.cpp` must continue to rebuild aggregates explicitly;
+  no new mutation instruction should appear.
+- `kernel/src/boot/boot_update.mc` is the strongest current spend site and must
+  become materially clearer if the phase is honest.
+
+Relevant test surfaces
+~~~~~~~~~~~~~~~~~~~~~~
+- Primary owning test family: `tests/compiler/parser/`, then
+  `tests/compiler/sema/`, then `tests/compiler/mir/`.
+- Narrowest expected first executable validation target:
+  `mc_parser_fixture_unit`.
+- Follow-on validation targets: `mc_sema_fixture_unit` and
+  `mc_mir_fixture_unit`.
+- Fixture convention note: parser, sema, and MIR aggregate/update fixtures use
+  adjacent `.ast.txt`, `.sema.txt`, and `.mir.txt` goldens and should be added
+  in that order as ownership widens.
+
+Test obligations
+----------------
+- `Build debug`
+- `mc_parser_fixture_unit`
+- `mc_sema_fixture_unit`
+- `mc_mir_fixture_unit`
+- one repository-owned spend-site proof showing clearer record construction or
+  record update in `kernel/src/boot/boot_update.mc`
+
+Acceptance criteria
+-------------------
+- one bounded shorthand now reduces real record-construction boilerplate in the
+  repository
+- the shorthand stays limited to already-explicit typed or expected-type
+  contexts
+- MIR still lowers the admitted shape through aggregate rebuild rather than new
+  mutation machinery
+- broader builder, reflection, or hidden-mutation work remains explicitly
+  deferred
+
+Future follow-up
+----------------
+- If later pressure still points at a different record-construction shorthand,
+  record that separately in `docs/plan/backlog.txt` rather than broadening this
+  phase after the fact.
+- If the admitted shorthand exposes a cleaner AST or sema boundary, record it
+  in `docs/plan/decision_log.txt`.
+- Broader object-construction or pattern-style language work remains outside
+  this bounded follow-through.

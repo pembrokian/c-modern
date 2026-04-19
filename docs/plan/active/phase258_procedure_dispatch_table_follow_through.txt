@@ -1,0 +1,189 @@
+Phase 258 -- Procedure Dispatch Table Follow-Through
+====================================================
+
+Status
+------
+PROPOSED
+
+Purpose
+-------
+Spend the already-admitted exact-signature procedure-table surface on one real
+repository-owned consumer so the repository stops carrying that capability only
+as an isolated compiler proof and starts maintaining it as a living table-owned
+pattern.
+
+This phase exists now because Phase 230b already closed the language and
+constant-emission admission for explicit procedure-value dispatch tables, but
+the repository still lacks one maintained post-230b consumer that proves where
+procedure tables are actually honest and where flat if-chains must remain.
+
+Repository status note
+----------------------
+- Phase 230b already admitted exact-signature named procedures in explicit
+  typed arrays and structs, including imported constant aggregates.
+- The backlog explicitly keeps broader callable-feature widening deferred.
+- Kernel dispatch, shell routing, and restart control intentionally remain flat
+  conditional owners and should not be rewritten into tables by convenience.
+- The repository therefore still lacks one maintained answer to a narrower
+  question: where is a procedure-table consumer actually honest in the current
+  tree?
+
+Problem being solved
+--------------------
+- The compiler now supports explicit procedure-value tables, but the feature is
+  still maintained mostly as capability proof rather than as a living,
+  repository-owned pattern.
+- Without one honest consumer, later app or launcher or UI work will either
+  avoid procedure tables entirely out of caution or misuse them in owners that
+  should remain explicit if-chains.
+- The real current-repo problem is not another callable feature gap. It is the
+  lack of one maintained example that draws the line between an honest table
+  owner and a framework-shaped abuse.
+
+Non-goals
+---------
+- no closure or callback-framework widening
+- no generic procedure constants
+- no kernel-dispatch, shell, or boot routing-table rewrite
+- no service registry, broker, or discovery framework
+- no equality or ordering for procedures
+- no dynamic plugin or scriptable dispatch surface
+
+Invariants
+----------
+- Procedure tables remain ordinary typed data holding exact-signature named
+  non-generic procedures only.
+- Kernel dispatch, shell decode, and boot topology remain explicit owner-local
+  conditionals where that boundary is already intentional.
+- Sema owns callable legality; MIR and backend lower admitted callable truth.
+- Deterministic constant transport and executable lowering must remain stable.
+- The phase must prove one honest table owner, not imply a platform-wide
+  callback direction.
+
+Required surface changes
+------------------------
+1. Choose one repository-owned consumer where a fixed exact-signature procedure
+   table is more honest than the current handwritten branch family.
+2. Keep the consumer outside kernel dispatch, shell decode, and other owners
+   whose flat explicit shape is already intentional.
+3. Add focused sema, MIR, and executable regressions for the chosen procedure-
+   table consumer if existing 230b coverage is not sufficient.
+4. Document why the chosen consumer is honest while the preserved flat owners
+   remain intentionally non-table-driven.
+5. Preserve the already-admitted exact-signature, named-procedure-only limit.
+
+Forbidden changes
+-----------------
+- do not use this phase to justify table-driven kernel dispatch
+- do not widen into generic callbacks, closures, or dynamic service routing
+- do not treat one honest table owner as evidence for registry or plugin
+  frameworks
+- do not reopen callable syntax or constant-data semantics already settled in
+  Phase 230b unless a real regression is found
+- do not move owner-local policy into tables merely because it compresses code
+
+Phase role in the larger sequence
+---------------------------------
+- This phase turns the already-landed procedure-table compiler capability into
+  a maintained consumer pattern before Band B and Band C reach more app-facing
+  dispatch pressure.
+- It complements Phase 257 by proving one table family that includes callable
+  behavior without reopening broad callable work.
+- It also sharpens the architectural line around where table-driven source is
+  and is not honest in this repository.
+
+Relevant backlog items this phase intentionally brings under pressure
+--------------------------------------------------------------------
+- keep broader callable-feature widening deferred after Phase 230b now that
+  imported struct procedure tables lower honestly across module boundaries
+
+Questions this phase must answer
+--------------------------------
+1. What is the narrowest honest procedure-table consumer in the current tree:
+   app-local command decode, launcher-local action selection, or another fixed
+   exact-signature table?
+2. Which current flat owner must remain flat even after the new consumer lands,
+   and how should that boundary be stated explicitly?
+3. Do the existing 230b compiler regressions fully cover the chosen consumer,
+   or is one new executable proof needed?
+4. Can the chosen consumer stay same-module, or does it rely on imported
+   callable tables that should be coordinated with Phase 259?
+
+Preferred implementation shape
+------------------------------
+- Reuse the exact procedure-table contract admitted in Phase 230b.
+- Keep the first consumer fixed-size, explicitly typed, and repository-owned.
+- Prefer a consumer in support or app-local code over any core kernel routing
+  owner.
+- If the consumer needs labels or metadata beside procedures, compose it with
+  the descriptor-table work from Phase 257 rather than inventing a second table
+  model.
+
+Implementation accelerators
+---------------------------
+Main files and navigations
+- Primary controlling owners: the chosen repository-owned consumer module plus
+  `compiler/sema/check_const_eval.cpp`, `compiler/mci/mci.cpp`, and
+  `compiler/codegen_llvm/backend.cpp` only where the consumer exercises the
+  existing procedure-table transport path.
+- First-hop adjacent files: `tests/compiler/codegen/codegen_executable_tests.cpp`,
+  `tests/compiler/sema/`, and the Phase 230b archived note.
+- Nearby accelerator docs: `docs/agent/prompts/patterns_cookbook.txt`,
+  `docs/agent/prompts/compiler_file_invariants.txt`,
+  `docs/arch/c-lang/language/procedure_value_dispatch_tables_note.txt`, and
+  `/memories/repo/phase230b_procedure_dispatch_tables.md`.
+- Expected first validation target when the owner changes:
+  `mc_sema_fixture_unit`, then `mc_codegen_executable_core_unit`.
+
+Relevant cookbook patterns
+- Pattern 6 -- Add A Compiler Phase applies because the compiler contract is
+  already admitted and the phase is about a bounded repository-owned follow-
+  through consumer.
+- This phase also partially resembles Pattern 5 -- Add A Test File because the
+  strongest new protection may be one focused spend-site regression rather than
+  wide new compiler work.
+
+Relevant file-local invariants
+- `compiler/sema/check_const_eval.cpp` remains the first owner of procedure-
+  valued constant legality.
+- `compiler/mci/mci.cpp` and the executable backend already know the admitted
+  procedure-table transport path; this phase should reuse that path rather than
+  redesigning it.
+- Kernel dispatch owners remain intentionally flat and are explicitly out of
+  scope for table-driven rewrites.
+- The chosen consumer must stay obviously fixed-size and exact-signature.
+
+Relevant test surfaces
+~~~~~~~~~~~~~~~~~~~~~~
+- Primary owning test family: `tests/compiler/codegen/` for executable spend-
+  site proof, backed by `tests/compiler/sema/` for constant legality.
+- Narrowest expected first executable validation target: `mc_sema_fixture_unit`.
+- Follow-on validation target: `mc_codegen_executable_core_unit`.
+- Existing proof anchor: the Phase 230b executable coverage already uses
+  `mc_codegen_executable_core_unit` and should be extended rather than forked.
+
+Test obligations
+----------------
+- `Build debug`
+- `mc_sema_fixture_unit`
+- `mc_codegen_executable_core_unit`
+- one repository-owned spend-site proof showing the chosen procedure-table
+  consumer is now maintained in real code
+
+Acceptance criteria
+-------------------
+- one repository-owned consumer now uses the already-admitted exact-signature
+  procedure-table surface honestly
+- the landing states clearly why that consumer is honest while preserved flat
+  kernel owners remain intentionally non-table-driven
+- broader callable or callback-framework work remains explicitly deferred
+- existing Phase 230b procedure-table guarantees remain unchanged
+
+Future follow-up
+----------------
+- If the honest consumer immediately needs imported descriptor transport, route
+  that follow-through to Phase 259.
+- If later app or UI work finds a second materially different honest procedure-
+  table owner, record it separately instead of generalizing from one consumer.
+- Any pressure toward dynamic registries, plugins, or closure-like behavior
+  belongs in `docs/plan/backlog.txt`, not as incidental growth from this phase.

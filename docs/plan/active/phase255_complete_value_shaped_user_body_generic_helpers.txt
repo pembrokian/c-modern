@@ -1,0 +1,198 @@
+Phase 255 -- Complete Value-Shaped User-Body Generic Helpers
+============================================================
+
+Status
+------
+PROPOSED
+
+Purpose
+-------
+Complete the narrow value-shaped generic helper slice already framed in Phase
+252 so the real `ServiceCell<T>` helper family can execute through the full
+ compiler path and remove the current explicit wrapper noise in boot-state
+ update code.
+
+This phase exists now because the repository already named the exact blocked
+consumer and the decision-log closure for Phase 252 already chose the smallest
+honest implementation shape. The next honest move is to land that same-module,
+direct-call helper family, not to reopen broader monomorphization.
+
+Repository status note
+----------------------
+- Phase 252 already framed the bounded compiler problem and identified
+  `service_cell_with_state<T>(...)` and `service_cell_restart<T>(...)` in
+  `kernel/src/boot/boot_update.mc` as the real repository-owned spend site.
+- The decision log now records the intended narrow owner: a MIR-owned
+  executable specialization transform for value-shaped generic bodies whose ABI
+  depends on concrete type shape.
+- `kernel/src/boot/boot_update.mc` still carries explicit per-service wrappers
+  because the helper family is not yet executable on the admitted path.
+- The repository still lacks one landed compiler phase that turns that chosen
+  shape into a maintained capability.
+
+Problem being solved
+--------------------
+- The repository already knows the exact helper family it wants, but the full
+  compiler path still rejects user-body generic helpers whose instantiated ABI
+  depends on concrete value shape.
+- Leaving that gap unresolved keeps real boot-state update code noisier than it
+  should be and leaves an already-chosen compiler repair stuck as planning
+  rather than maintained capability.
+- This is now a current-repo contradiction rather than speculative generic
+  ambition: the repository has a real consumer, a real chosen narrow shape, and
+  a real remaining compiler-owned blocker.
+
+Non-goals
+---------
+- no whole-program generic monomorphization
+- no imported or cross-module value-shaped generic-body follow-through
+- no generic call-site inference
+- no closures, lambdas, callback registries, or generic procedure constants
+- no parser or sema redesign of generic meaning
+- no silent widening to indirect-only generic call shapes without concrete
+  direct-call metadata
+
+Invariants
+----------
+- Generic legality and type meaning remain sema-owned.
+- MIR owns any executable specialization required by value-shaped generic
+  bodies; backend code lowers admitted MIR truth only.
+- The already-admitted erased-ABI generic family remains unchanged.
+- Artifact naming, emitted output, and MIR dumps remain deterministic.
+- Unsupported broader generic-body shapes must continue to fail explicitly.
+
+Required surface changes
+------------------------
+1. Land one MIR-owned executable specialization path for same-module
+   value-shaped user-body generic helpers whose ABI depends on concrete type
+   shape.
+2. Keep the admitted slice tied to the real `ServiceCell<T>` helper pair in
+   `kernel/src/boot/boot_update.mc` or an equivalently narrow checked-in
+   helper family if the final spend site proves cleaner.
+3. Remove the current per-service wrapper boilerplate only where the admitted
+   helper pair now compiles honestly.
+4. Add focused MIR and executable regressions for the admitted helper shape.
+5. Preserve explicit rejection for imported, inferred, or indirect-only generic
+   body shapes outside this slice.
+
+Forbidden changes
+-----------------
+- do not widen into a general generic framework just because one helper family
+  now works
+- do not move executable specialization policy into sema or the driver
+- do not silently accept imported or indirect-only value-shaped generic bodies
+- do not bundle record-construction ergonomics or other source cleanup into the
+  same phase beyond the direct `ServiceCell<T>` spend site
+- do not weaken MIR validation just to admit unsupported generic bodies
+
+Phase role in the larger sequence
+---------------------------------
+- This phase converts the Phase 252 chosen shape into a real landed compiler
+  capability.
+- It prepares Phase 256 by making the same-module helper family honest before
+  any imported generic-body follow-through is considered.
+- It also removes one concrete source distortion before Band A turns toward
+  descriptor tables, dispatch tables, and later app-facing compiler pressure.
+
+Relevant backlog items this phase intentionally brings under pressure
+--------------------------------------------------------------------
+- keep broader generic-function monomorphization explicit after the Phase 171
+  deferral audit
+- consider executable support for value-shaped user-body generic helper
+  functions
+
+Questions this phase must answer
+--------------------------------
+1. What is the narrowest deterministic specialization unit for the admitted
+   helper family: per concrete direct-call target, per symbol-ref target, or a
+   slightly broader MIR clone boundary?
+2. Which MIR owner should hold the specialization transform:
+   `compiler/mir/mir.cpp`, `compiler/mir/mir_lower.cpp`, or one small adjacent
+   helper split if the logic proves isolated enough?
+3. What is the smallest executable regression that proves the helper family
+   works end to end without implying imported-generic completion?
+4. How should the phase keep unsupported generic-body surfaces visibly closed
+   after the narrow helper family lands?
+
+Preferred implementation shape
+------------------------------
+- Follow the Phase 252 decision-log shape: specialize only direct `symbol_ref`
+  and direct `call` targets when the generic body ABI truly depends on
+  concrete type shape.
+- Keep erased-ABI generic bodies on the existing path.
+- Keep parser and sema stable unless one narrow diagnostic or query hook is
+  required by the specialization path.
+- Spend the landing in `kernel/src/boot/boot_update.mc` using explicit type
+  arguments rather than reopening inference.
+- Keep backend work limited to lowering already-specialized MIR truth.
+
+Implementation accelerators
+---------------------------
+Main files and navigations
+- Primary controlling owners: `compiler/mir/mir.cpp` for specialization policy
+  and `compiler/mir/mir_lower.cpp` for the direct-call metadata that the
+  specialization path consumes.
+- First-hop adjacent files: `compiler/mir/mir.h`,
+  `compiler/mir/mir_validate.cpp`, `compiler/codegen_llvm/backend.cpp`, and
+  `kernel/src/boot/boot_update.mc`.
+- Nearby accelerator docs: `docs/agent/prompts/patterns_cookbook.txt`,
+  `docs/agent/prompts/compiler_file_invariants.txt`, and the 2026-04-18 Phase
+  252 entry in `docs/plan/decision_log.txt`.
+- Expected first validation target when the owner changes: `mc_mir_unit`, then
+  `mc_codegen_executable_core_unit`.
+
+Relevant cookbook patterns
+- Pattern 6 -- Add A Compiler Phase applies because this is a bounded
+  compiler-owned follow-through slice with one explicit consumer and one
+  explicit deferred frontier.
+- This phase differs from the default pattern because the primary semantic
+  design work is already done; the remaining owner is executable MIR
+  specialization, not new parser or sema meaning.
+
+Relevant file-local invariants
+- `compiler/mir/mir.cpp` owns MIR-level specialization and must not become a
+  second sema checker.
+- `compiler/mir/mir_lower.cpp` must continue to consume sema truth rather than
+  rebuilding generic legality.
+- `compiler/mir/mir_validate.cpp` must stay strict and validate the admitted
+  specialized shape explicitly.
+- `kernel/src/boot/boot_update.mc` is the real source spend site; if the phase
+  cannot clean that file materially, the slice is too abstract.
+
+Relevant test surfaces
+- Primary owning test family: `tests/compiler/mir/` for specialization truth,
+  then `tests/compiler/codegen/` for executable follow-through.
+- Narrowest expected first executable validation target: `mc_mir_unit`.
+- Follow-on executable validation target: `mc_codegen_executable_core_unit`.
+- Fixture and proof anchor: `tests/compiler/mir/mir_tests.cpp` already contains
+  the value-shaped generic helper source check that should become the first
+  maintained regression surface.
+
+Test obligations
+----------------
+- `Build debug`
+- `mc_mir_unit`
+- one focused executable regression in `mc_codegen_executable_core_unit` for
+  the admitted helper family
+- one repository-owned spend-site proof in `kernel/src/boot/boot_update.mc`
+  that the helper pair now compiles through the full path
+
+Acceptance criteria
+-------------------
+- the `ServiceCell<T>` helper pair or an equivalently narrow checked-in helper
+  family now executes through the full compiler path
+- `kernel/src/boot/boot_update.mc` becomes materially cleaner by using the
+  admitted generic helper family
+- broader imported, inferred, and indirect-only value-shaped generic bodies
+  remain explicitly rejected
+- the erased-ABI generic family remains correct and unchanged in behavior
+
+Future follow-up
+----------------
+- If imported or cross-module value-shaped generic bodies remain blocked after
+  this landing, route that follow-through to Phase 256 rather than widening
+  this phase.
+- If the specialization path exposes a better deterministic naming owner,
+  record that in `docs/plan/decision_log.txt`.
+- Any broader callable or generic surface must remain separate from this
+  narrow helper-family closure.

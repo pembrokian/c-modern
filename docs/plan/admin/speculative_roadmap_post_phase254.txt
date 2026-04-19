@@ -1,0 +1,484 @@
+Phase 255 Through Phase 289 -- Speculative Post-Phase-254 Roadmap
+=================================================================
+
+Status
+------
+SPECULATIVE
+
+Purpose
+-------
+Sketch one plausible continuation after the completed Phase 254 object-version
+truth landing so the next repository wave can mix bounded compiler follow-
+through with more visible operating-system outcomes.
+
+This document is intentionally forward-looking and tentative.
+It does not replace `docs/plan/plan.txt`.
+It does not replace the concrete Phase 249 through Phase 254 execution notes.
+It gives one plausible ordering for the next 35 phases if the repository keeps
+following the same evidence-first rules used so far:
+
+- one owner-local gap at a time
+- one real repository-owned consumer at a time
+- one explicit exit criterion per phase
+- no framework widening before one smaller outcome is already honest
+
+Relationship to companion notes
+-------------------------------
+This roadmap is meant to stay aligned with:
+
+- `docs/plan/backlog.txt`
+- `docs/plan/decision_log.txt`
+- `docs/plan/admin/modern_c_v0_3_direction_veya.txt`
+- `docs/plan/admin/modern_c_v0_3_proof_programs_and_milestones.txt`
+- `docs/plan/admin/veya_v0_consumer_matrix.txt`
+- `docs/plan/admin/speculative_roadmap_post_phase145.txt`
+- `docs/plan/admin/archive/speculative_roadmap_post_phase95.txt`
+- `docs/plan/active/phase249_typed_empty_collection_literals.txt`
+- `docs/plan/active/phase250_llvm_executable_backend_decomposition.txt`
+- `docs/plan/active/phase251_hosted_executable_top_level_string_constant_lowering.txt`
+- `docs/plan/active/phase252_value_shaped_user_body_generic_helper_follow_through.txt`
+- `docs/plan/active/phase253_bounded_live_receive_owner_probe.txt`
+- `docs/plan/active/phase254_object_version_truth_for_delegated_durable_mutation.txt`
+
+If those notes define the current compiler, kernel, workflow, and proof
+surfaces, this roadmap suggests one practical next wave after the repository
+proved that the reset-lane kernel can now carry retained state, durable state,
+workflow execution, delegated authority, live input, and explicit durable
+object-version truth.
+
+Repository numbering note
+-------------------------
+- Phase 249 through Phase 252 reopened a narrow language and compiler follow-
+  through band around typed empty collection literals, executable backend
+  decomposition, top-level string globals, and value-shaped generic helper
+  pressure.
+- Phase 253 admitted one explicit live hosted input owner without widening the
+  reset-lane kernel into a poller or event framework.
+- Phase 254 completed one bounded durable delegated-mutation follow-through by
+  making object-local version truth explicit at `object_store_service`.
+- The repository therefore now has both fresh compiler pressure and fresh
+  user-facing system pressure at the same time.
+- The next speculative continuation starts at Phase 255.
+
+Repository status note
+----------------------
+- The repository can now honestly claim a bootstrap compiler with parser,
+  sema, typed MIR, deterministic fixture coverage, and a hosted executable
+  backend that has recently absorbed several narrow late-compiler follow-
+  through slices.
+- The repository can also honestly claim a reset-lane kernel slice with
+  explicit service ownership for retained state, durable journal or object or
+  update state, workflow execution, completion delivery, temporary delegation,
+  external ingress, live input, and restart-visible truth.
+- That result matters because the repository is no longer blocked only on
+  foundational mechanism bring-up. It now has enough substrate to ask for
+  somewhat larger outcomes: cleaner kernel or service source, installable or
+  updateable app-shaped flows, and eventually one bounded first UI path.
+- The strongest next question is no longer simply "which service comes next?"
+  It is whether the repository can cash the current infrastructure into a more
+  human-facing system slice without hiding ownership in frameworks, registries,
+  toolkits, or speculative language redesign.
+
+What this roadmap is trying to answer
+-------------------------------------
+- Which compiler and language follow-through slices are now justified by real
+  repository-owned pressure rather than by generic language ambition?
+- In what order should the repository convert the current workflow or update or
+  durable-service substrate into more visible application outcomes?
+- When can basic UI work start honestly without locking the repository into bad
+  abstractions too early?
+- Where should the repository stop before it drifts into a window-system,
+  widget-toolkit, package-manager, or desktop-platform claim that the current
+  owned slices do not yet justify?
+
+Core rule
+---------
+- Keep the current parser, sema, MIR, backend, and kernel ownership boundaries
+  intact unless a real repository-owned consumer proves one boundary is now the
+  controlling blocker.
+- Prefer owner-local library or service follow-through over new global
+  frameworks.
+- Spend every 4 to 7 phases on at least one more visible outcome rather than
+  allowing the wave to become pure infrastructure motion.
+- Treat the first UI contact as a bounded hosted proof over the current reset-
+  lane kernel, not as permission to invent a general GUI toolkit.
+- Keep policy in user space or service owners; do not turn dispatch, boot, or
+  the compiler into convenience owners for app, display, input, or update
+  policy.
+
+UI admission rule
+-----------------
+The earliest honest UI band should start only after three conditions hold:
+
+1. one app-shaped launch or install or update path is already explicit
+2. one input path already exists as explicit events rather than only shell
+   command decode
+3. one owned display target can be named without inventing general composition
+   policy
+
+If those conditions are not met, "doing UI" is still premature. If they are
+met, the first UI phase should still remain a single-surface or single-app or
+single-control proof rather than a toolkit wave.
+
+Outcome bias
+------------
+This roadmap intentionally alternates between two kinds of work:
+
+- compiler or language slices that make repeated system code materially cleaner
+- user-visible vertical slices that prove the repository is building toward a
+  more legible operating-system outcome
+
+That bias is deliberate. If the repository spends another 30 phases only on
+internal substrate tightening, it risks missing the point at which the current
+kernel and compiler are already strong enough to support a more ambitious but
+still bounded demo.
+
+Roadmap bands
+-------------
+
+Band A - Harvest The Strongest Post-254 Compiler Pressure
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+Phases 255 through 261 should reopen a narrow compiler wave, but only where
+real kernel or service code is already exposing source-level distortion.
+
+Likely themes:
+- finish the value-shaped generic helper family already named in Phase 252
+- make a small amount of cross-module generic or constant or table pressure
+  honest if current owner code now needs it
+- improve executable support for service-local dispatch and table patterns
+- keep parser and sema closed unless real source awkwardness proves otherwise
+
+Why this band comes first:
+- the repository already has live post-249 compiler pressure, and clearing the
+  strongest source distortions first will make the next user-facing system work
+  cheaper and more honest.
+
+Possible phases in this band:
+
+Phase 255 -- Complete Value-Shaped User-Body Generic Helpers
+- Exit criterion: the real `ServiceCell<T>`-style helper family or an equally
+  narrow repository-owned value-shaped generic helper now executes through the
+  full compiler path without widening into general monomorphization.
+
+Phase 256 -- Imported Generic Helper Follow-Through
+- Exit criterion: one already-admitted value-shaped generic helper can cross
+  one honest module boundary without turning imported generic bodies into a
+  broad new compiler framework.
+
+Phase 257 -- Const-Evaluable Table And Descriptor Follow-Through
+- Exit criterion: one real repository-owned table or descriptor family used by
+  service or workflow code can be expressed as explicit compile-time data
+  without ad hoc runtime construction noise.
+
+Phase 258 -- Procedure Dispatch Table Follow-Through
+- Exit criterion: one bounded procedure-table or callback-table family becomes
+  executable and deterministic through MIR and backend support without opening
+  closures, captured lambdas, or a dynamic dispatch framework.
+
+Phase 259 -- Imported Constant Surface Follow-Through For Runtime Tables
+- Exit criterion: one real imported constant family needed by cross-module
+  protocol or UI descriptor code remains honest through sema, MIR, and
+  executable lowering in table positions, not only in local scalar use.
+
+Phase 260 -- Bounded Record-Construction Ergonomics Follow-Through
+- Exit criterion: one repeatedly awkward repository-owned record-construction
+  pattern becomes materially cleaner without reopening general builder or
+  object-construction frameworks.
+
+Phase 261 -- Compiler Pressure Audit After The Generic Or Table Wave
+- Exit criterion: the repository publishes which late-compiler pressures are
+  now honestly closed, which remain deferred, and which should not be reopened
+  before another stronger real consumer appears.
+
+Outcome checkpoint after Band A:
+- the compiler should feel meaningfully better for service, workflow, and app-
+  local support code, but still remain visibly bounded rather than in a broad
+  language-expansion wave.
+
+Band B - Memory Expansion
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+Phase 262 fixed_size_pool_allocator_first_slice.txt
+Phase 263 arena_allocator_for_parser_and_workflow_scratch.txt
+Phase 264 page_allocator_and_page_run_tracking.txt
+Phase 265 small_object_slab_allocator_probe.txt
+Phase 266 allocator_selection_guidelines_and_audit.txt
+
+Band C - Turn The Current Kernel Into An App-Shaped System Substrate
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+Phases 267 through 273 should spend the current workflow or durable or update
+owners on something closer to applications and installable behavior rather than
+on another long run of isolated service-local features.
+
+Likely themes:
+- explicit app or program identity on top of the current durable and update
+  owners
+- one launcher or foreground-selection path that stays owner-local
+- one honest asset or bundle or manifest story for user-facing programs
+- one visible install or update or restart flow that feels more like a product
+  surface than a raw mechanism probe
+
+Why this band comes next:
+- once the strongest post-254 compiler pain is reduced, the repository is ready
+  to convert existing durable and workflow truth into a more legible app model
+  without yet inventing desktop frameworks.
+
+Possible phases in this band:
+
+Phase 267 -- Program Identity And Launch Descriptor Audit
+- Exit criterion: one explicit program or app descriptor shape is admitted for
+  repository-owned launchable user-space programs, with identity owned by the
+  narrowest honest launcher or manifest surface.
+
+Phase 268 -- Bounded Launcher Service First Slice
+- Exit criterion: one explicit launcher-owned path can enumerate or choose from
+  a fixed set of admitted programs and start one foreground program without
+  widening into discovery, sessions, or a process-management framework.
+
+Phase 269 -- Installable Bundle Or Slot First Slice
+- Exit criterion: one update-store or object-store backed install slot or app
+  bundle path becomes explicit, so a repository-owned program can be staged,
+  activated, and identified as an app-shaped artifact rather than only as raw
+  bytes.
+
+Phase 270 -- App-Visible Restart And Resume Truth
+- Exit criterion: one admitted program path can distinguish fresh launch,
+  resumed launch, and restart-invalidated state honestly without a session
+  framework.
+
+Phase 271 -- App Asset And Manifest Follow-Through
+- Exit criterion: one repository-owned program can access one bounded asset or
+  manifest family through an owner-local path without claiming a filesystem or
+  broad resource API.
+
+Phase 272 -- First User-Facing Installed Workflow Demo
+- Exit criterion: one small repository-owned program can be installed or
+  launched or updated through the current kernel substrate with explicit user-
+  visible status and no hidden orchestration layer.
+
+Phase 273 -- App Substrate Pressure Audit
+- Exit criterion: the repository names which app-facing pressures now belong to
+  launcher or update or object-store owners, and which still remain too weak to
+  justify broader packaging or app-framework work.
+
+Outcome checkpoint after Band B:
+- the repository should have one believable app-shaped path, not just a bag of
+  services.
+
+Band D - Start The First Human-Facing Surface Conservatively
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+Phases 274 through 281 are the earliest honest place to start basic UI work,
+and even here the right target is still small: one input owner, one display
+owner, one presentation contract, and one or two app proofs.
+
+Likely themes:
+- convert live input from shell-only decode into explicit event ownership
+- admit one bounded display target such as a text grid or fixed framebuffer
+- keep composition flat and explicit
+- prefer one human-visible program over a general widget toolkit
+
+Why this band comes here:
+- by this point the repository should already have a launchable program model
+  and one app-shaped install path, which makes a first human-facing surface an
+  outcome rather than a disconnected graphics experiment.
+
+Earliest honest UI answer:
+- if the roadmap is followed roughly as written, basic UI work can probably
+  start around Phase 269 through Phase 272.
+- the first honest UI should be a hosted reset-lane proof such as a text-grid
+  surface, fixed framebuffer, or equally bounded display owner, not a window
+  manager or widget library.
+
+Possible phases in this band:
+
+Phase 274 -- Input Event Owner First Slice
+- Exit criterion: one service or user-space owner turns live keyboard or serial
+  or equivalent input into explicit events instead of shell-command-only decode,
+  without widening into a general event broker.
+
+Phase 275 -- Display Surface Owner First Slice
+- Exit criterion: one bounded display owner exposes one fixed target surface
+  such as a text grid or fixed framebuffer with explicit present semantics and
+  no compositor framework.
+
+Phase 276 -- Foreground App Input Routing
+- Exit criterion: one launcher or UI owner can route input to exactly one
+  foreground program with explicit focus truth and no multi-window policy.
+
+Phase 277 -- Explicit Repaint Or Present Contract
+- Exit criterion: one admitted app can request redraw or present through a
+  small explicit contract without hidden invalidation machinery.
+
+Phase 278 -- Fixed-Font Text Rendering Or Cell Rendering Path
+- Exit criterion: one owned rendering path can draw stable text or cells on the
+  admitted surface without widening into font systems, rich text, or layout
+  engines.
+
+Phase 279 -- First Human-Facing App Proof
+- Exit criterion: one repository-owned app such as a log viewer, queue viewer,
+  task inspector, or similar utility becomes directly usable through the first
+  admitted UI surface.
+
+Phase 280 -- UI App Restart And Update Follow-Through
+- Exit criterion: one human-facing app remains honest under restart or update
+  or relaunch pressure on the current surface without requiring a retained UI
+  framework.
+
+Phase 281 -- First UI Slice Audit
+- Exit criterion: the repository states one first user-facing UI slice honestly,
+  naming the admitted input, display, routing, and app proof boundaries while
+  keeping windows, widgets, mouse, and graphics acceleration explicitly
+  deferred.
+
+Outcome checkpoint after Band C:
+- the repository should now have touched genuine UI work, but only through one
+  deliberately narrow human-facing path.
+
+Band E - Add One More Layer Of UI Without Freezing Bad Abstractions
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+Phases 282 through 289 can broaden the UI story slightly, but only if the Band
+C slice exposes repeated real friction. The goal is not a desktop. The goal is
+one more layer of composition and interaction that still has a clear owner.
+
+Likely themes:
+- one bounded composition or region-splitting owner
+- one second input family if a real app needs it
+- one small control vocabulary if repeated app code now proves it
+- one more ambitious app proof such as editor or installer UI
+
+Why this band is separate:
+- the first UI slice should be allowed to teach the repository what is still
+  awkward before another layer is admitted.
+
+Possible phases in this band:
+
+Phase 282 -- Surface Composition Or Region Owner First Slice
+- Exit criterion: one bounded owner can manage a small number of regions or
+  panels or layers for one foreground UI path without claiming a general window
+  system.
+
+Phase 283 -- Pointer Or Alternate Input First Slice
+- Exit criterion: one second input family such as pointer or pointing-device
+  input becomes explicit only if a real admitted app now needs it.
+
+Phase 284 -- Selection And Focus Follow-Through
+- Exit criterion: one bounded focus or selection model becomes explicit for the
+  admitted UI app family without widening into accessibility or general scene-
+  graph frameworks.
+
+Phase 285 -- Small Control Vocabulary Audit
+- Exit criterion: the repository either proves that one tiny shared control
+  family is now justified, or records that app-local drawing is still the more
+  honest owner.
+
+Phase 286 -- First Editor Or Installer-Style UI Proof
+- Exit criterion: one more ambitious repository-owned UI program such as a
+  simple editor, installer, or update manager becomes usable on the admitted
+  surface.
+
+Phase 287 -- Document Or View State Persistence Follow-Through
+- Exit criterion: one admitted UI app can preserve one bounded document or view
+  state honestly through the existing durable owners without a UI-state
+  framework.
+
+Phase 288 -- UI Tooling And Build Path Audit
+- Exit criterion: the repository documents and validates the build, launch, and
+  test path for UI-facing programs without creating a separate platform or app
+  packaging stack.
+
+Phase 289 -- Second UI Slice Freeze
+- Exit criterion: the repository states exactly what "basic UI" now means in
+  the repo and what still remains intentionally closed.
+
+Outcome checkpoint after Band D:
+- the repository should have something closer to a tiny user-facing system,
+  not merely a service shell plus one probe surface.
+
+Band F - Reassess The Broader Platform Direction
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+Phases 290 through 294 should freeze what the repository learned from the app-
+ and UI-facing wave and decide the next major pressure honestly.
+
+Likely themes:
+- one integrated small-system demo
+- one compiler or kernel re-audit based on actual UI and app pressure
+- one refreshed support statement for a more human-facing slice
+- one explicit decision about what remains too early
+
+Why this band comes last:
+- after roughly 30 more phases, the repository should stop and classify what is
+  now truly justified rather than letting a successful first UI demo turn into
+  open-ended platform growth.
+
+Possible phases in this band:
+
+Phase 290 -- Integrated Small User-Facing System Demo
+- Exit criterion: one coherent repository-owned system combines launcher,
+  installed program identity, update path, first UI surface, and one or two
+  directly useful apps.
+
+Phase 291 -- Post-UI Compiler Pressure Audit
+- Exit criterion: the repository identifies which additional language or
+  compiler pressures are now real because of app or UI code, and which remain
+  speculative.
+
+Phase 292 -- Post-UI Kernel Ownership Audit
+- Exit criterion: the repository identifies which new pressures belong to
+  kernel or launcher or display or workflow owners and rejects convenience
+  migrations that would blur those boundaries.
+
+Phase 293 -- First Human-Facing Support Statement
+- Exit criterion: the repository can honestly state one bounded user-facing
+  slice above the current reset-lane kernel while naming exactly what is still
+  not claimed.
+
+Phase 294 -- Next-Wave Decision Note
+- Exit criterion: the repository records whether the strongest next pressure is
+  broader app packaging, richer UI composition, networking, durable file-like
+  growth, or another compiler follow-through wave, instead of assuming the next
+  expansion automatically.
+
+Likely ordering bias
+--------------------
+If the repository keeps following the same pattern, the safest order is:
+
+1. clear the strongest post-254 compiler pain first
+2. spend current durable and workflow truth on one app-shaped substrate
+3. admit one first UI surface only after app launch and input or display owners
+   are explicit
+4. broaden UI by only one more owner layer if the first UI slice proves it
+5. freeze and re-audit before any desktop, filesystem, or toolkit ambition
+
+That ordering intentionally makes room for more language work and for more
+visible system outcomes at the same time. It avoids the two common failure
+modes after a long infrastructure wave:
+
+- reopening the compiler everywhere without a real consumer
+- rushing into GUI or desktop abstractions before one smaller UI slice has a
+  clear owner
+
+Non-goals
+---------
+- treating this note as a committed execution plan
+- claiming a full desktop environment, window system, or package-manager stack
+- implying broad filesystem, browser, network stack, or graphics-acceleration
+  support inside this roadmap horizon
+- using "UI" as permission to add widget frameworks, retained scene graphs,
+  declarative DSLs, or broad styling systems before one smaller owned slice is
+  honest
+- reopening the compiler into broad inference, trait, async, actor, or runtime
+  waves merely because user-facing work becomes more interesting
+
+Interpretation guide
+--------------------
+- Treat this as a rough map, not a contract.
+- If one stronger real consumer appears earlier, the repository should prefer
+  that bounded owner pressure over defending the exact phase order in this
+  note.
+- If Band D arrives and the repository still cannot name one honest display or
+  input owner, UI should be delayed rather than forced.
+- If Band A or Band C reveals a simpler honest plateau, stopping there is a
+  success rather than a failure.
+- If the first UI slice lands cleanly much earlier than expected, that is not
+  permission to jump straight to desktop frameworks; it is only evidence that
+  one second narrow UI band may now be justified.

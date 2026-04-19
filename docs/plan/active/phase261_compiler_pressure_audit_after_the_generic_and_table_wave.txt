@@ -1,0 +1,188 @@
+Phase 261 -- Compiler Pressure Audit After The Generic And Table Wave
+=====================================================================
+
+Status
+------
+PROPOSED
+
+Purpose
+-------
+Re-audit the compiler frontier after Phases 255 through 260 so the repository
+can state clearly which Band A pressures are now honestly closed, which remain
+explicitly deferred, and whether the next stronger owner lies in the compiler
+or in the more visible app-facing work of Band B.
+
+This phase exists now because Band A intentionally mixes several narrow but
+different compiler fronts. The repository should stop after that wave and
+classify the outcome before it drifts into another unbounded compiler sequence.
+
+Repository status note
+----------------------
+- Phase 252 and the new Band A plans reopen late-compiler work only where real
+  repository-owned pressure exists.
+- The speculative post-254 roadmap explicitly intends Band A to improve the
+  compiler enough for service, workflow, and app-local code without becoming a
+  broad language-expansion wave.
+- The repository already has a long history of pressure-audit phases that keep
+  local compiler repairs from turning into vague capability creep.
+- There is therefore a real planning need for one closeout audit after the
+  generic and table wave.
+
+Problem being solved
+--------------------
+- Without an explicit closeout audit, a successful Band A could easily blur
+  into another sequence of loosely connected compiler wishes.
+- The repository needs one honest answer to three questions: which Band A
+  slices actually landed cleanly, which still-closed surfaces remain the next
+  real compiler frontier, and whether the stronger next owner has now moved out
+  of the compiler and into Band B's app-facing substrate work.
+- This is a current planning problem, not generic roadmap hygiene. The repo is
+  deliberately choosing between more compiler closure and more visible system
+  outcomes.
+
+Non-goals
+---------
+- no new compiler feature landing by convenience
+- no opportunistic backlog grooming unrelated to the Band A compiler wave
+- no broad language-version statement
+- no silent reopening of parser, sema, MIR, backend, or interface-artifact
+  families during the audit
+- no user-facing support statement; that belongs later in the roadmap
+
+Invariants
+----------
+- The audit must classify actual landed or still-blocked repository-owned
+  pressures only.
+- Closed surfaces must stay bounded to what the earlier phases really proved.
+- Still-open surfaces must remain explicit and owner-local rather than vague
+  feature families.
+- The audit must not claim a broader milestone than the individual landed Band
+  A phases justify.
+- If the strongest next owner is no longer the compiler, the audit must say so
+  plainly.
+
+Required surface changes
+------------------------
+1. Re-audit Phases 255 through 260 against their actual landed or blocked
+   outcomes.
+2. Publish which compiler pressures are now honestly closed.
+3. Publish which nearby compiler surfaces remain explicitly deferred and why.
+4. Identify whether Band B's app-facing substrate work now outranks any
+   remaining compiler frontier.
+5. Update the backlog or decision log only where the audit finds a real
+   bounded still-open pressure that should remain visible.
+
+Forbidden changes
+-----------------
+- do not land a new compiler feature inside the audit note
+- do not reframe a partially closed slice as broad generic or table completion
+- do not broaden the audit into app, launcher, or UI phase design beyond what
+  is needed to classify the next stronger owner
+- do not bury the real still-open frontier under generic categories like
+  "language ergonomics" or "compiler polish"
+
+Phase role in the larger sequence
+---------------------------------
+- This phase closes Band A and decides whether the next honest motion remains
+  compiler-owned or should move to Band B's app-shaped substrate work.
+- It preserves the repository's evidence-first habit of stopping after a mixed
+  follow-through wave and stating what is actually true.
+- It should make the handoff into Band B easier by naming which compiler truths
+  Band B may now rely on.
+
+Relevant backlog items this phase intentionally brings under pressure
+--------------------------------------------------------------------
+- keep broader generic-function monomorphization explicit after the Phase 171
+  deferral audit
+- keep broader callable-feature widening deferred after Phase 230b
+- keep broader compile-time execution and imported artifact widening explicit
+  unless Band A proves one of them is still the narrowest blocker
+
+Questions this phase must answer
+--------------------------------
+1. Which Band A slices landed cleanly enough that later phases can treat them
+   as maintained truth rather than provisional probes?
+2. Which still-closed compiler surfaces remain the next honest frontier after
+   the generic and table wave?
+3. Did Band A reveal that one stronger remaining pressure actually belongs to
+   Band B or later app-facing work rather than to another compiler phase?
+4. Which backlog and decision-log entries now need tightening, retirement, or a
+   sharpened revisit trigger?
+
+Preferred implementation shape
+------------------------------
+- Keep the audit document-focused and owner-local.
+- Reuse the repository's earlier plateau and frontier-audit style: classify
+  landed truth, remaining truth gaps, and why adjacent tempting work still does
+  not win.
+- Prefer a short set of concrete still-open fronts over a diffuse wish list.
+- If Band B now clearly wins, say so and stop rather than inventing a second
+  compiler wave.
+
+Implementation accelerators
+---------------------------
+Main files and navigations
+- Primary controlling owners: the six preceding Band A phase docs plus
+  `docs/plan/backlog.txt` and `docs/plan/decision_log.txt`.
+- First-hop adjacent files: `docs/plan/admin/speculative_roadmap_post_phase254.txt`,
+  `docs/agent/prompts/plan_spec.txt`, and the real source or test files named
+  by Phases 255 through 260 only where the audit needs to confirm outcome.
+- Nearby accelerator docs: `docs/agent/prompts/patterns_cookbook.txt`,
+  `docs/agent/prompts/compiler_file_invariants.txt`, and
+  `docs/agent/prompts/test_overview.txt`.
+- Expected first validation target when the owner changes: none beyond build or
+  test evidence already required by the earlier phases; this is a planning
+  audit, not a new behavior landing.
+
+Relevant cookbook patterns
+- Pattern 6 -- Add A Compiler Phase is the nearest fit because this is a
+  bounded compiler-planning slice, but the phase is explicitly an audit rather
+  than a new behavior admission.
+- No other cookbook pattern fits cleanly because the main owner is the planning
+  surface itself.
+
+Relevant file-local invariants
+- The active Band A phase docs are the contract owners for what each slice
+  meant; the audit must not silently reinterpret them.
+- `docs/plan/backlog.txt` is for still-open work items, not unresolved design
+  questions.
+- `docs/plan/decision_log.txt` is for bounded deliberate limits, not status
+  narration.
+- The audit should classify compiler ownership honestly before handing off to
+  Band B.
+
+Relevant test surfaces
+~~~~~~~~~~~~~~~~~~~~~~
+- Primary owning validation surface: the build and test obligations already
+  named by Phases 255 through 260.
+- Narrowest expected first executable validation target: none new; the audit
+  should cite prior validation rather than invent fresh broad-suite runs.
+- Supporting validation guidance: if one Band A slice is still ambiguous, use
+  the narrowest owning compiler target from that phase instead of broad full-
+  suite reruns.
+
+Test obligations
+----------------
+- no new executable validation is required beyond the earlier Band A phase
+  evidence unless the audit finds a still-ambiguous slice
+- if ambiguity remains, rerun only the narrowest owning target named by the
+  ambiguous earlier phase
+
+Acceptance criteria
+-------------------
+- the repository has one explicit closeout statement for the Band A compiler
+  wave
+- later phases can see clearly which compiler surfaces are now maintained truth
+  and which remain deferred
+- the next stronger owner after Band A is classified honestly rather than left
+  implicit
+- no new feature work is smuggled into the audit
+
+Future follow-up
+----------------
+- If Band B clearly wins after the audit, proceed to the program-identity and
+  launcher substrate work without inventing another compiler wave first.
+- If one still-open compiler blocker remains stronger than Band B, record it as
+  the next explicit phase rather than leaving it as narrative residue.
+- Tighten or retire any stale backlog or decision-log entries exposed by the
+  audit.

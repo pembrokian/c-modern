@@ -1,0 +1,200 @@
+Phase 257 -- Const-Evaluable Table And Descriptor Follow-Through
+================================================================
+
+Status
+------
+PROPOSED
+
+Purpose
+-------
+Admit one bounded constant-descriptor follow-through so repository-owned table
+and descriptor records can combine already-admitted constant ingredients into a
+maintained compile-time data shape that later app and launcher work can reuse
+honestly.
+
+This phase exists now because the repository already admits flat aggregate
+tables, structural constant transport, top-level string globals, and exact-
+signature procedure constants in isolation, but it still lacks one maintained
+descriptor-style proof that composes the relevant constant ingredients in one
+table-owned shape.
+
+Repository status note
+----------------------
+- Phase 191 admitted explicit typed aggregate tables for flat owner data.
+- Phase 192 admitted inferred brace aggregates in expected-type contexts.
+- Phase 230b admitted exact-signature procedure-valued constants in explicit
+  typed aggregates.
+- Phase 251 made top-level `const str` executable on the hosted path.
+- The repository still does not carry one maintained descriptor-table proof for
+  records that mix labels, ids, nested records, and other constant ingredients
+  likely to matter for the Band B launcher and app-descriptor work.
+
+Problem being solved
+--------------------
+- The compiler has closed several constant ingredients one at a time, but it
+  still lacks one maintained proof that those ingredients compose honestly in a
+  descriptor-style table rather than only in isolated scalar or flat-record
+  examples.
+- Without that proof, later app or launcher or UI descriptor work would either
+  have to rediscover constant-composition gaps under deadline pressure or keep
+  runtime construction noise around static data that should be compile-time
+  truth.
+- The current-repo problem is therefore compositional: not whether tables or
+  strings or structural constants exist separately, but whether one realistic
+  descriptor family can now be owned honestly at compile time.
+
+Non-goals
+---------
+- no filesystem, launcher, or UI framework admission in the same phase
+- no dynamic registries, reflection, or discovery frameworks
+- no general const-function execution wave
+- no callback registries or closure systems
+- no imported-module follow-through beyond what the same-module descriptor
+  proof requires
+- no driver or manifest redesign
+
+Invariants
+----------
+- Compile-time truth remains sema-owned and deterministic.
+- `.mci` and executable lowering must transport admitted constant facts rather
+  than reconstructing them from source text.
+- The phase must stay on explicit typed tables and records; no free-floating
+  partial descriptor inference.
+- Procedure-valued constant support remains limited to the exact-signature
+  named-procedure family already admitted.
+- Descriptor tables remain ordinary typed data, not a registry or framework.
+
+Required surface changes
+------------------------
+1. Choose one real repository-owned descriptor family that combines already-
+   admitted constant ingredients into one table or record shape.
+2. Make that descriptor family compile honestly through sema, MIR, `.mci` when
+   needed, and executable lowering.
+3. Keep the first admitted descriptor family same-module and explicitly typed.
+4. Add focused sema, MIR, and executable regressions for the chosen table or
+   descriptor shape.
+5. Spend the feature in one repository-owned owner that later Band B work can
+   reuse instead of inventing a synthetic descriptor benchmark.
+
+Forbidden changes
+-----------------
+- do not widen into const functions, reflection, or discovery metadata
+- do not treat one descriptor family as permission for arbitrary framework
+  tables
+- do not reopen imported constant transport unless the chosen descriptor proof
+  actually needs it
+- do not bundle app identity, launcher policy, or UI composition into this
+  compiler phase
+- do not add general callback or event registries in the name of descriptors
+
+Phase role in the larger sequence
+---------------------------------
+- This phase prepares Band B by making one launcher- or app-adjacent
+  descriptor family honest before those larger user-facing phases begin.
+- It follows the generic-helper closures so Band A does not stay trapped on one
+  compiler frontier only.
+- It also sets up Phase 258 and Phase 259 by clarifying whether procedure-
+  valued and imported descriptor follow-through are still needed after one
+  same-module composed proof.
+
+Relevant backlog items this phase intentionally brings under pressure
+--------------------------------------------------------------------
+- keep broader callable-feature widening deferred after Phase 230b
+- keep broader compile-time execution explicit after structural constant and
+  string-global follow-through slices
+
+Questions this phase must answer
+--------------------------------
+1. What is the narrowest honest repository-owned descriptor family for this
+   phase: service topology metadata, launcher-ready program descriptors, or
+   another fixed table with clear future reuse?
+2. Which constant ingredients are still unproven when they appear together in
+   one descriptor shape?
+3. Can the chosen descriptor family stay same-module, or does imported surface
+   pressure appear immediately and therefore belong to Phase 259 instead?
+4. What is the smallest executable proof that the descriptor stays compile-time
+   data rather than devolving into runtime construction?
+
+Preferred implementation shape
+------------------------------
+- Start from a same-module explicit typed descriptor family.
+- Prefer nested record and label or id composition over speculative broad
+  metadata vocabularies.
+- Reuse existing structural constant, string-global, and procedure-value
+  machinery where each ingredient is already admitted.
+- Keep the descriptor family small enough that later phases can either reuse it
+  or reject it cleanly as a local owner rather than a platform-wide schema.
+
+Implementation accelerators
+---------------------------
+Main files and navigations
+- Primary controlling owners: `compiler/sema/check_const_eval.cpp` for
+  descriptor constant evaluation, `compiler/mci/mci.cpp` only if artifact
+  transport is required, and `compiler/codegen_llvm/backend.cpp` plus the split
+  executable lowering owners for global emission follow-through.
+- First-hop adjacent files: `compiler/sema/check.cpp`,
+  `compiler/sema/check_summary.cpp`, `tests/compiler/sema/const_array_table_ok.mc`,
+  and the chosen repository-owned descriptor consumer.
+- Nearby accelerator docs: `docs/agent/prompts/patterns_cookbook.txt`,
+  `docs/agent/prompts/compiler_file_invariants.txt`, and the earlier aggregate-
+  table and procedure-table phase notes.
+- Expected first validation target when the owner changes:
+  `mc_sema_fixture_unit`, then `mc_mir_fixture_unit`, then
+  `mc_codegen_executable_core_unit`.
+
+Relevant cookbook patterns
+- Pattern 6 -- Add A Compiler Phase applies because this is a bounded compiler
+  capability slice with one real consumer family.
+- Pattern 10 -- Parser + Sema + MIR Follow-Through does not fit cleanly unless
+  the chosen descriptor family exposes a new syntax gap; by default this phase
+  should stay sema- and codegen-centered.
+
+Relevant file-local invariants
+- `compiler/sema/check_const_eval.cpp` owns compile-time structural truth and
+  should remain the first rejecting owner.
+- `compiler/mci/mci.cpp` must carry admitted constant facts deterministically if
+  the chosen descriptor surface crosses an artifact boundary.
+- `compiler/codegen_llvm/backend.cpp` remains orchestration only; detailed
+  constant emission should stay in the existing split lowering owners.
+- Descriptor tables must remain ordinary typed data and not become hidden
+  registration policy.
+
+Relevant test surfaces
+~~~~~~~~~~~~~~~~~~~~~~
+- Primary owning test family: `tests/compiler/sema/` for constant-table truth.
+- Narrowest expected first executable validation target: `mc_sema_fixture_unit`.
+- Follow-on validation targets: `mc_mir_fixture_unit` and
+  `mc_codegen_executable_core_unit`.
+- Existing fixture anchors: `tests/compiler/sema/const_array_table_ok.mc` and
+  `tests/compiler/sema/inferred_brace_aggregate_ok.mc` are the nearest current
+  constant-table proofs and should guide the new descriptor fixture family.
+
+Test obligations
+----------------
+- `Build debug`
+- `mc_sema_fixture_unit`
+- one focused MIR follow-through check in `mc_mir_fixture_unit` if the chosen
+  descriptor family is lowered into executable code
+- one focused executable proof in `mc_codegen_executable_core_unit`
+- one repository-owned spend site proving the descriptor remains compile-time
+  data rather than runtime-built data
+
+Acceptance criteria
+-------------------
+- one real repository-owned descriptor family now compiles honestly as explicit
+  typed compile-time data
+- the admitted descriptor family combines the intended constant ingredients in
+  one maintained proof surface
+- the landing stays bounded to one descriptor family and does not widen into a
+  framework or registry direction
+- later Band B work can cite this descriptor family as an already-admitted
+  constant surface rather than rediscovering it
+
+Future follow-up
+----------------
+- If the first honest descriptor consumer immediately needs imported transport,
+  route that to Phase 259 rather than widening this phase.
+- If the chosen descriptor family proves that exact-signature procedure fields
+  need stronger consumer validation, route that to Phase 258.
+- Any broader const-function or metadata framework pressure belongs in
+  `docs/plan/backlog.txt`, not as silent scope growth here.
