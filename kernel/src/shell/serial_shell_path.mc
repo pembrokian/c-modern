@@ -17,6 +17,16 @@ func pathwith(p: SerialShellPathState, serial: serial_service.SerialServiceState
     return p with { serial_state: serial, shell_state: shell }
 }
 
+func path_receive(path: *SerialShellPathState, obs: syscall.ReceiveObservation) {
+    current := *path
+    serial_state := serial_service.serial_on_receive(current.serial_state, obs)
+    *path = pathwith(current, serial_state, current.shell_state)
+}
+
+func path_shell_message(path: SerialShellPathState) service_effect.Message {
+    return service_effect.message(path.shell_state.pid, path.shell_endpoint_id, serial_service.serial_forward_request_len(path.serial_state), serial_service.serial_forward_request_payload(path.serial_state))
+}
+
 func build_reply_observation(shell_state: shell_service.ShellServiceState, shell_endpoint_id: u32, effect: service_effect.Effect) syscall.ReceiveObservation {
     return syscall.ReceiveObservation{ status: service_effect.effect_reply_status(effect), block_reason: syscall.BlockReason.None, endpoint_id: shell_endpoint_id, source_pid: shell_state.pid, payload_len: service_effect.effect_reply_payload_len(effect), received_handle_slot: 0, received_handle_count: 0, payload: service_effect.effect_reply_payload(effect) }
 }

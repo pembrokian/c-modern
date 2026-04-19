@@ -11,6 +11,7 @@ import completion_mailbox_service
 import connection_service
 import echo_service
 import file_service
+import input_event
 import journal_service
 import init
 import identity_taxonomy
@@ -314,34 +315,14 @@ func dispatch_connection(state: *boot.KernelBootState, msg: service_effect.Messa
             return prepared.effect
         }
         step := workflow_protocol.workflow_step_schedule_connection(current.workflow.state, step_context, prepared.request, msg.payload[1], prepared.opcode)
-        if object_store_service.object_store_changed(current.object_store.state, step.object_store) {
-            if !object_store_service.object_store_persist(step.object_store) {
-                return service_effect.effect_reply(syscall.SyscallStatus.Closed, 0, primitives.zero_payload())
-            }
-        }
-        if journal_service.journal_changed(current.journal.state, step.journal) {
-            if !journal_service.journal_persist(step.journal) {
-                return service_effect.effect_reply(syscall.SyscallStatus.Closed, 0, primitives.zero_payload())
-            }
-        }
-        if update_store_service.update_store_changed(current.update_store.state, step.update_store) {
-            if !update_store_service.update_store_persist(step.update_store) {
-                return service_effect.effect_reply(syscall.SyscallStatus.Closed, 0, primitives.zero_payload())
-            }
+        if !persist_workflow_step(current, step) {
+            return dispatch_closed_effect()
         }
         if service_effect.effect_reply_status(step.effect) != syscall.SyscallStatus.Ok {
             return step.effect
         }
         next := boot.bootwith_connection(current, prepared.state)
-        next = boot.bootwith_workflow(next, step.workflow)
-        next = boot.bootwith_timer(next, step.timer)
-        next = boot.bootwith_task(next, step.task)
-        next = boot.bootwith_object_store(next, step.object_store)
-        next = boot.bootwith_journal(next, step.journal)
-        next = boot.bootwith_update_store(next, step.update_store)
-        next = boot.bootwith_lease(next, step.lease)
-        next = boot.bootwith_ticket(next, step.ticket)
-        next = boot.bootwith_completion(next, step.completion)
+        next = commit_workflow_step(next, step)
         *state = next
         return step.effect
     }
@@ -356,7 +337,7 @@ func dispatch_launcher(state: *boot.KernelBootState, msg: service_effect.Message
     result := launcher_service.handle(current.launcher.state, context, msg)
     if update_store_service.update_store_changed(current.update_store.state, result.update_store) {
         if !update_store_service.update_store_persist(result.update_store) {
-            return service_effect.effect_reply(syscall.SyscallStatus.Closed, 0, primitives.zero_payload())
+            return dispatch_closed_effect()
         }
     }
     next := boot.bootwith_launcher(current, result.state)
@@ -369,7 +350,7 @@ func dispatch_journal(state: *boot.KernelBootState, msg: service_effect.Message)
     journal_result: journal_service.JournalResult = journal_service.handle(current.journal.state, msg)
     if journal_service.journal_changed(current.journal.state, journal_result.state) {
         if !journal_service.journal_persist(journal_result.state) {
-            return service_effect.effect_reply(syscall.SyscallStatus.Closed, 0, primitives.zero_payload())
+            return dispatch_closed_effect()
         }
     }
     *state = boot.bootwith_journal(current, journal_result.state)
@@ -381,7 +362,7 @@ func dispatch_object_store(state: *boot.KernelBootState, msg: service_effect.Mes
     result := object_store_service.handle(current.object_store.state, msg)
     if object_store_service.object_store_changed(current.object_store.state, result.state) {
         if !object_store_service.object_store_persist(result.state) {
-            return service_effect.effect_reply(syscall.SyscallStatus.Closed, 0, primitives.zero_payload())
+            return dispatch_closed_effect()
         }
     }
     *state = boot.bootwith_object_store(current, result.state)
@@ -393,11 +374,47 @@ func dispatch_update_store(state: *boot.KernelBootState, msg: service_effect.Mes
     result := update_store_service.handle(current.update_store.state, msg)
     if update_store_service.update_store_changed(current.update_store.state, result.state) {
         if !update_store_service.update_store_persist(result.state) {
-            return service_effect.effect_reply(syscall.SyscallStatus.Closed, 0, primitives.zero_payload())
+            return dispatch_closed_effect()
         }
     }
     *state = boot.bootwith_update_store(current, result.state)
     return result.effect
+}
+
+func dispatch_closed_effect() service_effect.Effect {
+    return service_effect.effect_reply(syscall.SyscallStatus.Closed, 0, primitives.zero_payload())
+}
+
+func persist_workflow_step(current: boot.KernelBootState, step: workflow_core.WorkflowStepResult) bool {
+    if object_store_service.object_store_changed(current.object_store.state, step.object_store) {
+        if !object_store_service.object_store_persist(step.object_store) {
+            return false
+        }
+    }
+    if journal_service.journal_changed(current.journal.state, step.journal) {
+        if !journal_service.journal_persist(step.journal) {
+            return false
+        }
+    }
+    if update_store_service.update_store_changed(current.update_store.state, step.update_store) {
+        if !update_store_service.update_store_persist(step.update_store) {
+            return false
+        }
+    }
+    return true
+}
+
+func commit_workflow_step(current: boot.KernelBootState, step: workflow_core.WorkflowStepResult) boot.KernelBootState {
+    next := boot.bootwith_workflow(current, step.workflow)
+    next = boot.bootwith_timer(next, step.timer)
+    next = boot.bootwith_task(next, step.task)
+    next = boot.bootwith_object_store(next, step.object_store)
+    next = boot.bootwith_update_store(next, step.update_store)
+    next = boot.bootwith_journal(next, step.journal)
+    next = boot.bootwith_lease(next, step.lease)
+    next = boot.bootwith_ticket(next, step.ticket)
+    next = boot.bootwith_completion(next, step.completion)
+    return next
 }
 
 func dispatch_completion_mailbox(state: *boot.KernelBootState, msg: service_effect.Message) service_effect.Effect {
@@ -424,6 +441,8 @@ func dispatch_lease(state: *boot.KernelBootState, msg: service_effect.Message) s
         payload[2] = lease_result.second
         payload[3] = lease_result.third
         *state = next
+        // Lease owns the delegated update handoff shape, but workflow still
+        // owns execution semantics, so this stays one direct local call.
         delegated := service_effect.message(msg.source_pid, service_topology.WORKFLOW_ENDPOINT_ID, 4, payload)
         return dispatch_workflow(state, delegated)
     }
@@ -439,30 +458,10 @@ func dispatch_workflow(state: *boot.KernelBootState, msg: service_effect.Message
     previous_workflow := current.workflow.state
     step_context := workflow_dispatch_step_context(current)
     step := workflow_protocol.step(current.workflow.state, step_context, msg)
-    if object_store_service.object_store_changed(current.object_store.state, step.object_store) {
-        if !object_store_service.object_store_persist(step.object_store) {
-            return service_effect.effect_reply(syscall.SyscallStatus.Closed, 0, primitives.zero_payload())
-        }
+    if !persist_workflow_step(current, step) {
+        return dispatch_closed_effect()
     }
-    if journal_service.journal_changed(current.journal.state, step.journal) {
-        if !journal_service.journal_persist(step.journal) {
-            return service_effect.effect_reply(syscall.SyscallStatus.Closed, 0, primitives.zero_payload())
-        }
-    }
-    if update_store_service.update_store_changed(current.update_store.state, step.update_store) {
-        if !update_store_service.update_store_persist(step.update_store) {
-            return service_effect.effect_reply(syscall.SyscallStatus.Closed, 0, primitives.zero_payload())
-        }
-    }
-    next := boot.bootwith_workflow(current, step.workflow)
-    next = boot.bootwith_timer(next, step.timer)
-    next = boot.bootwith_task(next, step.task)
-    next = boot.bootwith_object_store(next, step.object_store)
-    next = boot.bootwith_update_store(next, step.update_store)
-    next = boot.bootwith_journal(next, step.journal)
-    next = boot.bootwith_lease(next, step.lease)
-    next = boot.bootwith_ticket(next, step.ticket)
-    next = boot.bootwith_completion(next, step.completion)
+    next := commit_workflow_step(current, step)
     if workflow_core.workflow_is_connection(previous_workflow) && !workflow_core.workflow_is_active(step.workflow) && !workflow_core.workflow_is_delivering(step.workflow) && previous_workflow.id != 0 {
         next = boot.bootwith_connection(next, connection_service.connection_request_finish(next.connection.state, workflow_core.workflow_connection_slot(previous_workflow), previous_workflow.id))
     }
@@ -617,9 +616,9 @@ func serial_build_reply(next_path: serial_shell_path.SerialShellPathState) servi
     return service_effect.effect_reply(serial_shell_path.path_serial_reply_status(next_path), serial_shell_path.path_serial_reply_len(next_path), serial_shell_path.path_serial_reply_payload(next_path))
 }
 
-// Attach event markers to a serial reply effect and propagate the
-// send_dropped witness from the resolved inner effect.
-func serial_attach_events(serial_effect: service_effect.Effect, obs: syscall.ReceiveObservation, next_path: serial_shell_path.SerialShellPathState, resolved: service_effect.Effect) service_effect.Effect {
+// Attach event markers to a serial reply effect that routed through shell and
+// leaf services, preserving the flat shell-path event order.
+func serial_attach_shell_events(serial_effect: service_effect.Effect, obs: syscall.ReceiveObservation, next_path: serial_shell_path.SerialShellPathState, resolved: service_effect.Effect) service_effect.Effect {
     result: service_effect.Effect = serial_effect
     if obs.payload_len != 0 {
         if obs.payload[0] == 255 {
@@ -646,17 +645,49 @@ func serial_attach_events(serial_effect: service_effect.Effect, obs: syscall.Rec
     return result
 }
 
+// Attach event markers to a serial reply effect handled entirely by the
+// explicit input-event path, which has no shell-forwarded phase.
+func serial_attach_input_events(serial_effect: service_effect.Effect, obs: syscall.ReceiveObservation, next_path: serial_shell_path.SerialShellPathState) service_effect.Effect {
+    result := serial_effect
+    if obs.payload_len != 0 {
+        if obs.payload[0] == 255 {
+            result = service_effect.effect_with_event(result, event_codes.EVENT_SERIAL_REJECTED)
+        } else {
+            result = service_effect.effect_with_event(result, event_codes.EVENT_SERIAL_BUFFERED)
+        }
+    }
+    if serial_shell_path.path_serial_reply_status(next_path) != syscall.SyscallStatus.None && serial_shell_path.path_serial_buffer_len(next_path) == 0 {
+        result = service_effect.effect_with_event(result, event_codes.EVENT_SERIAL_CLEARED)
+    }
+    return result
+}
+
 // Serial path dispatch: run path_step, chase the shell→leaf chain, commit
 // the resolved reply back into path state, then compose the serial reply.
 func kernel_dispatch_serial(state: *boot.KernelBootState, obs: syscall.ReceiveObservation) service_effect.Effect {
     current: boot.KernelBootState = *state
     next_path: serial_shell_path.SerialShellPathState = current.path_state
-    inner: service_effect.Effect = serial_shell_path.path_step(&next_path, obs)
-    resolved: service_effect.Effect = execute_effect(state, inner)
+    serial_shell_path.path_receive(&next_path, obs)
+    if serial_shell_path.path_serial_buffer_len(next_path) == 0 {
+        *state = boot.bootwith_path(current, next_path)
+        return serial_attach_input_events(serial_build_reply(next_path), obs, next_path)
+    }
+
+    shell_msg := serial_shell_path.path_shell_message(next_path)
+    input_route := input_event.handle(launcher_service.launcher_foreground_id(current.launcher.state), shell_msg.payload_len, shell_msg.payload)
+    resolved: service_effect.Effect
+    if input_route.kind != input_event.InputRouteKind.NotInput {
+        resolved = input_route.effect
+    } else {
+        resolved = execute_effect(state, shell_service.handle(next_path.shell_state, shell_msg))
+    }
     next_path = serial_shell_path.path_commit_reply(next_path, resolved)
     current = *state
     *state = boot.bootwith_path(current, next_path)
-    return serial_attach_events(serial_build_reply(next_path), obs, next_path, resolved)
+    if input_route.kind != input_event.InputRouteKind.NotInput {
+        return serial_attach_input_events(serial_build_reply(next_path), obs, next_path)
+    }
+    return serial_attach_shell_events(serial_build_reply(next_path), obs, next_path, resolved)
 }
 
 // Top-level dispatch step: route to the serial path or directly to leaf

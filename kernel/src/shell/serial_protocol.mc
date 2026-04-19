@@ -14,6 +14,7 @@
 //   Q C ! !         — queue count (returns count as reply_payload_len)
 //   Q P ! !         — queue peek
 //   P Q ! !         — launcher status
+//   I K <value> !   — foreground key input
 //   X A <target> !  — authority inspection query
 //   X C <target> !  — compact service-state query
 //   X D <target> !  — retained-vs-durable boundary query
@@ -212,6 +213,10 @@ func encode_launcher_select(id: u8) [4]u8 {
 
 func encode_launcher_launch() [4]u8 {
     return encode_no_args(CMD_P, CMD_A)
+}
+
+func encode_input_key(value: u8) [4]u8 {
+    return encode_one_arg(CMD_I, CMD_K, value)
 }
 
 func encode_queue_stall_count() [4]u8 {

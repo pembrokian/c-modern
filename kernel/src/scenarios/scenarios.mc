@@ -26,6 +26,7 @@ import scenario_retained_summary
 import scenario_restart
 import scenario_stall
 import scenario_file_service
+import scenario_input_event
 import scenario_timer_task_service
 import scenario_workflow_service
 import scenario_steps
@@ -105,6 +106,10 @@ func run(state: *boot.KernelBootState) i32 {
         return result
     }
     result = scenario_launcher_service.run_launcher_installed_workflow_demo_probe()
+    if result != 0 {
+        return result
+    }
+    result = scenario_input_event.run_input_event_probe()
     if result != 0 {
         return result
     }

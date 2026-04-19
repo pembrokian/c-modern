@@ -3,7 +3,7 @@ Phase 274 -- Input Event Owner First Slice
 
 Status
 ------
-PROPOSED
+LANDED
 
 Purpose
 -------
@@ -165,3 +165,28 @@ Future follow-up
 - Phase 275 should spend the new input seam on one explicit display owner.
 - Reopen broader input work only when a second input family or richer event
   vocabulary proves stronger than the display or foreground-routing slices.
+
+Implementation summary
+----------------------
+- Added `kernel/src/input_event.mc` as the explicit first UI input owner.
+- Kept `live_receive.mc` as hosted polling plus four-byte assembly only.
+- Kept `shell_service.mc` as shell decode only by routing the admitted input
+  frame family before shell decode in `kernel_dispatch.mc`.
+- Reused `launcher_service.mc` for single-foreground truth and spent the first
+  delivered path only on `issue_rollup`, with explicit no-foreground and
+  unsupported outcomes.
+- Kept the vocabulary tiny: one admitted frame family, `I K <byte> !`.
+
+Implemented decisions
+---------------------
+1. The narrowest honest first event vocabulary is one key-event family,
+  `I K <byte> !`, rather than text editing, pointer work, or a generic event
+  bus.
+2. `kernel_dispatch.mc` performs the routing split, but `input_event.mc`
+  owns the app-input semantics. That keeps dispatch as routing and keeps the
+  new input meaning out of `shell_service.mc`.
+3. No-foreground and unsupported cases stay explicit through the reply payload
+  produced by `input_event.mc` rather than falling back to shell-invalid
+  decode.
+4. The focused reset-lane proof is
+  `tests/system/kernel_reset_lane_phase274_input_event_owner`.
