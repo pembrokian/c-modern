@@ -138,10 +138,11 @@ Roadmap bands
 
 Band A - Harvest The Strongest Post-254 Compiler Pressure
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-Phases 255 and 256 are now landed as the same-module and one-module-boundary
-value-shaped generic-helper slices. Phases 257 through 261 should reopen only the remaining
-narrow compiler wave, and only where real kernel or service code is already
-exposing source-level distortion.
+Phases 255 through 260 are now landed as the same-module and imported generic-
+helper, descriptor-table, procedure-table, imported runtime-table, and bounded
+record-construction follow-through wave. Phase 261 now closes that wave with
+an explicit audit and keeps the remaining compiler fronts deferred until a
+later real consumer proves one of them stronger than Band B.
 
 Likely themes:
 - make a small amount of cross-module generic or constant or table pressure
@@ -183,14 +184,19 @@ Phase 260 -- Bounded Record-Construction Ergonomics Follow-Through
   object-construction frameworks.
 
 Phase 261 -- Compiler Pressure Audit After The Generic Or Table Wave
-- Exit criterion: the repository publishes which late-compiler pressures are
-  now honestly closed, which remain deferred, and which should not be reopened
-  before another stronger real consumer appears.
+- Landed: Band A is now explicitly closed. The maintained truths are the
+  landed Phase 255 through Phase 260 slices, while broader generic-body
+  execution, imported descriptor transport, and broader compile-time or global-
+  constant widening remain deferred until a later real consumer proves one of
+  them stronger than Band B.
 
 Outcome checkpoint after Band A:
 - the compiler should feel meaningfully better for service, workflow, and app-
   local support code, but still remain visibly bounded rather than in a broad
   language-expansion wave.
+- Phase 261 now also makes the next priority explicit: Band B outranks the
+  remaining deferred compiler fronts unless a later real consumer proves
+  otherwise.
 
 Band B - Make Memory An Honest Substrate For Later System Growth
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~

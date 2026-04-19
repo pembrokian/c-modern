@@ -3,7 +3,7 @@ Phase 261 -- Compiler Pressure Audit After The Generic And Table Wave
 
 Status
 ------
-PROPOSED
+COMPLETED
 
 Purpose
 -------
@@ -18,15 +18,22 @@ classify the outcome before it drifts into another unbounded compiler sequence.
 
 Repository status note
 ----------------------
-- Phase 252 and the new Band A plans reopen late-compiler work only where real
-  repository-owned pressure exists.
-- The speculative post-254 roadmap explicitly intends Band A to improve the
-  compiler enough for service, workflow, and app-local code without becoming a
-  broad language-expansion wave.
-- The repository already has a long history of pressure-audit phases that keep
-  local compiler repairs from turning into vague capability creep.
-- There is therefore a real planning need for one closeout audit after the
-  generic and table wave.
+- Phase 252 named the same-module value-shaped generic-helper blocker and
+  Phase 255 completed that direct helper slice for the real `ServiceCell<T>`
+  family.
+- Phase 256 extended that same helper family across one honest imported module
+  boundary without reopening general imported generic-body completion.
+- Phase 257 proved one same-module descriptor-table owner in
+  `kernel/src/identity/service_topology.mc`.
+- Phase 258 proved one same-module procedure-table consumer in the maintained
+  `issue_rollup` render owner.
+- Phase 259 proved one imported fixed procedure-table consumer through
+  `rollup_render_table.mc` without reopening imported descriptors or registry
+  semantics.
+- Phase 260 closed one bounded record-construction shorthand, `field:`, at the
+  parser/sema/MIR boundary and spent it in the boot helper family.
+- The speculative post-254 roadmap explicitly intended this mixed wave to stop
+  for an audit before another compiler phase was chosen.
 
 Problem being solved
 --------------------
@@ -109,6 +116,60 @@ Questions this phase must answer
 4. Which backlog and decision-log entries now need tightening, retirement, or a
    sharpened revisit trigger?
 
+Implementation outcome
+----------------------
+- Band A now closes as maintained truth for five narrow compiler surfaces:
+  same-module value-shaped user-body generic helpers, one imported direct
+  generic-helper family, one same-module descriptor-table family, one
+  maintained same-module procedure-table consumer plus one imported fixed
+  procedure-table consumer, and one bounded omitted-value record-construction
+  shorthand.
+- Those slices remain intentionally bounded to what the landed phases actually
+  proved. They do not imply broad monomorphization, imported descriptor
+  transport, descriptor-plus-procedure composition, general compile-time
+  execution, broad callback features, or a general object-construction system.
+- The remaining compiler fronts are now clear and owner-local rather than
+  diffuse:
+  1. broader generic-body execution beyond the landed same-module and direct
+    imported helper path
+  2. imported descriptor transport and descriptor-plus-procedure table
+    composition
+  3. broader type-position constant evaluation and broader hosted executable
+    global-constant families beyond the specifically landed repairs
+- None of those remaining fronts currently outranks Band B's more visible
+  program-identity, launcher, and app-shaped substrate work. The audit
+  therefore closes Band A and hands priority to Band B instead of inventing a
+  second compiler wave.
+
+Questions answered
+------------------
+1. The maintained Band A truths are the exact landed slices from Phases 255
+  through 260: direct same-module helper specialization, one imported direct
+  helper family, one same-module descriptor-table family, one maintained
+  same-module procedure-table consumer plus one imported fixed runtime-table
+  consumer, and one bounded `field:` shorthand.
+2. The still-closed compiler fronts are specific and already recorded: broader
+  generic-body execution beyond the landed helper path, imported descriptors
+  and descriptor-plus-procedure composition, and broader compile-time or
+  global-constant execution families.
+3. Band A revealed that the stronger next owner is no longer the compiler.
+  Band B's app-facing substrate work now wins unless a later real consumer is
+  blocked by one of the explicitly named deferred compiler fronts.
+4. The backlog needed tightening where older compiler entries still read as if
+  a broad generic or global-constant follow-through remained active. The
+  decision log needed one explicit closeout entry recording that Band B now
+  outranks the remaining compiler fronts.
+
+Non-decisions and deferred edges
+--------------------------------
+- No new compiler phase is chosen inside this audit.
+- No imported descriptor transport, descriptor-plus-procedure composition, or
+  broader callback follow-through is reframed as partially complete.
+- No broader type-position constant execution or hosted executable global-data
+  framework is admitted by implication from the landed narrow repairs.
+- No app, launcher, or UI design is specified here beyond the ownership claim
+  that Band B now outranks the remaining compiler fronts.
+
 Preferred implementation shape
 ------------------------------
 - Keep the audit document-focused and owner-local.
@@ -167,6 +228,19 @@ Test obligations
   evidence unless the audit finds a still-ambiguous slice
 - if ambiguity remains, rerun only the narrowest owning target named by the
   ambiguous earlier phase
+
+Validation
+----------
+- No new executable validation was required because the six preceding Band A
+  phase documents already record their owning compiler and project validation
+  surfaces and the audit found no ambiguous landed slice that changed the
+  ownership classification.
+- Validation for this phase is therefore documentation consistency only: the
+  active Phase 261 note, `docs/plan/backlog.txt`,
+  `docs/plan/decision_log.txt`,
+  `docs/plan/admin/speculative_roadmap_post_phase254.txt`, and
+  `docs/agent/prompts/repo_map.md` must agree that Band A is closed and that
+  Band B now outranks the remaining deferred compiler fronts.
 
 Acceptance criteria
 -------------------
