@@ -18,6 +18,8 @@ modules = [
 	"src/shell",
 	"src/scenarios",
 	"src/transport",
+	"../examples/real/issue_rollup/src/model",
+	"../examples/real/issue_rollup/src/render",
 	"../stdlib"
 ]
 

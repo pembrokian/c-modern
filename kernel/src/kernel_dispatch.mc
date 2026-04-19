@@ -14,6 +14,7 @@ import echo_service
 import file_service
 import foreground_input_route
 import input_event
+import issue_rollup_app
 import journal_service
 import init
 import identity_taxonomy
@@ -344,11 +345,15 @@ func dispatch_launcher(state: *boot.KernelBootState, msg: service_effect.Message
         }
     }
     next := boot.bootwith_launcher(current, result.state)
-    *state = boot.bootwith_update_store(next, result.update_store)
+    next = boot.bootwith_update_store(next, result.update_store)
     if msg.payload_len == 1 && msg.payload[0] == launcher_service.LAUNCHER_OP_LAUNCH && service_effect.effect_reply_status(result.effect) == syscall.SyscallStatus.Ok {
-        display_msg := service_effect.message(current.launcher.state.pid, service_topology.DISPLAY_ENDPOINT_ID, 4, program_catalog.program_display_cells(launcher_service.launcher_foreground_id(result.state)))
-        _ = dispatch_display(state, display_msg)
+        if launcher_service.launcher_foreground_id(result.state) == program_catalog.PROGRAM_ID_ISSUE_ROLLUP {
+            present := issue_rollup_app.issue_rollup_launch(next.update_store.state, next.display.state)
+            next = boot.bootwith_issue_rollup(next, present.app)
+            next = boot.bootwith_display(next, present.display)
+        }
     }
+    *state = next
     return result.effect
 }
 
@@ -690,9 +695,12 @@ func kernel_dispatch_serial(state: *boot.KernelBootState, obs: syscall.ReceiveOb
     }
 
     shell_msg := serial_shell_path.path_shell_message(next_path)
-    input_route := foreground_input_route.handle(current.launcher.state, shell_msg.payload_len, shell_msg.payload)
+    input_route := foreground_input_route.handle(current.launcher.state, current.issue_rollup, current.update_store.state, current.display.state, shell_msg.payload_len, shell_msg.payload)
     resolved: service_effect.Effect
     if input_route.kind != foreground_input_route.ForegroundInputRouteKind.NotInput {
+        current = boot.bootwith_issue_rollup(current, input_route.issue_rollup)
+        current = boot.bootwith_display(current, input_route.display)
+        *state = current
         resolved = input_route.effect
     } else {
         resolved = execute_effect(state, shell_service.handle(next_path.shell_state, shell_msg))

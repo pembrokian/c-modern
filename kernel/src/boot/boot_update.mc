@@ -3,6 +3,7 @@ import connection_service
 import display_surface
 import echo_service
 import file_service
+import issue_rollup_app
 import journal_service
 import kv_service
 import launcher_service
@@ -167,6 +168,10 @@ func bootwith_connection_restart_outcome(s: KernelBootState, connection_restart_
 
 func bootwith_launcher(s: KernelBootState, launcher: launcher_service.LauncherServiceState) KernelBootState {
     return s with { launcher: service_cell_helpers.service_cell_with_state<launcher_service.LauncherServiceState>(s.launcher, launcher) }
+}
+
+func bootwith_issue_rollup(s: KernelBootState, issue_rollup: issue_rollup_app.IssueRollupAppState) KernelBootState {
+    return s with { issue_rollup: }
 }
 
 func bootwith_launcher_restart_outcome(s: KernelBootState, launcher_restart_outcome: RestartOutcome) KernelBootState {

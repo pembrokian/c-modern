@@ -9,6 +9,7 @@ import connection_service
 import display_surface
 import echo_service
 import file_service
+import issue_rollup_app
 import journal_service
 import kv_service
 import launcher_service
@@ -73,6 +74,7 @@ struct KernelBootState {
     connection: service_cell_helpers.ServiceCell<connection_service.ConnectionServiceState>
     connection_restart_outcome: RestartOutcome
     launcher: service_cell_helpers.ServiceCell<launcher_service.LauncherServiceState>
+    issue_rollup: issue_rollup_app.IssueRollupAppState
     launcher_restart_outcome: RestartOutcome
     display: service_cell_helpers.ServiceCell<display_surface.DisplaySurfaceState>
     display_restart_outcome: RestartOutcome
@@ -159,6 +161,7 @@ func kernel_init() KernelBootState {
         connection: connection_cell,
         connection_restart_outcome: RestartOutcome.None,
         launcher: launcher_cell,
+        issue_rollup: issue_rollup_app.issue_rollup_app_init(),
         launcher_restart_outcome: RestartOutcome.None,
         display: display_cell,
         display_restart_outcome: RestartOutcome.None,

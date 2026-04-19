@@ -3,7 +3,7 @@ Phase 277 -- Explicit Repaint Or Present Contract
 
 Status
 ------
-PROPOSED
+LANDED
 
 Purpose
 -------
@@ -18,12 +18,11 @@ graph.
 
 Repository status note
 ----------------------
-- Phase 275 should admit one explicit display owner and one fixed surface.
-- Phase 276 should route one admitted input path to one foreground app.
-- `examples/real/issue_rollup/src/render/` already contains app-local render
-  selection logic, but not a maintained repaint contract with a display owner.
-- The repository still has no explicit answer to when or how the first UI app
-  asks the surface to refresh.
+- Phase 275 admitted one explicit display owner and one fixed surface.
+- Phase 276 routed one admitted input path to one foreground app.
+- Phase 277 now adds one explicit app-owned present path for `issue_rollup`.
+- `examples/real/issue_rollup/src/render/` remains the render-policy owner for
+  the first app-visible cell tokens.
 
 Problem being solved
 --------------------
@@ -145,6 +144,22 @@ Acceptance criteria
   behavior
 - the first foreground app can exercise the contract deterministically
 - no retained invalidation or animation framework is introduced
+
+Implementation notes
+--------------------
+- `kernel/src/issue_rollup_app.mc` is the new first app-owned present seam. It
+  keeps one tiny app-local summary state, derives cells from the existing
+  `issue_rollup` render modules plus the installed manifest bytes, and calls
+  `display_surface.display_present(...)` directly.
+- `kernel/src/kernel_dispatch.mc` no longer pushes display tokens from
+  `program_catalog.mc` on launcher launch. Launch and foreground input now
+  reach the surface only through the app-owned present seam.
+- `kernel/src/foreground_input_route.mc` remains the input handoff owner. It
+  now threads the app state and display state through the same bounded route
+  instead of turning launcher or display into a redraw coordinator.
+- The explicit no-op outcome is one app-local `NoChange` case: admitted key
+  input can be delivered without forcing a visible update when the app decides
+  its visible state did not change.
 
 Future follow-up
 ----------------

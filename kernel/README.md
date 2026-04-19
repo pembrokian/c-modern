@@ -13,7 +13,7 @@ Rules
 - Keep compiler, sema, MIR, backend, ABI, target, runtime, and `hal` surfaces closed unless a narrow blocker forces a local change.
 - Add modules only when a specific phase boundary needs them, at the lean behavioral minimum the four-section standard allows.
 
-Current scope (through Phase 276)
+Current scope (through Phase 277)
 
 - All three canonical service shapes are present: forwarding (`serial_service`, `shell_service`, `serial_shell_path`), append/tail (`log_service`), and key/value (`kv_service`).
 - The compact shell route now reaches `log_service` and `kv_service` over the real reset-lane path instead of stopping at shell-local echo behavior.
@@ -30,6 +30,7 @@ Current scope (through Phase 276)
 - Phase 274 adds one explicit `input_event.mc` owner for the first `I K <byte> !` foreground-input path.
 - Phase 275 adds one explicit `display_surface.mc` owner for one fixed four-cell visible target and one bounded launcher-triggered foreground present handoff.
 - Phase 276 adds one explicit `foreground_input_route.mc` seam that keeps event parsing in `input_event.mc`, keeps foreground truth in `launcher_service.mc`, and routes the admitted input family to exactly one current foreground app without widening launcher, display, or dispatch into a UI framework.
+- Phase 277 adds one explicit `issue_rollup_app.mc` owner for the first app-driven present path, keeps render classification in the `issue_rollup` render modules, and removes the old launcher-time display-token shortcut so launch/input now reach the surface only through an explicit app-to-display present request.
 
 Source tree layout (Phase 219)
 
@@ -55,6 +56,15 @@ The following modules are deferred until the named phase boundary forces them:
 
 Recent service targets
 
+- Phase 277 (landed): explicit repaint/present contract.
+  `issue_rollup_app.mc` now owns one bounded app-local summary plus one direct
+  `display_surface.display_present(...)` request path, while `display_surface.mc`
+  remains the fixed-surface owner and `launcher_service.mc` remains only the
+  foreground-policy owner. The admitted `issue_rollup` render policy now stays in
+  the app-local render modules and launch/input reach the surface only through
+  that explicit present path. The focused reset-lane fixture is
+  `tests/system/kernel_reset_lane_phase277_explicit_present_contract`.
+
 - Phase 276 (landed): foreground app input routing.
   `foreground_input_route.mc` now owns the first explicit foreground-app input handoff by consuming parsed input frames from `input_event.mc` and foreground truth from `launcher_service.mc`, while `kernel_dispatch.mc` stays a thin caller. The admitted path still routes to exactly one foreground app, keeps no-foreground explicit, and does not widen into background delivery, sessions, or routing frameworks. The focused reset-lane fixture is
   `tests/system/kernel_reset_lane_phase276_foreground_app_input_routing`.
@@ -62,9 +72,10 @@ Recent service targets
 - Phase 275 (landed): display surface owner first slice.
   `display_surface.mc` now owns one fixed four-cell visible target with one
   explicit present contract and one direct query path, while `launcher_service.mc`
-  still owns only foreground-program truth and `kernel_dispatch.mc` performs one
-  bounded launch-time handoff using fixed program display cells from
-  `program_catalog.mc`. The focused reset-lane fixture is
+  still owns only foreground-program truth. The original landing spent that
+  surface through one bounded launch-time handoff; Phase 277 later replaced the
+  old `program_catalog.mc` token shortcut with an app-owned present request
+  without widening launcher or display. The focused reset-lane fixture is
   `tests/system/kernel_reset_lane_phase275_display_surface_owner`.
 
 - Phase 273 (completed): app substrate pressure audit. Band C is now
