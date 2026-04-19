@@ -424,6 +424,50 @@ void RunBuiltProjectFixture(const std::filesystem::path& mc_path,
                          "run built executable " + artifacts.executable.generic_string());
 }
 
+void RunBuiltProjectFixtureWithIrSnippetChecks(const std::filesystem::path& mc_path,
+                                               const std::filesystem::path& project_path,
+                                               const std::filesystem::path& root_source_path,
+                                               const std::filesystem::path& build_dir,
+                                               int expected_exit_code,
+                                               const std::vector<std::string>& run_args,
+                                               const std::vector<std::string>& required_ir_snippets,
+                                               const std::vector<std::string>& forbidden_ir_snippets) {
+    std::filesystem::remove_all(build_dir);
+    std::filesystem::create_directories(build_dir);
+
+    ExpectCommandSuccess({mc_path.generic_string(),
+                          "build",
+                          "--project",
+                          project_path.generic_string(),
+                          "--build-dir",
+                          build_dir.generic_string()},
+                         "mc build --project " + project_path.generic_string());
+
+    const auto artifacts = mc::support::ComputeBuildArtifactTargets(root_source_path, build_dir);
+    if (!std::filesystem::exists(artifacts.llvm_ir) ||
+        !std::filesystem::exists(artifacts.object) ||
+        !std::filesystem::exists(artifacts.executable)) {
+        Fail("expected build artifacts for project fixture: " + project_path.generic_string());
+    }
+
+    const std::string llvm_ir = ReadFile(artifacts.llvm_ir);
+    for (const auto& snippet : required_ir_snippets) {
+        if (llvm_ir.find(snippet) == std::string::npos) {
+            Fail("expected LLVM IR snippet '" + snippet + "' in " + artifacts.llvm_ir.generic_string());
+        }
+    }
+    for (const auto& snippet : forbidden_ir_snippets) {
+        if (llvm_ir.find(snippet) != std::string::npos) {
+            Fail("unexpected LLVM IR snippet '" + snippet + "' in " + artifacts.llvm_ir.generic_string());
+        }
+    }
+
+    ExpectExecutableExit(artifacts.executable,
+                         run_args,
+                         expected_exit_code,
+                         "run built executable " + artifacts.executable.generic_string());
+}
+
 void RunBuiltProjectNetworkEchoFixture(const std::filesystem::path& mc_path,
                                        const std::filesystem::path& project_path,
                                        const std::filesystem::path& root_source_path,
@@ -544,6 +588,13 @@ void RunCodegenExecutableCoreSuite(const std::filesystem::path& source_root,
                     {},
                     false,
                     source_root / "tests/compiler/codegen/procedure_dispatch_table_import");
+
+    RunBuiltFixtureWithIrSnippets(mc_path,
+                                  source_root / "tests/compiler/codegen/const_descriptor_table.mc",
+                                  work_root / "const_descriptor_table",
+                                  40,
+                                  {},
+                                  {"@global.DESCRIPTORS = constant [2 x"});
 
     const std::filesystem::path global_source = work_root / "global_counter.mc";
     WriteFile(global_source,
@@ -1070,6 +1121,50 @@ void RunCodegenExecutableCoreSuite(const std::filesystem::path& source_root,
                                        {"define {i32} @box_with$inst$i32(", "call {i32} @box_with$inst$i32(i32 7)"},
                                        {"@box_with("});
 
+    const std::filesystem::path service_cell_helper_source = work_root / "service_cell_helper.mc";
+    WriteFile(service_cell_helper_source,
+              "struct ServiceCell<T> {\n"
+              "    state: T\n"
+              "    generation: u32\n"
+              "}\n"
+              "\n"
+              "func service_cell_with_state<T>(cell: ServiceCell<T>, state: T) ServiceCell<T> {\n"
+              "    return ServiceCell<T>{ state: state, generation: cell.generation }\n"
+              "}\n"
+              "\n"
+              "func service_cell_restart<T>(cell: ServiceCell<T>, state: T) ServiceCell<T> {\n"
+              "    return ServiceCell<T>{ state: state, generation: cell.generation + 1 }\n"
+              "}\n"
+              "\n"
+              "func main() i32 {\n"
+              "    base := ServiceCell<i32>{ state: 3, generation: 7 }\n"
+              "    updated := service_cell_with_state<i32>(base, 11)\n"
+              "    restarted := service_cell_restart<i32>(updated, 13)\n"
+              "    if updated.state != 11 {\n"
+              "        return 1\n"
+              "    }\n"
+              "    if updated.generation != 7 {\n"
+              "        return 2\n"
+              "    }\n"
+              "    if restarted.state != 13 {\n"
+              "        return 3\n"
+              "    }\n"
+              "    if restarted.generation != 8 {\n"
+              "        return 4\n"
+              "    }\n"
+              "    return 0\n"
+              "}\n");
+    RunBuiltFixtureWithIrSnippetChecks(mc_path,
+                                       service_cell_helper_source,
+                                       work_root / "service_cell_helper_build",
+                                       0,
+                                       {},
+                                       {"define {i32, i32} @service_cell_with_state$inst$i32(",
+                                        "define {i32, i32} @service_cell_restart$inst$i32(",
+                                        "call {i32, i32} @service_cell_with_state$inst$i32(",
+                                        "call {i32, i32} @service_cell_restart$inst$i32("},
+                                       {"@service_cell_with_state(", "@service_cell_restart("});
+
     const std::filesystem::path hosted_args_source = work_root / "hosted_main_args.mc";
     WriteFile(hosted_args_source,
               "func main(args: Slice<cstr>) i32 {\n"
@@ -1440,6 +1535,74 @@ void RunCodegenExecutableProjectSuite(const std::filesystem::path& source_root,
                            work_root / "imported_layout_project_build",
                            30,
                            {});
+
+    const std::filesystem::path imported_service_cell_project_root = work_root / "imported_service_cell_project";
+    WriteFile(imported_service_cell_project_root / "build.toml",
+              "schema = 1\n"
+              "project = \"phase256-imported-service-cell\"\n"
+              "default = \"app\"\n"
+              "\n"
+              "[targets.app]\n"
+              "kind = \"exe\"\n"
+              "root = \"src/main.mc\"\n"
+              "mode = \"debug\"\n"
+              "env = \"hosted\"\n"
+              "\n"
+              "[targets.app.search_paths]\n"
+              "modules = [\"src\"]\n"
+              "\n"
+              "[targets.app.runtime]\n"
+              "startup = \"default\"\n");
+    WriteFile(imported_service_cell_project_root / "src/service_cell_helpers.mc",
+              "struct ServiceCell<T> {\n"
+              "    state: T\n"
+              "    generation: u32\n"
+              "}\n"
+              "\n"
+              "func service_cell_with_state<T>(cell: ServiceCell<T>, state: T) ServiceCell<T> {\n"
+              "    return ServiceCell<T>{ state: state, generation: cell.generation }\n"
+              "}\n"
+              "\n"
+              "func service_cell_restart<T>(cell: ServiceCell<T>, state: T) ServiceCell<T> {\n"
+              "    return ServiceCell<T>{ state: state, generation: cell.generation + 1 }\n"
+              "}\n");
+    WriteFile(imported_service_cell_project_root / "src/main.mc",
+              "import service_cell_helpers\n"
+              "\n"
+              "struct Payload {\n"
+              "    value: i32\n"
+              "}\n"
+              "\n"
+              "func main() i32 {\n"
+              "    base := service_cell_helpers.ServiceCell<Payload>{ state: Payload{ value: 3 }, generation: 7 }\n"
+              "    updated := service_cell_helpers.service_cell_with_state<Payload>(base, Payload{ value: 11 })\n"
+              "    restarted := service_cell_helpers.service_cell_restart<Payload>(updated, Payload{ value: 13 })\n"
+              "    if updated.state.value != 11 {\n"
+              "        return 1\n"
+              "    }\n"
+              "    if updated.generation != 7 {\n"
+              "        return 2\n"
+              "    }\n"
+              "    if restarted.state.value != 13 {\n"
+              "        return 3\n"
+              "    }\n"
+              "    if restarted.generation != 8 {\n"
+              "        return 4\n"
+              "    }\n"
+              "    return 0\n"
+              "}\n");
+    RunBuiltProjectFixtureWithIrSnippetChecks(mc_path,
+                                              imported_service_cell_project_root / "build.toml",
+                                              imported_service_cell_project_root / "src/main.mc",
+                                              work_root / "imported_service_cell_project_build",
+                                              0,
+                                              {},
+                                              {"@service_cell_helpers.service_cell_with_state$inst$Payload(",
+                                               "@service_cell_helpers.service_cell_restart$inst$Payload(",
+                                               "call {{i32}, i32} @service_cell_helpers.service_cell_with_state$inst$Payload(",
+                                               "call {{i32}, i32} @service_cell_helpers.service_cell_restart$inst$Payload("},
+                                              {"@service_cell_helpers.service_cell_with_state(",
+                                               "@service_cell_helpers.service_cell_restart("});
 
     RunBuiltProjectNetworkEchoFixture(mc_path,
                                       source_root / "examples/real/evented_echo/build.toml",

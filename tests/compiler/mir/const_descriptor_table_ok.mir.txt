@@ -1,0 +1,84 @@
+Module
+  TypeDecl kind=enum name=RestartMode
+    Variant name=None
+    Variant name=Reload
+    Variant name=Reset
+  TypeDecl kind=enum name=AuthorityClass
+    Variant name=None
+    Variant name=PublicEndpoint
+    Variant name=DurableOwner
+  TypeDecl kind=struct name=ServiceSlot
+    Field name=endpoint type=u32
+    Field name=pid type=u32
+  TypeDecl kind=struct name=ServiceDescriptor
+    Field name=label type=string
+    Field name=slot type=ServiceSlot
+    Field name=restart type=RestartMode
+    Field name=authority type=AuthorityClass
+  Function name=second_score returns=[i32]
+    Local name=descriptors type=[2]ServiceDescriptor
+    Local name=desc type=ServiceDescriptor
+    Block label=entry0
+      const %v0:string op="serial"
+      const %v1:int_literal op=10
+      const %v2:int_literal op=1
+      aggregate_init %v3:ServiceSlot target=ServiceSlot operands=[%v1, %v2] fields=[endpoint, pid]
+      symbol_ref %v4:RestartMode target=RestartMode.None target_kind=other target_name=RestartMode.None
+      symbol_ref %v5:AuthorityClass target=AuthorityClass.PublicEndpoint target_kind=other target_name=AuthorityClass.PublicEndpoint
+      aggregate_init %v6:ServiceDescriptor target=ServiceDescriptor operands=[%v0, %v3, %v4, %v5] fields=[label, slot, restart, authority]
+      const %v7:string op="journal"
+      const %v8:int_literal op=21
+      const %v9:int_literal op=12
+      aggregate_init %v10:ServiceSlot target=ServiceSlot operands=[%v8, %v9] fields=[endpoint, pid]
+      symbol_ref %v11:RestartMode target=RestartMode.Reload target_kind=other target_name=RestartMode.Reload
+      symbol_ref %v12:AuthorityClass target=AuthorityClass.DurableOwner target_kind=other target_name=AuthorityClass.DurableOwner
+      aggregate_init %v13:ServiceDescriptor target=ServiceDescriptor operands=[%v7, %v10, %v11, %v12] fields=[label, slot, restart, authority]
+      aggregate_init %v14:[2]ServiceDescriptor target=[2]ServiceDescriptor operands=[%v6, %v13] fields=[_, _]
+      store_local target=descriptors operands=[%v14]
+      load_local %v15:[2]ServiceDescriptor target=descriptors
+      const %v16:int_literal op=1
+      const %v17:usize op=2
+      bounds_check op=index operands=[%v16, %v17]
+      index %v18:ServiceDescriptor target_kind=index target_display=descriptors[1] target_base=[2]ServiceDescriptor operands=[%v15, %v16] target_types=[int_literal]
+      store_local target=desc operands=[%v18]
+      load_local %v19:ServiceDescriptor target=desc
+      field %v20:RestartMode target=restart target_kind=field target_name=restart target_display=desc.restart target_base=ServiceDescriptor operands=[%v19]
+      symbol_ref %v21:RestartMode target=RestartMode.Reload target_kind=other target_name=RestartMode.Reload
+      binary %v22:bool op=!= operands=[%v20, %v21]
+      terminator cond value=%v22 true=if_then1 false=if_merge2
+    Block label=if_then1
+      const %v23:int_literal op=1
+      terminator return values=[%v23]
+    Block label=if_merge2
+      load_local %v24:ServiceDescriptor target=desc
+      field %v25:AuthorityClass target=authority target_kind=field target_name=authority target_display=desc.authority target_base=ServiceDescriptor operands=[%v24]
+      symbol_ref %v26:AuthorityClass target=AuthorityClass.DurableOwner target_kind=other target_name=AuthorityClass.DurableOwner
+      binary %v27:bool op=!= operands=[%v25, %v26]
+      terminator cond value=%v27 true=if_then3 false=if_merge4
+    Block label=if_then3
+      const %v28:int_literal op=2
+      terminator return values=[%v28]
+    Block label=if_merge4
+      load_local %v29:ServiceDescriptor target=desc
+      load_local %v30:ServiceDescriptor target=desc
+      field %v31:ServiceSlot target=slot target_kind=field target_name=slot target_display=desc.slot target_base=ServiceDescriptor operands=[%v30]
+      field %v32:u32 target=endpoint target_kind=field target_name=endpoint target_display=desc.slot.endpoint target_base=ServiceSlot operands=[%v31]
+      convert_numeric %v33:i32 target=i32 operands=[%v32]
+      load_local %v34:ServiceDescriptor target=desc
+      load_local %v35:ServiceDescriptor target=desc
+      field %v36:ServiceSlot target=slot target_kind=field target_name=slot target_display=desc.slot target_base=ServiceDescriptor operands=[%v35]
+      field %v37:u32 target=pid target_kind=field target_name=pid target_display=desc.slot.pid target_base=ServiceSlot operands=[%v36]
+      convert_numeric %v38:i32 target=i32 operands=[%v37]
+      binary %v39:i32 op=+ arithmetic=wrap operands=[%v33, %v38]
+      load_local %v40:ServiceDescriptor target=desc
+      load_local %v41:ServiceDescriptor target=desc
+      field %v42:string target=label target_kind=field target_name=label target_display=desc.label target_base=ServiceDescriptor operands=[%v41]
+      field %v43:usize target=len target_kind=field target_name=len target_display=desc.label.len target_base=string operands=[%v42]
+      convert_numeric %v44:i32 target=i32 operands=[%v43]
+      binary %v45:i32 op=+ arithmetic=wrap operands=[%v39, %v44]
+      terminator return values=[%v45]
+  Function name=main returns=[i32]
+    Block label=entry0
+      symbol_ref %v0:proc()->i32 target=second_score target_kind=function target_name=second_score
+      call %v1:i32 target=second_score target_kind=function target_name=second_score operands=[%v0]
+      terminator return values=[%v1]

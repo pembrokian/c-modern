@@ -416,6 +416,7 @@ int main(int argc, char** argv) {
     const std::filesystem::path fixture_dir = source_root / "tests/compiler/sema";
     const std::vector<FixtureCase> explicit_fixtures = {
         {"import_root_ok_main.mc", "import_root_ok_main.sema.txt", {"tests/compiler/sema/import_roots"}, true},
+        {"imported_service_cell_helper_ok.mc", "imported_service_cell_helper_ok.sema.txt", {"tests/compiler/sema/import_roots"}, true},
         {"switch_qualified_const_ok.mc", "switch_qualified_const_ok.sema.txt", {"tests/compiler/sema/import_roots"}, true},
         {"internal_same_package/main.mc", "internal_same_package/main.sema.txt", {}, true, "pkg", {{"internal_same_package", "pkg"}}},
         {"internal_cross_package/pkg_a/main.mc", "internal_cross_package/pkg_a/main.errors.txt", {"tests/compiler/sema/internal_cross_package/pkg_b"}, false, "pkg_a", {{"internal_cross_package/pkg_a", "pkg_a"}, {"internal_cross_package/pkg_b", "pkg_b"}}},

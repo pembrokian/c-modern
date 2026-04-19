@@ -3,7 +3,7 @@ Phase 255 -- Complete Value-Shaped User-Body Generic Helpers
 
 Status
 ------
-PROPOSED
+COMPLETED
 
 Purpose
 -------
@@ -22,13 +22,33 @@ Repository status note
 - Phase 252 already framed the bounded compiler problem and identified
   `service_cell_with_state<T>(...)` and `service_cell_restart<T>(...)` in
   `kernel/src/boot/boot_update.mc` as the real repository-owned spend site.
-- The decision log now records the intended narrow owner: a MIR-owned
-  executable specialization transform for value-shaped generic bodies whose ABI
-  depends on concrete type shape.
-- `kernel/src/boot/boot_update.mc` still carries explicit per-service wrappers
-  because the helper family is not yet executable on the admitted path.
-- The repository still lacks one landed compiler phase that turns that chosen
-  shape into a maintained capability.
+- The decision log now records and the compiler now carries the intended
+  narrow owner: a MIR-owned executable specialization transform for same-module
+  value-shaped generic bodies whose ABI depends on concrete type shape.
+- `kernel/src/boot/boot_update.mc` now uses the real generic helper pair on
+  the admitted path instead of retaining per-service inner-cell reconstruction
+  noise.
+- The repository now has owning MIR, executable, and reset-lane workflow proof
+  coverage for this same-module helper slice while still leaving broader
+  imported, inferred, and indirect-only shapes deferred.
+
+Landed shape
+------------
+- Keep executable specialization MIR-owned in `compiler/mir/mir.cpp` and route
+  the executable build path through that transform from
+  `compiler/codegen_llvm/backend_host.cpp` before target validation and LLVM IR
+  emission.
+- Specialize only direct `symbol_ref` and direct `call` targets when MIR
+  already carries a concrete procedure type and the callee ABI depends on
+  concrete type shape.
+- Keep erased-ABI generic bodies on the existing direct executable path rather
+  than cloning them unnecessarily.
+- Spend the admitted source-level cleanup in `kernel/src/boot/boot_update.mc`
+  through the real `ServiceCell<T>` helper pair with explicit type arguments.
+- Prove the slice through the existing MIR specialization regression, one
+  focused executable regression on the `ServiceCell<T>` helper shape, and the
+  maintained reset-lane workflow build path that compiles the real boot helper
+  spend site.
 
 Problem being solved
 --------------------
@@ -186,6 +206,12 @@ Acceptance criteria
 - broader imported, inferred, and indirect-only value-shaped generic bodies
   remain explicitly rejected
 - the erased-ABI generic family remains correct and unchanged in behavior
+
+Validation
+----------
+- `mc_mir_unit`
+- `mc_codegen_executable_core_unit`
+- `mc_tool_workflow_kernel_reset_lane_unit`
 
 Future follow-up
 ----------------

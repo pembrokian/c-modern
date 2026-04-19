@@ -1172,14 +1172,22 @@ bool RenderLlvmModuleImpl(const mir::Module& module,
                         return false;
                     }
                     stream << prelude.str();
-                } else if (!RenderLLVMGlobalConstValue(module,
-                                                       global.type,
-                                                       *global.constant_values[index],
-                                                       wrap_hosted_main,
-                                                       source_path,
-                                                       diagnostics,
-                                                       init_value)) {
-                    return false;
+                } else {
+                    std::ostringstream prelude;
+                    std::size_t string_constant_index = 0;
+                    if (!RenderLLVMGlobalConstValue(module,
+                                                   global.type,
+                                                   *global.constant_values[index],
+                                                   wrap_hosted_main,
+                                                   source_path,
+                                                   diagnostics,
+                                                   init_value,
+                                                   LLVMGlobalName(name),
+                                                   &prelude,
+                                                   &string_constant_index)) {
+                        return false;
+                    }
+                    stream << prelude.str();
                 }
             } else if (index < global.initializers.size()) {
                 init_value = FormatLLVMLiteral(global_type, global.initializers[index]);

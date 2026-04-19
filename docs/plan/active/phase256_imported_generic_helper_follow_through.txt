@@ -3,7 +3,7 @@ Phase 256 -- Imported Generic Helper Follow-Through
 
 Status
 ------
-PROPOSED
+COMPLETED
 
 Purpose
 -------
@@ -24,9 +24,26 @@ Repository status note
   that older slice: imported value-shaped generic helper bodies, not just
   erased-ABI generic calls.
 - The decision log for Phase 252 explicitly kept imported or cross-module
-  value-shaped generic bodies out of scope.
-- The repository still lacks one explicit plan that says how imported generic
-  helper follow-through should stay narrow after the same-module case lands.
+  value-shaped generic bodies out of scope until one real shared-helper
+  consumer forced the next narrower follow-through.
+- The repository now carries that bounded consumer in
+  `kernel/src/boot/service_cell_helpers.mc` and validates the imported helper
+  path through sema, MIR, and project executable coverage.
+
+Landed shape
+------------
+- Keep imported surface truth where it already belongs: sema-owned import
+  rewriting plus `.mci` transport remain unchanged.
+- Spend the imported helper family in one adjacent ordinary module,
+  `kernel/src/boot/service_cell_helpers.mc`, rather than widening the `boot`
+  module set or inventing a helper framework.
+- Keep executable specialization MIR-owned and reuse the existing Phase 255
+  specialization path.
+- Extend only the executable target builder path in `compiler/driver/builder.cpp`
+  so multi-module executable targets build and link one merged object when they
+  need cross-module generic helper bodies at link time.
+- Add one focused sema fixture, one focused MIR fixture, and one focused
+  executable project regression for the imported `ServiceCell<T>` helper pair.
 
 Problem being solved
 --------------------
@@ -193,3 +210,5 @@ Future follow-up
   `docs/plan/decision_log.txt`.
 - Broader imported generic-body execution still belongs to a later dedicated
   compiler phase rather than to this helper-specific follow-through.
+- Linked static-library targets, indirect-only callable shapes, and generic
+  call-site inference remain explicitly out of scope after this landing.

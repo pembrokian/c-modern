@@ -1,0 +1,10 @@
+SemanticModule
+  Import name=service_cell_helpers
+  TypeDecl name=service_cell_helpers.ServiceCell kind=struct
+    typeParams=[T]
+    Field name=state type=T
+    Field name=generation type=u32
+  TypeDecl name=Payload kind=struct
+    Field name=value type=i32
+    Layout size=4 align=4 offsets=[0]
+  Function name=main params=[] returns=[i32]

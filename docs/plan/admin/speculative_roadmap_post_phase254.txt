@@ -1,4 +1,4 @@
-Phase 255 Through Phase 289 -- Speculative Post-Phase-254 Roadmap
+Phase 255 Through Phase 294 -- Speculative Post-Phase-254 Roadmap
 =================================================================
 
 Status
@@ -138,11 +138,12 @@ Roadmap bands
 
 Band A - Harvest The Strongest Post-254 Compiler Pressure
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-Phases 255 through 261 should reopen a narrow compiler wave, but only where
-real kernel or service code is already exposing source-level distortion.
+Phases 255 and 256 are now landed as the same-module and one-module-boundary
+value-shaped generic-helper slices. Phases 257 through 261 should reopen only the remaining
+narrow compiler wave, and only where real kernel or service code is already
+exposing source-level distortion.
 
 Likely themes:
-- finish the value-shaped generic helper family already named in Phase 252
 - make a small amount of cross-module generic or constant or table pressure
   honest if current owner code now needs it
 - improve executable support for service-local dispatch and table patterns
@@ -155,15 +156,10 @@ Why this band comes first:
 
 Possible phases in this band:
 
-Phase 255 -- Complete Value-Shaped User-Body Generic Helpers
-- Exit criterion: the real `ServiceCell<T>`-style helper family or an equally
-  narrow repository-owned value-shaped generic helper now executes through the
-  full compiler path without widening into general monomorphization.
-
 Phase 256 -- Imported Generic Helper Follow-Through
-- Exit criterion: one already-admitted value-shaped generic helper can cross
-  one honest module boundary without turning imported generic bodies into a
-  broad new compiler framework.
+- Landed: one already-admitted value-shaped generic helper now crosses one
+  honest module boundary through the boot `ServiceCell<T>` helper module
+  without turning imported generic bodies into a broad new compiler framework.
 
 Phase 257 -- Const-Evaluable Table And Descriptor Follow-Through
 - Exit criterion: one real repository-owned table or descriptor family used by
@@ -197,6 +193,10 @@ Outcome checkpoint after Band A:
 
 Band B - Memory Expansion
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+why? right launcher state, ui surfaces, app manifests - these are allocator 
+heavy, risk being app shaped and not enough system shaped. need to acknowledge
+missing mem shape story
 
 Phase 262 fixed_size_pool_allocator_first_slice.txt
 Phase 263 arena_allocator_for_parser_and_workflow_scratch.txt

@@ -4,10 +4,12 @@
 // in one place (service_topology.ServiceSlot) rather than split between
 // endpoint ID constants in service_topology.mc and PID constants in boot.mc.
 //
-// Three checks:
+// Four checks:
 //   A. Slot endpoint fields match the raw endpoint ID constants.
 //   B. SERVICE_COUNT equals the number of wired slots.
-//   C. kernel_init() produces working state that accepts a round-trip
+//   C. Service descriptors keep labels, restart class, and authority class in
+//      one compile-time table owned by service_topology.
+//   D. kernel_init() produces working state that accepts a round-trip
 //      command — confirming that slot-based init is functionally identical
 //      to the former hard-coded PID init.
 
@@ -106,7 +108,34 @@ func smoke_service_count_is_eighteen() bool {
     return true
 }
 
-// C: kernel_init() uses the slot PIDs under the hood; confirm a basic
+// C: descriptor records stay compile-time data owned by service_topology.
+func smoke_descriptor_table_is_consistent() bool {
+    log_desc: service_topology.ServiceDescriptor = service_topology.service_descriptor_for_endpoint(service_topology.LOG_ENDPOINT_ID)
+    if !service_topology.service_slot_is_valid(log_desc.slot) {
+        return false
+    }
+    if log_desc.slot.pid != 3 {
+        return false
+    }
+    if log_desc.restart != service_topology.ServiceRestartMode.Reload {
+        return false
+    }
+    if log_desc.authority != service_topology.ServiceAuthorityClass.RetainedOwner {
+        return false
+    }
+    if service_topology.service_label_for_endpoint(service_topology.LOG_ENDPOINT_ID).len != 3 {
+        return false
+    }
+    if service_topology.service_label_for_endpoint(service_topology.UPDATE_STORE_ENDPOINT_ID).len != 12 {
+        return false
+    }
+    if service_topology.service_label_for_endpoint(99).len != 0 {
+        return false
+    }
+    return true
+}
+
+// D: kernel_init() uses the slot PIDs under the hood; confirm a basic
 // log-append round-trip still returns Ok.
 func smoke_init_and_round_trip() bool {
     state: boot.KernelBootState = boot.kernel_init()
@@ -125,8 +154,11 @@ func main() i32 {
     if smoke_service_count_is_eighteen() == false {
         return 2
     }
-    if smoke_init_and_round_trip() == false {
+    if smoke_descriptor_table_is_consistent() == false {
         return 3
+    }
+    if smoke_init_and_round_trip() == false {
+        return 4
     }
     return 0
 }

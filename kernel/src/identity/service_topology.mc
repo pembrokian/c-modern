@@ -70,6 +70,13 @@ enum ServiceAuthorityClass {
     ShellControl,
 }
 
+struct ServiceDescriptor {
+    label: str
+    slot: ServiceSlot
+    restart: ServiceRestartMode
+    authority: ServiceAuthorityClass
+}
+
 const SERIAL_SLOT: ServiceSlot = { endpoint: SERIAL_ENDPOINT_ID, pid: 1 }
 const SHELL_SLOT: ServiceSlot = { endpoint: SHELL_ENDPOINT_ID, pid: 2 }
 const LOG_SLOT: ServiceSlot = { endpoint: LOG_ENDPOINT_ID, pid: 3 }
@@ -110,25 +117,32 @@ const SERVICE_SLOTS: [18]ServiceSlot = {
     UPDATE_STORE_SLOT
 }
 
-const SERVICE_RESTART_MODES: [18]ServiceRestartMode = {
-    ServiceRestartMode.None,
-    ServiceRestartMode.None,
-    ServiceRestartMode.Reload,
-    ServiceRestartMode.Reload,
-    ServiceRestartMode.Reset,
-    ServiceRestartMode.Reset,
-    ServiceRestartMode.Reload,
-    ServiceRestartMode.Reset,
-    ServiceRestartMode.Reload,
-    ServiceRestartMode.Reload,
-    ServiceRestartMode.Reset,
-    ServiceRestartMode.Reload,
-    ServiceRestartMode.Reload,
-    ServiceRestartMode.Reset,
-    ServiceRestartMode.Reload,
-    ServiceRestartMode.Reload,
-    ServiceRestartMode.Reset,
-    ServiceRestartMode.Reload
+const INVALID_SERVICE_DESCRIPTOR: ServiceDescriptor = {
+    label: "",
+    slot: { endpoint: 0, pid: 0 },
+    restart: ServiceRestartMode.None,
+    authority: ServiceAuthorityClass.None
+}
+
+const SERVICE_DESCRIPTORS: [18]ServiceDescriptor = {
+    { label: "serial", slot: SERIAL_SLOT, restart: ServiceRestartMode.None, authority: ServiceAuthorityClass.PublicEndpoint },
+    { label: "shell", slot: SHELL_SLOT, restart: ServiceRestartMode.None, authority: ServiceAuthorityClass.ShellControl },
+    { label: "log", slot: LOG_SLOT, restart: ServiceRestartMode.Reload, authority: ServiceAuthorityClass.RetainedOwner },
+    { label: "kv", slot: KV_SLOT, restart: ServiceRestartMode.Reload, authority: ServiceAuthorityClass.RetainedOwner },
+    { label: "echo", slot: ECHO_SLOT, restart: ServiceRestartMode.Reset, authority: ServiceAuthorityClass.PublicEndpoint },
+    { label: "transfer", slot: TRANSFER_SLOT, restart: ServiceRestartMode.Reset, authority: ServiceAuthorityClass.TransferOnly },
+    { label: "queue", slot: QUEUE_SLOT, restart: ServiceRestartMode.Reload, authority: ServiceAuthorityClass.RetainedOwner },
+    { label: "ticket", slot: TICKET_SLOT, restart: ServiceRestartMode.Reset, authority: ServiceAuthorityClass.PublicEndpoint },
+    { label: "file", slot: FILE_SLOT, restart: ServiceRestartMode.Reload, authority: ServiceAuthorityClass.RetainedOwner },
+    { label: "timer", slot: TIMER_SLOT, restart: ServiceRestartMode.Reload, authority: ServiceAuthorityClass.RetainedOwner },
+    { label: "task", slot: TASK_SLOT, restart: ServiceRestartMode.Reset, authority: ServiceAuthorityClass.PublicEndpoint },
+    { label: "journal", slot: JOURNAL_SLOT, restart: ServiceRestartMode.Reload, authority: ServiceAuthorityClass.DurableOwner },
+    { label: "workflow", slot: WORKFLOW_SLOT, restart: ServiceRestartMode.Reload, authority: ServiceAuthorityClass.RetainedOwner },
+    { label: "lease", slot: LEASE_SLOT, restart: ServiceRestartMode.Reset, authority: ServiceAuthorityClass.RetainedOwner },
+    { label: "completion_mailbox", slot: COMPLETION_MAILBOX_SLOT, restart: ServiceRestartMode.Reload, authority: ServiceAuthorityClass.RetainedOwner },
+    { label: "object_store", slot: OBJECT_STORE_SLOT, restart: ServiceRestartMode.Reload, authority: ServiceAuthorityClass.DurableOwner },
+    { label: "connection", slot: CONNECTION_SLOT, restart: ServiceRestartMode.Reset, authority: ServiceAuthorityClass.PublicEndpoint },
+    { label: "update_store", slot: UPDATE_STORE_SLOT, restart: ServiceRestartMode.Reload, authority: ServiceAuthorityClass.DurableOwner }
 }
 
 // SERVICE_COUNT is the number of boot-wired services in the static topology.
@@ -136,24 +150,32 @@ const SERVICE_RESTART_MODES: [18]ServiceRestartMode = {
 const SERVICE_COUNT: u32 = 18
 
 func service_count() usize {
-    return 18
+    return usize(SERVICE_COUNT)
+}
+
+func service_descriptor_at(index: usize) ServiceDescriptor {
+    if index >= service_count() {
+        return INVALID_SERVICE_DESCRIPTOR
+    }
+    return SERVICE_DESCRIPTORS[index]
+}
+
+func service_descriptor_for_endpoint(endpoint: u32) ServiceDescriptor {
+    for i in 0..service_count() {
+        desc := service_descriptor_at(i)
+        if desc.slot.endpoint == endpoint {
+            return desc
+        }
+    }
+    return INVALID_SERVICE_DESCRIPTOR
 }
 
 func service_slot_at(index: usize) ServiceSlot {
-    if index >= service_count() {
-        return { endpoint: 0, pid: 0 }
-    }
-    return SERVICE_SLOTS[index]
+    return service_descriptor_at(index).slot
 }
 
 func service_slot_for_endpoint(endpoint: u32) ServiceSlot {
-    for i in 0..service_count() {
-        slot: ServiceSlot = SERVICE_SLOTS[i]
-        if slot.endpoint == endpoint {
-            return slot
-        }
-    }
-    return { endpoint: 0, pid: 0 }
+    return service_descriptor_for_endpoint(endpoint).slot
 }
 
 func service_slot_is_valid(slot: ServiceSlot) bool {
@@ -167,13 +189,7 @@ func service_slot_is_valid(slot: ServiceSlot) bool {
 // init.mc enacts restart, but the topology module names which public services
 // restart at all and which ones reload retained state.
 func service_restart_mode(endpoint: u32) ServiceRestartMode {
-    for i in 0..service_count() {
-        slot: ServiceSlot = SERVICE_SLOTS[i]
-        if slot.endpoint == endpoint {
-            return SERVICE_RESTART_MODES[i]
-        }
-    }
-    return ServiceRestartMode.None
+    return service_descriptor_for_endpoint(endpoint).restart
 }
 
 func service_can_restart(endpoint: u32) bool {
@@ -191,41 +207,11 @@ func service_restart_reloads_state(endpoint: u32) bool {
 }
 
 func service_authority_class(endpoint: u32) ServiceAuthorityClass {
-    switch endpoint {
-    case SHELL_ENDPOINT_ID:
-        return ServiceAuthorityClass.ShellControl
-    case TRANSFER_ENDPOINT_ID:
-        return ServiceAuthorityClass.TransferOnly
-    case LOG_ENDPOINT_ID:
-        return ServiceAuthorityClass.RetainedOwner
-    case KV_ENDPOINT_ID:
-        return ServiceAuthorityClass.RetainedOwner
-    case QUEUE_ENDPOINT_ID:
-        return ServiceAuthorityClass.RetainedOwner
-    case FILE_ENDPOINT_ID:
-        return ServiceAuthorityClass.RetainedOwner
-    case TIMER_ENDPOINT_ID:
-        return ServiceAuthorityClass.RetainedOwner
-    case JOURNAL_ENDPOINT_ID:
-        return ServiceAuthorityClass.DurableOwner
-    case WORKFLOW_ENDPOINT_ID:
-        return ServiceAuthorityClass.RetainedOwner
-    case LEASE_ENDPOINT_ID:
-        return ServiceAuthorityClass.RetainedOwner
-    case COMPLETION_MAILBOX_ENDPOINT_ID:
-        return ServiceAuthorityClass.RetainedOwner
-    case OBJECT_STORE_ENDPOINT_ID:
-        return ServiceAuthorityClass.DurableOwner
-    case CONNECTION_ENDPOINT_ID:
-        return ServiceAuthorityClass.PublicEndpoint
-    case UPDATE_STORE_ENDPOINT_ID:
-        return ServiceAuthorityClass.DurableOwner
-    default:
-        if endpoint_is_boot_wired(endpoint) {
-            return ServiceAuthorityClass.PublicEndpoint
-        }
-        return ServiceAuthorityClass.None
-    }
+    return service_descriptor_for_endpoint(endpoint).authority
+}
+
+func service_label_for_endpoint(endpoint: u32) str {
+    return service_descriptor_for_endpoint(endpoint).label
 }
 
 // endpoint_is_boot_wired returns true when the endpoint id names one of the

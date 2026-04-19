@@ -1,0 +1,45 @@
+Module
+  Import name=service_cell_helpers
+  TypeDecl kind=struct name=Payload
+    Field name=value type=i32
+  TypeDecl kind=struct name=service_cell_helpers.ServiceCell
+    typeParams=[T]
+    Field name=state type=T
+    Field name=generation type=u32
+  Function name=main returns=[i32]
+    Local name=base type=service_cell_helpers.ServiceCell<Payload>
+    Local name=updated type=service_cell_helpers.ServiceCell<Payload>
+    Local name=restarted type=service_cell_helpers.ServiceCell<Payload>
+    Block label=entry0
+      const %v0:int_literal op=3
+      aggregate_init %v1:Payload target=Payload operands=[%v0] fields=[value]
+      const %v2:int_literal op=7
+      aggregate_init %v3:service_cell_helpers.ServiceCell<Payload> target=service_cell_helpers.ServiceCell<Payload> operands=[%v1, %v2] fields=[state, generation]
+      store_local target=base operands=[%v3]
+      load_local %v4:service_cell_helpers.ServiceCell<Payload> target=base
+      const %v5:int_literal op=11
+      aggregate_init %v6:Payload target=Payload operands=[%v5] fields=[value]
+      symbol_ref %v7:proc(service_cell_helpers.ServiceCell<Payload>, Payload)->service_cell_helpers.ServiceCell<Payload> target=service_cell_helpers.service_cell_with_state target_kind=function target_name=service_cell_helpers.service_cell_with_state
+      call %v8:service_cell_helpers.ServiceCell<Payload> target=service_cell_helpers.service_cell_with_state target_kind=function target_name=service_cell_helpers.service_cell_with_state operands=[%v7, %v4, %v6]
+      store_local target=updated operands=[%v8]
+      load_local %v9:service_cell_helpers.ServiceCell<Payload> target=updated
+      const %v10:int_literal op=13
+      aggregate_init %v11:Payload target=Payload operands=[%v10] fields=[value]
+      symbol_ref %v12:proc(service_cell_helpers.ServiceCell<Payload>, Payload)->service_cell_helpers.ServiceCell<Payload> target=service_cell_helpers.service_cell_restart target_kind=function target_name=service_cell_helpers.service_cell_restart
+      call %v13:service_cell_helpers.ServiceCell<Payload> target=service_cell_helpers.service_cell_restart target_kind=function target_name=service_cell_helpers.service_cell_restart operands=[%v12, %v9, %v11]
+      store_local target=restarted operands=[%v13]
+      load_local %v14:service_cell_helpers.ServiceCell<Payload> target=restarted
+      field %v15:u32 target=generation target_kind=field target_name=generation target_display=restarted.generation target_base=service_cell_helpers.ServiceCell<Payload> operands=[%v14]
+      const %v16:int_literal op=8
+      convert_numeric %v17:u32 target=u32 operands=[%v16]
+      binary %v18:bool op=!= operands=[%v15, %v17]
+      terminator cond value=%v18 true=if_then1 false=if_merge2
+    Block label=if_then1
+      const %v19:int_literal op=1
+      terminator return values=[%v19]
+    Block label=if_merge2
+      load_local %v20:service_cell_helpers.ServiceCell<Payload> target=restarted
+      load_local %v21:service_cell_helpers.ServiceCell<Payload> target=restarted
+      field %v22:Payload target=state target_kind=field target_name=state target_display=restarted.state target_base=service_cell_helpers.ServiceCell<Payload> operands=[%v21]
+      field %v23:i32 target=value target_kind=field target_name=value target_display=restarted.state.value target_base=Payload operands=[%v22]
+      terminator return values=[%v23]

@@ -7,7 +7,7 @@ This file is a fast orientation map for agents working in this repository.
 - `CMakeLists.txt`: canonical build graph and CTest registration
 - `Makefile`: convenience wrapper around the CMake workflow
 - `README.md`: current repository summary and common commands
-- `kernel/`: repository-owned Veya kernel bring-up tree; currently through the Phase 254 object-version-truth slice over the hosted reset-lane workflow surface
+- `kernel/`: repository-owned Veya kernel bring-up tree; currently through the Phase 254 object-version-truth slice over the hosted reset-lane workflow surface, with the Phase 255 same-module and Phase 256 imported value-shaped generic-helper follow-through now landed for the boot helper family
 - `docs/agent/prompts/plan_spec.txt`: normative spec for the required structure of new per-phase plan documents
 - `docs/plan/admin/canopus_repo_layout_and_test_policy.txt`: current repository policy for Veya source, build, and test placement
 - `docs/plan/plan.txt`: authoritative multi-phase implementation plan
@@ -36,6 +36,7 @@ This file is a fast orientation map for agents working in this repository.
   - `src/main.mc`: explicit architecture entry that initializes boot state and delegates immediately to `kernel_entry`
   - `src/kernel_entry.mc`: thin reset-lane entry router that preserves scripted scenarios as the default path and admits one explicit `live` stdin-backed mode without turning `main.mc` into a policy owner
   - `src/live_receive.mc`: bounded hosted live receive owner that polls one real input fd, assembles one four-byte shell frame at a time, and feeds the existing serial or shell dispatch path without duplicating shell decode or routing logic
+  - `src/identity/service_topology.mc`: repository-owned static service-topology owner for boot-wired endpoint ids, slot records, restart classification, authority classification, and the same-module `ServiceDescriptor` compile-time table that now carries labels plus topology metadata in one bounded descriptor family
   - `src/services/object_store_service.mc`: bounded durable named-object owner with fixed-capacity create/read/replace semantics, one owner-local workflow-facing update step, one owner-local per-object version byte, owner-local artifact persistence, explicit conflict-aware delegated update checks, and explicit reload-on-restart follow-through
   - `src/services/update_store_service.mc`: bounded durable staged-update owner with one fixed artifact slot, one compact manifest record, one owner-local applied target, one owner-local classification and apply step, one owner-local artifact persistence, and explicit reload-on-restart follow-through
   - `src/sched.mc`: scheduler-owned lifecycle validation for bounded spawn, wait, sleep, and wake follow-through
@@ -190,6 +191,9 @@ This file is a fast orientation map for agents working in this repository.
 - Phase 244 adds one delegated installer-authority path so a bounded installer-apply lease now gates one retained update-apply workflow and yields explicit applied, stale, invalid, and already-consumed outcomes.
 - Phase 245 adds one composed mailbox-pressure and restart-resumed reporting path so delegated update apply now proves deferred completion delivery without widening the completion or installer owners.
 - Phase 254 adds one object-local version truth for delegated named-object mutation, so delegated durable updates now reject direct object changes deterministically at commit time without widening into transactions or a second workflow lane.
+- Phase 255 completes the same-module value-shaped user-body generic-helper slice, so MIR now specializes direct `symbol_ref` and `call` targets with concrete procedure metadata for admitted value-shaped helper bodies and the real `ServiceCell<T>` helper pair in `kernel/src/boot/boot_update.mc` executes through the full compiler path without widening into general monomorphization.
+- Phase 256 extends that helper family across one honest imported module boundary, so `kernel/src/boot/service_cell_helpers.mc` now owns `ServiceCell<T>` and its helper pair, while multi-module executable targets build one merged object before link so imported direct calls can execute through the existing MIR specialization path without widening into general imported generic-body completion.
+- Phase 257 proves one same-module explicit typed descriptor-table family in `kernel/src/identity/service_topology.mc`, so compile-time data can now combine labels, nested records, and enum metadata in one maintained repository-owned descriptor shape without widening into a registry, procedure-valued descriptor fields, or imported transport.
 - Phase 246 admits same-name local bindings in disjoint sibling branches and admits `_` as a discard target in local binding and assignment positions while keeping `_` unreadable and storage-free; MIR lowering now preserves that local-target truth through scoped visible-local mapping instead of assuming function-wide source-name uniqueness.
 - Phase 247 admits trailing commas in the existing comma-delimited expression and aggregate-init list owners, and the repository now carries explicit parser and lowering regressions for chained `a || b || c` short-circuit forms instead of treating that surface as a deferred limitation.
 - Phase 248 normalizes module-local compile-time integer array extents through sema and downstream local-annotation reconstruction, so `[CAP + 1]T` and `[5]T` now share one semantic fixed-array type when the extent evaluates to `5`.
@@ -215,6 +219,7 @@ This file is a fast orientation map for agents working in this repository.
 - New lowered control-flow or MIR rule:
   - `compiler/mir/mir.cpp`
   - matching MIR fixtures and MIR unit tests
+  - same-module executable specialization for admitted value-shaped generic helper bodies also stays MIR-owned here; keep parser, sema, driver, and backend policy narrow
 
 - New command-line behavior:
   - `compiler/driver/driver.cpp`

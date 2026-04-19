@@ -16,6 +16,7 @@ import object_store_service
 import queue_service
 import serial_service
 import serial_shell_path
+import service_cell_helpers
 import service_effect
 import service_identity
 import service_topology
@@ -43,16 +44,11 @@ enum RestartOutcome {
     DurableReloaded,
 }
 
-struct ServiceCell<T> {
-    state: T
-    generation: u32
-}
-
 struct KernelBootState {
     path_state: serial_shell_path.SerialShellPathState
-    log: ServiceCell<log_service.LogServiceState>
-    kv: ServiceCell<kv_service.KvServiceState>
-    queue: ServiceCell<queue_service.QueueServiceState>
+    log: service_cell_helpers.ServiceCell<log_service.LogServiceState>
+    kv: service_cell_helpers.ServiceCell<kv_service.KvServiceState>
+    queue: service_cell_helpers.ServiceCell<queue_service.QueueServiceState>
     workset_generation: u32
     audit_generation: u32
     log_restart_outcome: RestartOutcome
@@ -60,27 +56,27 @@ struct KernelBootState {
     queue_restart_outcome: RestartOutcome
     workset_restart_outcome: RestartOutcome
     audit_restart_outcome: RestartOutcome
-    echo: ServiceCell<echo_service.EchoServiceState>
+    echo: service_cell_helpers.ServiceCell<echo_service.EchoServiceState>
     echo_restart_outcome: RestartOutcome
-    transfer: ServiceCell<transfer_service.TransferServiceState>
+    transfer: service_cell_helpers.ServiceCell<transfer_service.TransferServiceState>
     transfer_restart_outcome: RestartOutcome
-    ticket: ServiceCell<ticket_service.TicketServiceState>
+    ticket: service_cell_helpers.ServiceCell<ticket_service.TicketServiceState>
     ticket_restart_outcome: RestartOutcome
-    file: ServiceCell<file_service.FileServiceState>
+    file: service_cell_helpers.ServiceCell<file_service.FileServiceState>
     file_restart_outcome: RestartOutcome
-    timer: ServiceCell<timer_service.TimerServiceState>
+    timer: service_cell_helpers.ServiceCell<timer_service.TimerServiceState>
     timer_restart_outcome: RestartOutcome
-    task: ServiceCell<task_service.TaskServiceState>
+    task: service_cell_helpers.ServiceCell<task_service.TaskServiceState>
     task_restart_outcome: RestartOutcome
-    connection: ServiceCell<connection_service.ConnectionServiceState>
+    connection: service_cell_helpers.ServiceCell<connection_service.ConnectionServiceState>
     connection_restart_outcome: RestartOutcome
-    journal: ServiceCell<journal_service.JournalServiceState>
+    journal: service_cell_helpers.ServiceCell<journal_service.JournalServiceState>
     journal_restart_outcome: RestartOutcome
-    workflow: ServiceCell<workflow_core.WorkflowServiceState>
-    lease: ServiceCell<lease_service.LeaseServiceState>
-    completion: ServiceCell<completion_mailbox_service.CompletionMailboxServiceState>
-    object_store: ServiceCell<object_store_service.ObjectStoreServiceState>
-    update_store: ServiceCell<update_store_service.UpdateStoreServiceState>
+    workflow: service_cell_helpers.ServiceCell<workflow_core.WorkflowServiceState>
+    lease: service_cell_helpers.ServiceCell<lease_service.LeaseServiceState>
+    completion: service_cell_helpers.ServiceCell<completion_mailbox_service.CompletionMailboxServiceState>
+    object_store: service_cell_helpers.ServiceCell<object_store_service.ObjectStoreServiceState>
+    update_store: service_cell_helpers.ServiceCell<update_store_service.UpdateStoreServiceState>
     lease_restart_outcome: RestartOutcome
     completion_restart_outcome: RestartOutcome
     object_store_restart_outcome: RestartOutcome
@@ -109,22 +105,22 @@ func kernel_init() KernelBootState {
     update_store_slot := service_topology.UPDATE_STORE_SLOT
 
     path_state := serial_shell_path.path_init(serial_service.serial_init(serial_slot.pid, 1), shell_service.shell_init(shell_slot.pid, 1), shell_slot.endpoint)
-    log_cell := ServiceCell<log_service.LogServiceState>{ state: log_service.log_init(log_slot.pid, 1), generation: 1 }
-    kv_cell := ServiceCell<kv_service.KvServiceState>{ state: kv_service.kv_init(kv_slot.pid, 1), generation: 1 }
-    queue_cell := ServiceCell<queue_service.QueueServiceState>{ state: queue_service.queue_init(queue_slot.pid, 1), generation: 1 }
-    echo_cell := ServiceCell<echo_service.EchoServiceState>{ state: echo_service.echo_init(echo_slot.pid, 1), generation: 1 }
-    transfer_cell := ServiceCell<transfer_service.TransferServiceState>{ state: transfer_service.transfer_init(transfer_slot.pid, 1), generation: 1 }
-    ticket_cell := ServiceCell<ticket_service.TicketServiceState>{ state: ticket_service.ticket_init(ticket_slot.pid, 1, 1), generation: 1 }
-    file_cell := ServiceCell<file_service.FileServiceState>{ state: file_service.file_init(file_slot.pid, 1), generation: 1 }
-    timer_cell := ServiceCell<timer_service.TimerServiceState>{ state: timer_service.timer_init(timer_slot.pid, 1), generation: 1 }
-    task_cell := ServiceCell<task_service.TaskServiceState>{ state: task_service.task_init(task_slot.pid, 1), generation: 1 }
-    connection_cell := ServiceCell<connection_service.ConnectionServiceState>{ state: connection_service.connection_init(connection_slot.pid, 1), generation: 1 }
-    journal_cell := ServiceCell<journal_service.JournalServiceState>{ state: journal_service.journal_load(journal_slot.pid, 1), generation: 1 }
-    workflow_cell := ServiceCell<workflow_core.WorkflowServiceState>{ state: workflow_core.workflow_state_init(workflow_slot.pid), generation: 1 }
-    lease_cell := ServiceCell<lease_service.LeaseServiceState>{ state: lease_service.lease_init(lease_slot.pid, 1), generation: 1 }
-    completion_cell := ServiceCell<completion_mailbox_service.CompletionMailboxServiceState>{ state: completion_mailbox_service.completion_mailbox_init(completion_slot.pid, 1), generation: 1 }
-    object_store_cell := ServiceCell<object_store_service.ObjectStoreServiceState>{ state: object_store_service.object_store_load(object_store_slot.pid, 1), generation: 1 }
-    update_store_cell := ServiceCell<update_store_service.UpdateStoreServiceState>{ state: update_store_service.update_store_load(update_store_slot.pid, 1), generation: 1 }
+    log_cell := service_cell_helpers.ServiceCell<log_service.LogServiceState>{ state: log_service.log_init(log_slot.pid, 1), generation: 1 }
+    kv_cell := service_cell_helpers.ServiceCell<kv_service.KvServiceState>{ state: kv_service.kv_init(kv_slot.pid, 1), generation: 1 }
+    queue_cell := service_cell_helpers.ServiceCell<queue_service.QueueServiceState>{ state: queue_service.queue_init(queue_slot.pid, 1), generation: 1 }
+    echo_cell := service_cell_helpers.ServiceCell<echo_service.EchoServiceState>{ state: echo_service.echo_init(echo_slot.pid, 1), generation: 1 }
+    transfer_cell := service_cell_helpers.ServiceCell<transfer_service.TransferServiceState>{ state: transfer_service.transfer_init(transfer_slot.pid, 1), generation: 1 }
+    ticket_cell := service_cell_helpers.ServiceCell<ticket_service.TicketServiceState>{ state: ticket_service.ticket_init(ticket_slot.pid, 1, 1), generation: 1 }
+    file_cell := service_cell_helpers.ServiceCell<file_service.FileServiceState>{ state: file_service.file_init(file_slot.pid, 1), generation: 1 }
+    timer_cell := service_cell_helpers.ServiceCell<timer_service.TimerServiceState>{ state: timer_service.timer_init(timer_slot.pid, 1), generation: 1 }
+    task_cell := service_cell_helpers.ServiceCell<task_service.TaskServiceState>{ state: task_service.task_init(task_slot.pid, 1), generation: 1 }
+    connection_cell := service_cell_helpers.ServiceCell<connection_service.ConnectionServiceState>{ state: connection_service.connection_init(connection_slot.pid, 1), generation: 1 }
+    journal_cell := service_cell_helpers.ServiceCell<journal_service.JournalServiceState>{ state: journal_service.journal_load(journal_slot.pid, 1), generation: 1 }
+    workflow_cell := service_cell_helpers.ServiceCell<workflow_core.WorkflowServiceState>{ state: workflow_core.workflow_state_init(workflow_slot.pid), generation: 1 }
+    lease_cell := service_cell_helpers.ServiceCell<lease_service.LeaseServiceState>{ state: lease_service.lease_init(lease_slot.pid, 1), generation: 1 }
+    completion_cell := service_cell_helpers.ServiceCell<completion_mailbox_service.CompletionMailboxServiceState>{ state: completion_mailbox_service.completion_mailbox_init(completion_slot.pid, 1), generation: 1 }
+    object_store_cell := service_cell_helpers.ServiceCell<object_store_service.ObjectStoreServiceState>{ state: object_store_service.object_store_load(object_store_slot.pid, 1), generation: 1 }
+    update_store_cell := service_cell_helpers.ServiceCell<update_store_service.UpdateStoreServiceState>{ state: update_store_service.update_store_load(update_store_slot.pid, 1), generation: 1 }
 
     return KernelBootState{
         path_state: path_state,

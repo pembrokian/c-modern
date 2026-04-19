@@ -59,7 +59,10 @@ bool RenderLLVMGlobalConstValue(const mir::Module& module,
                                 bool wrap_hosted_main,
                                 const std::filesystem::path& source_path,
                                 support::DiagnosticSink& diagnostics,
-                                std::string& rendered);
+                                std::string& rendered,
+                                std::string_view string_backing_prefix = {},
+                                std::ostringstream* prelude = nullptr,
+                                std::size_t* string_constant_index = nullptr);
 
 bool RenderLLVMGlobalStringConstValue(const mir::Module& module,
                                       sema::Type type,

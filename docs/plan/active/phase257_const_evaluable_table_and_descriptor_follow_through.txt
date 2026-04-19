@@ -3,7 +3,7 @@ Phase 257 -- Const-Evaluable Table And Descriptor Follow-Through
 
 Status
 ------
-PROPOSED
+COMPLETED
 
 Purpose
 -------
@@ -114,6 +114,19 @@ Questions this phase must answer
    pressure appear immediately and therefore belong to Phase 259 instead?
 4. What is the smallest executable proof that the descriptor stays compile-time
    data rather than devolving into runtime construction?
+
+Implementation outcome
+----------------------
+- Chosen descriptor family: `kernel/src/identity/service_topology.mc`
+  now owns one explicit typed `ServiceDescriptor` table combining a string
+  label, nested `ServiceSlot`, restart classification, and authority class.
+- The phase stayed same-module and explicitly typed.  It did not reopen
+  imported descriptor transport, procedure-valued descriptor fields, or any
+  launcher or UI descriptor framework.
+- The focused executable proof is `tests/compiler/codegen/const_descriptor_table.mc`,
+  which reads one descriptor from a top-level constant table and validates the
+  emitted executable plus one IR snippet proving the table lowers as a global
+  constant.
 
 Preferred implementation shape
 ------------------------------

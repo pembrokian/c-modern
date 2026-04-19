@@ -1,0 +1,24 @@
+SemanticModule
+  TypeDecl name=RestartMode kind=enum
+    Variant name=None
+    Variant name=Reload
+    Variant name=Reset
+    Layout size=8 align=8 offsets=[]
+  TypeDecl name=AuthorityClass kind=enum
+    Variant name=None
+    Variant name=PublicEndpoint
+    Variant name=DurableOwner
+    Layout size=8 align=8 offsets=[]
+  TypeDecl name=ServiceSlot kind=struct
+    Field name=endpoint type=u32
+    Field name=pid type=u32
+    Layout size=8 align=4 offsets=[0, 4]
+  TypeDecl name=ServiceDescriptor kind=struct
+    Field name=label type=string
+    Field name=slot type=ServiceSlot
+    Field name=restart type=RestartMode
+    Field name=authority type=AuthorityClass
+    Layout size=40 align=8 offsets=[0, 16, 24, 32]
+  Const names=[DESCRIPTORS] type=[2]ServiceDescriptor values=[{{label: "serial", slot: {endpoint: 10, pid: 1}, restart: RestartMode.None, authority: AuthorityClass.PublicEndpoint}, {label: "journal", slot: {endpoint: 21, pid: 12}, restart: RestartMode.Reload, authority: AuthorityClass.DurableOwner}}]
+  Function name=second_endpoint params=[] returns=[u32]
+  Function name=main params=[] returns=[i32]

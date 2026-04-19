@@ -344,7 +344,7 @@ std::optional<ProjectBuildResult> BuildProjectTarget(TargetBuildGraph& graph,
         return std::nullopt;
     }
 
-    const BuildUnit& entry_unit = units->back();
+    BuildUnit& entry_unit = units->back();
     const auto build_targets = support::ComputeLogicalBuildArtifactTargets(entry_unit.artifact_key, graph.compile_graph.build_dir);
 
     if (IsStaticLibraryTargetKind(graph.target.kind)) {
@@ -391,9 +391,36 @@ std::optional<ProjectBuildResult> BuildProjectTarget(TargetBuildGraph& graph,
                                       linked_library_paths,
                                       *units)) {
         std::vector<std::filesystem::path> object_paths;
-        object_paths.reserve(units->size());
-        for (const auto& unit : *units) {
-            object_paths.push_back(unit.object_path);
+        if (units->size() > 1) {
+            auto merged_module = MergeBuildUnits(*units, *entry_unit.mir_result.module, entry_unit.source_path, diagnostics);
+            if (!merged_module) {
+                return std::nullopt;
+            }
+            if (!mc::mir::ValidateModule(*merged_module, entry_unit.source_path, diagnostics)) {
+                return std::nullopt;
+            }
+            const auto object_result = mc::codegen_llvm::BuildObjectFile(
+                *merged_module,
+                entry_unit.source_path,
+                {
+                    .target = graph.compile_graph.target_config,
+                    .artifacts = {
+                        .llvm_ir_path = build_targets.llvm_ir,
+                        .object_path = build_targets.object,
+                    },
+                    .wrap_hosted_main = graph.compile_graph.wrap_entry_main,
+                },
+                diagnostics);
+            if (!object_result.ok) {
+                return std::nullopt;
+            }
+            entry_unit.object_path = build_targets.object;
+            object_paths.push_back(build_targets.object);
+        } else {
+            object_paths.reserve(units->size());
+            for (const auto& unit : *units) {
+                object_paths.push_back(unit.object_path);
+            }
         }
 
         const auto link_result = mc::codegen_llvm::LinkExecutable(entry_unit.source_path,

@@ -29,7 +29,7 @@ Current scope (Phase 153)
 Source tree layout (Phase 219)
 
 - `src/` root: `main.mc` (entry), `kernel_dispatch.mc` (routing), `event_codes.mc` (shared shell-event constants)
-- `src/boot/`: `boot.mc`, `boot_identity.mc`, `boot_update.mc`, `init.mc`
+- `src/boot/`: `boot.mc`, `boot_identity.mc`, `boot_update.mc`, `service_cell_helpers.mc`, `init.mc`
 - `src/identity/`: `service_identity.mc`, `service_state.mc`, `service_topology.mc`, `identity_taxonomy.mc`
 - `src/services/`: `completion_mailbox_service.mc`, `connection_service.mc`, `echo_service.mc`, `file_service.mc`, `journal_service.mc`, `kv_service.mc`, `lease_service.mc`, `log_service.mc`, `object_store_service.mc`, `queue_service.mc`, `task_service.mc`, `ticket_service.mc`, `timer_service.mc`, `transfer_grant.mc`, `transfer_service.mc`, `update_store_service.mc`, `workflow_service.mc`
 - `src/shell/`: `serial_protocol.mc`, `serial_service.mc`, `serial_shell_event_log.mc`, `serial_shell_path.mc`, `shell_service.mc`

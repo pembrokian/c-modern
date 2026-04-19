@@ -240,10 +240,22 @@ bool RenderLLVMGlobalConstValue(const mir::Module& module,
                                 bool wrap_hosted_main,
                                 const std::filesystem::path& source_path,
                                 support::DiagnosticSink& diagnostics,
-                                std::string& rendered) {
+                                std::string& rendered,
+                                std::string_view string_backing_prefix,
+                                std::ostringstream* prelude,
+                                std::size_t* string_constant_index) {
     type = sema::CanonicalizeBuiltinType(std::move(type));
     if (type.kind == sema::Type::Kind::kConst && !type.subtypes.empty()) {
-        return RenderLLVMGlobalConstValue(module, type.subtypes.front(), value, wrap_hosted_main, source_path, diagnostics, rendered);
+        return RenderLLVMGlobalConstValue(module,
+                                          type.subtypes.front(),
+                                          value,
+                                          wrap_hosted_main,
+                                          source_path,
+                                          diagnostics,
+                                          rendered,
+                                          string_backing_prefix,
+                                          prelude,
+                                          string_constant_index);
     }
 
     if (value.kind == sema::ConstValue::Kind::kProcedure) {
@@ -265,6 +277,23 @@ bool RenderLLVMGlobalConstValue(const mir::Module& module,
                            "LLVM bootstrap backend cannot lower global constant type " + sema::FormatType(canonical_type),
                            diagnostics);
         return false;
+    }
+
+    if (canonical_type.kind == sema::Type::Kind::kString && value.kind == sema::ConstValue::Kind::kString) {
+        if (prelude != nullptr && string_constant_index != nullptr && !string_backing_prefix.empty()) {
+            const std::string backing_name = std::string(string_backing_prefix) + ".str." +
+                                             std::to_string((*string_constant_index)++);
+            return RenderLLVMGlobalStringConstValue(module,
+                                                    canonical_type,
+                                                    value,
+                                                    backing_name,
+                                                    source_path,
+                                                    diagnostics,
+                                                    *prelude,
+                                                    rendered);
+        }
+        rendered = FormatLLVMLiteral(*lowered_type, value.text);
+        return true;
     }
 
     if (value.kind != sema::ConstValue::Kind::kAggregate) {
@@ -312,7 +341,10 @@ bool RenderLLVMGlobalConstValue(const mir::Module& module,
                                             wrap_hosted_main,
                                             source_path,
                                             diagnostics,
-                                            element_text)) {
+                                            element_text,
+                                            string_backing_prefix,
+                                            prelude,
+                                            string_constant_index)) {
                 return false;
             }
             if (index > 0) {
@@ -371,7 +403,10 @@ bool RenderLLVMGlobalConstValue(const mir::Module& module,
                                         wrap_hosted_main,
                                         source_path,
                                         diagnostics,
-                                        field_text)) {
+                                        field_text,
+                                        string_backing_prefix,
+                                        prelude,
+                                        string_constant_index)) {
             return false;
         }
 

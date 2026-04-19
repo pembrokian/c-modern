@@ -225,6 +225,7 @@ int main(int argc, char** argv) {
         {"canonical_window_stats.mc", "canonical_window_stats.mir.txt", true, "window_stats.mc", {}, {}},
         {"canonical_array_grid_lookup.mc", "canonical_array_grid_lookup.mir.txt", true, "array_grid_lookup.mc", {}, {}},
         {"imported_generic_box_ok.mc", "imported_generic_box_ok.mir.txt", true, "", {}, {{"helper_box", "import_roots/helper_box.mc"}}},
+        {"imported_service_cell_helper_ok.mc", "imported_service_cell_helper_ok.mir.txt", true, "", {"tests/compiler/mir/import_roots"}, {}},
         {"import_root_ok_main.mc", "import_root_ok_main.mir.txt", true, "", {"tests/compiler/mir/import_roots"}, {}},
         {"imported_atomic_ok.mc", "imported_atomic_ok.mir.txt", true, "", {}, {{"sync", "import_roots/sync_module.mc"}}},
         {"imported_event_buffer_ok.mc", "imported_event_buffer_ok.mir.txt", true, "", {"tests/compiler/mir/import_roots"}, {}},
