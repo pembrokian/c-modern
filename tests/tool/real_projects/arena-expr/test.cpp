@@ -22,7 +22,7 @@ void TestRealArenaExprToolProject(const std::filesystem::path& source_root,
     const std::filesystem::path build_dir = binary_root / "arena_expr_build";
     std::filesystem::remove_all(build_dir);
 
-    const std::string expected_line = "((1+2)+(3+4))\n";
+    const std::string expected_output = "((1+2)+(3+4))\n(7+(8+9))\n";
 
     const auto [run_outcome, run_output] = RunCommandCapture({mc_path.generic_string(),
                                                               "run",
@@ -38,8 +38,8 @@ void TestRealArenaExprToolProject(const std::filesystem::path& source_root,
         Fail("phase8 arena expr run should succeed:\n" + run_output);
     }
     ExpectOutputContains(run_output,
-                         expected_line,
-                         "phase8 arena expr should print the deterministic normalized form");
+                         expected_output,
+                         "phase8 arena expr should print deterministic normalized output for each scratch pass");
 
     const auto [test_outcome, test_output] = RunCommandCapture({mc_path.generic_string(),
                                                                 "test",
@@ -59,7 +59,10 @@ void TestRealArenaExprToolProject(const std::filesystem::path& source_root,
                          "PASS parse_tree_test.test_parse_tree",
                          "phase8 arena expr ordinary tests should include tree-shape coverage");
     ExpectOutputContains(test_output,
-                         "3 tests, 3 passed, 0 failed",
+                         "PASS arena_reset_test.test_arena_reset_reuses_scratch",
+                         "phase263 arena expr ordinary tests should include arena reset coverage");
+    ExpectOutputContains(test_output,
+                         "4 tests, 4 passed, 0 failed",
                          "phase8 arena expr test summary should be deterministic");
 }
 

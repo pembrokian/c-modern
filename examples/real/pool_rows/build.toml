@@ -1,0 +1,22 @@
+schema = 1
+project = "pool-rows"
+default = "pool-rows"
+
+[targets.pool-rows]
+kind = "exe"
+package = "pool-rows"
+root = "src/main.mc"
+mode = "debug"
+env = "hosted"
+
+[targets.pool-rows.search_paths]
+modules = ["src", "../../../stdlib"]
+
+[targets.pool-rows.runtime]
+startup = "default"
+
+[targets.pool-rows.tests]
+enabled = true
+roots = ["tests"]
+mode = "checked"
+timeout_ms = 5000

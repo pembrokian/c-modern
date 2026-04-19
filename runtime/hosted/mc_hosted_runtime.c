@@ -14,8 +14,10 @@
 
 #include <arpa/inet.h>
 #include <fcntl.h>
+#include <limits.h>
 #include <netinet/in.h>
 #include <stdbool.h>
+#include <stddef.h>
 #include <sys/wait.h>
 
 struct mc_string {
@@ -38,6 +40,15 @@ struct mc_arena {
     uint8_t* ptr;
     int64_t cap;
     int64_t used;
+    struct mc_allocator* alloc;
+};
+
+struct mc_pool {
+    uint8_t* data;
+    uint8_t* in_use;
+    int64_t slot_size;
+    int64_t cap;
+    int64_t available;
     struct mc_allocator* alloc;
 };
 
@@ -460,6 +471,14 @@ struct mc_arena* __mc_mem_arena_init(struct mc_allocator* alloc, int64_t cap) {
     return arena;
 }
 
+void __mc_mem_arena_reset(struct mc_arena* arena) {
+    if (arena == NULL) {
+        return;
+    }
+
+    arena->used = 0;
+}
+
 void __mc_mem_arena_deinit(struct mc_arena* arena) {
     if (arena == NULL) {
         return;
@@ -467,6 +486,121 @@ void __mc_mem_arena_deinit(struct mc_arena* arena) {
 
     free(arena->ptr);
     free(arena);
+}
+
+uintptr_t __mc_mem_pool_init(struct mc_allocator* alloc, int64_t slot_size, int64_t cap) {
+    struct mc_allocator* actual_alloc = alloc != NULL ? alloc : &k_default_allocator;
+    if (slot_size <= 0 || cap < 0) {
+        return 0;
+    }
+
+    struct mc_pool* pool = (struct mc_pool*) malloc(sizeof(struct mc_pool));
+    if (pool == NULL) {
+        return 0;
+    }
+
+    const size_t requested_slot_size = (size_t) slot_size;
+    const size_t requested_cap = (size_t) cap;
+    if (requested_cap != 0 && requested_slot_size > SIZE_MAX / requested_cap) {
+        free(pool);
+        return 0;
+    }
+
+    const size_t data_size = requested_cap == 0 ? 1u : requested_slot_size * requested_cap;
+    const size_t flags_size = requested_cap == 0 ? 1u : requested_cap;
+
+    uint8_t* data = (uint8_t*) malloc(data_size);
+    if (data == NULL) {
+        free(pool);
+        return 0;
+    }
+
+    uint8_t* in_use = (uint8_t*) malloc(flags_size);
+    if (in_use == NULL) {
+        free(data);
+        free(pool);
+        return 0;
+    }
+
+    memset(data, 0, data_size);
+    memset(in_use, 0, flags_size);
+    pool->data = data;
+    pool->in_use = in_use;
+    pool->slot_size = slot_size;
+    pool->cap = cap;
+    pool->available = cap;
+    pool->alloc = actual_alloc;
+    return (uintptr_t) pool;
+}
+
+void __mc_mem_pool_deinit(uintptr_t raw) {
+    struct mc_pool* pool = (struct mc_pool*) raw;
+    if (pool == NULL) {
+        return;
+    }
+
+    free(pool->data);
+    free(pool->in_use);
+    free(pool);
+}
+
+uint8_t* __mc_mem_pool_take(uintptr_t raw) {
+    struct mc_pool* pool = (struct mc_pool*) raw;
+    if (pool == NULL || pool->cap <= 0 || pool->available <= 0) {
+        return NULL;
+    }
+
+    for (size_t index = 0; index < (size_t) pool->cap; ++index) {
+        if (pool->in_use[index] != 0) {
+            continue;
+        }
+
+        pool->in_use[index] = 1;
+        pool->available -= 1;
+        uint8_t* slot = pool->data + index * (size_t) pool->slot_size;
+        memset(slot, 0, (size_t) pool->slot_size);
+        return slot;
+    }
+
+    return NULL;
+}
+
+bool __mc_mem_pool_return(uintptr_t raw, uint8_t* slot) {
+    struct mc_pool* pool = (struct mc_pool*) raw;
+    if (pool == NULL || slot == NULL || pool->cap <= 0 || pool->slot_size <= 0) {
+        return false;
+    }
+
+    const size_t slot_size = (size_t) pool->slot_size;
+    const size_t cap = (size_t) pool->cap;
+    uint8_t* const base = pool->data;
+    uint8_t* const end = base + slot_size * cap;
+    if (slot < base || slot >= end) {
+        return false;
+    }
+
+    const ptrdiff_t offset = slot - base;
+    if (offset < 0 || ((size_t) offset % slot_size) != 0u) {
+        return false;
+    }
+
+    const size_t index = (size_t) offset / slot_size;
+    if (index >= cap || pool->in_use[index] == 0) {
+        return false;
+    }
+
+    memset(slot, 0, slot_size);
+    pool->in_use[index] = 0;
+    pool->available += 1;
+    return true;
+}
+
+int64_t __mc_mem_pool_available(uintptr_t raw) {
+    struct mc_pool* pool = (struct mc_pool*) raw;
+    if (pool == NULL || pool->available < 0) {
+        return 0;
+    }
+    return pool->available;
 }
 
 uintptr_t __mc_io_write(struct mc_string text) {

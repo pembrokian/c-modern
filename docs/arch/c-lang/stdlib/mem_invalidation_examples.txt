@@ -51,13 +51,9 @@ Arena-backed example:
 
 ```text
 arena = mem.arena_init(alloc, 4096)
-defer mem.arena_deinit(&arena)
+defer mem.arena_deinit(arena)
 
-scratch = mem.arena_allocator(&arena)
-node, err = mem.alloc_value<Node>(scratch)
-if err != nil {
-    return err
-}
+node = mem.arena_new<Node>(arena)
 
 // node remains valid only while arena is live
 ```
@@ -67,20 +63,22 @@ Rule:
 
 API guidance:
 - APIs that return arena-backed results should keep the arena lifetime explicit in the surrounding contract rather than hiding it inside the callee
+- reset is the honest repeated-scratch boundary when one owner wants to reuse the same arena for multiple transient passes
 
 4. Pool Slot Return
 
 Pool-backed example:
 
 ```text
-proc = process_pool_alloc(pool)
-if proc == nil {
-    return errors.fail("no process slots")
+pool = mem.pool_init(mem.default_allocator(), 32, 4)
+slot = mem.pool_take(pool)
+if slot == nil {
+    return errors.fail("no pool slots")
 }
 
-process_pool_free(pool, proc)
+mem.pool_return(pool, slot)
 
-// invalid: proc now names returned storage
+// invalid: slot now names returned storage
 ```
 
 Rule:

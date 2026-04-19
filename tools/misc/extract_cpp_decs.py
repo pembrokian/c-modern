@@ -12,8 +12,8 @@ LIBCLANG_CANDIDATES = [
 ]
 
 # fixed output dir and file
-OUTPUT_DIR = 'tools/miscl/extracted_decls'
-OUTPUT_FILE = 'compiler_extracted_decls.txt'
+OUTPUT_DIR = 'tools/misc/extracted_decls'
+OUTPUT_FILE = 'compiler_extracted_decs.txt'
 DECL_KINDS = {
     CursorKind.FUNCTION_DECL,
     CursorKind.NAMESPACE,
@@ -33,6 +33,7 @@ def configure_libclang():
             return candidate
 
     raise RuntimeError('Unable to locate libclang.dylib; set LIBCLANG_FILE to a valid path')
+
 
 def extract_declarations_from_file(file_path):
     index = Index.create()
@@ -66,6 +67,7 @@ def extract_declarations_from_file(file_path):
 
     return declarations
 
+
 def scan_dir(dir_path):
     files = []
     for root, _, filenames in os.walk(dir_path):
@@ -75,10 +77,11 @@ def scan_dir(dir_path):
 
     return sorted(files)
 
+
 def write_output(results, output_file):
     os.makedirs(OUTPUT_DIR, exist_ok=True)
     out_path = os.path.join(OUTPUT_DIR, output_file)
-    
+
     with open(out_path, 'w') as out:
         for file, funcs in results.items():
             out.write(f"==== {file} ====\n")
@@ -91,6 +94,7 @@ def write_output(results, output_file):
             out.write("\n")
 
     print(f"Wrote output to {out_path}")
+
 
 def main():
     configure_libclang()
@@ -107,5 +111,6 @@ def main():
 
     write_output(results, OUTPUT_FILE)
 
-if __name__ == "__main__":    
+
+if __name__ == "__main__":
     main()

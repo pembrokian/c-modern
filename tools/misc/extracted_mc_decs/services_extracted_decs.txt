@@ -352,6 +352,7 @@ FUNCTION_DECL: leasewith
    Param: [LEASE_CAPACITY]u8 kinds
    Param: [LEASE_CAPACITY]u8 firsts
    Param: [LEASE_CAPACITY]u8 seconds
+   Param: [LEASE_CAPACITY]u8 thirds
    Param: [LEASE_CAPACITY]u8 gens
    Param: usize len
 FUNCTION_DECL: lease_reply
@@ -368,6 +369,7 @@ FUNCTION_DECL: lease_issue
    Param: u8 kind
    Param: u8 first
    Param: u8 second
+   Param: u8 third
    Param: u8 generation
 FUNCTION_DECL: lease_issue_completion
    Return: LeaseResult
@@ -381,6 +383,7 @@ FUNCTION_DECL: lease_issue_installer_apply
 FUNCTION_DECL: lease_issue_object_update
    Return: LeaseResult
    Param: LeaseServiceState s
+   Param: object_store_service.ObjectStoreServiceState object_store
    Param: u8 name
    Param: u8 value
    Param: u8 generation
@@ -422,6 +425,7 @@ FUNCTION_DECL: lease_consume_external_ticket
 FUNCTION_DECL: handle
    Return: LeaseResult
    Param: LeaseServiceState s
+   Param: object_store_service.ObjectStoreServiceState object_store
    Param: service_effect.Message m
    Param: u8 completion_generation
    Param: u8 workset_generation
@@ -508,6 +512,15 @@ FUNCTION_DECL: object_slot_equal
    Return: bool
    Param: ObjectSlot left
    Param: ObjectSlot right
+FUNCTION_DECL: object_update_conflict
+   Return: service_effect.Effect
+FUNCTION_DECL: object_next_version
+   Return: u8
+   Param: u8 version
+FUNCTION_DECL: object_current_version
+   Return: u8
+   Param: ObjectStoreServiceState s
+   Param: u8 name
 FUNCTION_DECL: object_store_changed
    Return: bool
    Param: ObjectStoreServiceState before
@@ -541,6 +554,12 @@ FUNCTION_DECL: object_update
    Param: ObjectStoreServiceState s
    Param: u8 name
    Param: u8 value
+FUNCTION_DECL: object_update_if_version
+   Return: ObjectStoreResult
+   Param: ObjectStoreServiceState s
+   Param: u8 name
+   Param: u8 value
+   Param: u8 version
 FUNCTION_DECL: handle
    Return: ObjectStoreResult
    Param: ObjectStoreServiceState s
@@ -1107,6 +1126,11 @@ FUNCTION_DECL: workflow_schedule_object_update_spec
    Return: WorkflowScheduleSpec
    Param: u8 name
    Param: u8 value
+FUNCTION_DECL: workflow_schedule_versioned_object_update_spec
+   Return: WorkflowScheduleSpec
+   Param: u8 name
+   Param: u8 value
+   Param: u8 version
 FUNCTION_DECL: workflow_schedule_update_apply_spec
    Return: WorkflowScheduleSpec
 FUNCTION_DECL: workflow_schedule_update_apply_with_lease_spec
@@ -1192,6 +1216,9 @@ FUNCTION_DECL: workflow_connection_ticket_lease_id
 FUNCTION_DECL: workflow_object_name
    Return: u8
    Param: WorkflowServiceState s
+FUNCTION_DECL: workflow_object_expected_version
+   Return: u8
+   Param: WorkflowServiceState s
 FUNCTION_DECL: workflow_wait_due
    Return: u8
    Param: WorkflowServiceState s
@@ -1231,6 +1258,12 @@ FUNCTION_DECL: workflow_schedule_object_update
    Param: WorkflowServiceState s
    Param: u8 name
    Param: u8 value
+FUNCTION_DECL: workflow_schedule_versioned_object_update
+   Return: WorkflowResult
+   Param: WorkflowServiceState s
+   Param: u8 name
+   Param: u8 value
+   Param: u8 version
 FUNCTION_DECL: workflow_schedule_connection
    Return: WorkflowResult
    Param: WorkflowServiceState s

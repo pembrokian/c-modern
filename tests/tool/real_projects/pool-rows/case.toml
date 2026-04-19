@@ -1,0 +1,8 @@
+name = "pool-rows"
+family = "tool-real-project"
+runner = "mc_tool_real_project_tests"
+selector = "pool-rows"
+function = "TestRealPoolRowsProject"
+roots = [
+  "examples/real/pool_rows/",
+]

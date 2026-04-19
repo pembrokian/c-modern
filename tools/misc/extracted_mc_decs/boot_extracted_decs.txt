@@ -1,5 +1,4 @@
 ==== kernel/src/boot/boot.mc ====
-STRUCT_DECL: ServiceCell
 STRUCT_DECL: KernelBootState
 FUNCTION_DECL: kernel_init
    Return: KernelBootState
@@ -117,7 +116,7 @@ FUNCTION_DECL: bootwith_log
 FUNCTION_DECL: bootwith_path
    Return: KernelBootState
    Param: KernelBootState s
-   Param: serial_shell_path.SerialShellPathState path
+   Param: serial_shell_path.SerialShellPathState path_state
 FUNCTION_DECL: bootwith_kv
    Return: KernelBootState
    Param: KernelBootState s
@@ -129,31 +128,31 @@ FUNCTION_DECL: bootwith_queue
 FUNCTION_DECL: bootwith_workset_generation
    Return: KernelBootState
    Param: KernelBootState s
-   Param: u32 generation
+   Param: u32 workset_generation
 FUNCTION_DECL: bootwith_audit_generation
    Return: KernelBootState
    Param: KernelBootState s
-   Param: u32 generation
+   Param: u32 audit_generation
 FUNCTION_DECL: bootwith_log_restart_outcome
    Return: KernelBootState
    Param: KernelBootState s
-   Param: RestartOutcome outcome
+   Param: RestartOutcome log_restart_outcome
 FUNCTION_DECL: bootwith_kv_restart_outcome
    Return: KernelBootState
    Param: KernelBootState s
-   Param: RestartOutcome outcome
+   Param: RestartOutcome kv_restart_outcome
 FUNCTION_DECL: bootwith_queue_restart_outcome
    Return: KernelBootState
    Param: KernelBootState s
-   Param: RestartOutcome outcome
+   Param: RestartOutcome queue_restart_outcome
 FUNCTION_DECL: bootwith_workset_restart_outcome
    Return: KernelBootState
    Param: KernelBootState s
-   Param: RestartOutcome outcome
+   Param: RestartOutcome workset_restart_outcome
 FUNCTION_DECL: bootwith_audit_restart_outcome
    Return: KernelBootState
    Param: KernelBootState s
-   Param: RestartOutcome outcome
+   Param: RestartOutcome audit_restart_outcome
 FUNCTION_DECL: bootwith_echo
    Return: KernelBootState
    Param: KernelBootState s
@@ -161,7 +160,7 @@ FUNCTION_DECL: bootwith_echo
 FUNCTION_DECL: bootwith_echo_restart_outcome
    Return: KernelBootState
    Param: KernelBootState s
-   Param: RestartOutcome outcome
+   Param: RestartOutcome echo_restart_outcome
 FUNCTION_DECL: bootwith_transfer
    Return: KernelBootState
    Param: KernelBootState s
@@ -169,7 +168,7 @@ FUNCTION_DECL: bootwith_transfer
 FUNCTION_DECL: bootwith_transfer_restart_outcome
    Return: KernelBootState
    Param: KernelBootState s
-   Param: RestartOutcome outcome
+   Param: RestartOutcome transfer_restart_outcome
 FUNCTION_DECL: bootwith_ticket
    Return: KernelBootState
    Param: KernelBootState s
@@ -177,7 +176,7 @@ FUNCTION_DECL: bootwith_ticket
 FUNCTION_DECL: bootwith_ticket_restart_outcome
    Return: KernelBootState
    Param: KernelBootState s
-   Param: RestartOutcome outcome
+   Param: RestartOutcome ticket_restart_outcome
 FUNCTION_DECL: bootwith_grants
    Return: KernelBootState
    Param: KernelBootState s
@@ -219,7 +218,7 @@ FUNCTION_DECL: bootwith_file
 FUNCTION_DECL: bootwith_file_restart_outcome
    Return: KernelBootState
    Param: KernelBootState s
-   Param: RestartOutcome outcome
+   Param: RestartOutcome file_restart_outcome
 FUNCTION_DECL: bootrestart_file
    Return: KernelBootState
    Param: KernelBootState s
@@ -231,7 +230,7 @@ FUNCTION_DECL: bootwith_timer
 FUNCTION_DECL: bootwith_timer_restart_outcome
    Return: KernelBootState
    Param: KernelBootState s
-   Param: RestartOutcome outcome
+   Param: RestartOutcome timer_restart_outcome
 FUNCTION_DECL: bootrestart_timer
    Return: KernelBootState
    Param: KernelBootState s
@@ -243,7 +242,7 @@ FUNCTION_DECL: bootwith_task
 FUNCTION_DECL: bootwith_task_restart_outcome
    Return: KernelBootState
    Param: KernelBootState s
-   Param: RestartOutcome outcome
+   Param: RestartOutcome task_restart_outcome
 FUNCTION_DECL: bootwith_connection
    Return: KernelBootState
    Param: KernelBootState s
@@ -251,7 +250,7 @@ FUNCTION_DECL: bootwith_connection
 FUNCTION_DECL: bootwith_connection_restart_outcome
    Return: KernelBootState
    Param: KernelBootState s
-   Param: RestartOutcome outcome
+   Param: RestartOutcome connection_restart_outcome
 FUNCTION_DECL: bootrestart_connection
    Return: KernelBootState
    Param: KernelBootState s
@@ -267,7 +266,7 @@ FUNCTION_DECL: bootwith_journal
 FUNCTION_DECL: bootwith_journal_restart_outcome
    Return: KernelBootState
    Param: KernelBootState s
-   Param: RestartOutcome outcome
+   Param: RestartOutcome journal_restart_outcome
 FUNCTION_DECL: bootrestart_journal
    Return: KernelBootState
    Param: KernelBootState s
@@ -283,7 +282,7 @@ FUNCTION_DECL: bootwith_lease
 FUNCTION_DECL: bootwith_lease_restart_outcome
    Return: KernelBootState
    Param: KernelBootState s
-   Param: RestartOutcome outcome
+   Param: RestartOutcome lease_restart_outcome
 FUNCTION_DECL: bootwith_completion
    Return: KernelBootState
    Param: KernelBootState s
@@ -291,7 +290,7 @@ FUNCTION_DECL: bootwith_completion
 FUNCTION_DECL: bootwith_completion_restart_outcome
    Return: KernelBootState
    Param: KernelBootState s
-   Param: RestartOutcome outcome
+   Param: RestartOutcome completion_restart_outcome
 FUNCTION_DECL: bootwith_object_store
    Return: KernelBootState
    Param: KernelBootState s
@@ -299,7 +298,7 @@ FUNCTION_DECL: bootwith_object_store
 FUNCTION_DECL: bootwith_object_store_restart_outcome
    Return: KernelBootState
    Param: KernelBootState s
-   Param: RestartOutcome outcome
+   Param: RestartOutcome object_store_restart_outcome
 FUNCTION_DECL: bootwith_update_store
    Return: KernelBootState
    Param: KernelBootState s
@@ -307,7 +306,7 @@ FUNCTION_DECL: bootwith_update_store
 FUNCTION_DECL: bootwith_update_store_restart_outcome
    Return: KernelBootState
    Param: KernelBootState s
-   Param: RestartOutcome outcome
+   Param: RestartOutcome update_store_restart_outcome
 FUNCTION_DECL: bootrestart_workflow
    Return: KernelBootState
    Param: KernelBootState s
@@ -405,4 +404,15 @@ FUNCTION_DECL: restart_object_store
 FUNCTION_DECL: restart_update_store
    Return: boot.KernelBootState
    Param: boot.KernelBootState state
+
+==== kernel/src/boot/service_cell_helpers.mc ====
+STRUCT_DECL: ServiceCell
+FUNCTION_DECL: service_cell_with_state
+   Return: ServiceCell<T>
+   Param: ServiceCell<T> cell
+   Param: T state
+FUNCTION_DECL: service_cell_restart
+   Return: ServiceCell<T>
+   Param: ServiceCell<T> cell
+   Param: T state
 

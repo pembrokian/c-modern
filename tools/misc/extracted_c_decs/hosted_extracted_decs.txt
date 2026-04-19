@@ -1,0 +1,351 @@
+==== runtime/hosted/mc_hosted_runtime.c ====
+STRUCT_DECL: mc_string
+STRUCT_DECL: mc_allocator
+STRUCT_DECL: mc_buffer_u8
+STRUCT_DECL: mc_arena
+STRUCT_DECL: mc_pool
+STRUCT_DECL: mc_slice_cstr
+STRUCT_DECL: mc_slice_u8
+STRUCT_DECL: mc_io_poller
+STRUCT_DECL: pollfd
+STRUCT_DECL: mc_io_pipe
+STRUCT_DECL: mc_io_event
+STRUCT_DECL: mc_sync_thread
+STRUCT_DECL: mc_os_child
+STRUCT_DECL: mc_sync_mutex
+STRUCT_DECL: mc_sync_condvar
+STRUCT_DECL: mc_hosted_thread
+STRUCT_DECL: mc_hosted_mutex
+STRUCT_DECL: mc_hosted_condvar
+STRUCT_DECL: mc_hosted_thread_start
+FUNCTION_DECL: __mc_hosted_entry
+   Return: int
+   Param: struct mc_slice_cstr args
+STRUCT_DECL: mc_dir_entry
+ENUM_DECL: mc_error_kind
+FUNCTION_DECL: mc_zero_buffer_u8
+   Return: void
+   Param: struct mc_buffer_u8 * out
+   Param: struct mc_allocator * alloc
+FUNCTION_DECL: mc_copy_string_to_cstr
+   Return: char *
+   Param: struct mc_string text
+FUNCTION_DECL: mc_free_dir_entries
+   Return: void
+   Param: struct mc_dir_entry * entries
+   Param: int count
+FUNCTION_DECL: mc_error_make
+   Return: int
+   Param: enum mc_error_kind kind
+   Param: int code
+FUNCTION_DECL: mc_error_from_errno_value
+   Return: int
+   Param: int err
+FUNCTION_DECL: mc_error_code_from_errno
+   Return: int
+FUNCTION_DECL: mc_errno_was_interrupted
+   Return: int
+FUNCTION_DECL: mc_store_error
+   Return: void
+   Param: int * out_err
+   Param: int err
+FUNCTION_DECL: __mc_time_monotonic_nanos
+   Return: int
+STRUCT_DECL: timespec
+FUNCTION_DECL: mc_poll_events_from_mask
+   Return: short
+   Param: int interests
+FUNCTION_DECL: mc_find_pollfd
+   Return: struct pollfd *
+   Param: struct mc_io_poller * poller
+   Param: int file
+FUNCTION_DECL: mc_grow_poller
+   Return: int
+   Param: struct mc_io_poller * poller
+FUNCTION_DECL: mc_fill_ipv4_sockaddr
+   Return: void
+   Param: struct sockaddr_in * addr
+   Param: int a
+   Param: int b
+   Param: int c
+   Param: int d
+   Param: int port
+FUNCTION_DECL: mc_configure_stream_socket
+   Return: void
+   Param: int fd
+FUNCTION_DECL: mc_join_path
+   Return: char *
+   Param: const char * base
+   Param: int base_len
+   Param: const char * name
+   Param: int name_len
+FUNCTION_DECL: mc_compare_dir_entries
+   Return: int
+   Param: const void * lhs
+   Param: const void * rhs
+FUNCTION_DECL: mc_thread_entry_shim
+   Return: void *
+   Param: void * opaque
+FUNCTION_DECL: mc_free_c_argv
+   Return: void
+   Param: char ** argv
+   Param: int count
+FUNCTION_DECL: mc_allocate_argv
+   Return: char **
+   Param: int count
+FUNCTION_DECL: mc_copy_three_strings_to_argv
+   Return: char **
+   Param: struct mc_string program
+   Param: struct mc_string arg0
+   Param: struct mc_string arg1
+FUNCTION_DECL: mc_copy_string_slice_to_argv
+   Return: char **
+   Param: struct mc_slice_cstr args
+FUNCTION_DECL: __mc_mem_default_allocator
+   Return: struct mc_allocator *
+FUNCTION_DECL: __mc_mem_buffer_new_u8
+   Return: struct mc_buffer_u8 *
+   Param: struct mc_allocator * alloc
+   Param: int len
+FUNCTION_DECL: __mc_mem_buffer_free_u8
+   Return: void
+   Param: struct mc_buffer_u8 * buf
+FUNCTION_DECL: __mc_mem_buffer_len_u8
+   Return: int
+   Param: struct mc_buffer_u8 * buf
+FUNCTION_DECL: __mc_mem_arena_init
+   Return: struct mc_arena *
+   Param: struct mc_allocator * alloc
+   Param: int cap
+FUNCTION_DECL: __mc_mem_arena_deinit
+   Return: void
+   Param: struct mc_arena * arena
+FUNCTION_DECL: __mc_mem_pool_init
+   Return: int
+   Param: struct mc_allocator * alloc
+   Param: int slot_size
+   Param: int cap
+FUNCTION_DECL: __mc_mem_pool_deinit
+   Return: void
+   Param: int raw
+FUNCTION_DECL: __mc_mem_pool_take
+   Return: int *
+   Param: int raw
+FUNCTION_DECL: __mc_mem_pool_return
+   Return: int
+   Param: int raw
+   Param: int * slot
+FUNCTION_DECL: __mc_mem_pool_available
+   Return: int
+   Param: int raw
+FUNCTION_DECL: __mc_io_write
+   Return: int
+   Param: struct mc_string text
+FUNCTION_DECL: __mc_io_write_line
+   Return: int
+   Param: struct mc_string text
+FUNCTION_DECL: __mc_testing_fail_sentinel
+   Return: int *
+FUNCTION_DECL: __mc_io_read
+   Return: int
+   Param: int file
+   Param: struct mc_slice_u8 bytes
+   Param: int * out_err
+FUNCTION_DECL: __mc_io_write_file
+   Return: int
+   Param: int file
+   Param: struct mc_slice_u8 bytes
+   Param: int * out_err
+FUNCTION_DECL: __mc_io_close
+   Return: int
+   Param: int file
+FUNCTION_DECL: __mc_io_pipe
+   Return: struct mc_io_pipe
+   Param: int * out_err
+FUNCTION_DECL: mc_prepare_child_stdio
+   Return: int
+   Param: int stdin_file
+   Param: int stdout_file
+   Param: int stderr_file
+   Param: int redirect_stderr
+   Param: int close_file0
+   Param: int close_file1
+FUNCTION_DECL: __mc_os_spawn3
+   Return: struct mc_os_child
+   Param: struct mc_string program
+   Param: struct mc_string arg0
+   Param: struct mc_string arg1
+   Param: int stdin_file
+   Param: int stdout_file
+   Param: int close_file0
+   Param: int close_file1
+   Param: int * out_err
+FUNCTION_DECL: __mc_os_spawnv
+   Return: struct mc_os_child
+   Param: struct mc_string program
+   Param: struct mc_slice_cstr argv
+   Param: int stdin_file
+   Param: int stdout_file
+   Param: int close_file0
+   Param: int close_file1
+   Param: int * out_err
+FUNCTION_DECL: __mc_os_spawnve
+   Return: struct mc_os_child
+   Param: struct mc_string program
+   Param: struct mc_slice_cstr argv
+   Param: int stdin_file
+   Param: int stdout_file
+   Param: int stderr_file
+   Param: int close_file0
+   Param: int close_file1
+   Param: int * out_err
+FUNCTION_DECL: __mc_os_wait
+   Return: int
+   Param: struct mc_os_child * child
+   Param: int * out_err
+FUNCTION_DECL: __mc_io_poller_new
+   Return: struct mc_io_poller *
+   Param: int * out_err
+FUNCTION_DECL: __mc_io_poller_add
+   Return: int
+   Param: struct mc_io_poller * poller
+   Param: int file
+   Param: int interests
+FUNCTION_DECL: __mc_io_poller_set
+   Return: int
+   Param: struct mc_io_poller * poller
+   Param: int file
+   Param: int interests
+FUNCTION_DECL: __mc_io_poller_remove
+   Return: int
+   Param: struct mc_io_poller * poller
+   Param: int file
+FUNCTION_DECL: __mc_io_poller_wait
+   Return: int
+   Param: struct mc_io_poller * poller
+   Param: struct mc_io_event * events
+   Param: int capacity
+   Param: int timeout_ms
+   Param: int * out_err
+FUNCTION_DECL: __mc_io_poller_close
+   Return: void
+   Param: struct mc_io_poller * poller
+FUNCTION_DECL: __mc_strings_eq
+   Return: int
+   Param: struct mc_string left
+   Param: struct mc_string right
+FUNCTION_DECL: __mc_strings_find_byte
+   Return: int
+   Param: struct mc_string text
+   Param: int needle
+FUNCTION_DECL: __mc_strings_trim_space_start
+   Return: int
+   Param: struct mc_string text
+FUNCTION_DECL: __mc_strings_trim_space_end
+   Return: int
+   Param: struct mc_string text
+FUNCTION_DECL: __mc_fs_file_size
+   Return: int
+   Param: struct mc_string path
+   Param: int * out_err
+STRUCT_DECL: stat
+FUNCTION_DECL: __mc_fs_is_dir
+   Return: int
+   Param: struct mc_string path
+   Param: int * out_err
+STRUCT_DECL: stat
+FUNCTION_DECL: __mc_fs_list_dir_err
+   Return: struct mc_buffer_u8 *
+   Param: struct mc_string path
+   Param: struct mc_allocator * alloc
+   Param: int * out_err
+STRUCT_DECL: dirent
+STRUCT_DECL: stat
+FUNCTION_DECL: __mc_fs_list_dir
+   Return: struct mc_buffer_u8 *
+   Param: struct mc_string path
+   Param: struct mc_allocator * alloc
+STRUCT_DECL: dirent
+STRUCT_DECL: stat
+FUNCTION_DECL: __mc_fs_read_all
+   Return: struct mc_buffer_u8 *
+   Param: struct mc_string path
+   Param: struct mc_allocator * alloc
+FUNCTION_DECL: __mc_fs_read_all_err
+   Return: struct mc_buffer_u8 *
+   Param: struct mc_string path
+   Param: struct mc_allocator * alloc
+   Param: int * out_err
+FUNCTION_DECL: __mc_fs_write_all_err
+   Return: int
+   Param: struct mc_string path
+   Param: struct mc_slice_u8 bytes
+   Param: int * out_err
+FUNCTION_DECL: __mc_fs_read_exact_err
+   Return: int
+   Param: struct mc_string path
+   Param: struct mc_slice_u8 bytes
+   Param: int * out_err
+FUNCTION_DECL: __mc_net_tcp_listen
+   Return: int
+   Param: int a
+   Param: int b
+   Param: int c
+   Param: int d
+   Param: int port
+   Param: int * out_err
+STRUCT_DECL: sockaddr_in
+FUNCTION_DECL: __mc_net_accept
+   Return: int
+   Param: int listener
+   Param: int * out_err
+FUNCTION_DECL: __mc_net_connect_tcp
+   Return: int
+   Param: int a
+   Param: int b
+   Param: int c
+   Param: int d
+   Param: int port
+   Param: int * out_err
+STRUCT_DECL: sockaddr_in
+FUNCTION_DECL: __mc_sync_thread_spawn
+   Return: struct mc_sync_thread
+   Param: int entry
+   Param: int ctx
+   Param: int * out_err
+FUNCTION_DECL: __mc_sync_thread_join
+   Return: int
+   Param: struct mc_sync_thread thread
+FUNCTION_DECL: __mc_sync_mutex_init
+   Return: struct mc_sync_mutex
+   Param: int * out_err
+FUNCTION_DECL: __mc_sync_mutex_destroy
+   Return: int
+   Param: struct mc_sync_mutex * mu
+FUNCTION_DECL: __mc_sync_mutex_lock
+   Return: int
+   Param: struct mc_sync_mutex * mu
+FUNCTION_DECL: __mc_sync_mutex_unlock
+   Return: int
+   Param: struct mc_sync_mutex * mu
+FUNCTION_DECL: __mc_sync_condvar_init
+   Return: struct mc_sync_condvar
+   Param: int * out_err
+FUNCTION_DECL: __mc_sync_condvar_destroy
+   Return: int
+   Param: struct mc_sync_condvar * cv
+FUNCTION_DECL: __mc_sync_condvar_wait
+   Return: int
+   Param: struct mc_sync_condvar * cv
+   Param: struct mc_sync_mutex * mu
+FUNCTION_DECL: __mc_sync_condvar_signal
+   Return: int
+   Param: struct mc_sync_condvar * cv
+FUNCTION_DECL: __mc_sync_condvar_broadcast
+   Return: int
+   Param: struct mc_sync_condvar * cv
+FUNCTION_DECL: main
+   Return: int
+   Param: int argc
+   Param: char ** argv
+

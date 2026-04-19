@@ -791,6 +791,19 @@ FUNCTION_DECL: RenderLLVMGlobalConstValue
    Param: const int & source_path
    Param: int & diagnostics
    Param: int & rendered
+   Param: int string_backing_prefix
+   Param: int * prelude
+   Param: int * string_constant_index
+FUNCTION_DECL: RenderLLVMGlobalStringConstValue
+   Return: bool
+   Param: const int & module
+   Param: int type
+   Param: const int & value
+   Param: int backing_global_name
+   Param: const int & source_path
+   Param: int & diagnostics
+   Param: int & prelude
+   Param: int & rendered
 FUNCTION_DECL: IsSignedSourceType
    Return: bool
    Param: int source_name
@@ -2205,6 +2218,43 @@ FUNCTION_DECL: FindMirVariantDecl
 FUNCTION_DECL: PrimaryTargetName
    Return: int
    Param: const int & instruction
+NAMESPACE: 
+FUNCTION_DECL: IsBuiltinExecutableErasedNamedType
+   Return: bool
+   Param: int name
+FUNCTION_DECL: TypeContainsTypeParams
+   Return: bool
+   Param: const int & type
+   Param: const int & type_param_set
+FUNCTION_DECL: TypeNeedsExecutableSpecialization
+   Return: bool
+   Param: const int & module
+   Param: const int & raw_type
+   Param: const int & type_param_set
+FUNCTION_DECL: FunctionNeedsExecutableSpecialization
+   Return: bool
+   Param: const int & module
+   Param: const int & function
+FUNCTION_DECL: SanitizeSpecializationNamePart
+   Return: int
+   Param: int text
+FUNCTION_DECL: SpecializationName
+   Return: int
+   Param: const int & function
+   Param: const int & type_args
+FUNCTION_DECL: CloneFunctionSpecialization
+   Return: int
+   Param: const int & function
+   Param: const int & type_args
+   Param: const int & specialized_name
+FUNCTION_DECL: BuildInstructionValueTypes
+   Return: int
+   Param: const int & function
+FUNCTION_DECL: ReportExecutableGenericSpecializationError
+   Return: void
+   Param: const int & file_path
+   Param: int & diagnostics
+   Param: const int & message
 FUNCTION_DECL: CanonicalVariantDisplayName
    Return: int
    Param: const int & selector_type
@@ -2213,6 +2263,12 @@ FUNCTION_DECL: MatchesTargetDisplay
    Return: bool
    Param: int target
    Param: const int & type
+FUNCTION_DECL: SpecializeExecutableGenericFunctions
+   Return: bool
+   Param: const int & module
+   Param: const int & file_path
+   Param: int & diagnostics
+   Param: int & specialized_module
 
 ==== compiler/mir/mir.h ====
 

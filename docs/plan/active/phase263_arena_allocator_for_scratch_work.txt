@@ -3,7 +3,7 @@ Phase 263 -- Arena Allocator For Scratch Work
 
 Status
 ------
-PROPOSED
+COMPLETED
 
 Purpose
 -------
@@ -20,6 +20,9 @@ Repository status note
 ----------------------
 - `stdlib/mem.mc` already exposes `Arena`, `arena_init`, `arena_deinit`, and
   `arena_new<T>`.
+- Phase 263 now adds additive `arena_reset` so one explicit arena lifetime can
+  own multiple scratch passes without widening into allocator adapters or a
+  region framework.
 - The compiler and executable backend already recognize the arena special-call
   path.
 - `examples/real/arena_expr/` already exists as a repository-owned real
@@ -112,6 +115,30 @@ Preferred implementation shape
   scratch allocator family.
 - Keep the chosen consumer's lifetime boundary local and explicit rather than
   threading arena handles through large swaths of the repository.
+
+Implemented outcome
+-------------------
+- `stdlib/mem.mc` and `runtime/hosted/mc_hosted_runtime.c` now expose one
+  additive `arena_reset` operation beside the existing init/new/deinit seam.
+- `examples/real/arena_expr/` is the maintained first scratch-work owner.
+  It now reuses one explicit arena across multiple line-local parse and
+  normalize passes, resetting the arena between transient ASTs.
+- Arena-backed nodes stay owner-local to one parse pass, while token text
+  continues to borrow from the owned file buffer instead of pretending the
+  arena is an owning text store.
+
+Questions answered
+------------------
+1. `examples/real/arena_expr/` remains the narrowest honest maintained arena
+  consumer in the repository.
+2. The first maintained scratch proof does need one additive reset surface;
+  init-plus-deinit alone left repeated scratch reuse unspent.
+3. Arena-backed storage stays limited to transient AST nodes for one parse
+  pass, while file bytes remain in the owning input buffer and output stays
+  immediate instead of arena-owned.
+4. The smallest proof is one maintained run path plus one focused ordinary test
+  showing that one arena lifetime can serve multiple parse passes while reset
+  stays the explicit invalidation boundary.
 
 Implementation accelerators
 ---------------------------

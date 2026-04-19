@@ -347,6 +347,27 @@ FUNCTION_DECL: expect_completion
 FUNCTION_DECL: run_named_object_update_workflow_probe
    Return: i32
 
+==== kernel/src/scenarios/scenario_object_version_conflict.mc ====
+FUNCTION_DECL: expect_value
+   Return: bool
+   Param: service_effect.Effect effect
+   Param: u8 value
+FUNCTION_DECL: expect_workflow
+   Return: bool
+   Param: service_effect.Effect effect
+   Param: syscall.SyscallStatus status
+   Param: u8 state
+   Param: u8 restart
+FUNCTION_DECL: expect_completion
+   Return: bool
+   Param: service_effect.Effect effect
+   Param: u8 id
+   Param: u8 state
+   Param: u8 restart
+   Param: u8 generation
+FUNCTION_DECL: run_object_version_conflict_probe
+   Return: i32
+
 ==== kernel/src/scenarios/scenario_queue.mc ====
 FUNCTION_DECL: run_queue_observability_probe
    Return: i32

@@ -123,8 +123,15 @@ FUNCTION_DECL: state_generation_from_payload
 
 ==== kernel/src/identity/service_topology.mc ====
 STRUCT_DECL: ServiceSlot
+STRUCT_DECL: ServiceDescriptor
 FUNCTION_DECL: service_count
    Return: usize
+FUNCTION_DECL: service_descriptor_at
+   Return: ServiceDescriptor
+   Param: usize index
+FUNCTION_DECL: service_descriptor_for_endpoint
+   Return: ServiceDescriptor
+   Param: u32 endpoint
 FUNCTION_DECL: service_slot_at
    Return: ServiceSlot
    Param: usize index
@@ -145,6 +152,9 @@ FUNCTION_DECL: service_restart_reloads_state
    Param: u32 endpoint
 FUNCTION_DECL: service_authority_class
    Return: ServiceAuthorityClass
+   Param: u32 endpoint
+FUNCTION_DECL: service_label_for_endpoint
+   Return: str
    Param: u32 endpoint
 FUNCTION_DECL: endpoint_is_boot_wired
    Return: bool

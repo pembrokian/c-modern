@@ -229,12 +229,35 @@ func write_expr(expr: *Expr) i32 {
     return 0
 }
 
-func normalize_text(text: str) i32 {
-    alloc: *mem.Allocator = mem.default_allocator()
-    arena_cap: usize = text.len * 64 + 256
-    arena: mem.Arena = mem.arena_init(alloc, arena_cap)
-    defer mem.arena_deinit(arena)
+func find_line_end(text: str, start: usize) usize {
+    bytes: Slice<u8> = Slice<u8>{ ptr: text.ptr, len: text.len }
+    end: usize = start
+    while end < text.len {
+        ch: u8 = bytes[end]
+        if ch == 10 {
+            break
+        }
+        if ch == 13 {
+            break
+        }
+        end = end + 1
+    }
+    return end
+}
 
+func next_line_start(text: str, end: usize) usize {
+    bytes: Slice<u8> = Slice<u8>{ ptr: text.ptr, len: text.len }
+    next: usize = end
+    if next < text.len && bytes[next] == 13 {
+        next = next + 1
+    }
+    if next < text.len && bytes[next] == 10 {
+        next = next + 1
+    }
+    return next
+}
+
+func normalize_line(arena: mem.Arena, text: str) i32 {
     root: *Expr = parse_text(arena, text)
     if root == nil {
         return 90
@@ -246,6 +269,36 @@ func normalize_text(text: str) i32 {
     }
     if io.write_line("") != 0 {
         return 1
+    }
+    return 0
+}
+
+func normalize_text(text: str) i32 {
+    alloc: *mem.Allocator = mem.default_allocator()
+    arena_cap: usize = text.len * 64 + 256
+    arena: mem.Arena = mem.arena_init(alloc, arena_cap)
+    defer mem.arena_deinit(arena)
+
+    pos: usize = 0
+    wrote_expr: bool = false
+    while pos < text.len {
+        end: usize = find_line_end(text, pos)
+        line: str = text[pos:end]
+        pos = next_line_start(text, end)
+        if token_count(line) == 0 {
+            continue
+        }
+
+        mem.arena_reset(arena)
+        status: i32 = normalize_line(arena, line)
+        if status != 0 {
+            return status
+        }
+        wrote_expr = true
+    }
+
+    if !wrote_expr {
+        return 90
     }
     return 0
 }

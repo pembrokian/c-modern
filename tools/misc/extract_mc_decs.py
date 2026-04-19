@@ -6,7 +6,7 @@ SOURCE_EXTS = ['.mc']
 SOURCE_DIRS = ['kernel/src']
 
 # fixed output dir and file
-OUTPUT_DIR = 'tools/miscl/extracted_c_funcs'
+OUTPUT_DIR = 'tools/misc/extracted_mc_decs'
 DECL_KIND = 'FUNCTION_DECL'
 STRUCT_KIND = 'STRUCT_DECL'
 
@@ -249,7 +249,7 @@ def discover_source_dirs(root_dir):
 
 def output_file_name(source_dir):
     dir_name = os.path.basename(os.path.normpath(source_dir))
-    return f"{dir_name}_extracted_funcs.txt"
+    return f"{dir_name}_extracted_decs.txt"
 
 
 def write_output(results, output_file):
@@ -278,7 +278,7 @@ def write_output(results, output_file):
 
 def main():
     if len(sys.argv) != 1:
-        print('Usage: python extract_c_funcs.py')
+        print('Usage: python extract_mc_decs.py')
         return
 
     outputs = {}

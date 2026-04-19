@@ -15,10 +15,11 @@ Current repository-specific admitted real projects:
 - `real/grep_lite/` for bounded text search over a single file
 - `real/file_walker/` for deterministic recursive file traversal
 - `real/hash_tool/` for bounded whole-file checksum output
-- `real/arena_expr/` for arena-backed expression parsing and normalization
+- `real/arena_expr/` for arena-backed scratch expression parsing and normalization with explicit per-line arena reset
 - `real/worker_queue/` for bounded producer-or-worker queue pressure on the admitted hosted `sync` slice as an explicit low-level shared-memory proof rather than the preferred portable communication model
 - `real/pipe_handoff/` for the admitted handle-first thread-plus-pipe communication proof on the minimal `io.pipe()` surface
 - `real/pipe_ready/` for the admitted poller-coupled pipe-readiness proof on `io.pipe()` plus `io.poller_*`
+- `real/pool_rows/` for the admitted fixed-size pool take-or-return proof on `mem.Pool` with explicit exhaustion, return, and slot reuse
 - `real/line_filter_relay/` for the admitted narrow hosted subprocess proof over explicit argv spawn plus pipe-backed stdin/stdout relay
 - `real/evented_echo/` for the admitted hosted networking project proof
 - `real/evented_partial_write/` for the admitted partial-write networking follow-on
@@ -33,11 +34,13 @@ build/debug/bin/mc run --project examples/real/arena_expr/build.toml --build-dir
 build/debug/bin/mc run --project examples/real/worker_queue/build.toml --build-dir build/debug/probes/worker_queue
 build/debug/bin/mc run --project examples/real/pipe_handoff/build.toml --build-dir build/debug/probes/pipe_handoff
 build/debug/bin/mc run --project examples/real/pipe_ready/build.toml --build-dir build/debug/probes/pipe_ready
+build/debug/bin/mc run --project examples/real/pool_rows/build.toml --build-dir build/debug/probes/pool_rows
 build/debug/bin/mc run --project examples/real/line_filter_relay/build.toml --build-dir build/debug/probes/line_filter_relay -- "phase forty five"
 build/debug/bin/mc test --project examples/real/arena_expr/build.toml --build-dir build/debug/probes/arena_expr_tests
 build/debug/bin/mc test --project examples/real/worker_queue/build.toml --build-dir build/debug/probes/worker_queue
 build/debug/bin/mc test --project examples/real/pipe_handoff/build.toml --build-dir build/debug/probes/pipe_handoff
 build/debug/bin/mc test --project examples/real/pipe_ready/build.toml --build-dir build/debug/probes/pipe_ready
+build/debug/bin/mc test --project examples/real/pool_rows/build.toml --build-dir build/debug/probes/pool_rows
 build/debug/bin/mc test --project examples/real/line_filter_relay/build.toml --build-dir build/debug/probes/line_filter_relay
 ```
 

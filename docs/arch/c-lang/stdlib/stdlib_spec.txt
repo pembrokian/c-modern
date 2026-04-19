@@ -42,7 +42,8 @@ Toolchain companion module:
 
 `mem`
 - allocation interfaces and owning storage helpers
-- examples: `Allocator`, `Buffer<T>`, `heap_alloc`, `heap_free`, `default_allocator`, `alloc_value`, `alloc_array`, `buffer_new`, `buffer_free`, `slice_from_array`, `slice_from_buffer`, `copy_bytes`, `fill_bytes`
+- examples: `Allocator`, `Buffer<T>`, `Pool`, `heap_alloc`, `heap_free`, `default_allocator`, `alloc_value`, `alloc_array`, `buffer_new`, `buffer_free`, `pool_init`, `pool_deinit`, `pool_take`, `pool_return`, `pool_available`, `slice_from_array`, `slice_from_buffer`, `copy_bytes`, `fill_bytes`
+- current repository shape: the first admitted pool surface is one explicit fixed-size byte-slot owner, not a typed `Pool<T>` wrapper; callers state `slot_size` explicitly and handle slot pointers plus explicit invalidation at `pool_return(...)`
 - note: invalidation examples for `buffer_free`, arena reset, pool return, and unmap-style boundaries live in `mem_invalidation_examples.txt`
 
 `utf8`
