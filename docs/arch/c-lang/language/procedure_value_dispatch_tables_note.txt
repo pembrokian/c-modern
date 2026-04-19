@@ -94,6 +94,27 @@ decision, not as an architecture decision. The language may admit the shape
 while the kernel and reset-lane system still prefer flat owner-local routing,
 switches, and topology-owned explicit dispatch.
 
+Repository-owned consumer note
+------------------------------
+The first maintained post-admission consumer is app-local render selection in
+`examples/real/issue_rollup/src/render/rollup_render.mc`.
+
+That owner now uses one fixed exact-signature table:
+
+```mc
+const ROLLUP_WRITERS: [4]func() i32 = [4]func() i32{
+  write_empty,
+  write_steady,
+  write_busy,
+  write_attention,
+}
+```
+
+This is an honest table owner because the mapping from classified render kind
+to one of four same-module output actions is static data rather than hidden
+policy. It does not justify rewriting kernel dispatch, shell decode, boot
+topology, or service routing into procedure tables.
+
 Current boundary
 ----------------
 The admitted surface is intentionally limited to named procedures with exact

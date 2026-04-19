@@ -167,9 +167,10 @@ Phase 257 -- Const-Evaluable Table And Descriptor Follow-Through
   without ad hoc runtime construction noise.
 
 Phase 258 -- Procedure Dispatch Table Follow-Through
-- Exit criterion: one bounded procedure-table or callback-table family becomes
+- Exit criterion: one bounded same-module procedure-table family becomes
   executable and deterministic through MIR and backend support without opening
-  closures, captured lambdas, or a dynamic dispatch framework.
+  closures, captured lambdas, imported runtime tables, or a dynamic dispatch
+  framework.
 
 Phase 259 -- Imported Constant Surface Follow-Through For Runtime Tables
 - Exit criterion: one real imported constant family needed by cross-module

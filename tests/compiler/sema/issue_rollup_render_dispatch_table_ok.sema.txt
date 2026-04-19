@@ -1,0 +1,21 @@
+SemanticModule
+  TypeDecl name=Summary kind=struct
+    Field name=open_items type=usize
+    Field name=closed_items type=usize
+    Field name=blocked_items type=usize
+    Field name=priority_items type=usize
+    Layout size=32 align=8 offsets=[0, 8, 16, 24]
+  Const names=[ROLLUP_EMPTY] type=i32 values=[0]
+  Const names=[ROLLUP_STEADY] type=i32 values=[1]
+  Const names=[ROLLUP_BUSY] type=i32 values=[2]
+  Const names=[ROLLUP_ATTENTION] type=i32 values=[3]
+  Const names=[ROLLUP_WRITERS] type=[4]proc()->i32 values=[{write_empty, write_steady, write_busy, write_attention}]
+  Function name=total_items params=[Summary] returns=[usize]
+  Function name=has_priority params=[Summary] returns=[bool]
+  Function name=write_empty params=[] returns=[i32]
+  Function name=write_steady params=[] returns=[i32]
+  Function name=write_busy params=[] returns=[i32]
+  Function name=write_attention params=[] returns=[i32]
+  Function name=rollup_kind params=[Summary] returns=[i32]
+  Function name=write_rollup params=[Summary] returns=[i32]
+  Function name=main params=[] returns=[i32]

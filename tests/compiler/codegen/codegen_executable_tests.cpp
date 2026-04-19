@@ -582,6 +582,12 @@ void RunCodegenExecutableCoreSuite(const std::filesystem::path& source_root,
                     {});
 
     RunBuiltFixture(mc_path,
+                    source_root / "tests/compiler/codegen/issue_rollup_render_dispatch_table.mc",
+                    work_root / "issue_rollup_render_dispatch_table",
+                    100,
+                    {});
+
+    RunBuiltFixture(mc_path,
                     source_root / "tests/compiler/codegen/procedure_dispatch_table_import/main.mc",
                     work_root / "procedure_dispatch_table_import",
                     45,

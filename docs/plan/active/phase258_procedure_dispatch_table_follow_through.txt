@@ -3,7 +3,7 @@ Phase 258 -- Procedure Dispatch Table Follow-Through
 
 Status
 ------
-PROPOSED
+COMPLETED
 
 Purpose
 -------
@@ -24,9 +24,9 @@ Repository status note
 - The backlog explicitly keeps broader callable-feature widening deferred.
 - Kernel dispatch, shell routing, and restart control intentionally remain flat
   conditional owners and should not be rewritten into tables by convenience.
-- The repository therefore still lacks one maintained answer to a narrower
-  question: where is a procedure-table consumer actually honest in the current
-  tree?
+- The repository now has one maintained answer to a narrower question: the
+  fixed render-kind to writer mapping in `examples/real/issue_rollup/src/render/rollup_render.mc`
+  is an honest same-module procedure-table owner.
 
 Problem being solved
 --------------------
@@ -109,6 +109,20 @@ Questions this phase must answer
 4. Can the chosen consumer stay same-module, or does it rely on imported
    callable tables that should be coordinated with Phase 259?
 
+Implementation outcome
+----------------------
+- Chosen consumer: `examples/real/issue_rollup/src/render/rollup_render.mc`
+  now routes one classified render kind through a fixed `[4]func() i32`
+  `ROLLUP_WRITERS` table.
+- The consumer stayed same-module, fixed-size, and explicitly typed. It did
+  not reopen imported callable tables, callback registries, descriptor-plus-
+  procedure table composition, or any kernel routing owner.
+- Focused proofs now cover the same shape in `tests/compiler/sema/issue_rollup_render_dispatch_table_ok.mc`,
+  `tests/compiler/mir/issue_rollup_render_dispatch_table_ok.mc`, and
+  `tests/compiler/codegen/issue_rollup_render_dispatch_table.mc`, while the
+  existing `issue_rollup` project workflow continues to build and run the real
+  consumer.
+
 Preferred implementation shape
 ------------------------------
 - Reuse the exact procedure-table contract admitted in Phase 230b.
@@ -152,13 +166,16 @@ Relevant file-local invariants
 - Kernel dispatch owners remain intentionally flat and are explicitly out of
   scope for table-driven rewrites.
 - The chosen consumer must stay obviously fixed-size and exact-signature.
+- The first maintained consumer is app-local render selection, not a system
+  routing or lifecycle owner.
 
 Relevant test surfaces
 ~~~~~~~~~~~~~~~~~~~~~~
 - Primary owning test family: `tests/compiler/codegen/` for executable spend-
   site proof, backed by `tests/compiler/sema/` for constant legality.
 - Narrowest expected first executable validation target: `mc_sema_fixture_unit`.
-- Follow-on validation target: `mc_codegen_executable_core_unit`.
+- Follow-on validation targets: `mc_mir_fixture_unit` and
+  `mc_codegen_executable_core_unit`.
 - Existing proof anchor: the Phase 230b executable coverage already uses
   `mc_codegen_executable_core_unit` and should be extended rather than forked.
 
@@ -166,6 +183,7 @@ Test obligations
 ----------------
 - `Build debug`
 - `mc_sema_fixture_unit`
+- `mc_mir_fixture_unit`
 - `mc_codegen_executable_core_unit`
 - one repository-owned spend-site proof showing the chosen procedure-table
   consumer is now maintained in real code
