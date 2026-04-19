@@ -3,7 +3,7 @@ Phase 276 -- Foreground App Input Routing
 
 Status
 ------
-PROPOSED
+LANDED
 
 Purpose
 -------
@@ -157,3 +157,46 @@ Future follow-up
   the routed foreground path.
 - Reopen broader routing work only when a second simultaneous consumer or
   richer focus model becomes stronger than the repaint slice.
+
+Implementation summary
+----------------------
+- Kept `input_event.mc` as the owner of admitted input-frame meaning by making
+  it parse the `I K <byte> !` family into one compact parsed-input record
+  instead of deciding the foreground app target directly.
+- Added `kernel/src/foreground_input_route.mc` as the explicit routing seam
+  that asks `launcher_service.mc` for the current foreground app and routes the
+  admitted input family to exactly that one app path.
+- Kept `kernel_dispatch.mc` as a thin caller that invokes the new routing seam
+  before the existing shell route rather than absorbing focus policy or app
+  routing tables.
+- Preserved one explicit bounded no-foreground outcome and one explicit
+  unsupported-target outcome without widening the first path into background
+  delivery, sessions, or a focus stack.
+- Added `tests/system/kernel_reset_lane_phase276_foreground_app_input_routing`
+  as the focused reset-lane proof and wired it into the maintained grouped
+  reset-lane workflow suite.
+
+Implemented decisions
+---------------------
+1. The foreground-routing decision now lives in one dedicated seam,
+   `foreground_input_route.mc`, rather than being folded into input parsing or
+   launcher policy.
+2. `launcher_service.mc` remains the sole owner of single-foreground truth;
+   the new seam consumes that truth but does not store or derive a second focus
+   model.
+3. The bounded idle failure remains one explicit no-foreground reply on the
+   admitted input family.
+4. The first proof that only the foreground app receives input is one focused
+   reset-lane scenario where `issue_rollup` stays foreground while
+   `review_board` becomes only the selected program, and the routed input still
+   lands on `issue_rollup` alone.
+
+Preserved invariants review
+---------------------------
+- `launcher_service.mc` remains the single foreground policy owner.
+- Input parsing stays in `input_event.mc`; display ownership stays in
+  `display_surface.mc`; dispatch remains a routing seam only.
+- No background delivery, multi-window focus, sessions, or registries were
+  introduced.
+- No central file became a new center of gravity: the new routing work lives in
+  one small dedicated module rather than in launcher, dispatch, or display.

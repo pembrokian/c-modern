@@ -11,6 +11,7 @@ import scenario_delegated_installer_authority
 import scenario_connection_service
 import scenario_coordination
 import scenario_display_surface
+import scenario_foreground_input_routing
 import scenario_delegated_object_processing
 import scenario_durability
 import scenario_journal_service
@@ -115,6 +116,10 @@ func run(state: *boot.KernelBootState) i32 {
         return result
     }
     result = scenario_display_surface.run_display_surface_probe()
+    if result != 0 {
+        return result
+    }
+    result = scenario_foreground_input_routing.run_foreground_input_routing_probe()
     if result != 0 {
         return result
     }

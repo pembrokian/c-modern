@@ -12,6 +12,7 @@ import connection_service
 import display_surface
 import echo_service
 import file_service
+import foreground_input_route
 import input_event
 import journal_service
 import init
@@ -689,9 +690,9 @@ func kernel_dispatch_serial(state: *boot.KernelBootState, obs: syscall.ReceiveOb
     }
 
     shell_msg := serial_shell_path.path_shell_message(next_path)
-    input_route := input_event.handle(launcher_service.launcher_foreground_id(current.launcher.state), shell_msg.payload_len, shell_msg.payload)
+    input_route := foreground_input_route.handle(current.launcher.state, shell_msg.payload_len, shell_msg.payload)
     resolved: service_effect.Effect
-    if input_route.kind != input_event.InputRouteKind.NotInput {
+    if input_route.kind != foreground_input_route.ForegroundInputRouteKind.NotInput {
         resolved = input_route.effect
     } else {
         resolved = execute_effect(state, shell_service.handle(next_path.shell_state, shell_msg))
@@ -699,7 +700,7 @@ func kernel_dispatch_serial(state: *boot.KernelBootState, obs: syscall.ReceiveOb
     next_path = serial_shell_path.path_commit_reply(next_path, resolved)
     current = *state
     *state = boot.bootwith_path(current, next_path)
-    if input_route.kind != input_event.InputRouteKind.NotInput {
+    if input_route.kind != foreground_input_route.ForegroundInputRouteKind.NotInput {
         return serial_attach_input_events(serial_build_reply(next_path), obs, next_path)
     }
     return serial_attach_shell_events(serial_build_reply(next_path), obs, next_path, resolved)

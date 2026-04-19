@@ -13,7 +13,7 @@ Rules
 - Keep compiler, sema, MIR, backend, ABI, target, runtime, and `hal` surfaces closed unless a narrow blocker forces a local change.
 - Add modules only when a specific phase boundary needs them, at the lean behavioral minimum the four-section standard allows.
 
-Current scope (through Phase 275)
+Current scope (through Phase 276)
 
 - All three canonical service shapes are present: forwarding (`serial_service`, `shell_service`, `serial_shell_path`), append/tail (`log_service`), and key/value (`kv_service`).
 - The compact shell route now reaches `log_service` and `kv_service` over the real reset-lane path instead of stopping at shell-local echo behavior.
@@ -29,6 +29,7 @@ Current scope (through Phase 275)
 - Phase 273 then closes Band C as a planning audit and classifies the first UI input/display owners as the stronger next move rather than another launcher/update/object-store follow-through.
 - Phase 274 adds one explicit `input_event.mc` owner for the first `I K <byte> !` foreground-input path.
 - Phase 275 adds one explicit `display_surface.mc` owner for one fixed four-cell visible target and one bounded launcher-triggered foreground present handoff.
+- Phase 276 adds one explicit `foreground_input_route.mc` seam that keeps event parsing in `input_event.mc`, keeps foreground truth in `launcher_service.mc`, and routes the admitted input family to exactly one current foreground app without widening launcher, display, or dispatch into a UI framework.
 
 Source tree layout (Phase 219)
 
@@ -53,6 +54,10 @@ The following modules are deferred until the named phase boundary forces them:
 - `mmu` — probably never in this tree; hosted execution makes MMU stubs meaningless
 
 Recent service targets
+
+- Phase 276 (landed): foreground app input routing.
+  `foreground_input_route.mc` now owns the first explicit foreground-app input handoff by consuming parsed input frames from `input_event.mc` and foreground truth from `launcher_service.mc`, while `kernel_dispatch.mc` stays a thin caller. The admitted path still routes to exactly one foreground app, keeps no-foreground explicit, and does not widen into background delivery, sessions, or routing frameworks. The focused reset-lane fixture is
+  `tests/system/kernel_reset_lane_phase276_foreground_app_input_routing`.
 
 - Phase 275 (landed): display surface owner first slice.
   `display_surface.mc` now owns one fixed four-cell visible target with one
