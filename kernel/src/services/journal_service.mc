@@ -61,6 +61,13 @@ func journal_with_lane(s: JournalServiceState, name: u8, lane: JournalLane) Jour
     return journalwith(s, s.lane0, lane)
 }
 
+func journal_write_lane(s: JournalServiceState, name: u8, len: usize, data: [JOURNAL_RECORD_CAPACITY]u8) JournalServiceState {
+    if !lane_valid(name) || len > JOURNAL_RECORD_CAPACITY {
+        return s
+    }
+    return journal_with_lane(s, name, JournalLane{ name: name, len: len, data: data })
+}
+
 func lane_equal(left: JournalLane, right: JournalLane) bool {
     if left.name != right.name || left.len != right.len {
         return false

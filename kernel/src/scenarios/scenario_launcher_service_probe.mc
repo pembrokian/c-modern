@@ -1,4 +1,5 @@
 import launcher_service
+import kernel_dispatch
 import program_catalog
 import scenario_assert
 import scenario_helpers
@@ -51,7 +52,7 @@ func run_launcher_service_probe() i32 {
     }
 
     state := setup.state
-    effect := kernel_dispatch.kernel_dispatch_step(&state, scenario_transport.cmd_launcher_list())
+    effect: service_effect.Effect = kernel_dispatch.kernel_dispatch_step(&state, scenario_transport.cmd_launcher_list())
     if !scenario_assert.expect_reply(effect, syscall.SyscallStatus.Ok, 4, 2, program_catalog.PROGRAM_ID_ISSUE_ROLLUP, program_catalog.PROGRAM_ID_REVIEW_BOARD, 0) {
         return FAIL_LAUNCHER_LIST
     }

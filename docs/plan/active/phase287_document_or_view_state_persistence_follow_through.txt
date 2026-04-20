@@ -3,7 +3,7 @@ Phase 287 -- Document Or View State Persistence Follow-Through
 
 Status
 ------
-PROPOSED
+COMPLETED
 
 Purpose
 -------
@@ -23,8 +23,9 @@ Repository status note
   persisted journal data.
 - Phase 286 should choose one stronger UI consumer that may now benefit from a
   bounded persisted view or document state.
-- No admitted UI app yet preserves user-visible state across restart through an
-  existing durable owner.
+- `review_board` now preserves one bounded user-visible view state through the
+  existing `journal_service.mc` owner and reloads it through the existing boot
+  and launch path.
 
 Problem being solved
 --------------------
@@ -207,6 +208,21 @@ Acceptance criteria
 - no UI-state framework, session system, or generic document store is
   introduced
 - the persisted state and restart proof are both explicit and reviewable
+
+Implementation notes
+--------------------
+- `review_board` is the chosen consumer.
+- The bounded persisted state is exactly one four-byte journal lane carrying
+  `open`, `closed`, `urgent`, and one packed `(mode, focus)` tag.
+- `journal_service.mc` remains the durability owner; `review_board_app.mc`
+  owns only the projection between app-local UI meaning and that bounded lane.
+- `boot.mc` now seeds the `review_board` app state from the already-loaded
+  journal state, `boot/init.mc` reloads that app state when the journal
+  service reload path runs, and `kernel_dispatch.mc` syncs changed
+  `review_board` input state back into the journal before committing the new
+  visible app state.
+- Focused validation landed on `Build debug` plus the dedicated reset-lane
+  fixture `tests/system/kernel_reset_lane_phase287_document_or_view_state_persistence_follow_through/`.
 
 Future follow-up
 ----------------

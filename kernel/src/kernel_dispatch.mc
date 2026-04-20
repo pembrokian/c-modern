@@ -354,7 +354,7 @@ func dispatch_launcher(state: *boot.KernelBootState, msg: service_effect.Message
             next = boot.bootwith_display(next, present.display)
         }
         if launcher_service.launcher_foreground_id(result.state) == program_catalog.PROGRAM_ID_REVIEW_BOARD {
-            present := review_board_app.review_board_launch(next.display.state)
+            present := review_board_app.review_board_launch(next.apps.review_board, next.display.state)
             next = boot.bootwith_review_board(next, present.app)
             next = boot.bootwith_display(next, present.display)
         }
@@ -704,9 +704,22 @@ func kernel_dispatch_serial(state: *boot.KernelBootState, obs: syscall.ReceiveOb
     input_route := foreground_input_route.handle(current.launcher.state, current.apps, current.update_store.state, current.display.state, shell_msg.payload_len, shell_msg.payload)
     resolved: service_effect.Effect
     if input_route.kind != foreground_input_route.ForegroundInputRouteKind.NotInput {
-        current = boot.bootwith_apps(current, input_route.apps)
-        current = boot.bootwith_display(current, input_route.display)
-        *state = current
+        next := current
+        if launcher_service.launcher_foreground_id(current.launcher.state) == program_catalog.PROGRAM_ID_REVIEW_BOARD {
+            journal := review_board_app.review_board_sync_journal(current.journal.state, input_route.apps.review_board)
+            if journal_service.journal_changed(current.journal.state, journal) {
+                if !journal_service.journal_persist(journal) {
+                    resolved = dispatch_closed_effect()
+                    next_path = serial_shell_path.path_commit_reply(next_path, resolved)
+                    *state = boot.bootwith_path(current, next_path)
+                    return serial_attach_input_events(serial_build_reply(next_path), obs, next_path)
+                }
+                next = boot.bootwith_journal(next, journal)
+            }
+        }
+        next = boot.bootwith_apps(next, input_route.apps)
+        next = boot.bootwith_display(next, input_route.display)
+        *state = next
         resolved = input_route.effect
     } else {
         resolved = execute_effect(state, shell_service.handle(next_path.shell_state, shell_msg))

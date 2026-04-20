@@ -26,6 +26,7 @@ import lease_service
 import log_service
 import object_store_service
 import queue_service
+import review_board_app
 import serial_protocol
 import service_topology
 import task_service
@@ -267,7 +268,9 @@ func restart_display(state: boot.KernelBootState) boot.KernelBootState {
 
 func restart_journal(state: boot.KernelBootState) boot.KernelBootState {
     journal_slot := service_topology.JOURNAL_SLOT
-    next := boot.bootrestart_journal(state, journal_service.journal_load(journal_slot.pid, 1))
+    journal := journal_service.journal_load(journal_slot.pid, 1)
+    next := boot.bootrestart_journal(state, journal)
+    next = boot.bootwith_review_board(next, review_board_app.review_board_app_reload(journal))
     return boot.bootwith_journal_restart_outcome(next, boot.RestartOutcome.DurableReloaded)
 }
 

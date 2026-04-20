@@ -57,10 +57,10 @@ func app_runtime_state(issue_rollup: issue_rollup_app.IssueRollupAppState, revie
     return AppRuntimeState{ issue_rollup: issue_rollup, review_board: review_board }
 }
 
-func app_runtime_init() AppRuntimeState {
+func app_runtime_init(journal: journal_service.JournalServiceState) AppRuntimeState {
     return app_runtime_state(
         issue_rollup_app.issue_rollup_app_init(issue_rollup_app.ISSUE_ROLLUP_LAUNCH_STATUS_NONE),
-        review_board_app.review_board_app_init())
+    review_board_app.review_board_app_reload(journal))
 }
 
 struct KernelBootState {
@@ -136,6 +136,8 @@ func kernel_init() KernelBootState {
     update_store_slot := service_topology.UPDATE_STORE_SLOT
 
     path_state := serial_shell_path.path_init(serial_service.serial_init(serial_slot.pid, 1), shell_service.shell_init(shell_slot.pid, 1), shell_slot.endpoint)
+    journal := journal_service.journal_load(journal_slot.pid, 1)
+
     return KernelBootState{
         path_state: path_state,
         log: service_cell_helpers.ServiceCell<log_service.LogServiceState>{ state: log_service.log_init(log_slot.pid, 1), generation: 1 },
@@ -166,7 +168,7 @@ func kernel_init() KernelBootState {
         launcher_restart_outcome: RestartOutcome.None,
         display: service_cell_helpers.ServiceCell<display_surface.DisplaySurfaceState>{ state: display_surface.display_init(display_slot.pid, 1), generation: 1 },
         display_restart_outcome: RestartOutcome.None,
-        journal: service_cell_helpers.ServiceCell<journal_service.JournalServiceState>{ state: journal_service.journal_load(journal_slot.pid, 1), generation: 1 },
+        journal: service_cell_helpers.ServiceCell<journal_service.JournalServiceState>{ state: journal, generation: 1 },
         journal_restart_outcome: RestartOutcome.None,
         workflow: service_cell_helpers.ServiceCell<workflow_core.WorkflowServiceState>{ state: workflow_core.workflow_state_init(workflow_slot.pid), generation: 1 },
         lease: service_cell_helpers.ServiceCell<lease_service.LeaseServiceState>{ state: lease_service.lease_init(lease_slot.pid, 1), generation: 1 },
@@ -177,7 +179,7 @@ func kernel_init() KernelBootState {
         object_store_restart_outcome: RestartOutcome.None,
         update_store: service_cell_helpers.ServiceCell<update_store_service.UpdateStoreServiceState>{ state: update_store_service.update_store_load(update_store_slot.pid, 1), generation: 1 },
         update_store_restart_outcome: RestartOutcome.None,
-        apps: app_runtime_init(),
+        apps: app_runtime_init(journal),
         grants: transfer_grant.grant_init()
     }
 }
