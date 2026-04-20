@@ -1,0 +1,192 @@
+Phase 293 -- First Human-Facing Support Statement
+=================================================
+
+Status
+------
+PROPOSED
+
+Purpose
+-------
+State one bounded support claim for the repository's user-facing slice above
+the current reset-lane kernel while naming exactly what is still not claimed.
+
+This phase exists now because the repository now has an integrated small-system
+demo, two directly usable apps, and a frozen account of basic UI. The next
+honest move is to convert that internal reality into one explicit support
+statement rather than leaving users to infer the repo's maturity from phase
+docs alone.
+
+Repository status note
+----------------------
+- Phase 289 freezes basic UI after the second UI slice.
+- Phase 290 is expected to provide one coherent integrated system demo above
+  the launcher, update, and UI owners.
+- Phase 291 and Phase 292 are expected to classify the strongest remaining
+  compiler and kernel-side pressures.
+- `README.md`, `kernel/README.md`, and `tests/tool/README.md` already describe
+  parts of the current workflow and system shape, but the repository still
+  lacks one bounded human-facing support statement that says what users can
+  honestly rely on now.
+
+Problem being solved
+--------------------
+- Without one explicit support statement, readers must reconstruct the current
+  user-facing story from many phase notes, tests, and owner files.
+- That creates two failure modes: underselling the progress because the system
+  still looks like disconnected bring-up work, or overselling it by assuming a
+  broader app or UI platform than the repo actually claims.
+- The current-repo problem is therefore one missing bounded public-facing
+  statement of present support, not another implementation gap.
+
+Non-goals
+---------
+- no new feature landing by default
+- no broad product positioning or marketing rewrite
+- no desktop, toolkit, package-manager, or filesystem claim
+- no host-portability promise beyond the current documented workflow surface
+- no new roadmap branch selection beyond what Phase 294 will decide
+
+Invariants
+----------
+- The support statement must describe landed repository truth only.
+- Support claims must stay bounded to explicit owners, workflows, and tests.
+- Still-deferred platform areas must remain explicit.
+- The statement must not imply a broader support tier than the repository can
+  validate through maintained workflow and reset-lane evidence.
+
+Required surface changes
+------------------------
+1. Derive one concise support statement from the landed Phase 289 through Phase
+   292 baseline.
+2. Name the supported user-facing slice, workflow expectations, and evidence
+   surfaces.
+3. Name the major still-unclaimed platform areas explicitly.
+4. Place the statement in the repository's maintained documentation surfaces.
+
+Forbidden changes
+-----------------
+- do not turn the support statement into a roadmap or architecture essay
+- do not claim packaging, desktop, filesystem, or richer UI capabilities that
+  remain deferred
+- do not hide host assumptions or workflow constraints that materially shape
+  the admitted slice
+- do not rewrite unresolved next-wave decisions as already-supported features
+
+Phase role in the larger sequence
+---------------------------------
+- This phase converts the integrated demo and the neighboring audits into one
+  reviewable support claim.
+- It prepares Phase 294 by making the current plateau explicit before the next-
+  wave decision is recorded.
+
+Relevant backlog items this phase intentionally brings under pressure
+--------------------------------------------------------------------
+- keep public support claims aligned with frozen owner boundaries and
+  maintained workflow evidence
+- keep deferred platform areas explicit instead of letting the user-facing
+  story drift into implied support
+
+Questions this phase must answer
+--------------------------------
+1. What exact user-facing slice can the repository support honestly today?
+2. Which workflows, host assumptions, and test surfaces back that claim?
+3. Which larger platform areas remain intentionally unsupported?
+4. Which documentation surfaces should carry this support statement so it stays
+   durable and easy to find?
+
+Preferred implementation shape
+------------------------------
+- Reuse the ownership-and-evidence style of Phase 289, but translate it into a
+  small user-facing support contract.
+- Prefer updating existing public docs such as `README.md` and `kernel/README.md`
+  over creating a new standalone manifesto.
+- Keep the statement short, bounded, and evidence-backed.
+
+Implementation accelerators
+---------------------------
+Main files and navigations
+~~~~~~~~~~~~~~~~~~~~~~~~~~
+- Primary source docs: `docs/plan/active/phase289_second_ui_slice_freeze.txt`,
+  `docs/plan/active/phase290_integrated_small_user_facing_system_demo.txt`,
+  `docs/plan/active/phase291_post_ui_compiler_pressure_audit.txt`, and
+  `docs/plan/active/phase292_post_ui_kernel_ownership_audit.txt`.
+- Primary publication surfaces: `README.md`, `kernel/README.md`, and
+  `tests/tool/README.md`.
+- Supporting routing docs: `docs/plan/backlog.txt` and
+  `docs/plan/decision_log.txt`.
+- Expected first validation target if the statement update changes public
+  workflow commands or target names: the narrowest documented owning tool or
+  reset-lane target referenced by the changed text.
+
+Relevant cookbook patterns
+~~~~~~~~~~~~~~~~~~~~~~~~~~
+- No exact cookbook pattern applies because this is a support statement rather
+  than a code or service feature.
+- Pattern 6 -- Add A Compiler Phase is only loosely relevant as a reminder to
+  keep the document bounded and contract-like.
+
+Relevant file-local invariants
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+- `README.md` should carry only claims that the repository can support through
+  current maintained commands and tests.
+- `kernel/README.md` should describe the bounded hosted reset-lane kernel slice
+  rather than a broader OS platform.
+- `tests/tool/README.md` already names the owning UI-facing hosted targets and
+  should remain the canonical workflow evidence surface.
+- Phase 289 remains the owner-and-evidence baseline for the underlying user-
+  facing capability claim.
+
+Dependency-ordered touch sequence
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+- Audit the landed Phase 289 through Phase 292 truth set first.
+- Land the support-statement wording in the owning documentation surfaces
+  second.
+- Update only the narrow supporting plan, backlog, or decision-note references
+  that must reflect the new public claim third.
+- Repair a missing evidence gap last and only if the statement cannot stay
+  honest without it.
+
+Common breakage map
+~~~~~~~~~~~~~~~~~~~
+- Public support claim exceeds Phase 289 or Phase 290 evidence -> docs overclaim
+  the current system slice.
+- Workflow text names targets or commands that no longer match current tool
+  docs -> the support statement becomes non-executable.
+- Still-deferred platform areas are omitted -> readers infer desktop, package,
+  or filesystem support that the repo does not claim.
+- Statement lands only in phase docs -> the user-facing support story remains
+  hard to find.
+
+Relevant test surfaces
+~~~~~~~~~~~~~~~~~~~~~~
+- Primary owning validation surface: no new executable validation by default,
+  because this phase is documentation-first.
+- Narrowest expected first executable validation target if changed commands or
+  targets must be confirmed: the exact owning tool or reset-lane target named
+  by the updated support text.
+- `tests/tool/README.md` is the workflow-routing anchor for choosing that
+  narrow validation surface.
+
+Test obligations
+----------------
+- no new executable validation by default
+- if the support statement changes published commands or target names, run the
+  narrowest owning tool or reset-lane target referenced by the updated text
+- do not widen to a broad suite unless the statement changed cross-cutting
+  workflow guidance honestly
+
+Acceptance criteria
+-------------------
+- the repository has one easy-to-find, bounded human-facing support statement
+- the claim is tied to explicit owners, workflows, host assumptions, and test
+  surfaces
+- still-unclaimed platform areas remain explicit
+- later readers can understand the current user-facing plateau without
+  re-deriving it from many phase notes
+
+Future follow-up
+----------------
+- Phase 294 should use this support statement as the present-tense baseline for
+  choosing the next major wave.
+- Reopen the statement only when a later phase materially changes the bounded
+  user-facing slice or its owning workflow evidence.

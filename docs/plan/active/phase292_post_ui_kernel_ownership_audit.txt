@@ -1,0 +1,204 @@
+Phase 292 -- Post-UI Kernel Ownership Audit
+===========================================
+
+Status
+------
+PROPOSED
+
+Purpose
+-------
+Classify which new pressures after the second UI slice belong to kernel,
+launcher, display, workflow, persistence, or app-local owners, and reject
+convenience migrations that would blur those boundaries.
+
+This phase exists now because once a small user-facing system demo exists, the
+repository will naturally feel pressure to centralize behavior for convenience.
+The next honest move is to audit those pressures explicitly before they become
+boundary erosion.
+
+Repository status note
+----------------------
+- Phase 289 freezes the current basic-UI owner map.
+- Phase 290 is expected to compose launcher, update, UI, and app owners into
+  one integrated small-system demo.
+- The current kernel already has explicit owners for launcher choice, input
+  parsing, foreground routing, fixed-surface presentation, optional small
+  composition, durable journal state, and app-local interaction truth.
+- The repository still lacks one post-UI audit that says where new convenience
+  pressure should and should not move.
+
+Problem being solved
+--------------------
+- Integrated user-facing behavior creates strong temptation to move more logic
+  into launcher, display, dispatch, or boot simply because those files are
+  already on the main path.
+- Without one explicit ownership audit, later work can easily widen core kernel
+  seams into a hidden framework while still appearing locally convenient.
+- The current-repo problem is therefore one missing post-UI ownership audit,
+  not the absence of another runtime feature.
+
+Non-goals
+---------
+- no new kernel service by default
+- no launcher redesign, window system, or desktop policy
+- no app framework or shared UI state machine
+- no boot or dispatch refactor for convenience alone
+- no new persistence lane unless the audit proves an existing owner is truly
+  insufficient
+
+Invariants
+----------
+- Boot continues to assemble state, not own runtime policy.
+- `kernel_dispatch.mc` continues to route and chase effects, not absorb
+  service-local or app-local state machines.
+- Launcher remains the foreground-program owner, not a general UI coordinator.
+- Display and composition owners remain bounded visible-surface owners.
+- App-local interaction truth remains app-local unless a shared owner is
+  stronger and explicit.
+
+Required surface changes
+------------------------
+1. Audit the post-Phase-290 integrated flow for convenience migrations and
+   boundary pressure.
+2. Classify which pressures belong to existing kernel or app owners.
+3. Record which tempting migrations should be rejected even if they simplify
+   local code.
+4. Identify only the bounded ownership gaps that remain genuinely unresolved.
+
+Forbidden changes
+-----------------
+- do not turn the audit into an implementation phase for new owners
+- do not widen `kernel_dispatch.mc`, boot, or launcher merely to simplify the
+  integrated path
+- do not restate app-local UI behavior as kernel-owned just because it is now
+  exercised more often
+- do not hide unresolved ownership tension by describing it vaguely
+
+Phase role in the larger sequence
+---------------------------------
+- This phase is the post-UI ownership honesty check for the kernel and app
+  boundary map.
+- It complements Phase 291 by giving the next-wave decision a system-side
+  classification alongside the compiler-side one.
+- It also prepares Phase 293 by clarifying which user-facing claims are
+  supported by stable owner boundaries.
+
+Relevant backlog items this phase intentionally brings under pressure
+--------------------------------------------------------------------
+- preserve the current kernel owner split as user-facing behavior becomes more
+  integrated
+- reject convenience migrations into boot, dispatch, launcher, or display that
+  would turn bounded owners into hidden frameworks
+
+Questions this phase must answer
+--------------------------------
+1. Which new pressures exposed by the integrated demo belong to launcher,
+   display, workflow, persistence, or app-local owners?
+2. Which tempting migrations into boot or dispatch should be rejected
+   explicitly?
+3. Are there any genuinely unresolved ownership gaps after Band E, or are the
+   strongest remaining tensions still outside current repo scope?
+4. Which still-deferred areas remain intentionally closed rather than missing?
+
+Preferred implementation shape
+------------------------------
+- Use the frozen Band E owner map and the integrated Phase 290 flow as the two
+  baseline inputs.
+- Evaluate each pressure at the current controlling owner first before
+  considering any boundary shift.
+- Prefer explicit rejection of convenience migrations over vague calls for
+  later cleanup.
+
+Implementation accelerators
+---------------------------
+Main files and navigations
+~~~~~~~~~~~~~~~~~~~~~~~~~~
+- Primary audit inputs: `docs/plan/active/phase289_second_ui_slice_freeze.txt`,
+  `docs/plan/active/phase290_integrated_small_user_facing_system_demo.txt`,
+  and `docs/agent/prompts/kernel_file_invariants.txt`.
+- First owner files to reopen when classifying pressure: `kernel/src/services/launcher_service.mc`,
+  `kernel/src/kernel_dispatch.mc`, `kernel/src/boot/boot.mc`,
+  `kernel/src/services/display_surface.mc`, `kernel/src/services/surface_composition.mc`,
+  `kernel/src/foreground_input_route.mc`, and the app wrappers under
+  `kernel/src/`.
+- Expected first validation target if the audit exposes a missing evidence gap:
+  the narrowest owning reset-lane or grouped workflow surface for the owner in
+  question.
+
+Relevant cookbook patterns
+~~~~~~~~~~~~~~~~~~~~~~~~~~
+- No exact cookbook pattern applies because this is an ownership audit rather
+  than a new kernel feature landing.
+- The closest routing aid is the kernel and workflow touch-set guidance in
+  `docs/agent/prompts/change_touch_sets.txt`, which should be used only if the
+  audit uncovers a real missing-evidence repair.
+
+Relevant file-local invariants
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+- `kernel_file_invariants.txt` is the routing truth for deciding whether a
+  pressure belongs in boot, dispatch, a service owner, or an app-local seam.
+- `phase289_second_ui_slice_freeze.txt` is the authoritative post-Band-E owner
+  baseline; the audit should not re-litigate already-frozen boundaries without
+  new integrated-demo evidence.
+- `kernel_dispatch.mc` must remain a routing owner even when integrated flows
+  make it tempting to centralize more policy there.
+- App wrappers such as `issue_rollup_app.mc` and `review_board_app.mc` are
+  allowed to keep app-local interaction truth if no stronger shared owner is
+  proven.
+
+Dependency-ordered touch sequence
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+- Audit the integrated Phase 290 flow against the frozen Phase 289 owner map
+  first.
+- Land the ranked kernel-ownership audit second.
+- Update only the narrow supporting backlog or decision surface that needs the
+  newly clarified ownership result third.
+- Repair a missing owner-local evidence gap last and only in the narrowest
+  owning runtime or grouped workflow surface.
+
+Common breakage map
+~~~~~~~~~~~~~~~~~~~
+- Pressure assigned to boot or dispatch for convenience -> hidden framework
+  drift and later repair churn.
+- App-local interaction pressure mislabeled as launcher or display work -> UI
+  boundary erosion.
+- Audit forgets the frozen Band E baseline -> already-settled owners get
+  reopened without new evidence.
+- Unresolved ownership gaps left vague -> later phases cannot tell whether to
+  add an owner or keep the pressure deferred.
+
+Relevant test surfaces
+~~~~~~~~~~~~~~~~~~~~~~
+- Primary owning validation surface: no executable validation by default
+  because this is an audit note.
+- Narrowest expected first executable validation target if an evidence gap must
+  be repaired: the owner-local reset-lane fixture or grouped workflow target
+  named by the affected kernel seam.
+- Use `docs/agent/prompts/test_overview.txt` and the kernel touch sets to keep
+  any gap repair owner-first and narrow.
+
+Test obligations
+----------------
+- no new executable validation by default
+- if the audit exposes a missing ownership evidence gap, repair it in the
+  narrowest owning runtime or grouped workflow surface and run that owner-local
+  target first
+- do not turn the audit into a broad reset-lane sweep unless the gap crosses
+  multiple owned seams honestly
+
+Acceptance criteria
+-------------------
+- the repository has one explicit post-UI account of where the strongest new
+  pressures belong in the kernel and app owner map
+- tempting convenience migrations into boot, dispatch, launcher, or display
+  are rejected explicitly when they would blur boundaries
+- unresolved ownership gaps, if any, are named narrowly and reviewably
+- Phase 294 can reuse this audit as one bounded system-side input to the next-
+  wave decision
+
+Future follow-up
+----------------
+- Phase 293 should convert the integrated demo and the ownership audits into a
+  bounded human-facing support statement.
+- Phase 294 should weigh the remaining unresolved ownership pressure against the
+  compiler and platform alternatives before selecting the next wave.

@@ -3,7 +3,7 @@ Phase 289 -- Second UI Slice Freeze
 
 Status
 ------
-PROPOSED
+COMPLETED
 
 Purpose
 -------
@@ -181,6 +181,101 @@ Acceptance criteria
 - still-closed UI and platform areas are called out explicitly
 - later planning can reuse this document as an honest baseline instead of a
   vague impression
+
+Implementation outcome
+----------------------
+- After Band E, the repository's admitted "basic UI" means exactly one
+  launcher-selected foreground app rendered on one fixed four-cell visible
+  surface, with one admitted key-only input family and one optional fixed
+  two-region composition seam.
+- The maintained owner set for that frozen slice is:
+  - `kernel/src/services/display_surface.mc` for one fixed four-cell visible
+    target and present/query semantics
+  - `kernel/src/services/surface_composition.mc` for one fixed two-cell body
+    plus two-cell status composition path on the same surface
+  - `kernel/src/input_event.mc` for the admitted `I K <byte> !` input family
+  - `kernel/src/foreground_input_route.mc` for one foreground-app routing seam
+  - `kernel/src/services/launcher_service.mc` for single-foreground program
+    choice, direct `review_board` launch, and the existing installed
+    `issue_rollup` launch classification path
+  - `kernel/src/issue_rollup_app.mc` for app-local render, focus, and
+    interaction truth on the first UI proof
+  - `kernel/src/review_board_app.mc` plus
+    `examples/real/review_board/src/review_board_ui.mc` for the second
+    directly usable UI proof and its app-local interaction truth
+  - `kernel/src/services/journal_service.mc` for one bounded persisted
+    `review_board` view-state lane
+- The admitted user-facing capabilities after Band E are now:
+  - one directly usable installed foreground app path for `issue_rollup`
+    with app-local rendering and the launch-only `FRSH` or `RSUM` or `INVD`
+    overlay
+  - one directly usable second foreground app path for `review_board` through
+    the same launcher/display/input seams without a shared app framework
+  - one optional body-versus-status composition path on the custom-manifest
+    `issue_rollup` slice instead of a general layout or compositor model
+  - one bounded persisted `review_board` view-state slice that reloads through
+    the existing journal plus boot plus launch path instead of a session or
+    document framework
+  - one canonical local workflow on the ordinary `mc` project path plus the
+    grouped reset-lane workflow path already documented in `README.md` and
+    `tests/tool/README.md`
+- The still-closed UI and platform areas remain explicit:
+  - no second input family beyond the current key-only path
+  - no window system, multi-surface policy, compositor, or general layout
+    engine
+  - no shared control vocabulary, widget toolkit, theming system, or
+    accessibility framework
+  - no text-system, document editor framework, or generalized app framework
+  - no session restore, generic document store, save framework, or sync model
+  - no UI-specific package manager, installer stack, desktop shell, or second
+    build or run workflow outside the ordinary `mc` and grouped test paths
+- The supporting evidence surfaces for the frozen claim set are:
+  - the Band E phase docs from Phase 282 through Phase 288
+  - the hosted UI workflow and commands documented in `README.md`
+  - the hosted owning test targets
+    `mc_tool_real_project_issue_rollup_unit` and
+    `mc_tool_real_project_review_board_unit`
+  - the reset-lane grouped UI workflow targets
+    `mc_tool_workflow_kernel_reset_lane_unit` and
+    `mc_tool_workflow_kernel_reset_lane_full_unit`
+  - the focused restart-sensitive persistence proof under
+    `tests/system/kernel_reset_lane_phase287_document_or_view_state_persistence_follow_through/`
+
+Validation
+----------
+- no new executable validation was required because Phase 289 is a bounded
+  freeze document and the owning executable evidence already landed in Phases
+  282 through 288
+
+Phase review against the spec
+-----------------------------
+- Preserved invariants:
+  - the freeze records only landed repository truth from the Band E owners and
+    proofs
+  - deferred UI and platform areas remain explicit and reviewable
+  - admitted capability is separated clearly from broader desktop or platform
+    expectations
+- Ownership boundaries did not weaken:
+  - `display_surface.mc` remains a fixed-surface owner only
+  - `surface_composition.mc` remains one tiny region assembler rather than a
+    layout framework
+  - `input_event.mc` and `foreground_input_route.mc` remain the admitted
+    input-shape and foreground-routing owners rather than broader event policy
+  - `launcher_service.mc` remains single-foreground and launch-classification
+    owner rather than a UI-state or package framework
+  - `issue_rollup_app.mc` and `review_board_app.mc` keep render and
+    interaction semantics app-local instead of promoting a shared toolkit
+  - `journal_service.mc` remains the bounded durable owner instead of a UI
+    persistence framework
+- Accidental abstractions and centers of gravity were avoided:
+  - no desktop shell, app platform, widget family, session framework, or
+    second workflow stack was introduced by the freeze
+  - no display-owned render policy, launcher-owned UI policy, or durable-owner
+    app framework was claimed
+- Honest non-decisions and deferred work:
+  - alternate input, shared controls, broader composition, richer persistence,
+    and broader platform direction remain explicit later pressure rather than
+    implied current capability
 
 Future follow-up
 ----------------

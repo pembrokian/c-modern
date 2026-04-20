@@ -1,0 +1,218 @@
+Phase 290 -- Integrated Small User-Facing System Demo
+=====================================================
+
+Status
+------
+PROPOSED
+
+Purpose
+-------
+Prove one coherent repository-owned small system that combines the current
+launcher, installed-program identity, update path, first UI surface, and the
+two admitted user-facing apps into one reviewable end-to-end outcome.
+
+This phase exists now because Band E closes with two directly usable UI-facing
+programs and one frozen account of basic UI. The next honest move is not more
+UI structure but one integrated demo that shows those owners compose into a
+small system rather than a set of disconnected proofs.
+
+Repository status note
+----------------------
+- Phase 272 already proves one installed workflow demo on the launcher-owned
+  installed path.
+- Phase 280 already proves restart and update follow-through on the visible
+  `issue_rollup` path.
+- Phase 286 adds `review_board` as the second directly usable UI proof.
+- Phase 287 adds one bounded persisted `review_board` view-state slice through
+  `journal_service.mc`.
+- Phase 289 freezes post-Band-E basic UI as one launcher-selected foreground
+  app on one fixed surface with one optional two-region composition seam.
+- The repository still lacks one coherent proof that these admitted owners now
+  read as a small user-facing system rather than as separate phase-local demos.
+
+Problem being solved
+--------------------
+- After a long sequence of narrow owner-local landings, the repository can
+  still undersell or oversell itself unless there is one explicit integrated
+  demo that exercises the composed outcome.
+- Without such a demo, later planning could either keep adding more substrate
+  because the current result still feels fragmented, or claim a broader system
+  maturity than the current owner set really supports.
+- The current-repo problem is therefore one missing end-to-end small-system
+  proof, not a missing platform framework.
+
+Non-goals
+---------
+- no desktop shell or session manager
+- no app packaging or installer framework beyond the already-admitted update
+  and launch paths
+- no third user-facing app
+- no new display, composition, control, or persistence owner unless the demo
+  exposes a concrete existing-owner gap
+- no separate product-demo harness outside the maintained workflow and reset-
+  lane surfaces
+
+Invariants
+----------
+- Launcher remains the single foreground-app owner.
+- `update_store_service.mc` remains the installed-byte and launch-record owner
+  for the admitted installed path.
+- `display_surface.mc`, `surface_composition.mc`, `input_event.mc`, and
+  `foreground_input_route.mc` keep their current UI boundaries.
+- `issue_rollup` and `review_board` remain ordinary repository-owned consumers,
+  not templates for a broader app framework.
+- The integrated demo must reuse existing maintained workflow surfaces instead
+  of inventing a second demo-only path.
+
+Required surface changes
+------------------------
+1. Define one coherent repository-owned demo flow that spends the admitted
+   launcher, install or update, UI, and app owners together.
+2. Add one focused proof surface for that integrated flow.
+3. Tighten any narrow workflow or documentation glue required to make the demo
+   reviewable and repeatable.
+4. Keep the composed outcome bounded to the already-admitted owner set.
+
+Forbidden changes
+-----------------
+- do not widen launcher into a desktop shell or app-platform owner
+- do not widen `update_store_service.mc` into a general package manager
+- do not add a third app or richer UI layer just to make the demo feel more
+  complete
+- do not create a second build, launch, or test stack outside the current `mc`
+  project and grouped workflow surfaces
+
+Phase role in the larger sequence
+---------------------------------
+- This phase turns the frozen Band E owner set into one coherent small-system
+  proof.
+- It prepares Phase 291 and Phase 292 by exposing which remaining compiler or
+  kernel pressures are real only after the integrated path is exercised.
+- It also gives Phase 293 a concrete user-facing slice to describe honestly.
+
+Relevant backlog items this phase intentionally brings under pressure
+--------------------------------------------------------------------
+- prove that the current launcher-plus-update-plus-UI stack composes into one
+  small system outcome
+- keep system integration bounded to admitted owners rather than drifting into
+  framework growth
+
+Questions this phase must answer
+--------------------------------
+1. What is the smallest coherent user-facing flow that spends the current
+   launcher, update, UI, and app owners together?
+2. Which parts of that flow belong on the installed `issue_rollup` path and
+   which belong on the direct-launch `review_board` path?
+3. What focused proof best demonstrates the integrated outcome without adding a
+   separate demo harness?
+4. Which awkward seams exposed by the demo are true next-phase pressure, and
+   which are only presentation friction?
+
+Preferred implementation shape
+------------------------------
+- Prefer one narrative but executable flow that uses the existing launcher to
+  enter either the installed `issue_rollup` lane or the direct-launch
+  `review_board` lane on the admitted surface.
+- Reuse the current reset-lane grouped path for the integration proof and the
+  current real-project tests for hosted corroboration.
+- Keep the demo focused on composition of existing truths: installed launch,
+  visible surface, direct app interaction, and persisted review-board view
+  state.
+
+Implementation accelerators
+---------------------------
+Main files and navigations
+~~~~~~~~~~~~~~~~~~~~~~~~~~
+- Primary controlling owners: `kernel/src/services/launcher_service.mc`,
+  `kernel/src/services/update_store_service.mc`, `kernel/src/issue_rollup_app.mc`,
+  and `kernel/src/review_board_app.mc`.
+- First-hop validation and workflow surfaces: `tests/tool/tool_kernel_reset_lane_suite.cpp`,
+  `tests/tool/real_projects/issue-rollup/test.cpp`, and
+  `tests/tool/real_projects/review-board/test.cpp`.
+- First supporting docs to open: `docs/plan/active/phase289_second_ui_slice_freeze.txt`,
+  `README.md`, and `tests/tool/README.md`.
+- Expected first validation target when the composed demo lands: one focused
+  reset-lane grouped case for the integrated flow.
+
+Relevant cookbook patterns
+~~~~~~~~~~~~~~~~~~~~~~~~~~
+- Pattern 5 -- Add A Test File is the closest fit because the phase should end
+  in one new focused system proof over existing owners.
+- The phase intentionally differs from a normal single-owner test addition
+  because it validates composition across already-landed launcher, UI, and app
+  owners.
+
+Relevant file-local invariants
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+- `launcher_service.mc` owns foreground program choice and launch-state truth;
+  do not hide integrated-demo policy in dispatch.
+- `update_store_service.mc` owns installed bytes and launch-record truth only;
+  it should not be widened to cover direct-launch `review_board` behavior.
+- `tests/tool/tool_kernel_reset_lane_suite.cpp` remains the maintained grouped
+  reset-lane owner; integrated demo coverage should land there instead of in a
+  new ad hoc harness.
+- The real-project tests remain corroborating hosted evidence, not the sole
+  integration proof for kernel-owned UI behavior.
+
+Dependency-ordered touch sequence
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+- Land the focused integrated-demo scenario or grouped-case owner first.
+- Move the direct app or launcher follow-through surface second only if the
+  demo exposes a real missing path.
+- Update supporting workflow documentation or grouped-suite registration third.
+- Touch neighboring hosted real-project proofs last and only if the integrated
+  demo changed a maintained app workflow contract.
+
+Common breakage map
+~~~~~~~~~~~~~~~~~~~
+- New integrated case touches installed launch truth -> launcher replies,
+  update-store follow-through, and reset-lane case expectations drift first.
+- New integrated case touches direct-launch `review_board` path -> launcher
+  direct-launch branch, app wrapper state, and grouped case registration drift
+  first.
+- Demo added only in docs -> no executable proof backs the composed claim.
+- Integration pressure pushed into `kernel_dispatch.mc` -> owner boundaries
+  blur instead of exposing the real controlling service or app seam.
+
+Relevant test surfaces
+~~~~~~~~~~~~~~~~~~~~~~
+- Primary owning validation surface: the grouped reset-lane workflow suite in
+  `tests/tool/tool_kernel_reset_lane_suite.cpp`.
+- Narrowest expected first executable validation target: the focused new Band F
+  integrated demo case inside `mc_tool_workflow_kernel_reset_lane_unit`.
+- Supporting validation: `mc_tool_real_project_issue_rollup_unit` and
+  `mc_tool_real_project_review_board_unit` only if the composed flow changes a
+  hosted workflow contract.
+- Follow the grouped reset-lane rule from `docs/agent/prompts/test_overview.txt`:
+  fix the owning grouped case first and widen to the full maintained grouped
+  case only after the narrow owner passes.
+
+Test obligations
+----------------
+- `Build debug`
+- one focused integrated-demo reset-lane grouped case
+- `mc_tool_workflow_kernel_reset_lane_unit`
+- `mc_tool_real_project_issue_rollup_unit` only if the installed app workflow
+  contract changes
+- `mc_tool_real_project_review_board_unit` only if the second app workflow
+  contract changes
+- `mc_tool_workflow_kernel_reset_lane_full_unit` only after the narrow grouped
+  owner passes and only if the maintained full path gained the new case
+
+Acceptance criteria
+-------------------
+- one coherent repository-owned demo composes the current launcher, install or
+  update, UI, and app owners into a reviewable small-system outcome
+- the proof lands on the maintained workflow and reset-lane surfaces instead of
+  in a separate demo harness
+- the phase exposes real next-pressure signals without widening the platform
+  scope
+- later audits can point to one concrete integrated result rather than a set of
+  disconnected owner proofs
+
+Future follow-up
+----------------
+- Phase 291 should audit which compiler pressures become real only after the
+  integrated demo is exercised.
+- Phase 292 should audit which system pressures belong to kernel, launcher,
+  display, workflow, or app owners after the same integrated path is reviewed.

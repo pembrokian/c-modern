@@ -1,0 +1,191 @@
+Phase 291 -- Post-UI Compiler Pressure Audit
+============================================
+
+Status
+------
+PROPOSED
+
+Purpose
+-------
+Classify which language or compiler pressures are now real because of the
+app-shaped and UI-facing code that the repository actually maintains, and keep
+the rest explicitly speculative.
+
+This phase exists now because Bands C through F give the repository more real
+consumer code than the earlier compiler wave had available. The next honest
+compiler step should come from those maintained consumers rather than from
+generic language ambition.
+
+Repository status note
+----------------------
+- Phase 261 closed the post-254 compiler wave and explicitly kept broader
+  compiler fronts deferred.
+- Bands C through E add installed-program, launcher, visible-surface, and
+  user-facing app code that can now expose different source awkwardness.
+- Phase 290 is expected to exercise those owners as one integrated demo.
+- The repository still lacks one explicit post-UI classification of which new
+  compiler pressures are now real and which remain premature.
+
+Problem being solved
+--------------------
+- More app and UI code naturally invites broader language requests, but without
+  an explicit audit the repository can drift back into compiler work that still
+  has no strong maintained consumer.
+- Conversely, real source awkwardness in the current launcher, app, render,
+  or persistence code can remain invisible if the repository treats Band A as
+  the last compiler word.
+- The current-repo problem is therefore one missing evidence-driven compiler
+  pressure audit after the first user-facing wave.
+
+Non-goals
+---------
+- no new compiler feature by default
+- no broad parser, inference, trait, async, actor, or runtime wave
+- no reopening of deferred compiler fronts unless the audit can name a strong
+  maintained consumer
+- no UI architecture work disguised as compiler cleanup
+
+Invariants
+----------
+- Compiler pressure must be justified by maintained repository-owned consumers.
+- Parser, sema, MIR, backend, and driver ownership boundaries remain intact.
+- Real source awkwardness belongs to the earliest honest compiler layer, not to
+  app-local workaround expansion.
+- The audit must be allowed to conclude that no new compiler wave yet outranks
+  another system or platform pressure.
+
+Required surface changes
+------------------------
+1. Audit the maintained post-Band-E and post-Phase-290 consumer code for real
+   repeated compiler pain.
+2. Classify candidate pressures by controlling compiler layer.
+3. Separate immediately credible next-wave compiler work from still-speculative
+   language ambition.
+4. Record the result in one reviewable audit note.
+
+Forbidden changes
+-----------------
+- do not land a new compiler feature just because the audit found a candidate
+- do not attribute parser or sema pain to MIR, backend, or driver convenience
+- do not use isolated hypothetical language ideas as evidence
+- do not turn a consumer-local cleanup wish into a compiler roadmap claim
+
+Phase role in the larger sequence
+---------------------------------
+- This phase consumes the integration evidence from Phase 290 and checks
+  whether the repository is now ready for another bounded compiler wave.
+- It prepares Phase 294 by giving the next-wave decision one evidence-based
+  compiler branch alongside the system-side options.
+
+Relevant backlog items this phase intentionally brings under pressure
+--------------------------------------------------------------------
+- keep compiler growth contract-first and consumer-driven
+- reopen compiler work only where the current app and UI code proves a bounded
+  next slice stronger than alternative platform pressure
+
+Questions this phase must answer
+--------------------------------
+1. Which maintained post-UI consumers now exhibit repeated source awkwardness
+   that clearly belongs in compiler work?
+2. Which controlling compiler layer owns each candidate pressure?
+3. Which previously deferred fronts from Phase 261 remain speculative even
+   after Bands C through F?
+4. Does any compiler pressure now outrank the strongest system or platform
+   pressure named by the neighboring Band F audits?
+
+Preferred implementation shape
+------------------------------
+- Start from maintained consumer code such as the launcher, UI app wrappers,
+  render helpers, review-board UI state, and persistence follow-through.
+- Classify pressure by earliest honest owner: parser syntax, sema meaning, MIR
+  lowering, backend execution, or driver workflow.
+- Prefer a short ranked audit over a broad wishlist.
+
+Implementation accelerators
+---------------------------
+Main files and navigations
+~~~~~~~~~~~~~~~~~~~~~~~~~~
+- Primary audit inputs: `docs/plan/active/phase261_compiler_pressure_audit_after_the_generic_and_table_wave.txt`,
+  `docs/plan/active/phase290_integrated_small_user_facing_system_demo.txt`,
+  `examples/real/issue_rollup/src/`, and `examples/real/review_board/src/`.
+- Compiler routing prompts to open first: `docs/agent/prompts/compiler_file_invariants.txt`,
+  `docs/agent/prompts/change_touch_sets.txt`, and
+  `docs/agent/prompts/patterns_cookbook.txt`.
+- Expected first validation target if the audit exposes a missing evidence gap:
+  the narrowest owning compiler target named by the affected layer, not a broad
+  full-suite rerun.
+
+Relevant cookbook patterns
+~~~~~~~~~~~~~~~~~~~~~~~~~~
+- Pattern 6 -- Add A Compiler Phase is the closest fit because this phase is a
+  bounded planning-time audit that should identify one potential next compiler
+  slice rather than scatter speculative ideas.
+- The phase intentionally differs from a normal feature plan because it should
+  not assume that a compiler landing follows automatically.
+
+Relevant file-local invariants
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+- `compiler_file_invariants.txt` is the routing truth for deciding whether a
+  pressure belongs to parser, sema, MIR, backend, or driver.
+- `phase261_compiler_pressure_audit_after_the_generic_and_table_wave.txt`
+  remains the immediate baseline for what was already deferred before the UI
+  and app wave matured.
+- Maintained app and UI sources are evidence surfaces only; they should not be
+  rewritten merely to make the audit easier.
+- If an audit claim implies a new source shape, check parser ownership first
+  rather than assuming a later-layer workaround.
+
+Dependency-ordered touch sequence
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+- Audit the maintained consumer code and the Phase 261 deferred set first.
+- Land the ranked compiler-pressure audit second.
+- Update only the narrow roadmap, backlog, or decision-note surface that must
+  reflect a newly credible compiler branch third.
+- Repair a missing owner-local compiler evidence gap last and only if the audit
+  cannot stay honest without it.
+
+Common breakage map
+~~~~~~~~~~~~~~~~~~~
+- Claimed compiler pressure has no maintained consumer -> audit drifts into
+  wishlist territory.
+- Pressure assigned to the wrong compiler layer -> later implementation starts
+  in MIR, backend, or driver for a parser or sema problem.
+- Audit forgets the Phase 261 deferred baseline -> already-rejected or still-
+  weak fronts get resurfaced without new evidence.
+- Sidecar roadmap churn after the audit -> planning surfaces move more than the
+  bounded reclassification requires.
+
+Relevant test surfaces
+~~~~~~~~~~~~~~~~~~~~~~
+- Primary owning validation surface: no executable validation by default
+  because this is an audit note.
+- Narrowest expected first executable validation target if an evidence gap must
+  be repaired: the owning compiler target named by the affected layer, such as
+  `mc_sema_fixture_unit`, `mc_mir_fixture_unit`, or the narrow tool owner.
+- Use `docs/agent/prompts/test_overview.txt` to route any necessary gap repair
+  before broadening validation.
+
+Test obligations
+----------------
+- no new executable validation by default
+- if the audit exposes a missing compiler evidence gap, repair it in the
+  narrowest owning layer and run only that owner-local target first
+- do not widen into a general compiler sweep unless a repaired gap crosses
+  multiple layers honestly
+
+Acceptance criteria
+-------------------
+- the repository has one explicit ranked account of which compiler pressures are
+  now real after the app and UI wave
+- each credible pressure is tied to maintained consumers and the controlling
+  compiler layer
+- still-speculative compiler ambitions remain explicitly deferred
+- the Phase 294 decision note can reuse this audit as one bounded input rather
+  than guessing about compiler needs
+
+Future follow-up
+----------------
+- If one compiler pressure clearly wins, Phase 294 should record it as a real
+  next-wave branch alongside the strongest system-side options.
+- If no compiler pressure wins, keep compiler expansion deferred until a later
+  consumer makes one bounded slice unavoidable.

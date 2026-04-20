@@ -1,0 +1,194 @@
+Phase 294 -- Next-Wave Decision Note
+====================================
+
+Status
+------
+PROPOSED
+
+Purpose
+-------
+Record which major next-wave pressure is strongest after the first integrated
+user-facing system plateau, instead of assuming the next expansion follows
+automatically from recent success.
+
+This phase exists now because Band F is explicitly supposed to stop and decide.
+After the integrated demo, the compiler audit, the kernel ownership audit, and
+the support statement, the repository should choose its next bounded direction
+deliberately rather than drifting into the most convenient adjacent work.
+
+Repository status note
+----------------------
+- The speculative roadmap names the candidate next branches explicitly:
+  broader app packaging, richer UI composition, networking, durable file-like
+  growth, or another compiler follow-through wave.
+- `docs/plan/backlog.txt` already carries active deferred themes for broader
+  package or install policy, richer UI growth, file-like service growth,
+  durable-owner boundaries, networking-style ingress, and compiler-local
+  follow-through.
+- Phases 291 through 293 are expected to produce the local evidence needed to
+  choose among those branches.
+- The repository still lacks one explicit recorded decision about which branch
+  currently wins and why the others do not.
+
+Problem being solved
+--------------------
+- After a visible successful wave, adjacent next steps can all look plausible.
+  Without one explicit decision note, later planning can drift toward the most
+  convenient code surface rather than the strongest evidence-backed pressure.
+- The repository also risks reopening already-deferred branches prematurely if
+  the reason they lost is not recorded while the comparison is fresh.
+- The current-repo problem is therefore one missing next-wave decision record,
+  not an absence of possible work.
+
+Non-goals
+---------
+- no new implementation landing by default
+- no broad roadmap rewrite beyond recording the chosen next-wave branch
+- no speculative ranking of branches that have no current-repo evidence
+- no attempt to solve ties by combining multiple major waves into one band
+
+Invariants
+----------
+- The decision must be driven by current maintained evidence, not by generic
+  product ambition.
+- Branch candidates must be compared as bounded next-wave options, not as open-
+  ended strategic visions.
+- The note must record why the chosen branch wins and why the strongest losers
+  remain deferred.
+- The decision must preserve current owner boundaries and the frozen post-Band-
+  E baseline.
+
+Required surface changes
+------------------------
+1. Compare the main next-wave candidates against the evidence from Phases 290
+   through 293 and the current backlog.
+2. Record the winning bounded next-wave branch.
+3. Record the key reasons the non-winning branches remain deferred.
+4. Update only the narrow roadmap or planning surface that must reflect the
+   decision.
+
+Forbidden changes
+-----------------
+- do not choose multiple major next-wave branches at once just to avoid making
+  a decision
+- do not restate deferred branches as implied commitments
+- do not pick a branch solely because it feels more visible or more fun
+- do not widen the note into a broad architecture treatise
+
+Phase role in the larger sequence
+---------------------------------
+- This phase closes the speculative post-254 roadmap horizon with one recorded
+  decision.
+- It gives the repository a clean handoff into the next concrete planning wave.
+
+Relevant backlog items this phase intentionally brings under pressure
+--------------------------------------------------------------------
+- compare deferred compiler, UI, packaging, durable file-like, and networking
+  branches against the current integrated-system evidence
+- keep next-wave selection evidence-based and bounded instead of convenience-
+  driven
+
+Questions this phase must answer
+--------------------------------
+1. Which bounded next-wave branch is strongest after the integrated demo and
+   the neighboring audits?
+2. Why does that branch outrank broader packaging, richer UI, networking,
+   durable file-like growth, and the competing compiler options?
+3. What exact evidence would have to change for one of the losing branches to
+   win later?
+4. Which planning surfaces must be updated so the decision stays durable and
+   visible?
+
+Preferred implementation shape
+------------------------------
+- Start from the ranked evidence in Phase 291 and Phase 292, then cross-check
+  the active backlog themes and the human-facing support plateau from Phase 293.
+- Prefer naming one winning branch with a short loser matrix over a vague
+  multi-direction note.
+- Keep the decision recorded in one durable planning note plus only the
+  narrowest roadmap sync required.
+
+Implementation accelerators
+---------------------------
+Main files and navigations
+~~~~~~~~~~~~~~~~~~~~~~~~~~
+- Primary decision inputs: `docs/plan/active/phase291_post_ui_compiler_pressure_audit.txt`,
+  `docs/plan/active/phase292_post_ui_kernel_ownership_audit.txt`, and
+  `docs/plan/active/phase293_first_human_facing_support_statement.txt`.
+- Deferred-branch inventory to reopen second: `docs/plan/backlog.txt`,
+  `docs/plan/decision_log.txt`, and
+  `docs/plan/admin/speculative_roadmap_post_phase254.txt`.
+- Expected first validation target if the decision note updates a public plan
+  index or roadmap summary: no executable validation by default; verify only
+  the touched planning docs for editor errors.
+
+Relevant cookbook patterns
+~~~~~~~~~~~~~~~~~~~~~~~~~~
+- No exact cookbook pattern applies because this is a bounded planning
+  decision note.
+- Pattern 6 -- Add A Compiler Phase is relevant only as a reminder that the
+  winning compiler branch, if any, still needs a separate bounded phase plan
+  later.
+
+Relevant file-local invariants
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+- `docs/plan/backlog.txt` is the inventory of active deferred themes, not the
+  place to announce the winner by itself.
+- `docs/plan/decision_log.txt` records intentional limited-solution choices and
+  is the right adjacent surface if the winning branch depends on one durable
+  rationale.
+- The speculative roadmap should only be updated narrowly enough to reflect the
+  recorded decision, not rewritten wholesale.
+- Phase 293 is the present-tense support baseline; the next-wave choice must
+  not weaken or overstate that plateau.
+
+Dependency-ordered touch sequence
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+- Compare the evidence from Phases 291 through 293 and the active backlog first.
+- Land the next-wave decision note second.
+- Sync only the narrow roadmap or supporting planning surface that must reflect
+  the choice third.
+- Draft the next concrete phase band last and only after this choice is stable.
+
+Common breakage map
+~~~~~~~~~~~~~~~~~~~
+- Decision note names no winner -> the repo remains drift-prone and the band
+  does not actually close.
+- Winning branch has no stronger evidence than a loser -> the note becomes
+  preference-driven instead of repo-driven.
+- Losing branches are not explained -> the same arguments get rediscovered in
+  the next planning cycle.
+- Roadmap sync widens too far -> speculative admin docs churn more than the
+  bounded decision requires.
+
+Relevant test surfaces
+~~~~~~~~~~~~~~~~~~~~~~
+- Primary owning validation surface: no executable validation by default
+  because this is a planning decision note.
+- Narrowest expected first validation target: editor diagnostics on the touched
+  planning docs.
+- If the decision note names a workflow or target in public docs, validate only
+  the narrow documented surface that changed.
+
+Test obligations
+----------------
+- editor diagnostics on the decision note and any narrowly synced planning doc
+- no executable validation by default
+- if the note changes a public workflow command or target name, run only the
+  narrow owning validation surface referenced by the changed text
+
+Acceptance criteria
+-------------------
+- the repository records one explicit evidence-backed next-wave winner
+- the strongest losing branches are named and deferred with concrete reasons
+- the result is visible in the planning surfaces that future phase work will
+  actually consult
+- the post-Band-F plateau closes with a durable decision instead of open-ended
+  momentum
+
+Future follow-up
+----------------
+- The next concrete planning band should be drafted only after this decision
+  note lands.
+- Reopen the loser branches only when new maintained consumers or new audit
+  evidence make one of them stronger than the recorded winner.
