@@ -3,7 +3,7 @@ Phase 288 -- UI Tooling And Build Path Audit
 
 Status
 ------
-PROPOSED
+COMPLETED
 
 Purpose
 -------
@@ -24,9 +24,8 @@ Repository status note
   `tests/tool/real_projects/review-board/`.
 - The reset-lane suite already carries the first UI proof and related grouped
   workflow coverage.
-- The repository still lacks one explicit statement of the standard build,
-  launch, run, and test path for UI-facing programs as a coherent maintained
-  workflow.
+- The repository now states one explicit maintained build, run, and test path
+  for the admitted UI-facing programs without introducing a second workflow.
 
 Problem being solved
 --------------------
@@ -214,6 +213,53 @@ Acceptance criteria
 - no UI-specific platform or packaging stack is introduced
 - Band E ends with a reviewable workflow surface rather than scattered tribal
   knowledge
+
+Implementation outcome
+----------------------
+- The canonical local UI workflow is now documented in `README.md` using the
+  existing `mc build`, `mc run`, and `mc test` surfaces for the admitted
+  hosted projects.
+- The documented hosted UI commands cover the maintained `issue_rollup`
+  targets (`issue-rollup-core`, `issue-rollup`, and `issue-rollup-report`) and
+  the maintained `review_board` targets (`audit`, `focus`, and `ui`).
+- The documented reset-lane UI path stays on the existing kernel repo-project
+  workflow through `kernel/build.toml`, `mc_tool_workflow_kernel_reset_lane_unit`,
+  and `mc_tool_workflow_kernel_reset_lane_full_unit`.
+- `tests/tool/README.md` now records the owning narrow validation targets for
+  the admitted hosted UI projects: `mc_tool_real_project_issue_rollup_unit`
+  and `mc_tool_real_project_review_board_unit`, with the reset-lane grouped
+  target unchanged as the system-owned UI workflow surface.
+- The audit found no missing workflow gap that justified a new runner,
+  manifest family, package layer, or grouped-suite split. The existing
+  real-project and reset-lane owners already covered the admitted UI-facing
+  programs; the missing piece was the explicit workflow account.
+
+Validation
+----------
+- `mc_tool_real_project_issue_rollup_unit`
+- `mc_tool_real_project_review_board_unit`
+
+Phase review against the spec
+-----------------------------
+- Preserved invariants:
+  - the ordinary `mc` build, run, and test workflow remains the core path for
+    UI-facing programs
+  - UI-facing programs remain ordinary repository-owned projects with
+    `build.toml` entrypoints
+  - reset-lane coverage remains grouped on the existing kernel workflow suite
+- Ownership boundaries did not weaken:
+  - `README.md` now owns the public canonical command account instead of
+    pushing UI workflow knowledge into tests alone
+  - `tests/tool/README.md` remains the owner-local guide for narrow grouped
+    validation routing
+  - no UI-specific tool, package manager, launcher daemon, or app platform was
+    introduced
+- Accidental centers of gravity were avoided:
+  - no new workflow wrapper, registry, descriptor family, or platform layer was
+    added
+  - the phase stayed documentation-local because the existing hosted
+    real-project and reset-lane test owners already provided the required
+    executable evidence
 
 Future follow-up
 ----------------

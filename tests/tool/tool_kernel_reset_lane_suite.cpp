@@ -341,6 +341,23 @@ bool CanReuseResetLaneBuild(const std::filesystem::path& source_root,
     return true;
 }
 
+void ClearResetLaneRuntimeArtifacts(const std::filesystem::path& build_dir) {
+    if (!std::filesystem::exists(build_dir) || !std::filesystem::is_directory(build_dir)) {
+        return;
+    }
+
+    for (const auto& entry : std::filesystem::directory_iterator(build_dir)) {
+        if (!entry.is_regular_file()) {
+            continue;
+        }
+        const std::string name = entry.path().filename().string();
+        if (!name.starts_with("mc_") || !name.ends_with(".bin")) {
+            continue;
+        }
+        std::filesystem::remove(entry.path());
+    }
+}
+
 void WriteFileIfChanged(const std::filesystem::path& path,
                         std::string_view contents) {
     if (std::filesystem::exists(path) && ReadFile(path) == contents) {
@@ -472,6 +489,8 @@ ResetLaneScenarioTiming RunKernelResetLaneScenario(const std::filesystem::path& 
     const auto build_end = std::chrono::steady_clock::now();
 
     std::vector<std::string> command = {executable_path.generic_string()};
+
+    ClearResetLaneRuntimeArtifacts(build_dir);
 
     const auto run_start = std::chrono::steady_clock::now();
     const auto [run_outcome, run_output] = mc::test_support::RunCommandCaptureInDir(command,

@@ -135,6 +135,39 @@ Supported command patterns:
 - direct-source inspection or build: `build/debug/mc check <file.mc>` and `build/debug/mc build <file.mc> --build-dir <dir>`
 - project inspection, build, run, or test: `build/debug/mc check --project <build.toml>`, `build/debug/mc build --project <build.toml> --build-dir <dir>`, `build/debug/mc run --project <build.toml> --build-dir <dir> -- <args>`, and `build/debug/mc test --project <build.toml> --build-dir <dir>`
 
+UI-facing project workflow:
+
+- UI-facing programs stay on the ordinary `mc` project workflow; there is no separate UI runner, package manager, or app-specific build tool.
+- `issue_rollup` is the hosted grouped-package UI proof. Use the same project manifest for build, run, and test:
+
+```sh
+build/debug/mc build --project examples/real/issue_rollup/build.toml --target issue-rollup-core --build-dir build/debug/probes/ui/issue_rollup
+build/debug/mc build --project examples/real/issue_rollup/build.toml --target issue-rollup-report --build-dir build/debug/probes/ui/issue_rollup
+build/debug/mc run --project examples/real/issue_rollup/build.toml --build-dir build/debug/probes/ui/issue_rollup -- examples/real/issue_rollup/tests/sample.txt
+build/debug/mc run --project examples/real/issue_rollup/build.toml --target issue-rollup-report --build-dir build/debug/probes/ui/issue_rollup -- examples/real/issue_rollup/tests/sample.txt
+build/debug/mc test --project examples/real/issue_rollup/build.toml --build-dir build/debug/probes/ui/issue_rollup
+```
+
+- `review_board` is the second hosted UI proof. Its canonical targets are `audit`, `focus`, and the directly runnable `ui` proof:
+
+```sh
+build/debug/mc run --project examples/real/review_board/build.toml --build-dir build/debug/probes/ui/review_board -- examples/real/review_board/tests/board_sample.txt
+build/debug/mc run --project examples/real/review_board/build.toml --target focus --build-dir build/debug/probes/ui/review_board -- examples/real/review_board/tests/board_sample.txt
+build/debug/mc run --project examples/real/review_board/build.toml --target ui --build-dir build/debug/probes/ui/review_board -- OTFTUUU
+build/debug/mc test --project examples/real/review_board/build.toml --build-dir build/debug/probes/ui/review_board
+build/debug/mc test --project examples/real/review_board/build.toml --target focus --build-dir build/debug/probes/ui/review_board
+```
+
+- The reset-lane UI path remains on the ordinary kernel project workflow and grouped tool tests:
+
+```sh
+build/debug/mc build --project kernel/build.toml --target kernel --build-dir build/debug/probes/ui/kernel
+ctest --test-dir build/debug -R '^mc_tool_workflow_kernel_reset_lane_unit$' --output-on-failure
+ctest --test-dir build/debug -R '^mc_tool_workflow_kernel_reset_lane_full_unit$' --output-on-failure
+```
+
+- Narrow owning validation targets for the admitted UI-facing programs are `mc_tool_real_project_issue_rollup_unit`, `mc_tool_real_project_review_board_unit`, and `mc_tool_workflow_kernel_reset_lane_unit`. Use `mc_tool_workflow_kernel_reset_lane_full_unit` only when a reset-lane change may affect build reuse, fixture coverage, or grouped-suite cost.
+
 Current module-model contract:
 
 - ordinary modules are public by default
