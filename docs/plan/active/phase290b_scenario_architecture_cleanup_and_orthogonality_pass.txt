@@ -1,0 +1,301 @@
+Phase 290B -- Scenario Architecture Cleanup And Orthogonality Pass
+=================================================================
+
+Status
+------
+PROPOSED
+
+Purpose
+-------
+Refactor `kernel/src/scenarios/` so the maintained scenario surface is easier
+to read, easier to extend, and less vulnerable to local helper drift.
+
+This phase exists now because the repository already has the right shared
+scenario owners in `scenario_assert.mc`, `scenario_transport.mc`,
+`scenario_helpers.mc`, and `scenario_steps.mc`, but the directory still reads
+as only partially migrated. The next honest move before Phase 291 is to finish
+that architecture cleanup so later work lands on a clearer, more orthogonal
+scenario substrate rather than on accumulated local copies and ambiguous seams.
+
+Repository status note
+----------------------
+- `kernel/src/scenarios/scenario_assert.mc` already owns shared reply and
+  workflow assertion helpers plus shared display-state constants.
+- `kernel/src/scenarios/scenario_transport.mc` already owns the canonical
+  command-observation vocabulary for serial-path scenario traffic.
+- `kernel/src/scenarios/scenario_helpers.mc` is already a small shared setup
+  owner and is not currently the main source of duplication pressure.
+- `kernel/src/scenarios/scenario_steps.mc` already proves one table-driven,
+  linear-step pattern, but that pattern currently appears isolated rather than
+  clearly canonical or clearly retired.
+- Many scenario files still define local `expect_reply`, `expect_workflow`,
+  and UI-display query helpers even though canonical shared owners now exist.
+- `kernel/src/scenarios/scenario_launcher_service.mc` is currently a thin
+  forwarding facade over already-split launcher probe files.
+- `kernel/src/scenarios/scenarios.mc` still mixes state-sharing probes and
+  self-contained probes in a way that reads more like historical accretion
+  than an explicit orchestration policy.
+
+Problem being solved
+--------------------
+- The current scenario tree has the right main owners but an incomplete
+  migration, so helper truth is split between canonical files and many local
+  scenario copies.
+- That partial migration creates real maintenance risk: a bug fix or contract
+  change to reply, workflow, or display-query helpers must currently be
+  replicated across many scenario files.
+- The same helper names also carry different local signatures, especially for
+  workflow expectations, so a call site does not reliably communicate which
+  contract is in use.
+- `scenario_steps.mc` and `scenario_launcher_service.mc` both currently have
+  ambiguous architectural status: each may be either a deliberate shared seam
+  or leftover structure from earlier splits, and the repository should decide
+  that explicitly rather than keeping both in a half-claimed state.
+- The current state-taking versus standalone probe split is locally workable
+  but not yet explicit enough to guide future scenario authors, which means the
+  directory can keep drifting even if no single file looks badly shaped.
+
+Non-goals
+---------
+- no kernel runtime behavior expansion
+- no new shell command family, transport width, or service owner
+- no rewrite of scenario content into a generic testing framework or DSL
+- no broad regrouping of reset-lane coverage outside `kernel/src/scenarios/`
+  and its existing grouped test owners
+- no requirement to convert every scenario to table-driven form if only a
+  subset benefits honestly
+- no change to app, launcher, workflow, or service semantics merely to make
+  the scenario directory look more uniform
+
+Invariants
+----------
+- `kernel/src/scenarios/` remains a repository-owned behavior-spending layer,
+  not a second kernel framework.
+- Shared assertion truth stays in `scenario_assert.mc` rather than drifting
+  back into local scenario files.
+- Shared transport and observation vocabulary stays in `scenario_transport.mc`
+  rather than being recreated per scenario.
+- `scenario_helpers.mc` stays a small shared setup owner; this phase must not
+  turn it into a catch-all utility bucket.
+- `scenarios.mc` remains the ordered orchestration entry for repo-owned
+  scenario probes; it does not become a policy or framework layer.
+- If `scenario_steps.mc` stays, it must have a clearly stated role as a shared
+  linear-sequence pattern; if that role cannot be justified, it should be
+  removed rather than left as an isolated curiosity.
+- State-taking probes should exist only when they honestly spend shared setup,
+  restart state, or sequence continuity from the orchestrator.
+- Standalone probes should own their own initialization when they do not need
+  cross-probe state continuity.
+
+Required surface changes
+------------------------
+1. Consolidate duplicated reply, workflow, completion, and display-query
+   helpers into the existing canonical scenario helper owners.
+2. Normalize workflow-assertion naming so distinct payload shapes use distinct
+   helper names instead of per-file shadowed `expect_workflow` variants.
+3. Decide the architectural role of `scenario_steps.mc`: either promote it as
+   the explicit linear-step pattern for the scenarios that benefit from it, or
+   retire it and move its lone remaining value into a clearer owner.
+4. Decide the architectural role of `scenario_launcher_service.mc`: either
+   keep it as a documented compatibility facade or remove it and route callers
+   directly to the split probe files.
+5. Make the state-taking versus standalone probe rule explicit in
+   `scenarios.mc` and adjacent scenario ownership so future probes follow a
+   deliberate split rather than historical accident.
+6. Keep the refactor behavior-preserving while reducing local duplication and
+   making the scenario directory read as one coherent architecture.
+
+Forbidden changes
+-----------------
+- do not solve helper duplication by introducing a generic assertion registry,
+  macro layer, or test framework
+- do not move service-owned truth out of kernel owners and into scenario-only
+  helper layers
+- do not widen `scenario_helpers.mc` into a miscellaneous bucket for every
+  reusable function in the directory
+- do not keep ambiguous facades or isolated patterns without documenting or
+  deciding their role in the maintained architecture
+- do not rewrite unrelated scenario logic just to make files look similar
+- do not change reset-lane fixture behavior or grouped suite scope unless the
+  refactor exposes a real maintained-contract mismatch
+
+Phase role in the larger sequence
+---------------------------------
+- This phase is a refactoring checkpoint inserted between the integrated small
+  system demo and the post-UI compiler pressure work.
+- It reduces scenario-local architectural noise so Phase 291 can assess real
+  next compiler pressure without accidental friction from a half-migrated
+  scenario layer.
+- It also leaves the kernel-side scenario substrate in a clearer state for any
+  later reset-lane maintenance or UI follow-through work.
+
+Relevant backlog items this phase intentionally brings under pressure
+--------------------------------------------------------------------
+- finish partial migrations once a canonical owner already exists
+- keep reset-lane support code explicit and local instead of drifting into a
+  framework or utility sprawl
+- make repository-owned behavior harnesses readable enough that later work can
+  distinguish real pressure from historical residue
+
+Questions this phase must answer
+--------------------------------
+1. Which duplicated scenario helpers are mature enough to centralize now, and
+   which still have a real owner-local reason to stay local?
+2. What is the canonical naming split for workflow and completion assertions
+   once differing payload shapes are made explicit?
+3. Should `display_query_obs` become transport vocabulary owned by
+   `scenario_transport.mc`, and if so what nearby observation helpers belong
+   with it?
+4. Is `scenario_steps.mc` a keeper shared pattern, a narrower owner for one
+   transport-path proof, or a removable historical experiment?
+5. Is `scenario_launcher_service.mc` providing a compatibility boundary that is
+   still useful, or is it only preserving an unnecessary extra hop?
+6. Which current probes should take shared boot state from `scenarios.mc`, and
+   which should become or remain standalone to make their setup boundary more
+   honest?
+
+Preferred implementation shape
+------------------------------
+- Start from the existing canonical shared owners rather than inventing new
+  ones: `scenario_assert.mc`, `scenario_transport.mc`, `scenario_helpers.mc`,
+  `scenario_steps.mc`, and `scenarios.mc`.
+- Migrate the obvious shared helpers first: reply-shape checks, workflow-shape
+  checks, completion-outcome checks, and display-surface query observations.
+- Replace overloaded local helper names with explicit shared names that encode
+  their payload shape, for example separate workflow helpers for plain state,
+  state-plus-task, state-plus-value, or status-free variants if those shapes
+  remain necessary.
+- Keep `scenario_helpers.mc` focused on setup or boot-state preparation and
+  keep transport observation constructors on `scenario_transport.mc`.
+- Treat `scenario_launcher_service.mc` as a binary choice: documented facade or
+  deletion. Avoid leaving it as an unexplained extra forwarding layer.
+- Treat `scenario_steps.mc` as a binary choice as well: either give it a
+  clearly documented shared role and move at least one more honest linear
+  sequence onto it, or collapse it into a narrower owner if broad adoption is
+  not justified.
+- Make `scenarios.mc` read as an explicit harness over a small number of probe
+  categories, with self-contained probes initialized locally and shared-state
+  probes taking state only when sequence continuity is materially required.
+
+Implementation accelerators
+---------------------------
+Main files and navigations
+~~~~~~~~~~~~~~~~~~~~~~~~~~
+- Primary controlling owners: `kernel/src/scenarios/scenario_assert.mc`,
+  `kernel/src/scenarios/scenario_transport.mc`,
+  `kernel/src/scenarios/scenario_steps.mc`,
+  `kernel/src/scenarios/scenario_launcher_service.mc`, and
+  `kernel/src/scenarios/scenarios.mc`.
+- First-hop direct consumers: the scenario files that still declare local
+  `expect_reply`, local `expect_workflow`, local completion assertions, or
+  local `display_query_obs` helpers, especially the UI-facing scenarios and the
+  workflow-pressure scenarios.
+- First documentation accelerators: `docs/agent/prompts/kernel_file_invariants.txt`,
+  `docs/agent/prompts/change_touch_sets.txt`, and
+  `docs/agent/prompts/test_overview.txt`.
+- Expected first validation target after owner-level refactor batches:
+  `Build debug`, then the grouped reset-lane owner in
+  `tests/tool/tool_kernel_reset_lane_suite.cpp` through
+  `mc_tool_workflow_kernel_reset_lane_unit`.
+
+Relevant cookbook patterns
+~~~~~~~~~~~~~~~~~~~~~~~~~~
+- Pattern 12 -- Split A Crowded Scenario Or Probe Module is the closest fit
+  for clarifying `scenario_launcher_service.mc`, tightening `scenarios.mc`, and
+  deciding whether thin facades should remain.
+- No exact existing cookbook pattern fully covers helper consolidation across
+  many scenario files, so this phase should reuse the repository's owner-first
+  rule directly: canonical owner first, then direct consumers, then harness
+  follow-through.
+
+Relevant file-local invariants
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+- `scenario_assert.mc` is the owner for shared effect-shape and display-state
+  assertions; duplicated helper logic should move here or disappear.
+- `scenario_transport.mc` is the owner for serial-path observation and command
+  vocabulary; repeated `display_query_obs` definitions belong here if they are
+  simply shared observation constructors.
+- `scenario_helpers.mc` should stay small and setup-oriented; do not move pure
+  assertion or transport vocabulary here by convenience.
+- `scenario_steps.mc` currently owns one table-driven transport-path proof; if
+  it stays, its role must be explicit enough that future authors know when to
+  use it.
+- `scenarios.mc` is the orchestration owner and should not accumulate helper
+  logic; its job is to sequence probes and provide shared-state continuity only
+  where that continuity is real.
+
+Dependency-ordered touch sequence
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+- Land the canonical helper-owner decisions first in `scenario_assert.mc` and
+  `scenario_transport.mc`.
+- Update the direct consumer scenario files second by deleting local helper
+  copies and importing the canonical forms.
+- Resolve the architectural status of `scenario_launcher_service.mc`,
+  `scenario_steps.mc`, and any state-taking versus standalone probe boundary
+  adjustments third.
+- Update `scenarios.mc` orchestration shape and grouped reset-lane follow-
+  through last, after the owner and direct-consumer contracts are stable.
+
+Common breakage map
+~~~~~~~~~~~~~~~~~~~
+- renamed assertion helpers -> import fallout, stale call sites, and local
+  signature mismatches in scenario files
+- moved display query observation -> stale local constructors and missing
+  `scenario_transport` imports in UI-facing probes
+- removed or repurposed launcher facade -> `scenarios.mc` imports and any thin
+  compatibility call sites drift first
+- promoted or retired `scenario_steps.mc` -> orchestration imports,
+  entrypoint names, and any step-table helper references drift first
+- changed state-taking boundary -> stale `boot.kernel_init()` ownership,
+  mismatched pointer parameters, and sequence-order assumptions in
+  `scenarios.mc`
+
+Relevant test surfaces
+~~~~~~~~~~~~~~~~~~~~~~
+- Primary owning validation surface: the grouped reset-lane workflow suite in
+  `tests/tool/tool_kernel_reset_lane_suite.cpp` because the refactor changes
+  the maintained scenario harness rather than one isolated service owner.
+- Narrowest expected first executable validation target:
+  `mc_tool_workflow_kernel_reset_lane_unit` after each meaningful scenario
+  architecture batch.
+- First compile validation: `Build debug` because helper moves across the
+  scenario directory will surface import and signature fallout quickly.
+- Follow the grouped-suite guidance in `docs/agent/prompts/test_overview.txt`:
+  fix the owner-local grouped reset-lane path first and widen to
+  `mc_tool_workflow_kernel_reset_lane_full_unit` only if the maintained full
+  grouped coverage needs confirmation after the narrow owner passes.
+
+Test obligations
+----------------
+- `Build debug`
+- `mc_tool_workflow_kernel_reset_lane_unit`
+- rerun `mc_tool_workflow_kernel_reset_lane_unit` after the final helper-
+  consolidation batch if the phase changes scenario orchestration shape
+- `mc_tool_workflow_kernel_reset_lane_full_unit` only after the narrow grouped
+  owner passes and only if the maintained full grouped path is affected by the
+  harness refactor
+
+Acceptance criteria
+-------------------
+- duplicated shared scenario helpers are reduced to canonical owners instead of
+  being maintained across many local scenario files
+- workflow and completion assertion names make their payload shape explicit
+  enough that a call site no longer depends on file-local shadowing for
+  interpretation
+- the repository records a clear keep-or-remove decision for both
+  `scenario_steps.mc` and `scenario_launcher_service.mc`
+- the state-taking versus standalone probe split is made explicit enough that
+  future scenario authors can follow it without re-deriving the rule
+- the scenario directory reads as one coherent maintained architecture without
+  widening into a framework or changing kernel behavior
+
+Future follow-up
+----------------
+- Phase 291 can then evaluate post-UI compiler pressure without scenario-layer
+  cleanup noise distorting what actually feels blocked.
+- If `scenario_steps.mc` survives and proves useful after this refactor, a
+  later narrow follow-through may migrate more honest linear-sequence probes to
+  it case by case.
+- If helper consolidation exposes one missing shared setup operation in three
+  or more scenario files, that follow-up belongs on `scenario_helpers.mc` as a
+  bounded additive move rather than in this phase by default.
