@@ -180,6 +180,22 @@ Acceptance criteria
 - journal and launcher owners keep their current narrow roles
 - hosted and reset-lane proofs both demonstrate the retained behavior clearly
 
+Implementation notes
+--------------------
+- `kernel/src/review_board_app.mc` now extends the existing bounded journal tag
+  model so one active detail view plus one in-progress filter-edit substate can
+  survive restart without introducing a retained UI-state framework.
+- The durable record remains the same four-byte lane owned by
+  `kernel/src/services/journal_service.mc`; the extra richness is encoded in
+  the app-owned tag mapping rather than in a broader storage owner.
+- `kernel/src/scenarios/scenario_review_board_state_persistence.mc` now proves
+  the restart-visible filter prompt and retained detail state on the reset-
+  lane path, and the matching hosted review_board proof exercises the same
+  retained contract.
+- The persistence spend stays app-local and additive: `review_board` keeps the
+  current journal-backed owner split, and the launcher and journal services do
+  not gain new policy roles.
+
 Future follow-up
 ----------------
 - Phase 301 should freeze exactly what richer interaction state is now part of

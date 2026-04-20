@@ -194,6 +194,25 @@ Acceptance criteria
 - any compiler readability pressure discovered by the phase is recorded rather
   than smuggled into this implementation
 
+Implementation notes
+--------------------
+- `examples/real/review_board/src/review_board_ui.mc` now owns one bounded
+  app-local filter-edit slice on the existing key-only lane, with a prompt
+  state, one intermediate first-key state, and one commit key family that maps
+  to the fixed `AL`, `OP`, `CL`, and `UR` tokens.
+- The filter edit remains additive to the existing `Summary`, `Open`,
+  `Closed`, and `Urgent` detail selector, so the richer interaction keeps the
+  same four-cell review_board surface instead of widening display policy or
+  introducing a text engine.
+- `kernel/src/review_board_app.mc` and
+  `kernel/src/scenarios/scenario_review_board_ui_proof.mc` now exercise the
+  same bounded filter prompt and result flow on the maintained reset-lane
+  proof surface, while the hosted `review_board` `ui` target remains the
+  matching app proof.
+- The slice stays app-local: `input_event.mc` remains key-only, the route
+  layer still only forwards input, and no shared text-entry framework or new
+  runner was introduced.
+
 Future follow-up
 ----------------
 - Phase 299 should ensure the richer interaction contract remains aligned

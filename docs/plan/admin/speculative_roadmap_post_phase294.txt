@@ -228,6 +228,16 @@ Outcome checkpoint after Band G:
 - If that checkpoint cannot be reached honestly without broader surface or
   input claims, the repository should stop early and record that the current
   UI plateau is tighter than Phase 294 predicted.
+- Phase 301 later records that Band G did land cleanly on its admitted terms:
+  `review_board` now carries foreground-input parity, additive
+  `Summary` or `Open` or `Closed` or `Urgent` detail selection, one tiny
+  shared `active_region` truth with `issue_rollup`, one bounded key-only
+  filter-edit lane, hosted/reset-lane parity, and bounded restart persistence
+  for the active detail view plus one in-progress filter-edit substate.
+- That freeze also records the next stronger blocker honestly: the byte-literal
+  compiler readability slice remains the clearest next follow-through, while
+  broader packaging stays deferred because `issue_rollup` is still the only
+  installed-program path.
 
 Band H - Cash Repeated UI Source Friction Into One Compiler Repair Only If Earned
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~

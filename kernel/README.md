@@ -16,10 +16,10 @@ Rules
 Human-facing support boundary
 
 - The current supported user-facing claim for this lane is one bounded small-system path built through [`kernel/build.toml`](build.toml) and evidenced by `mc_tool_workflow_kernel_reset_lane_unit`.
-- That claim is limited to one launcher-selected foreground app on one fixed four-cell visible surface, one admitted key-only input family, one installed `issue_rollup` path, one direct-launch `review_board` path, and one bounded persisted `review_board` reload path.
+- That claim is limited to one launcher-selected foreground app on one fixed four-cell visible surface, one admitted key-only input family, one installed `issue_rollup` path, one direct-launch `review_board` path with additive detail-selection and key-only filter-edit interaction, and one bounded persisted `review_board` reload path that now preserves the active detail view plus one in-progress filter-edit state.
 - This lane does not currently claim a desktop shell, package manager, filesystem API, general app framework, alternate input family, or richer multi-surface UI model.
 
-Current scope (through Phase 283)
+Current scope (through Phase 301)
 
 - All three canonical service shapes are present: forwarding (`serial_service`, `shell_service`, `serial_shell_path`), append/tail (`log_service`), and key/value (`kv_service`).
 - The compact shell route now reaches `log_service` and `kv_service` over the real reset-lane path instead of stopping at shell-local echo behavior.
@@ -42,6 +42,11 @@ Current scope (through Phase 283)
 - Phase 280 keeps restart and update truth on the same visible path through one launch-only `FRSH` or `RSUM` or `INVD` overlay that reuses launcher and update-store truth without admitting retained UI state.
 - Phase 281 closes Band D as a planning audit: the maintained first-UI truth is now one bounded input plus display plus routing plus present plus fixed-cell rendering plus app-proof lane, while windows, widgets, composition frameworks, alternate input families, and retained UI-state work remain deferred until a stronger later owner appears.
 - Phase 283 keeps alternate input deferred after an evidence-based audit: the maintained app path still only needs key events, and one focused reject proof now confirms that non-key `I <event> <value> !` frames stay explicitly unsupported without changing visible app state.
+- Phase 284 then keeps active-region truth app-local on the existing custom-manifest path, and Phase 285 explicitly declines to invent a broader shared control vocabulary before a second real consumer exists.
+- Phase 286 through Phase 290 add `review_board` as the second directly usable UI proof, give it one bounded journal-backed persisted view-state lane, document the canonical UI workflow surfaces, freeze post-Band-E basic UI, and prove the integrated installed-`issue_rollup` plus direct-launch-`review_board` demo on the maintained reset-lane path.
+- Phase 294 then chooses richer UI on the same fixed-surface, launcher-selected substrate as the strongest next wave.
+- Phase 295 through Phase 300 spend that richer UI wave without weakening the owner split: `review_board` joins the admitted foreground-input path, gains one additive `Summary` or `Open` or `Closed` or `Urgent` detail-selection lane, shares only the tiny `Body` or `Status` `active_region` truth with `issue_rollup`, gains one bounded key-only filter-edit path with the fixed tokens `AL`, `OP`, `CL`, and `UR`, stays aligned across hosted and reset-lane proofs, and now reloads the current detail view plus one in-progress filter-edit substate through the existing journal lane.
+- Phase 301 then freezes Band G as one more expressive but still bounded UI slice: fixed four-cell surface, optional two-region composition seam, key-only input, app-local interaction policy, one tiny shared value owner, no toolkit or broader layout/input framework, and the byte-literal compiler readability slice named as the strongest next blocker rather than broader packaging or another UI framework wave.
 
 Source tree layout (Phase 219)
 

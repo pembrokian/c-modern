@@ -140,6 +140,63 @@ void TestRealReviewBoardProject(const std::filesystem::path& source_root,
                               "UEFB\n",
                               "phase296 review board explicit ui detail run");
 
+    const auto [ui_filter_prompt_outcome, ui_filter_prompt_output] = RunCommandCapture({mc_path.generic_string(),
+                                                                                       "run",
+                                                                                       "--project",
+                                                                                       project_path.generic_string(),
+                                                                                       "--target",
+                                                                                       "ui",
+                                                                                       "--build-dir",
+                                                                                       graph_build_dir.generic_string(),
+                                                                                       "--",
+                                                                                       "TQU"},
+                                                                                      graph_build_dir / "review_board_ui_filter_prompt_run_output.txt",
+                                                                                      "review board explicit ui filter prompt run");
+    if (!ui_filter_prompt_outcome.exited || ui_filter_prompt_outcome.exit_code != 0) {
+        Fail("review board explicit ui filter prompt run should pass:\n" + ui_filter_prompt_output);
+    }
+    ExpectReviewBoardUiOutput(ui_filter_prompt_output,
+                              "U-AS\n",
+                              "phase298 review board explicit ui filter prompt run");
+
+    const auto [ui_filter_run_outcome, ui_filter_run_output] = RunCommandCapture({mc_path.generic_string(),
+                                                                                  "run",
+                                                                                  "--project",
+                                                                                  project_path.generic_string(),
+                                                                                  "--target",
+                                                                                  "ui",
+                                                                                  "--build-dir",
+                                                                                  graph_build_dir.generic_string(),
+                                                                                  "--",
+                                                                                  "TQUR"},
+                                                                                 graph_build_dir / "review_board_ui_filter_run_output.txt",
+                                                                                 "review board explicit ui filter run");
+    if (!ui_filter_run_outcome.exited || ui_filter_run_outcome.exit_code != 0) {
+        Fail("review board explicit ui filter run should pass:\n" + ui_filter_run_output);
+    }
+    ExpectReviewBoardUiOutput(ui_filter_run_output,
+                              "UQAS\n",
+                              "phase298 review board explicit ui filter run");
+
+    const auto [ui_parity_run_outcome, ui_parity_run_output] = RunCommandCapture({mc_path.generic_string(),
+                                                                                  "run",
+                                                                                  "--project",
+                                                                                  project_path.generic_string(),
+                                                                                  "--target",
+                                                                                  "ui",
+                                                                                  "--build-dir",
+                                                                                  graph_build_dir.generic_string(),
+                                                                                  "--",
+                                                                                  "OTFTUUUDDDTQAQQ"},
+                                                                                 graph_build_dir / "review_board_ui_parity_run_output.txt",
+                                                                                 "review board richer ui parity run");
+    if (!ui_parity_run_outcome.exited || ui_parity_run_outcome.exit_code != 0) {
+        Fail("review board richer ui parity run should pass:\n" + ui_parity_run_output);
+    }
+    ExpectReviewBoardUiOutput(ui_parity_run_output,
+                              "UEFS\n",
+                              "phase299 review board richer ui parity run");
+
     std::string audit_test_output = RunProjectTestTargetAndExpectSuccess(mc_path,
                                                                          project_path,
                                                                          graph_build_dir,

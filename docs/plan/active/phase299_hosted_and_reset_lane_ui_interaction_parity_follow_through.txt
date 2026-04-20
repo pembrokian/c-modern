@@ -199,6 +199,24 @@ Acceptance criteria
 - parity repairs stay on the behavior owners rather than in workflow glue
 - the maintained grouped reset-lane suite remains the canonical wide proof
 
+Implementation notes
+--------------------
+- The hosted and reset-lane proofs now exercise the same richer review_board
+  interaction contract, including the detail selector and the bounded filter
+  prompt or commit flow, without adding a second runner or a UI-specific test
+  harness.
+- `examples/real/review_board/src/review_board_ui.mc` remains the behavior
+  owner for the richer interaction semantics, while
+  `kernel/src/scenarios/scenario_review_board_ui_proof.mc` and the hosted
+  `tests/tool/real_projects/review-board/test.cpp` case each gained matching
+  parity coverage.
+- The reset-lane proof stays on the maintained grouped workflow surface, so
+  the parity follow-through records the behavior contract explicitly instead of
+  moving logic into workflow glue.
+- The parity result keeps the owner split intact: app-local interaction meaning
+  still lives in the app owners, and the kernel route and grouped workflow code
+  stay thin.
+
 Future follow-up
 ----------------
 - Phase 300 can then persist richer interaction state with confidence that the

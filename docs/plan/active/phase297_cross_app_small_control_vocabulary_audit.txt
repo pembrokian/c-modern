@@ -3,7 +3,7 @@ Phase 297 -- Cross-App Small Control Vocabulary Audit
 
 Status
 ------
-COMPLETED
+PROPOSED
 
 Purpose
 -------
@@ -23,11 +23,11 @@ Repository status note
 - `examples/real/review_board/src/review_board_ui.mc` already names concrete
   key meanings for mode, focus, reset, and count changes, while `issue_rollup`
   already uses a bounded focus-toggle key on a custom-manifest path.
-- Phase 295 and Phase 296 put both apps on a clearer common interaction
-  footing.
-- This phase lands one tiny shared control family, `active_region`, for the
-  repeated `Body` or `Status` active-region truth while keeping key meaning,
-  mode changes, launch overlays, and routing app-local.
+- Phase 295 and Phase 296 are expected to put both apps on a clearer common
+  interaction footing.
+- The repository still lacks one explicit decision about whether any repeated
+  control family is now real enough to extract or whether app-local ownership
+  remains the honest answer.
 
 Problem being solved
 --------------------
@@ -144,9 +144,6 @@ Relevant file-local invariants
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 - `kernel/src/issue_rollup_app.mc` and `kernel/src/review_board_app.mc` are
   the current owners of app-local interaction meaning.
-- `stdlib/active_region.mc` may name the repeated `Body` or `Status` active-
-  region family, but it must remain a tiny enum-plus-toggle helper rather than
-  a controller or policy owner.
 - `kernel/src/input_event.mc` names the admitted event family and should not be
   overloaded with app-control semantics.
 - `tests/tool/README.md` identifies the real-project UI targets and reset-lane
@@ -204,13 +201,6 @@ Acceptance criteria
 - any negative result is recorded explicitly enough to prevent immediate
   relitigation
 - the chosen outcome keeps hosted and reset-lane UI behavior intelligible
-
-Validation completed
---------------------
-- `Build debug`
-- `mc_tool_real_project_issue_rollup_unit`
-- `mc_tool_real_project_review_board_unit`
-- `mc_tool_workflow_kernel_reset_lane_unit`
 
 Implementation notes
 --------------------

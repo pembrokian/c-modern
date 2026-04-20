@@ -3,7 +3,7 @@ Phase 301 -- Richer UI Slice Freeze And Audit
 
 Status
 ------
-PROPOSED
+COMPLETED
 
 Purpose
 -------
@@ -18,14 +18,14 @@ Repository status note
 ----------------------
 - Phase 294 chooses richer UI composition and interaction as the next explicit
   branch.
-- Phase 295 through Phase 300 are expected to spend that branch on foreground
-  interaction parity, one richer detail or selection slice, one bounded typed-
-  input or filter slice, hosted/reset-lane parity, and one bounded persistence
-  follow-through.
+- Phase 295 through Phase 300 spent that branch on `review_board` foreground
+  interaction parity, one richer detail-selection slice, one tiny shared
+  active-region truth, one bounded key-only filter-edit slice, hosted/reset-
+  lane interaction parity, and one bounded persistence follow-through.
 - Phase 293 already defines the previous user-facing support baseline and the
   major non-claims the repository keeps explicit.
-- The repository still needs one note that says whether Band G succeeded, what
-  the richer UI slice now contains, and what still remains out of scope.
+- This phase now records that Band G succeeded on its admitted terms, what the
+  richer UI slice now contains, and what still remains out of scope.
 
 Problem being solved
 --------------------
@@ -192,10 +192,66 @@ Acceptance criteria
 - the richer UI freeze remains tied to maintained hosted and reset-lane proof
   surfaces rather than implied ambition
 
+Implementation outcome
+----------------------
+- Band G landed cleanly on the admitted owner map rather than stopping early.
+  The maintained richer UI slice is still one launcher-selected foreground app
+  on one fixed four-cell visible surface with the existing optional two-region
+  seam, one key-only input family, app-local interaction policy, and the same
+  ordinary hosted and reset-lane workflow evidence surfaces.
+- The additive richer interaction truth now carried by that slice is centered
+  on `review_board`: Phase 295 put it fully on the admitted foreground-input
+  path, Phase 296 added one app-local `Summary` or `Open` or `Closed` or
+  `Urgent` detail-selection lane, Phase 297 extracted only the repeated
+  `Body` or `Status` active-region truth into `stdlib/active_region.mc`,
+  Phase 298 added one bounded key-only filter-edit lane with the fixed tokens
+  `AL`, `OP`, `CL`, and `UR`, Phase 299 aligned hosted and reset-lane
+  behavior on that same contract, and Phase 300 made the current detail view
+  plus one in-progress filter-edit substate survive restart on the existing
+  journal-backed lane.
+- The richer UI wave therefore widened expressiveness without weakening the
+  core owner split: `input_event.mc` remains key-only, `foreground_input_route.mc`
+  remains a thin routing seam, `launcher_service.mc` remains the single-
+  foreground owner, `display_surface.mc` remains the fixed-surface owner,
+  `surface_composition.mc` remains the only admitted two-region helper, and
+  app-local UI modules still own detail semantics, filter semantics, and
+  present policy.
+- The deferred branches remain explicit. Band G did not admit pointer or
+  alternate input, a text engine, a shared control or editing framework beyond
+  the tiny `active_region` value owner, richer layout or multi-surface policy,
+  a desktop shell, a widget toolkit, a package platform, or broader retained
+  UI-state machinery.
+- The strongest next blocker exposed by the completed richer UI wave is still
+  the byte-literal compiler readability slice already identified in Phase 291.
+  Band G increased repeated `u8`-shaped key and cell pressure on the current
+  admitted UI owners, while broader packaging still lacks a second installed-
+  program consumer because `issue_rollup` remains the only installed path and
+  `review_board` remains direct-launch.
+
+Validation
+----------
+- Editor diagnostics on the touched planning and support documents.
+- No executable validation was required because this phase did not change any
+  public workflow commands, target names, or executable evidence routing.
+
+Phase review against spec
+-------------------------
+- Preserved invariants:
+  the freeze records only landed repository truth, keeps the fixed-surface,
+  key-only, launcher-selected, app-local owner map intact, and keeps deferred
+  loser branches explicit.
+- Ownership boundaries did not weaken:
+  Band G added only one tiny shared value owner, `stdlib/active_region.mc`,
+  while interaction semantics, persistence meaning, and render policy stayed on
+  the existing app-local, journal, launcher, and display owners.
+- Accidental centers of gravity were avoided:
+  no toolkit, framework, registry, or new runner emerged from the richer UI
+  wave, and the maintained proof surfaces remain the hosted UI real-project
+  targets plus `mc_tool_workflow_kernel_reset_lane_unit`.
+
 Future follow-up
 ----------------
-- If Band G made source readability the clearest next blocker, use this freeze
-  as the handoff into the byte-literal compiler band.
-- If Band G instead exposed a stronger installed-program or platform pressure,
-  use this freeze as the bounded baseline for the next decision note or phase
-  band.
+- Use this freeze as the handoff into the byte-literal compiler band unless a
+  later decision note finds a stronger newly emerged blocker.
+- Reopen broader packaging only if a second installed-program pressure becomes
+  stronger than further UI-local or compiler-readability work.

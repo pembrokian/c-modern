@@ -31,6 +31,11 @@ const FAIL_REVIEW_BOARD_INPUT_DETAIL0: i32 = 28617
 const FAIL_REVIEW_BOARD_INPUT_DETAIL1: i32 = 28618
 const FAIL_REVIEW_BOARD_INPUT_DETAIL2: i32 = 28619
 const FAIL_REVIEW_BOARD_DISPLAY_DETAIL: i32 = 28620
+const FAIL_REVIEW_BOARD_INPUT_FILTER_START: i32 = 28621
+const FAIL_REVIEW_BOARD_INPUT_FILTER_CHAR: i32 = 28622
+const FAIL_REVIEW_BOARD_DISPLAY_FILTER_PROMPT: i32 = 28623
+const FAIL_REVIEW_BOARD_INPUT_FILTER_COMMIT: i32 = 28624
+const FAIL_REVIEW_BOARD_DISPLAY_FILTER_RESULT: i32 = 28625
 
 const DISPLAY_STATE_AUDIT_STABLE_BODY: [4]u8 = [4]u8{ 65, 83, 65, 66 }
 const DISPLAY_STATE_AUDIT_PAUSE_BODY: [4]u8 = [4]u8{ 65, 80, 65, 66 }
@@ -39,6 +44,8 @@ const DISPLAY_STATE_FOCUS_NORMAL_STATUS: [4]u8 = [4]u8{ 70, 78, 70, 83 }
 const DISPLAY_STATE_FOCUS_NORMAL_BODY: [4]u8 = [4]u8{ 70, 78, 70, 66 }
 const DISPLAY_STATE_FOCUS_ESCALATE_BODY: [4]u8 = [4]u8{ 70, 69, 70, 66 }
 const DISPLAY_STATE_FOCUS_URGENT_DETAIL_BODY: [4]u8 = [4]u8{ 85, 69, 70, 66 }
+const DISPLAY_STATE_FOCUS_FILTER_PROMPT: [4]u8 = [4]u8{ 65, 45, 70, 83 }
+const DISPLAY_STATE_FOCUS_FILTER_SUMMARY: [4]u8 = [4]u8{ 70, 69, 70, 83 }
 
 func expect_delivered(effect: service_effect.Effect, value: u8) bool {
     return scenario_assert.expect_reply(effect, syscall.SyscallStatus.Ok, 4, program_catalog.PROGRAM_ID_REVIEW_BOARD, input_event.INPUT_ROUTE_DELIVERED, input_event.INPUT_EVENT_KEY, value)
@@ -133,6 +140,31 @@ func run_review_board_ui_proof_probe() i32 {
     effect = kernel_dispatch.kernel_dispatch_step(&state, scenario_transport.display_query_obs())
     if !scenario_assert.expect_display(effect, syscall.SyscallStatus.Ok, DISPLAY_STATE_FOCUS_URGENT_DETAIL_BODY) {
         return FAIL_REVIEW_BOARD_DISPLAY_DETAIL
+    }
+
+    effect = kernel_dispatch.kernel_dispatch_step(&state, scenario_transport.cmd_input_key(review_board_ui.REVIEW_BOARD_KEY_TOGGLE_REGION))
+    if !expect_delivered(effect, review_board_ui.REVIEW_BOARD_KEY_TOGGLE_REGION) {
+        return FAIL_REVIEW_BOARD_INPUT_STATUS
+    }
+    effect = kernel_dispatch.kernel_dispatch_step(&state, scenario_transport.cmd_input_key(review_board_ui.REVIEW_BOARD_KEY_FILTER))
+    if !expect_delivered(effect, review_board_ui.REVIEW_BOARD_KEY_FILTER) {
+        return FAIL_REVIEW_BOARD_INPUT_FILTER_START
+    }
+    effect = kernel_dispatch.kernel_dispatch_step(&state, scenario_transport.cmd_input_key(review_board_ui.REVIEW_BOARD_KEY_AUDIT))
+    if !expect_delivered(effect, review_board_ui.REVIEW_BOARD_KEY_AUDIT) {
+        return FAIL_REVIEW_BOARD_INPUT_FILTER_CHAR
+    }
+    effect = kernel_dispatch.kernel_dispatch_step(&state, scenario_transport.display_query_obs())
+    if !scenario_assert.expect_display(effect, syscall.SyscallStatus.Ok, DISPLAY_STATE_FOCUS_FILTER_PROMPT) {
+        return FAIL_REVIEW_BOARD_DISPLAY_FILTER_PROMPT
+    }
+    effect = kernel_dispatch.kernel_dispatch_step(&state, scenario_transport.cmd_input_key(review_board_ui.REVIEW_BOARD_KEY_FILTER_SUMMARY_TAIL))
+    if !expect_delivered(effect, review_board_ui.REVIEW_BOARD_KEY_FILTER_SUMMARY_TAIL) {
+        return FAIL_REVIEW_BOARD_INPUT_FILTER_COMMIT
+    }
+    effect = kernel_dispatch.kernel_dispatch_step(&state, scenario_transport.display_query_obs())
+    if !scenario_assert.expect_display(effect, syscall.SyscallStatus.Ok, DISPLAY_STATE_FOCUS_FILTER_SUMMARY) {
+        return FAIL_REVIEW_BOARD_DISPLAY_FILTER_RESULT
     }
 
     return 0
