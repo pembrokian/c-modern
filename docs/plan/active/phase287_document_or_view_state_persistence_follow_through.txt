@@ -175,6 +175,9 @@ Relevant test surfaces
   narrow real-project validation for the app if hosted code changes.
 - Supporting validation: `mc_tool_workflow_kernel_reset_lane_unit` and the
   relevant real-project suite for the chosen consumer.
+- Routing note: use the grouped reset-lane suite for restart workflow
+  follow-through and use `tests/system/` only if the change is primarily direct
+  runtime persistence behavior rather than tool-driven restart coverage.
 - Exact first command when the reset-lane path is touched:
   `ctest --test-dir build/debug -R mc_tool_workflow_kernel_reset_lane_unit --output-on-failure`.
 
@@ -185,6 +188,8 @@ Test obligations
 - one narrow real-project validation for the chosen UI consumer if its hosted
   code changes
 - `mc_tool_workflow_kernel_reset_lane_unit` if the reset-lane path is touched
+- do not widen to the full grouped reset-lane case until the focused restart-
+  sensitive proof is stable
 - `mc_tool_workflow_kernel_reset_lane_full_unit` only if the maintained full
   path gains the new persistence proof
 

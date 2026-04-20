@@ -172,12 +172,18 @@ Relevant test surfaces
 - Narrowest expected first executable validation target: none new unless a tiny
   shared control family actually lands.
 - If one does land, rerun only the narrowest UI fixture that spends it.
+- Routing note: if a shared control family lands on the maintained kernel UI
+  path, start in `tests/tool/tool_kernel_reset_lane_suite.cpp`; do not widen to
+  broader grouped workflow or real-project surfaces until the owner-local proof
+  is stable.
 
 Test obligations
 ----------------
 - no new executable validation by default
 - if a tiny shared control family lands, run `Build debug` plus one focused UI
   fixture that spends it
+- do not widen to `mc_tool_workflow_kernel_reset_lane_full_unit` unless the
+  shared control family actually becomes maintained reset-lane truth
 
 Acceptance criteria
 -------------------

@@ -159,12 +159,17 @@ Relevant test surfaces
   Phases 282 through 288.
 - Narrowest expected first executable validation target: none new unless the
   freeze discovers a missing evidence gap that must be repaired first.
+- Routing note: if an evidence gap is test-owned, repair it in the narrowest
+  owning target named by the earlier phase rather than rerunning broad grouped
+  coverage first.
 
 Test obligations
 ----------------
 - no new executable validation by default
 - if the freeze exposes a missing evidence gap, repair that gap in the owning
   phase surface before treating the slice as frozen
+- do not turn the freeze into a broad validation sweep; only rerun the narrow
+  owner that supports the missing claim
 
 Acceptance criteria
 -------------------

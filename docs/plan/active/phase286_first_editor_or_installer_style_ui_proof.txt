@@ -183,6 +183,10 @@ Relevant test surfaces
   narrow real-project test for the chosen consumer.
 - Supporting validation: `mc_tool_workflow_kernel_reset_lane_unit` if the
   kernel-owned UI path is involved.
+- Routing note: start in `tests/tool/tool_real_project_suite.cpp` and the
+  chosen `tests/tool/real_projects/<case>/test.cpp` when the proof is mainly a
+  hosted project path; use `tests/tool/tool_kernel_reset_lane_suite.cpp` only
+  for the reset-lane workflow follow-through.
 - Exact first command when `review_board` remains the chosen consumer:
   `ctest --test-dir build/debug -R 'mc_tool_real_project_.*review.*|mc_tool_real_project_.*review_board.*' --output-on-failure`.
 
@@ -193,6 +197,8 @@ Test obligations
 - one narrow real-project validation for the chosen consumer
 - `mc_tool_workflow_kernel_reset_lane_unit` if the admitted kernel UI path is
   touched
+- prefer the real-project owner before grouped reset-lane coverage when the
+  chosen proof is primarily a hosted program path
 - `mc_tool_workflow_kernel_reset_lane_full_unit` only if the maintained reset-
   lane path is widened
 

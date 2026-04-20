@@ -174,12 +174,16 @@ Common breakage map
 
 Relevant test surfaces
 ~~~~~~~~~~~~~~~~~~~~~~
-- Primary owning validation surface: one focused reset-lane fixture for the new
-  input family or for the decision to defer it.
-- Narrowest expected first executable validation target: that fixture plus
-  `mc_tool_workflow_kernel_reset_lane_unit`.
+- Primary owning validation surface: the grouped reset-lane workflow owner in
+  `tests/tool/tool_kernel_reset_lane_suite.cpp`, because this phase is tool-
+  driven kernel workflow coverage rather than a direct `tests/system/` runtime
+  probe by default.
+- Narrowest expected first executable validation target: the focused reset-lane
+  fixture or case plus `mc_tool_workflow_kernel_reset_lane_unit`.
 - Supporting validation: one narrow hosted app proof only if the chosen
   consumer's real-project code changes.
+- Routing note: use `tests/system/` only if the implementation lands as direct
+  runtime behavior rather than reset-lane workflow orchestration.
 - Exact first command when the phase lands a new reset-lane proof:
   `ctest --test-dir build/debug -R mc_tool_workflow_kernel_reset_lane_unit --output-on-failure`.
 
@@ -189,6 +193,8 @@ Test obligations
 - one focused alternate-input reset-lane fixture or one explicit defer-and-
   reject proof
 - `mc_tool_workflow_kernel_reset_lane_unit`
+- do not start with `mc_tool_workflow_kernel_reset_lane_full_unit` while the
+  owner-local case is still unresolved
 - `mc_tool_workflow_kernel_reset_lane_full_unit` only if the second input
   family actually lands
 

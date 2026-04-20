@@ -183,12 +183,18 @@ Relevant test surfaces
   tests whose workflow documentation or coverage changed.
 - Supporting validation: the grouped reset-lane suite only if the audit changes
   one of its owned paths.
+- Routing note: consult `tests/tool/README.md` and prefer the active grouped
+  owner named there rather than compatibility runners such as
+  `tests/tool/tool_suite_tests.cpp`.
 
 Test obligations
 ----------------
 - no blanket full-suite run by default
 - run the narrow real-project test or grouped reset-lane case that matches the
   workflow surface touched by the audit
+- after changing shared tool helpers or workflow docs that affect multiple
+  grouped owners, widen once to the neighboring grouped real-project or
+  reset-lane owner rather than jumping straight to the full suite
 - `Build debug` only if documentation changes are accompanied by tool or test
   edits
 
