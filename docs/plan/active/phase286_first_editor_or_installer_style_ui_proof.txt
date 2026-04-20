@@ -3,7 +3,7 @@ Phase 286 -- First Editor Or Installer-Style UI Proof
 
 Status
 ------
-PROPOSED
+COMPLETED
 
 Purpose
 -------
@@ -26,7 +26,9 @@ Repository status note
   audited and focus-oriented entry points.
 - `launcher_service.mc`, `display_surface.mc`, `foreground_input_route.mc`, and
   `issue_rollup_app.mc` are the current admitted UI seams.
-- No second repository-owned UI program is yet directly usable on that surface.
+- `review_board` is now the second repository-owned UI program directly usable
+  on that surface through one bounded app-local state machine and one focused
+  reset-lane proof.
 
 Problem being solved
 --------------------
@@ -174,6 +176,10 @@ Common breakage map
   fixed-size scenario table or count, coverage helper expectations, fixture
   naming, and the owning reset-lane CTest target before reopening broader
   workflow code.
+- watch for reset-lane registration fallout: if the fixture is added to the
+  reset-lane grouped suite, check the scenario registration row, fixed-size
+  table or scenario-count owner, and coverage helper before reopening broader
+  workflow code
 
 Relevant test surfaces
 ~~~~~~~~~~~~~~~~~~~~~~
@@ -211,6 +217,21 @@ Acceptance criteria
 - the chosen consumer has narrow, maintained validation
 - the phase increases UI evidence without widening into packaging or platform
   scope
+
+Implementation notes
+--------------------
+- The chosen proof stays on `examples/real/review_board/` by adding one small
+  `review_board_ui.mc` owner plus one hosted `ui` target that prints the same
+  four-cell surface consumed by the kernel wrapper.
+- `kernel/src/review_board_app.mc` is a thin wrapper over that consumer-local
+  UI state machine; launcher, display, and foreground-input routing stay
+  explicit owners and do not become a framework.
+- `launcher_service.mc` admits one bounded direct-launch exception for
+  `review_board` so the second UI proof does not borrow install truth from the
+  issue-rollup-only `update_store_service` slot.
+- Focused validation landed on `mc_tool_real_project_review_board_unit` and
+  `mc_tool_workflow_kernel_reset_lane_unit`, with the reset-lane suite carrying
+  one maintained Phase 286 scenario.
 
 Future follow-up
 ----------------

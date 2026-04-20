@@ -27,6 +27,7 @@ import object_store_service
 import primitives
 import program_catalog
 import queue_service
+import review_board_app
 import serial_protocol
 import serial_shell_path
 import service_effect
@@ -350,6 +351,11 @@ func dispatch_launcher(state: *boot.KernelBootState, msg: service_effect.Message
         if launcher_service.launcher_foreground_id(result.state) == program_catalog.PROGRAM_ID_ISSUE_ROLLUP {
             present := issue_rollup_app.issue_rollup_launch(result.state.status, next.update_store.state, next.display.state)
             next = boot.bootwith_issue_rollup(next, present.app)
+            next = boot.bootwith_display(next, present.display)
+        }
+        if launcher_service.launcher_foreground_id(result.state) == program_catalog.PROGRAM_ID_REVIEW_BOARD {
+            present := review_board_app.review_board_launch(next.display.state)
+            next = boot.bootwith_review_board(next, present.app)
             next = boot.bootwith_display(next, present.display)
         }
     }
@@ -695,10 +701,10 @@ func kernel_dispatch_serial(state: *boot.KernelBootState, obs: syscall.ReceiveOb
     }
 
     shell_msg := serial_shell_path.path_shell_message(next_path)
-    input_route := foreground_input_route.handle(current.launcher.state, current.issue_rollup, current.update_store.state, current.display.state, shell_msg.payload_len, shell_msg.payload)
+    input_route := foreground_input_route.handle(current.launcher.state, current.apps, current.update_store.state, current.display.state, shell_msg.payload_len, shell_msg.payload)
     resolved: service_effect.Effect
     if input_route.kind != foreground_input_route.ForegroundInputRouteKind.NotInput {
-        current = boot.bootwith_issue_rollup(current, input_route.issue_rollup)
+        current = boot.bootwith_apps(current, input_route.apps)
         current = boot.bootwith_display(current, input_route.display)
         *state = current
         resolved = input_route.effect

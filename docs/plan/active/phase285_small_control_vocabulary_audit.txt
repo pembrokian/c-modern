@@ -3,7 +3,7 @@ Phase 285 -- Small Control Vocabulary Audit
 
 Status
 ------
-PROPOSED
+COMPLETED
 
 Purpose
 -------
@@ -192,6 +192,66 @@ Acceptance criteria
   repeated use
 - if no shared control family lands, that deferral is explicit and reviewable
 - the phase avoids freezing a widget toolkit or generic control framework
+
+Implementation outcome
+----------------------
+- The audit found that the honest result is still app-local; no shared control
+  vocabulary lands in Phase 285.
+- The current maintained Band E evidence remains one consumer only:
+  `kernel/src/issue_rollup_app.mc` owns the only shipped focus toggle,
+  body-versus-status gating, and status-strip marker behavior on the custom-
+  manifest path.
+- Phase 282's composition owner, `kernel/src/services/surface_composition.mc`,
+  still owns only fixed two-region assembly and does not duplicate control
+  semantics.
+- Phase 283 remained an explicit non-landing for alternate input, so there is
+  still no second admitted interaction family that would strengthen a shared
+  control claim.
+- Phase 284 kept active-region truth local to `issue_rollup_app.mc`, and the
+  current code still shows one app-local `Body` or `Status` toggle plus one
+  app-local key gate rather than one repeated control shape shared by multiple
+  consumers.
+- The repository still has no second real UI app on the maintained reset-lane
+  path, no repeated button-like or tab-like owner across apps, and no repeated
+  control helper already being copied between consumers.
+- Phase 286 should therefore keep control semantics app-local unless that
+  phase itself introduces a second real consumer or exposes one repeated
+  interaction shape stronger than the current local reducer.
+
+Validation
+----------
+- no executable validation was required because Phase 285 lands as a bounded
+  planning audit and the honest implementation result is a documentation-only
+  non-landing
+
+Phase review against the spec
+-----------------------------
+- Preserved invariants:
+  - the audit classified actual landed Band E pressure only
+  - no shared control family landed without a second consumer or a clearly
+    repeated pattern
+  - app-local drawing and interaction remain the default honest owners
+  - the result is explicit and reviewable rather than buried in narrative
+- Ownership boundaries did not weaken:
+  - `kernel/src/issue_rollup_app.mc` remains the owner of current focus,
+    gating, and status-strip interaction truth
+  - `kernel/src/services/surface_composition.mc` remains a fixed region
+    assembler rather than a control or focus owner
+  - `kernel/src/services/display_surface.mc` remains a fixed visible-surface
+    owner only
+  - `kernel/src/foreground_input_route.mc` and
+    `kernel/src/services/launcher_service.mc` remain routing and foreground
+    truth owners rather than shared UI policy owners
+- Accidental abstractions were avoided:
+  - no widget toolkit, control registry, callback surface, event bus, or
+    focus framework was introduced
+  - no second center of gravity was added under display, composition, input
+    routing, or launcher
+- Honest non-decision and deferred work:
+  - shared controls remain deferred until a second real UI consumer or one
+    clearly repeated interaction shape appears
+  - the next UI proof should stay app-local by default and spend a shared
+    control family only if repeated pressure becomes reviewable in code
 
 Future follow-up
 ----------------

@@ -227,6 +227,7 @@ std::string LoadKernelResetLaneFixtureFile(const std::filesystem::path& source_r
     const std::string issue_rollup_model_src = (source_root / "examples" / "real" / "issue_rollup" / "src" / "model").generic_string();
     const std::string issue_rollup_parse_src = (source_root / "examples" / "real" / "issue_rollup" / "src" / "parse").generic_string();
     const std::string issue_rollup_render_src = (source_root / "examples" / "real" / "issue_rollup" / "src" / "render").generic_string();
+    const std::string review_board_src = (source_root / "examples" / "real" / "review_board" / "src").generic_string();
     const std::string stdlib_src = (source_root / "stdlib").generic_string();
     size_t pos = 0;
     while ((pos = text.find(kKernelNewSourcePlaceholder, pos)) != std::string::npos) {
@@ -238,6 +239,7 @@ std::string LoadKernelResetLaneFixtureFile(const std::filesystem::path& source_r
     const std::string issue_rollup_model_entry = "\"" + issue_rollup_model_src + "\"";
     const std::string issue_rollup_parse_entry = "\"" + issue_rollup_parse_src + "\"";
     const std::string issue_rollup_render_entry = "\"" + issue_rollup_render_src + "\"";
+    const std::string review_board_entry = "\"" + review_board_src + "\"";
     const std::string stdlib_entry = "\"" + stdlib_src + "\"";
     const size_t transport_pos = text.find(transport_entry);
     if (transport_pos != std::string::npos) {
@@ -254,6 +256,9 @@ std::string LoadKernelResetLaneFixtureFile(const std::filesystem::path& source_r
         }
         if (text.find(issue_rollup_render_entry) == std::string::npos) {
             insert_text += ",\n\t\"" + issue_rollup_render_src + "\"";
+        }
+        if (text.find(review_board_entry) == std::string::npos) {
+            insert_text += ",\n\t\"" + review_board_src + "\"";
         }
         if (text.find(stdlib_entry) == std::string::npos) {
             insert_text += ",\n\t\"" + stdlib_src + "\"";
@@ -528,7 +533,7 @@ void RunKernelRepoLiveReceiveScenario(const std::filesystem::path& source_root,
     }
 }
 
-constexpr std::array<ResetLaneScenario, 79> kResetLaneScenarios = {{
+constexpr std::array<ResetLaneScenario, 80> kResetLaneScenarios = {{
     {.label = "repo project", .scenario_key = "repo", .target_name = "kernel", .include_in_fast = true, .build_warn_ms = 2000},
     {.label = "smoke", .fixture_relative_path = "tests/smoke/kernel_reset_lane_serial_round_trip", .scenario_key = "smoke", .target_name = "app", .include_in_fast = true},
     {.label = "retained state", .fixture_relative_path = "tests/system/kernel_reset_lane_retained_log", .scenario_key = "retained_state", .context_label = "retained-state", .target_name = "app", .include_in_fast = true},
@@ -600,6 +605,7 @@ constexpr std::array<ResetLaneScenario, 79> kResetLaneScenarios = {{
     {.label = "surface composition", .fixture_relative_path = "tests/system/kernel_reset_lane_phase282_surface_composition", .scenario_key = "phase282_surface_composition", .context_label = "phase 282 surface composition", .target_name = "app", .include_in_fast = true, .build_warn_ms = 1000},
     {.label = "alternate input first slice", .fixture_relative_path = "tests/system/kernel_reset_lane_phase283_pointer_or_alternate_input_first_slice", .scenario_key = "phase283_pointer_or_alternate_input_first_slice", .context_label = "phase 283 alternate input first slice", .target_name = "app", .include_in_fast = true, .build_warn_ms = 1000},
     {.label = "selection and focus follow-through", .fixture_relative_path = "tests/system/kernel_reset_lane_phase284_selection_and_focus_follow_through", .scenario_key = "phase284_selection_and_focus_follow_through", .context_label = "phase 284 selection and focus follow-through", .target_name = "app", .include_in_fast = true, .build_warn_ms = 1000},
+    {.label = "review_board ui proof", .fixture_relative_path = "tests/system/kernel_reset_lane_phase286_first_editor_or_installer_style_ui_proof", .scenario_key = "phase286_first_editor_or_installer_style_ui_proof", .context_label = "phase 286 review_board ui proof", .target_name = "app", .include_in_fast = true, .build_warn_ms = 1000},
     {.label = "connection backed workflow", .fixture_relative_path = "tests/system/kernel_reset_lane_phase239_connection_backed_workflow", .scenario_key = "phase239_connection_backed_workflow", .context_label = "phase 239 connection backed workflow", .target_name = "app", .include_in_fast = true, .build_warn_ms = 1000},
     {.label = "external ingress completion pressure", .fixture_relative_path = "tests/system/kernel_reset_lane_phase240_external_ingress_completion_pressure", .scenario_key = "phase240_external_ingress_completion_pressure", .context_label = "phase 240 external ingress completion pressure", .target_name = "app", .include_in_fast = true, .build_warn_ms = 1000},
     {.label = "delegated external request handling", .fixture_relative_path = "tests/system/kernel_reset_lane_phase241_delegated_external_request_handling", .scenario_key = "phase241_delegated_external_request_handling", .context_label = "phase 241 delegated external request handling", .target_name = "app", .include_in_fast = true, .build_warn_ms = 1000},

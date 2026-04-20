@@ -11,6 +11,7 @@ import lease_service
 import log_service
 import object_store_service
 import queue_service
+import review_board_app
 import serial_shell_path
 import service_cell_helpers
 import service_identity
@@ -170,8 +171,16 @@ func bootwith_launcher(s: KernelBootState, launcher: launcher_service.LauncherSe
     return s with { launcher: service_cell_helpers.service_cell_with_state<launcher_service.LauncherServiceState>(s.launcher, launcher) }
 }
 
+func bootwith_apps(s: KernelBootState, apps: AppRuntimeState) KernelBootState {
+    return s with { apps: }
+}
+
 func bootwith_issue_rollup(s: KernelBootState, issue_rollup: issue_rollup_app.IssueRollupAppState) KernelBootState {
-    return s with { issue_rollup: }
+    return bootwith_apps(s, app_runtime_state(issue_rollup, s.apps.review_board))
+}
+
+func bootwith_review_board(s: KernelBootState, review_board: review_board_app.ReviewBoardAppState) KernelBootState {
+    return bootwith_apps(s, app_runtime_state(s.apps.issue_rollup, review_board))
 }
 
 func bootwith_launcher_restart_outcome(s: KernelBootState, launcher_restart_outcome: RestartOutcome) KernelBootState {

@@ -15,6 +15,28 @@ const DISPLAY_STATE_STEADY: [4]u8 = [4]u8{ 83, 84, 68, 89 }
 const DISPLAY_STATE_BUSY: [4]u8 = [4]u8{ 66, 85, 83, 89 }
 const DISPLAY_STATE_ATTN: [4]u8 = [4]u8{ 65, 84, 84, 78 }
 
+func expect_reply(effect: service_effect.Effect, status: syscall.SyscallStatus, len: usize, b0: u8, b1: u8, b2: u8, b3: u8) bool {
+    if service_effect.effect_reply_status(effect) != status {
+        return false
+    }
+    if service_effect.effect_reply_payload_len(effect) != len {
+        return false
+    }
+    payload := service_effect.effect_reply_payload(effect)
+    return payload[0] == b0 && payload[1] == b1 && payload[2] == b2 && payload[3] == b3
+}
+
+func expect_workflow(effect: service_effect.Effect, status: syscall.SyscallStatus, state: u8, restart: u8) bool {
+    if service_effect.effect_reply_status(effect) != status {
+        return false
+    }
+    if service_effect.effect_reply_payload_len(effect) != 4 {
+        return false
+    }
+    payload := service_effect.effect_reply_payload(effect)
+    return payload[0] == state && payload[1] == restart
+}
+
 func expect_restart_identity(before: service_identity.ServiceMark, after: service_identity.ServiceMark, base: i32) i32 {
     before_endpoint: u32 = service_identity.mark_endpoint(before)
     before_pid: u32 = service_identity.mark_pid(before)

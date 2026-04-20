@@ -136,18 +136,28 @@ func launcher_launch_classification(update_store: update_store_service.UpdateSto
     return LAUNCHER_RESUME_FRESH
 }
 
+func launcher_requires_installed_program(program: u8) bool {
+    return program != program_catalog.PROGRAM_ID_REVIEW_BOARD
+}
+
 func launcher_launch(s: LauncherServiceState, ctx: LauncherContext) LauncherResult {
     desc := program_catalog.program_descriptor_for_id(s.selected)
     if !program_catalog.program_descriptor_is_valid(desc) {
         return launcher_result(s, ctx.update_store, launcher_reply(syscall.SyscallStatus.InvalidArgument, 0, 0, 0, 0, 0))
     }
-    if update_store_service.update_installed_program_id(ctx.update_store) != s.selected {
+    if launcher_requires_installed_program(s.selected) && update_store_service.update_installed_program_id(ctx.update_store) != s.selected {
         return launcher_result(s, ctx.update_store, launcher_reply(syscall.SyscallStatus.InvalidArgument, 0, 0, 0, 0, 0))
     }
     next_foreground := s.selected
-    classification := launcher_launch_classification(ctx.update_store, next_foreground, ctx.generation)
+    classification := LAUNCHER_RESUME_FRESH
+    if launcher_requires_installed_program(next_foreground) {
+        classification = launcher_launch_classification(ctx.update_store, next_foreground, ctx.generation)
+    }
     next := launcherwith(s, s.selected, next_foreground, s.launches + 1, classification)
-    next_update_store := update_store_service.update_record_launch(ctx.update_store, next.foreground, ctx.generation)
+    next_update_store := ctx.update_store
+    if launcher_requires_installed_program(next_foreground) {
+        next_update_store = update_store_service.update_record_launch(ctx.update_store, next.foreground, ctx.generation)
+    }
     return launcher_result(next, next_update_store, launcher_reply(syscall.SyscallStatus.Ok, 4, next.foreground, program_catalog.program_launch_kind_code(desc), next.launches, classification))
 }
 

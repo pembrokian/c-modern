@@ -174,6 +174,10 @@ Common breakage map
   workflow code.
 - Post-green sidecar drift -> extra roadmap, repo-map, or architecture edits
   appear even though the audit only changed workflow-local truth.
+- watch for reset-lane registration fallout: if the fixture is added to the
+  reset-lane grouped suite, check the scenario registration row, fixed-size
+  table or scenario-count owner, and coverage helper before reopening broader
+  workflow code
 
 Relevant test surfaces
 ~~~~~~~~~~~~~~~~~~~~~~

@@ -29,6 +29,14 @@ void ExpectReviewBoardRunOutput(std::string_view output,
                          context_prefix + ": should print the deterministic target result");
 }
 
+void ExpectReviewBoardUiOutput(std::string_view output,
+                               std::string_view expected_line,
+                               const std::string& context_prefix) {
+    ExpectOutputContains(output,
+                         expected_line,
+                         context_prefix + ": should print the deterministic ui surface");
+}
+
 void ExpectReviewBoardTestOutput(std::string_view output,
                                  std::string_view target_name,
                                  const std::string& context_prefix) {
@@ -93,6 +101,25 @@ void TestRealReviewBoardProject(const std::filesystem::path& source_root,
     ExpectReviewBoardRunOutput(focus_run_output,
                                "review-focus-normal\n",
                                "phase22 review board explicit focus run");
+
+    const auto [ui_run_outcome, ui_run_output] = RunCommandCapture({mc_path.generic_string(),
+                                                                    "run",
+                                                                    "--project",
+                                                                    project_path.generic_string(),
+                                                                    "--target",
+                                                                    "ui",
+                                                                    "--build-dir",
+                                                                    graph_build_dir.generic_string(),
+                                                                    "--",
+                                                                    "OTFTUUU"},
+                                                                   graph_build_dir / "review_board_ui_run_output.txt",
+                                                                   "review board explicit ui run");
+    if (!ui_run_outcome.exited || ui_run_outcome.exit_code != 0) {
+        Fail("review board explicit ui run should pass:\n" + ui_run_output);
+    }
+    ExpectReviewBoardUiOutput(ui_run_output,
+                              "FEFB\n",
+                              "phase286 review board explicit ui run");
 
     std::string audit_test_output = RunProjectTestTargetAndExpectSuccess(mc_path,
                                                                          project_path,
@@ -179,7 +206,20 @@ void TestRealReviewBoardProject(const std::filesystem::path& source_root,
               "enabled = true\n"
               "roots = [\"tests\"]\n"
               "mode = \"checked\"\n"
-              "timeout_ms = 5000\n");
+              "timeout_ms = 5000\n"
+              "\n"
+              "[targets.ui]\n"
+              "kind = \"exe\"\n"
+              "package = \"review-board\"\n"
+              "root = \"src/ui_main.mc\"\n"
+              "mode = \"debug\"\n"
+              "env = \"hosted\"\n"
+              "\n"
+              "[targets.ui.search_paths]\n"
+              "modules = [\"src\", \"" + (source_root / "stdlib").generic_string() + "\"]\n"
+              "\n"
+              "[targets.ui.runtime]\n"
+              "startup = \"default\"\n");
     const std::filesystem::path cloned_project_path = cloned_project_root / "build.toml";
     const std::filesystem::path cloned_sample_path = cloned_project_root / "tests/board_sample.txt";
     const std::filesystem::path rebuild_build_dir = binary_root / "review_board_rebuild_build";

@@ -39,3 +39,16 @@ enabled = true
 roots = ["tests"]
 mode = "checked"
 timeout_ms = 5000
+
+[targets.ui]
+kind = "exe"
+package = "review-board"
+root = "src/ui_main.mc"
+mode = "debug"
+env = "hosted"
+
+[targets.ui.search_paths]
+modules = ["src", "../../../stdlib"]
+
+[targets.ui.runtime]
+startup = "default"

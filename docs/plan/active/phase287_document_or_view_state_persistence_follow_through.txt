@@ -166,6 +166,10 @@ Common breakage map
   row, fixed-size scenario table or count, coverage helper expectations,
   fixture naming, and the owning reset-lane CTest target before reopening
   broader workflow code.
+- watch for reset-lane registration fallout: if the fixture is added to the
+  reset-lane grouped suite, check the scenario registration row, fixed-size
+  table or scenario-count owner, and coverage helper before reopening broader
+  workflow code
 
 Relevant test surfaces
 ~~~~~~~~~~~~~~~~~~~~~~
