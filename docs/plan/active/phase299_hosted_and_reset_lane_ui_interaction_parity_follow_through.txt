@@ -1,0 +1,206 @@
+Phase 299 -- Hosted And Reset-Lane UI Interaction Parity Follow-Through
+=======================================================================
+
+Status
+------
+PROPOSED
+
+Purpose
+-------
+Keep the richer interaction contract for the admitted UI apps aligned across
+the hosted real-project path and the reset-lane kernel proof path, without
+creating a separate UI runner, presentation family, or packaging branch.
+
+This phase exists now because the richer-UI wave becomes misleading if hosted
+project behavior and reset-lane behavior drift apart after new interaction
+features land. The repository needs one explicit parity follow-through before
+it layers more state or persistence on top.
+
+Repository status note
+----------------------
+- `tests/tool/README.md` already treats the hosted UI real-project targets and
+  `mc_tool_workflow_kernel_reset_lane_unit` as the canonical human-facing proof
+  surfaces.
+- `examples/real/issue_rollup/` and `examples/real/review_board/` own the
+  hosted project behaviors, while `kernel/src/issue_rollup_app.mc` and
+  `kernel/src/review_board_app.mc` own the reset-lane wrapper behaviors.
+- Phase 295 through Phase 298 are expected to deepen interaction on those same
+  app owners.
+- The repository still lacks one explicit phase that reasserts parity once the
+  richer interaction contract becomes more than launch plus simple toggles.
+
+Problem being solved
+--------------------
+- The more interaction depth the admitted apps gain, the easier it becomes for
+  hosted behavior and reset-lane behavior to diverge while each path still
+  looks locally correct.
+- If that drift is not checked deliberately, the support story from Phase 293
+  becomes weaker and later persistence or packaging work can build on mismatched
+  assumptions.
+- The current-repo problem is therefore parity drift risk between the two
+  maintained UI proof surfaces, not missing additional app features.
+
+Non-goals
+---------
+- no separate UI-specific runner or descriptor family
+- no new presentation backend or alternate surface contract
+- no packaging or launcher-install expansion
+- no broader reset-lane rearchitecture
+- no attempt to make hosted and reset-lane internals identical when only their
+  behavior contract must match
+
+Invariants
+----------
+- Hosted and reset-lane UI paths must continue to share one bounded admitted
+  interaction story.
+- `tests/tool/tool_kernel_reset_lane_suite.cpp` remains the grouped reset-lane
+  owner; parity work must not bypass it.
+- `examples/real/issue_rollup/` and `examples/real/review_board/` remain the
+  hosted behavior owners for their respective apps.
+- Kernel app wrappers remain thin adapters over app-local UI state rather than
+  an alternate behavior implementation family.
+- The repository must keep one maintained reset-lane full grouped case instead
+  of solving parity by adding manual shard maintenance or a parallel suite.
+
+Required surface changes
+------------------------
+1. Compare the hosted and reset-lane interaction contracts for the admitted UI
+   apps after the richer interaction slices land.
+2. Repair any behavior-visible parity gaps in the owning app wrapper or hosted
+   app owner rather than adding a new runner.
+3. Strengthen the narrow hosted and reset-lane proof surfaces to make the
+   aligned contract explicit.
+4. Widen to the maintained full reset-lane grouped case only if the parity work
+   touches shared workflow or reuse behavior.
+
+Forbidden changes
+-----------------
+- do not add a UI-only harness, runner, or case family
+- do not solve parity by weakening one side's behavior contract artificially
+- do not move app semantics into workflow or launcher code to make tests match
+- do not widen build reuse maintenance into manual sharding
+- do not reopen packaging or install policy in the name of parity
+
+Phase role in the larger sequence
+---------------------------------
+- This phase stabilizes the richer-UI wave across the two maintained execution
+  surfaces.
+- It protects Phase 300 from persisting interaction state that only exists on
+  one path.
+- It also produces the evidence the later support or freeze note will need to
+  claim the richer UI slice honestly.
+
+Relevant backlog items this phase intentionally brings under pressure
+--------------------------------------------------------------------
+- keep hosted and reset-lane user-facing proofs behavior-aligned
+- preserve the active grouped reset-lane suite as the canonical kernel workflow
+  surface
+- keep app wrappers thin and behavior ownership local
+
+Questions this phase must answer
+--------------------------------
+1. Which richer interaction behaviors must remain identical across the hosted
+   and reset-lane paths?
+2. Which owner should be repaired first when parity breaks: hosted app logic,
+   kernel wrapper logic, or workflow expectation?
+3. What is the narrowest validation order that catches drift without reopening
+   broad workflow exploration?
+4. When is the full reset-lane grouped case necessary, and when is it just
+   avoidable cost?
+
+Preferred implementation shape
+------------------------------
+- Start from the app-local behavior contract, not from workflow code.
+- Prefer repairing kernel wrappers to match the hosted app owner when the app-
+  local logic is already correct, or repairing the hosted app owner when the
+  wrapper reflects the intended contract more honestly.
+- Keep the parity proof on the existing real-project and reset-lane targets.
+- Use the full reset-lane grouped case only as the follow-through validation
+  surface after the narrow owners pass.
+
+Implementation accelerators
+---------------------------
+Main files and navigations
+~~~~~~~~~~~~~~~~~~~~~~~~~~
+- Primary behavior owners: `examples/real/issue_rollup/`,
+  `examples/real/review_board/`, `kernel/src/issue_rollup_app.mc`, and
+  `kernel/src/review_board_app.mc`.
+- Primary grouped workflow owner: `tests/tool/tool_kernel_reset_lane_suite.cpp`.
+- Hosted target routing surface: `tests/tool/tool_real_project_suite.cpp` and
+  the case-local UI project directories if a hosted expectation changes.
+- Expected first validation targets after a behavior repair: the owning hosted
+  real-project target and `mc_tool_workflow_kernel_reset_lane_unit`.
+
+Relevant cookbook patterns
+~~~~~~~~~~~~~~~~~~~~~~~~~~
+- Pattern 11 -- Add A Narrow UI Slice Owner is relevant as a reminder that the
+  parity repair should stay on the current app owners rather than creating a
+  new center of gravity.
+- The grouped-test guidance in `docs/agent/prompts/test_overview.txt` applies
+  directly: start with the narrowest owning targets before widening.
+
+Relevant file-local invariants
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+- `tests/tool/README.md` names the canonical human-facing evidence route for
+  hosted UI and reset-lane UI behavior.
+- `tests/tool/tool_kernel_reset_lane_suite.cpp` owns grouped reset-lane fixture
+  runs and full-case coverage; parity work should flow through it, not around
+  it.
+- `kernel/src/issue_rollup_app.mc` and `kernel/src/review_board_app.mc` are
+  wrappers, not framework owners; parity repairs should keep them thin.
+- Real-project case-local behavior should remain directory-local by default
+  rather than moving into shared dispatcher code.
+
+Dependency-ordered touch sequence
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+- Identify the first behavior-visible parity gap on the owning hosted or
+  wrapper surface.
+- Repair the controlling behavior owner second.
+- Update the adjacent proof on the paired hosted or reset-lane surface third.
+- Run the full reset-lane grouped case last only if shared workflow or reuse is
+  implicated.
+
+Common breakage map
+~~~~~~~~~~~~~~~~~~~
+- Hosted and kernel wrapper disagree -> inspect app-local behavior owners
+  before touching grouped workflow code.
+- Reset-lane scenario mismatch after app change -> check wrapper presentation
+  and scenario expectations before changing launcher or route owners.
+- Full reset-lane cost jumps -> inspect `cache=hit` or `cache=miss` summaries
+  before altering suite shape.
+- Hosted fix changes case-local behavior only -> keep the repair directory-
+  local instead of widening shared real-project dispatch code.
+
+Relevant test surfaces
+~~~~~~~~~~~~~~~~~~~~~~
+- Primary owning test family: `mc_tool_real_project_issue_rollup_unit`,
+  `mc_tool_real_project_review_board_unit`, and
+  `mc_tool_workflow_kernel_reset_lane_unit`.
+- Narrowest first executable validation target: whichever hosted real-project
+  UI target matches the changed app, plus `mc_tool_workflow_kernel_reset_lane_unit`.
+- Wider follow-through target when shared reset-lane wiring or reuse changes:
+  `mc_tool_workflow_kernel_reset_lane_full_unit`.
+
+Test obligations
+----------------
+- run `Build debug`
+- run the owning hosted real-project UI target or targets touched by the parity
+  change
+- run `mc_tool_workflow_kernel_reset_lane_unit`
+- if shared reset-lane workflow or reuse changed, run
+  `mc_tool_workflow_kernel_reset_lane_full_unit`, then rerun it once to check
+  warm-path reuse honestly
+
+Acceptance criteria
+-------------------
+- the richer interaction contract for the admitted UI apps stays aligned across
+  the hosted and reset-lane proof paths
+- no separate runner, suite family, or presentation backend is introduced
+- parity repairs stay on the behavior owners rather than in workflow glue
+- the maintained grouped reset-lane suite remains the canonical wide proof
+
+Future follow-up
+----------------
+- Phase 300 can then persist richer interaction state with confidence that the
+  contract exists on both maintained execution paths.
+- Phase 301 should use the parity result when freezing the richer UI slice.

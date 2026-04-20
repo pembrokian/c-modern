@@ -1,0 +1,207 @@
+Phase 296 -- App-Local Selection Or Detail Surface First Slice
+==============================================================
+
+Status
+------
+PROPOSED
+
+Purpose
+-------
+Admit one richer selection, detail, or active-item view in one existing app on
+the current fixed surface and optional two-region seam, without widening the
+kernel into a layout, focus, or widget framework.
+
+This phase exists now because once both admitted apps consume the same
+foreground-input contract, the strongest remaining richer-UI pressure is no
+longer routing but how little app-local detail or active-item state can be
+shown on the maintained surface.
+
+Repository status note
+----------------------
+- Phase 282 admits the current two-region composition seam in
+  `kernel/src/services/surface_composition.mc`.
+- `kernel/src/issue_rollup_app.mc` already spends that seam for body plus
+  status presentation, while `kernel/src/review_board_app.mc` and
+  `examples/real/review_board/src/review_board_ui.mc` already own bounded
+  app-local state and display-cell rendering.
+- Phase 295 is expected to put `review_board` fully on the admitted
+  foreground-input path.
+- The repository still lacks one richer app-local detail or selection proof
+  that shows the current UI slice can become more expressive without falling
+  into a shared layout or focus framework.
+
+Problem being solved
+--------------------
+- The current fixed four-cell UI slice proves launch, focus toggle, and small
+  app-local state, but it still says very little about how one app exposes an
+  active item, selected view, or richer detail on the maintained surface.
+- Without one admitted detail or selection proof, richer UI work risks
+  widening surface composition or launcher truth prematurely because there is
+  no consumer-local example of a more expressive interaction state.
+- The current-repo problem is therefore missing app-local expressiveness on the
+  frozen surface, not missing a general composition engine.
+
+Non-goals
+---------
+- no layout engine, region graph, or compositor growth
+- no shared focus owner across apps
+- no generic list widget, menu system, or reusable selection framework
+- no new display size or second surface family
+- no packaging, install, or launcher workflow expansion
+
+Invariants
+----------
+- One existing app must remain the single owner of the richer selection or
+  detail state.
+- `kernel/src/services/surface_composition.mc` stays a tiny two-region helper,
+  not a policy owner.
+- `kernel/src/services/display_surface.mc` continues to own fixed visible-cell
+  presentation only.
+- `kernel/src/services/launcher_service.mc` must not become the owner of app-
+  local active-item or detail semantics.
+- The richer UI spend must remain readable and testable on both the hosted
+  real-project path and the reset-lane proof path.
+
+Required surface changes
+------------------------
+1. Choose one admitted app as the single owner of a richer selection, detail,
+   or active-item slice.
+2. Add one bounded app-local state path and display update path for that slice.
+3. Reuse the current fixed four-cell surface and optional two-region seam if
+   needed, without adding more regions or dynamic layout policy.
+4. Add one narrow hosted proof and one narrow reset-lane proof that exercise
+   the richer app-local view state.
+
+Forbidden changes
+-----------------
+- do not add a shared selection helper just because two apps might need one
+  later
+- do not move active-item truth into `surface_composition.mc`,
+  `display_surface.mc`, `launcher_service.mc`, or `kernel_dispatch.mc`
+- do not widen the surface beyond the current fixed four visible cells
+- do not admit scrolling, pagination frameworks, or generic region managers
+- do not couple this phase to broader input-family or persistence work
+
+Phase role in the larger sequence
+---------------------------------
+- This phase spends the first richer visual state above the post-Phase-294
+  interaction baseline.
+- It prepares Phase 297 by giving the repository one stronger second app or
+  cross-app comparison point for whether any control vocabulary is actually
+  shared.
+- It also prepares Phase 300 by identifying which richer interaction state is
+  important enough to persist later.
+
+Relevant backlog items this phase intentionally brings under pressure
+--------------------------------------------------------------------
+- richer UI expressiveness on the admitted fixed surface
+- keep app behavior app-local instead of reopening shared UI owners too early
+- make the second app as architecturally informative as the first one
+
+Questions this phase must answer
+--------------------------------
+1. Which current app is the best owner for the first richer selection or
+   detail spend?
+2. Can the slice stay honest on the current four-cell surface and optional
+   two-region seam?
+3. What exact state transition proves more expressiveness without implying a
+   framework?
+4. Which hosted and reset-lane proofs should own the visible behavior change?
+
+Preferred implementation shape
+------------------------------
+- Prefer `review_board` as the first richer detail consumer because it already
+  owns bounded app-local mode and focus state plus journal-backed reload, but
+  keep `issue_rollup` available if the repository finds a more honest owner
+  there during implementation.
+- Keep the richer state in the app-local UI module and wrapper, with the
+  kernel display and composition owners only presenting cells they are given.
+- If the app needs the two-region seam, reuse the existing `surface_composition`
+  helper rather than widening it.
+- Keep the proof narrow: one hosted real-project expectation and one reset-lane
+  scenario or fixture.
+
+Implementation accelerators
+---------------------------
+Main files and navigations
+~~~~~~~~~~~~~~~~~~~~~~~~~~
+- Likely first owners: `kernel/src/review_board_app.mc` and
+  `examples/real/review_board/src/review_board_ui.mc`.
+- Alternative comparison owner: `kernel/src/issue_rollup_app.mc`.
+- Adjacent presentation helpers: `kernel/src/services/surface_composition.mc`
+  and `kernel/src/services/display_surface.mc`.
+- Expected first validation target after the owner change: `mc_tool_real_project_review_board_unit`.
+
+Relevant cookbook patterns
+~~~~~~~~~~~~~~~~~~~~~~~~~~
+- Pattern 11 -- Add A Narrow UI Slice Owner applies directly because the phase
+  admits one bounded richer UI behavior without a toolkit or compositor wave.
+- Pattern 3 -- Add A Service State Field applies only if the chosen app
+  wrapper needs one explicit richer-view field.
+
+Relevant file-local invariants
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+- `kernel/src/review_board_app.mc` owns presentation, reload, and input follow-
+  through for the `review_board` app wrapper; richer view state should stay
+  there and in the paired app-local UI module.
+- `examples/real/review_board/src/review_board_ui.mc` already owns mode,
+  focus, and display-cell rendering; it is the natural home for one bounded
+  detail or selection extension.
+- `kernel/src/services/surface_composition.mc` is intentionally fixed at a
+  two-region body-plus-status shape and should not absorb detail policy.
+- `tests/tool/README.md` routes hosted UI changes first to the owning real-
+  project target and reset-lane kernel changes to
+  `mc_tool_workflow_kernel_reset_lane_unit`.
+
+Dependency-ordered touch sequence
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+- Extend the chosen app-local state and rendering owner first.
+- Update the kernel app wrapper second so the hosted and reset-lane paths share
+  the same richer state contract.
+- Update the narrow hosted proof third.
+- Add or update the reset-lane scenario or fixture last.
+
+Common breakage map
+~~~~~~~~~~~~~~~~~~~
+- Added app-local state field -> check init, clone or `with` helpers, present
+  path, reload path if applicable, then hosted and reset-lane expectations.
+- Changed display-cell contract -> check the app-local renderer first, then
+  wrapper presentation, then fixture goldens.
+- Two-region use changed -> check `surface_composition` callers before editing
+  `surface_composition.mc` itself.
+- Richer behavior only works on one path -> compare hosted real-project proof
+  against kernel wrapper follow-through before widening to route owners.
+
+Relevant test surfaces
+~~~~~~~~~~~~~~~~~~~~~~
+- Primary owning test family: the hosted real-project UI target for the chosen
+  app plus the grouped reset-lane workflow suite.
+- Narrowest first executable validation target: `mc_tool_real_project_review_board_unit`.
+- Adjacent reset-lane target: `mc_tool_workflow_kernel_reset_lane_unit`.
+- If the change touches shared reset-lane cost or reuse, widen afterward to
+  `mc_tool_workflow_kernel_reset_lane_full_unit`.
+
+Test obligations
+----------------
+- run `Build debug`
+- run the owning hosted real-project UI target for the chosen app
+- run `mc_tool_workflow_kernel_reset_lane_unit`
+- run `mc_tool_workflow_kernel_reset_lane_full_unit` only if shared reset-lane
+  wiring or reuse behavior changed
+
+Acceptance criteria
+-------------------
+- one admitted app exposes one richer selection, detail, or active-item view
+  on the current fixed surface
+- the richer view state remains app-local and does not widen shared kernel UI
+  owners
+- hosted and reset-lane proofs both exercise the same richer state contract
+- the phase demonstrates more expressiveness without implying a toolkit,
+  layout engine, or focus framework
+
+Future follow-up
+----------------
+- Phase 297 should compare the app controls exposed by this slice against the
+  existing app pair to decide whether any tiny shared vocabulary is now honest.
+- Phase 300 can use the richer state from this phase as the candidate for one
+  bounded persistence follow-through.

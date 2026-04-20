@@ -1,0 +1,202 @@
+Phase 298 -- Key-Only Text Entry Or Filter Input First Slice
+============================================================
+
+Status
+------
+PROPOSED
+
+Purpose
+-------
+Admit one bounded typed-input or filter-edit path inside one existing app while
+staying on the current key-only event family and avoiding any text engine,
+editor framework, or second input-family expansion.
+
+This phase exists now because the richer-UI wave needs one stronger proof that
+the admitted surface can handle limited user-entered input, not just toggles
+and counters, but the repository must reach that proof without widening into a
+general text subsystem.
+
+Repository status note
+----------------------
+- `kernel/src/input_event.mc` and `kernel/src/foreground_input_route.mc` already
+  define and route the admitted key-only input family.
+- `examples/real/review_board/src/review_board_ui.mc` and
+  `kernel/src/review_board_app.mc` already own bounded app-local interaction
+  state and are the most plausible consumers for one filter-style input path.
+- Phase 297 is expected to state whether any tiny shared control vocabulary is
+  honest or whether typed-input semantics must remain entirely app-local.
+- The repository still lacks one maintained proof that a bounded typed-input or
+  filter-edit path can live on the current UI slice without implying a general
+  editor or text-engine wave.
+
+Problem being solved
+--------------------
+- The current UI slice is expressive enough for toggles, focus changes, and
+  small counters, but not yet for a user-entered filter, query, or bounded edit
+  token that materially changes app behavior.
+- Without one narrow typed-input proof, the richer-UI wave risks stopping at
+  button-like interaction only, which understates the capacity of the admitted
+  surface.
+- The current-repo problem is therefore one missing bounded keyed text-entry or
+  filter example, not missing general text infrastructure.
+
+Non-goals
+---------
+- no pointer, mouse, touch, or second input family
+- no cursoring engine, selection engine, clipboard, or IME support
+- no general string editing framework or reusable text widget
+- no dynamic layout growth or display-width expansion
+- no general parser or compiler text-system reopening in this phase
+
+Invariants
+----------
+- Input remains key-only and continues to flow through the existing foreground-
+  route seam.
+- The chosen app owns the typed-input or filter state locally.
+- The allowed input envelope must remain bounded and explicit.
+- The phase must not require a general text-rendering or string-editing owner.
+- If source-level byte readability becomes the real blocker during this phase,
+  record that pressure for the later compiler branch rather than widening this
+  phase into compiler work.
+
+Required surface changes
+------------------------
+1. Choose one app-local typed-input or filter-edit slice with a bounded input
+   envelope.
+2. Add one explicit app-local state owner for that slice.
+3. Keep the route on the current key-only event family and current fixed
+   visible surface.
+4. Add one hosted proof and one reset-lane proof that exercise the bounded
+   typed-input or filter behavior.
+
+Forbidden changes
+-----------------
+- do not add a text engine, cursor framework, or generic editor owner
+- do not widen `input_event.mc` into a text protocol
+- do not introduce strings, buffers, or compiler features just because the app
+  wants a friendlier source spelling
+- do not move filter semantics into launcher, route, or display owners
+- do not imply full text-entry support when the admitted behavior is only one
+  bounded filter or token-edit slice
+
+Phase role in the larger sequence
+---------------------------------
+- This phase is the first richer-UI proof that goes beyond toggles and simple
+  state mutation into bounded user-entered input.
+- It creates the clearest evidence for whether later compiler readability work
+  is actually earned by the UI wave.
+- It also supplies a stronger candidate state for persistence work in Phase 300.
+
+Relevant backlog items this phase intentionally brings under pressure
+--------------------------------------------------------------------
+- richer UI interaction above the current fixed surface
+- keep input growth app-local and bounded
+- expose whether raw byte spelling becomes a real UI-facing source-pressure
+
+Questions this phase must answer
+--------------------------------
+1. Which app-local filter or typed-input slice is strongest and most honest on
+   the current surface?
+2. What bounded input envelope keeps the phase narrow and testable?
+3. Can the display contract remain understandable without any text-engine
+   framework?
+4. Does the source-level byte spelling become a real implementation blocker or
+   only a readability nuisance?
+
+Preferred implementation shape
+------------------------------
+- Prefer a `review_board` filter or bounded token-edit path because that app
+  already owns app-local interaction state, visible mode changes, and journal-
+  backed reload; it can spend one more local field honestly without widening
+  shared owners.
+- Keep input classification local to the app owner unless Phase 297 admitted a
+  tiny shared control family that cleanly applies here.
+- Represent the visible result through the existing four-cell display contract,
+  optionally using the current two-region seam, instead of adding a larger text
+  presentation surface.
+- If byte readability becomes painful, record that explicitly for Band H rather
+  than solving it here.
+
+Implementation accelerators
+---------------------------
+Main files and navigations
+~~~~~~~~~~~~~~~~~~~~~~~~~~
+- Likely first owners: `examples/real/review_board/src/review_board_ui.mc` and
+  `kernel/src/review_board_app.mc`.
+- Route and event surfaces to read second: `kernel/src/input_event.mc` and
+  `kernel/src/foreground_input_route.mc`.
+- Persistence-adjacent owner to inspect early if the typed-input state might
+  later need reload support: `kernel/src/services/journal_service.mc`.
+- Expected first validation target after the owner change: `mc_tool_real_project_review_board_unit`.
+
+Relevant cookbook patterns
+~~~~~~~~~~~~~~~~~~~~~~~~~~
+- Pattern 11 -- Add A Narrow UI Slice Owner applies because this phase admits
+  one bounded app-local interaction slice without a toolkit or second input
+  family.
+- Pattern 3 -- Add A Service State Field applies if the app wrapper needs one
+  explicit typed-input or filter state field.
+
+Relevant file-local invariants
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+- `kernel/src/input_event.mc` names the admitted input family and should stay a
+  bounded key-event vocabulary.
+- `kernel/src/foreground_input_route.mc` routes to the foreground app and must
+  not become a text-editing owner.
+- `examples/real/review_board/src/review_board_ui.mc` is already the natural
+  home for bounded app-local key semantics and display-cell output.
+- `tests/tool/README.md` routes hosted UI changes first to the owning real-
+  project target and reset-lane changes to the grouped workflow target.
+
+Dependency-ordered touch sequence
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+- Land the app-local typed-input or filter state and key-handling owner first.
+- Update the kernel app wrapper second.
+- Update the hosted proof third.
+- Add or update the reset-lane scenario or fixture last.
+
+Common breakage map
+~~~~~~~~~~~~~~~~~~~
+- Added typed-input state field -> check init, clone or `with` helpers,
+  display rendering, reload path if touched, then tests.
+- New key classification leaks into shared route owner -> move it back to the
+  app owner before proceeding.
+- Display output becomes unreadable on the fixed surface -> tighten the slice
+  rather than widening the display contract.
+- Source spelling becomes the real blocker -> record it for the later compiler
+  band instead of widening this phase.
+
+Relevant test surfaces
+~~~~~~~~~~~~~~~~~~~~~~
+- Primary owning test family: the chosen app's hosted real-project target plus
+  the grouped reset-lane workflow suite.
+- Narrowest first executable validation target: the owning hosted real-project
+  UI target.
+- Adjacent reset-lane target: `mc_tool_workflow_kernel_reset_lane_unit`.
+- If the change touches reset-lane shared wiring or persistence-adjacent code,
+  widen to `mc_tool_workflow_kernel_reset_lane_full_unit` only after the narrow
+  owner passes.
+
+Test obligations
+----------------
+- run `Build debug`
+- run the owning hosted real-project UI target
+- run `mc_tool_workflow_kernel_reset_lane_unit`
+- if shared reset-lane wiring or persistence behavior changed, run
+  `mc_tool_workflow_kernel_reset_lane_full_unit`
+
+Acceptance criteria
+-------------------
+- one existing app accepts one bounded typed-input or filter-edit path on the
+  existing key-only input family
+- the new behavior remains app-local and does not introduce a text framework
+- hosted and reset-lane proofs both exercise the same bounded input contract
+- any compiler readability pressure discovered by the phase is recorded rather
+  than smuggled into this implementation
+
+Future follow-up
+----------------
+- Phase 299 should ensure the richer interaction contract remains aligned
+  across the hosted and reset-lane UI surfaces.
+- If this phase exposes persistent interaction state worth keeping across
+  restart, Phase 300 should spend that state explicitly.

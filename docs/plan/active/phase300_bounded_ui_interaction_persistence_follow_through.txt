@@ -1,0 +1,188 @@
+Phase 300 -- Bounded UI Interaction Persistence Follow-Through
+==============================================================
+
+Status
+------
+PROPOSED
+
+Purpose
+-------
+Persist one richer interaction state beyond the current launch overlay and
+single `review_board` view-state byte family, using the existing journal,
+launcher, and app owners without admitting a retained UI-state framework.
+
+This phase exists now because the richer-UI wave becomes materially more useful
+once one deeper interaction state survives restart honestly. The repository
+already has one bounded persisted `review_board` state path, so the next honest
+move is a narrow follow-through rather than a new persistence architecture.
+
+Repository status note
+----------------------
+- Phase 287 already proves one bounded `review_board` view-state persistence
+  lane through `kernel/src/review_board_app.mc` and
+  `kernel/src/services/journal_service.mc`.
+- `kernel/src/review_board_app.mc` currently reloads and writes a fixed four-
+  byte record that captures counts plus a mode or focus tag.
+- Phase 296 through Phase 299 are expected to add richer interaction state and
+  confirm hosted/reset-lane parity for that state.
+- The repository still lacks one explicit follow-through that extends
+  persistence to one richer interaction slice without widening into general UI
+  snapshotting or session frameworks.
+
+Problem being solved
+--------------------
+- Once the richer-UI wave admits deeper interaction state, losing that state on
+  restart can make the app feel like a thinner demo than the visible interaction
+  contract suggests.
+- At the same time, broadening persistence too far would destabilize the owner
+  map by turning journal, launcher, or the app wrappers into general retained
+  UI-state frameworks.
+- The current-repo problem is therefore one missing bounded persistence spend
+  for richer interaction state, not missing general state retention.
+
+Non-goals
+---------
+- no generic retained UI-state framework
+- no launcher-owned app snapshot system
+- no filesystem-backed document persistence or asset storage
+- no multi-app session restoration or desktop-state model
+- no widening of journal into a schema registry or general database
+
+Invariants
+----------
+- One app remains the owner of the richer interaction state being persisted.
+- `kernel/src/services/journal_service.mc` remains a bounded durable byte-lane
+  owner, not a UI policy owner.
+- `kernel/src/services/launcher_service.mc` keeps launch and foreground truth,
+  not app-specific retained interaction semantics.
+- The persisted state shape must stay explicit, bounded, and restart-safe.
+- Hosted and reset-lane proofs must both stay honest about what is and is not
+  retained.
+
+Required surface changes
+------------------------
+1. Choose one richer interaction state that is worth persisting.
+2. Extend the owning app wrapper's reload and journal-sync path for that state.
+3. Keep the durable shape bounded and explicit.
+4. Add or update one hosted and one reset-lane proof that demonstrate the
+   retained behavior across restart or reload.
+
+Forbidden changes
+-----------------
+- do not add a generic UI snapshot or state-serialization framework
+- do not move app-owned retained semantics into launcher or journal owners
+- do not widen the durable shape beyond what one app currently needs
+- do not reopen filesystem or packaging work under a persistence label
+- do not hide persistence policy inside workflow code or tests
+
+Phase role in the larger sequence
+---------------------------------
+- This phase converts the richer interaction wave into one restart-visible
+  capability rather than leaving all richer state purely ephemeral.
+- It provides one stronger fact for the eventual richer-UI freeze and audit.
+- It also tests whether the current journal-backed owner split remains adequate
+  for the deeper UI slice without reopening broader storage work.
+
+Relevant backlog items this phase intentionally brings under pressure
+--------------------------------------------------------------------
+- bounded restart-visible UI state on the existing journal-backed owner map
+- keep durable state app-local and explicit
+- resist broader storage or session-framework pressure during the richer-UI
+  wave
+
+Questions this phase must answer
+--------------------------------
+1. Which richer interaction state is strong enough to deserve persistence?
+2. Can that state fit honestly inside the existing bounded journal model?
+3. What exact reload behavior should users be able to rely on after restart?
+4. Which proof surfaces best demonstrate retained truth without inventing a new
+   persistence harness?
+
+Preferred implementation shape
+------------------------------
+- Prefer extending `review_board` because it already has the explicit journal-
+  backed reload owner and is the cleanest app-local home for one more retained
+  interaction slice.
+- Keep encode, decode, reload, and sync logic close to
+  `kernel/src/review_board_app.mc`.
+- Use `journal_service` only as the byte-lane durable owner and keep the app
+  responsible for interpreting those bytes.
+- Prove the result with one focused hosted restart or reload check and one
+  reset-lane persisted-state scenario.
+
+Implementation accelerators
+---------------------------
+Main files and navigations
+~~~~~~~~~~~~~~~~~~~~~~~~~~
+- Controlling owner to open first: `kernel/src/review_board_app.mc`.
+- Adjacent durable owner: `kernel/src/services/journal_service.mc`.
+- Existing restart-visible proof surface: `kernel/src/scenarios/scenario_review_board_state_persistence.mc`.
+- Expected first validation target after the owner change: `mc_tool_workflow_kernel_reset_lane_unit`.
+
+Relevant cookbook patterns
+~~~~~~~~~~~~~~~~~~~~~~~~~~
+- Pattern 3 -- Add A Service State Field applies because this phase is likely
+  to add one explicit persisted interaction field and its reload or sync follow-
+  through.
+- Pattern 11 -- Add A Narrow UI Slice Owner remains the higher-level reminder:
+  the phase should deepen one app-local owner rather than invent a framework.
+
+Relevant file-local invariants
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+- `kernel/src/review_board_app.mc` already owns journal tag encoding, reload,
+  and sync for current bounded persisted state.
+- `kernel/src/services/journal_service.mc` stores bounded lane bytes and should
+  not decide the meaning of those bytes.
+- Restart-visible truth belongs on the owning scenario and grouped reset-lane
+  workflow surfaces before any broader suite.
+- `tests/tool/README.md` still routes active reset-lane kernel changes first to
+  `mc_tool_workflow_kernel_reset_lane_unit`.
+
+Dependency-ordered touch sequence
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+- Extend the app-local persisted-state owner first.
+- Update journal encoding or sync follow-through second if needed.
+- Update the narrow persisted-state scenario or fixture third.
+- Update hosted and grouped workflow proofs last.
+
+Common breakage map
+~~~~~~~~~~~~~~~~~~~
+- Added persisted state field -> check init, clone or `with` helpers, reload,
+  sync, tag validation, and durable byte length expectations.
+- Reload falls back unexpectedly -> inspect journal tag validity and bounded
+  length checks before widening to launcher or workflow code.
+- Hosted and reset-lane retained behavior diverge -> check wrapper encode or
+  decode logic before touching route owners.
+- Journal lane shape change breaks other expectations -> verify the chosen app
+  still owns the lane and that no broader journal policy leaked in.
+
+Relevant test surfaces
+~~~~~~~~~~~~~~~~~~~~~~
+- Primary owning test family: reset-lane persisted-state coverage plus the
+  chosen app's hosted UI proof.
+- Narrowest first executable validation target: `mc_tool_workflow_kernel_reset_lane_unit`.
+- Adjacent hosted validation target: the owning hosted real-project UI target.
+- Wider follow-through target when restart-sensitive grouped coverage changes:
+  `mc_tool_workflow_kernel_reset_lane_full_unit`.
+
+Test obligations
+----------------
+- run `Build debug`
+- run `mc_tool_workflow_kernel_reset_lane_unit`
+- run the owning hosted real-project UI target
+- if restart-sensitive grouped reset-lane coverage changed, run
+  `mc_tool_workflow_kernel_reset_lane_full_unit`
+
+Acceptance criteria
+-------------------
+- one richer interaction state persists honestly across restart or reload
+- the retained state remains app-local, bounded, and explicitly encoded
+- journal and launcher owners keep their current narrow roles
+- hosted and reset-lane proofs both demonstrate the retained behavior clearly
+
+Future follow-up
+----------------
+- Phase 301 should freeze exactly what richer interaction state is now part of
+  the admitted supported slice.
+- If persistence pressure grows beyond this bounded app-local lane, that should
+  reopen a later storage audit rather than widening this phase retroactively.

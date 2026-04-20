@@ -1,0 +1,210 @@
+Phase 295 -- Review Board Foreground Interaction Follow-Through
+===============================================================
+
+Status
+------
+PROPOSED
+
+Purpose
+-------
+Let `review_board` consume the admitted key-only foreground-input path through
+its own app-local owner, so the second directly usable UI app stops depending
+on a narrower interaction story than `issue_rollup`.
+
+This phase exists now because Phase 294 chose richer UI as the strongest next
+wave, and the first honest follow-through is to make both admitted apps live
+on the same launcher-selected foreground-input contract before adding any
+deeper interaction slice.
+
+Repository status note
+----------------------
+- Phase 289 freezes the current bounded UI baseline: one fixed four-cell
+  surface, one optional two-region seam, one key-only input family, and one
+  launcher-selected foreground app.
+- Phase 290 proves that `issue_rollup` and `review_board` both participate in
+  one integrated small-system demo, but only `issue_rollup` has been the main
+  consumer of the admitted foreground-interaction path.
+- `kernel/src/review_board_app.mc` already owns app-local display and key
+  handling, and `examples/real/review_board/` already proves hosted app logic.
+- The repository still lacks one explicit phase that makes `review_board` a
+  first-class consumer of the same foreground-input contract on the maintained
+  hosted and reset-lane surfaces.
+
+Problem being solved
+--------------------
+- The current richer-UI direction is not yet honest if one admitted app still
+  benefits from the foreground-input model while the second app effectively
+  stays on a thinner interaction lane.
+- Without this follow-through, later UI phases risk designing selection,
+  filter, or persistence behavior on top of app-specific shortcuts rather than
+  the actual admitted launcher-selected input path.
+- The current-repo problem is therefore uneven use of the existing interaction
+  substrate across the two admitted apps, not the absence of a broader input
+  framework.
+
+Non-goals
+---------
+- no new input family beyond the admitted key-only path
+- no pointer, mouse, touch, IME, or text-engine work
+- no shared UI controller between `issue_rollup` and `review_board`
+- no launcher redesign, focus stack, or multi-foreground policy
+- no layout or composition expansion beyond the current fixed surface
+
+Invariants
+----------
+- `kernel/src/foreground_input_route.mc` remains the routing seam for admitted
+  foreground input rather than becoming a shared interaction policy owner.
+- `kernel/src/services/launcher_service.mc` remains the owner of foreground app
+  truth rather than app-local key semantics.
+- `kernel/src/review_board_app.mc` remains the owner of `review_board` key
+  meaning, present behavior, and app-local state updates.
+- `kernel/src/input_event.mc` stays key-only; this phase does not widen event
+  families or transport vocabulary.
+- Hosted and reset-lane proofs must continue to use the maintained real-project
+  and grouped workflow surfaces rather than a new UI-specific runner.
+
+Required surface changes
+------------------------
+1. Route `review_board` through the admitted launcher-selected foreground-input
+   path on the maintained kernel path rather than through any app-specific
+   shortcut.
+2. Update the owning `review_board` app wrapper so the app-local key-handling
+   path is exercised through that foreground route.
+3. Add or update one narrow reset-lane scenario or fixture that proves
+   `review_board` input travels through the same admitted route as the other
+   foreground app.
+4. Keep the hosted `examples/real/review_board/` proof aligned with the same
+   interaction contract.
+
+Forbidden changes
+-----------------
+- do not widen `foreground_input_route.mc` into a shared control policy layer
+- do not move `review_board` key semantics into `launcher_service.mc`
+- do not add a second foreground app path, focus manager, or app registry
+- do not introduce a separate review-board-only input runner or workflow
+- do not solve the phase by adding synthetic test hooks that bypass the real
+  launcher-selected route
+
+Phase role in the larger sequence
+---------------------------------
+- This phase is the first concrete spend of the Phase 294 richer-UI winner.
+- It establishes one equal interaction baseline across the two admitted apps
+  before the repository spends deeper UI pressure on selection, detail, or
+  typed-input behavior.
+- If it lands honestly, later phases can compare the two apps on the same
+  input contract instead of mixing app-local shortcuts with true substrate use.
+
+Relevant backlog items this phase intentionally brings under pressure
+--------------------------------------------------------------------
+- richer UI growth on the existing fixed-surface, launcher-selected app model
+- keep cross-app interaction work on app-local owners and the existing input
+  route instead of widening into a UI framework
+- preserve hosted and reset-lane evidence parity for user-facing features
+
+Questions this phase must answer
+--------------------------------
+1. What is the smallest honest route that lets `review_board` consume the
+   admitted foreground-input path?
+2. Which owner should decide whether a key changes `review_board` state, and
+   which owner should only route the key?
+3. What reset-lane proof best shows that the path is real without inventing a
+   second UI runner?
+4. What hosted proof should remain the primary app-local behavior surface?
+
+Preferred implementation shape
+------------------------------
+- Reuse the existing launcher-selected foreground-input route and keep the
+  phase focused on bringing `review_board` onto that seam.
+- Let `kernel/src/review_board_app.mc` continue to translate keys into app-
+  local state and display updates.
+- Keep `foreground_input_route.mc` and `launcher_service.mc` thin: they should
+  select the app and forward keys, not interpret review-board behavior.
+- Spend the proof on one narrow reset-lane scenario plus the existing hosted
+  `review_board` real-project target.
+
+Implementation accelerators
+---------------------------
+Main files and navigations
+~~~~~~~~~~~~~~~~~~~~~~~~~~
+- Controlling owners to open first: `kernel/src/foreground_input_route.mc`,
+  `kernel/src/review_board_app.mc`, and
+  `kernel/src/services/launcher_service.mc`.
+- First adjacent behavior surfaces: `kernel/src/input_event.mc`,
+  `kernel/src/scenarios/scenario_review_board_ui_proof.mc`, and
+  `examples/real/review_board/src/review_board_ui.mc`.
+- Reset-lane suite owner to open for fixture wiring: `tests/tool/tool_kernel_reset_lane_suite.cpp`.
+- Expected first validation target after the owner change: `mc_tool_workflow_kernel_reset_lane_unit`.
+
+Relevant cookbook patterns
+~~~~~~~~~~~~~~~~~~~~~~~~~~
+- Pattern 11 -- Add A Narrow UI Slice Owner applies because this phase spends
+  one bounded interaction seam on an existing app without admitting a toolkit
+  or second surface family.
+- Pattern 3 -- Add A Service State Field is relevant only if launcher-visible
+  or app-wrapper state needs one small explicit field to keep the route honest.
+
+Relevant file-local invariants
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+- `kernel/src/kernel_dispatch.mc` owns runtime routing and effect chasing, so
+  app-local interaction semantics should not be moved there.
+- `kernel/src/foreground_input_route.mc` is the admitted seam for routing key
+  events to the launcher-selected foreground app; it should stay a seam, not a
+  second app owner.
+- `kernel/src/review_board_app.mc` already owns display presentation and key
+  handling; this phase should strengthen that owner rather than bypass it.
+- `tests/tool/README.md` names `mc_tool_workflow_kernel_reset_lane_unit` as
+  the narrow owning workflow target for active reset-lane kernel changes.
+
+Dependency-ordered touch sequence
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+- Land the foreground-route and `review_board` app-wrapper owner changes first.
+- Update the direct routing or launcher follow-through second if the app must
+  become a selectable foreground consumer on that path.
+- Update the narrow reset-lane scenario or fixture third.
+- Update the hosted real-project proof and any test wiring last.
+
+Common breakage map
+~~~~~~~~~~~~~~~~~~~
+- Changed app-selection or routing path -> check `launcher_service`, then
+  `foreground_input_route`, then the scenario or fixture expectation.
+- Changed `review_board` input contract -> check `review_board_app` first,
+  then `review_board_ui`, then the hosted proof and reset-lane fixture.
+- Added or changed scenario row -> check the reset-lane registration row and
+  owning grouped suite before widening to broader workflow code.
+- No visible interaction change in reset-lane proof -> verify that keys are
+  flowing through the real launcher-selected route rather than a helper path.
+
+Relevant test surfaces
+~~~~~~~~~~~~~~~~~~~~~~
+- Primary owning test family: `tests/tool/` grouped reset-lane workflow
+  coverage plus the hosted `review_board` real-project target.
+- Narrowest first executable validation target: `mc_tool_workflow_kernel_reset_lane_unit`.
+- Adjacent hosted validation target: `mc_tool_real_project_review_board_unit`.
+- If the route change affects reset-lane build reuse or grouped cost, widen to
+  `mc_tool_workflow_kernel_reset_lane_full_unit` only after the narrow owner
+  passes.
+
+Test obligations
+----------------
+- run `Build debug`
+- run `mc_tool_workflow_kernel_reset_lane_unit`
+- run `mc_tool_real_project_review_board_unit`
+- if the reset-lane route or fixture table changes, run
+  `mc_tool_workflow_kernel_reset_lane_full_unit` after the narrow owner passes
+
+Acceptance criteria
+-------------------
+- `review_board` consumes the admitted launcher-selected foreground-input path
+  through its own app-local owner
+- the owning kernel route stays thin and does not become a shared UI
+  controller
+- one maintained reset-lane proof demonstrates the path honestly
+- the hosted `review_board` proof remains aligned with the same interaction
+  contract
+
+Future follow-up
+----------------
+- Phase 296 can then spend richer selection or detail behavior on top of the
+  same admitted interaction path.
+- If this phase exposes repeated cross-app key semantics, Phase 297 should
+  audit whether any tiny shared control vocabulary is now honest.

@@ -1,0 +1,210 @@
+Phase 297 -- Cross-App Small Control Vocabulary Audit
+=====================================================
+
+Status
+------
+PROPOSED
+
+Purpose
+-------
+Determine whether `issue_rollup` and `review_board` now repeat one tiny shared
+control family strongly enough to justify a bounded common vocabulary, or
+whether interaction semantics still belong entirely to app-local owners.
+
+This phase exists now because the richer-UI wave should only extract shared
+control truth after two real consumers repeat it. Earlier extraction would be
+speculation; later extraction would let accidental duplication accumulate.
+
+Repository status note
+----------------------
+- `kernel/src/issue_rollup_app.mc` and `kernel/src/review_board_app.mc` already
+  expose app-local key-driven behavior on the same admitted foreground-input
+  substrate.
+- `examples/real/review_board/src/review_board_ui.mc` already names concrete
+  key meanings for mode, focus, reset, and count changes, while `issue_rollup`
+  already uses a bounded focus-toggle key on a custom-manifest path.
+- Phase 295 and Phase 296 are expected to put both apps on a clearer common
+  interaction footing.
+- The repository still lacks one explicit decision about whether any repeated
+  control family is now real enough to extract or whether app-local ownership
+  remains the honest answer.
+
+Problem being solved
+--------------------
+- Once two apps consume the same admitted interaction substrate, repeated key
+  families can start to look like implicit shared vocabulary even when no file
+  owns that truth explicitly.
+- If the repo never audits that repetition, later phases may either duplicate
+  the same control semantics inconsistently or extract them too broadly under
+  convenience pressure.
+- The current-repo problem is therefore one missing bounded control-vocabulary
+  decision, not a need for a general input framework.
+
+Non-goals
+---------
+- no general keybinding system or remapping framework
+- no global shortcut manager, command palette, or menu model
+- no user-configurable controls or persisted keymaps
+- no broad rewrite of existing app-local interaction logic
+- no new input family beyond key-only events
+
+Invariants
+----------
+- Shared control truth, if any, must remain tiny and explicit.
+- App-local semantics remain app-local unless two real consumers demonstrably
+  repeat the same bounded control meaning.
+- `kernel/src/input_event.mc` and `kernel/src/foreground_input_route.mc` must
+  not become a general interaction-policy owner.
+- The repository may conclude that no shared vocabulary is yet honest; that is
+  a valid outcome and must remain explicit if chosen.
+- Any extracted shared control family must stay subordinate to app-local state
+  machines rather than replacing them.
+
+Required surface changes
+------------------------
+1. Compare the current admitted control families in `issue_rollup` and
+   `review_board`.
+2. Record whether one tiny shared control family is honest now or whether the
+   repository should keep control semantics app-local.
+3. If the comparison proves one shared family, add only the minimal naming or
+   helper surface needed for that family.
+4. Align the hosted and reset-lane proofs with the chosen outcome.
+
+Forbidden changes
+-----------------
+- do not invent a shared control layer just because the apps both use keys
+- do not move app-local state transitions into `input_event`,
+  `foreground_input_route`, or `launcher_service`
+- do not widen the outcome into a command-dispatch or keybinding framework
+- do not force both apps to use identical controls if their local semantics
+  still differ honestly
+- do not hide a negative audit result; if no shared family is honest, record
+  that explicitly
+
+Phase role in the larger sequence
+---------------------------------
+- This phase is the first explicit cross-app audit inside the richer-UI wave.
+- It prevents later input or persistence work from silently depending on an
+  unproven shared interaction model.
+- It prepares Phase 298 by clarifying whether bounded typed-input or filter
+  behavior should reuse any tiny shared control family or stay purely app-
+  local.
+
+Relevant backlog items this phase intentionally brings under pressure
+--------------------------------------------------------------------
+- keep cross-app interaction truth evidence-based rather than convenience-based
+- resist hidden framework growth in the richer-UI wave
+- keep app-local ownership intact unless repetition becomes concrete
+
+Questions this phase must answer
+--------------------------------
+1. Which existing app controls are actually the same, and which only look
+   similar at a distance?
+2. If one shared family exists, what is the smallest honest surface that can
+   name it?
+3. If no shared family exists, where should that decision be recorded so later
+   phases do not re-litigate it immediately?
+4. Which tests best prove the chosen outcome without inventing new runners?
+
+Preferred implementation shape
+------------------------------
+- Start with a direct comparison of the two app-local control owners before
+  creating any shared file.
+- Prefer a negative result over a premature abstraction if the controls do not
+  match cleanly.
+- If the audit finds one honest shared family, keep it to a tiny adjacent
+  naming surface or helper that both apps can consume without moving their
+  state machines.
+- If the audit result is negative, record that in the narrowest planning or
+  decision surface needed and leave app-local code in place.
+
+Implementation accelerators
+---------------------------
+Main files and navigations
+~~~~~~~~~~~~~~~~~~~~~~~~~~
+- Primary comparison owners: `kernel/src/issue_rollup_app.mc`,
+  `kernel/src/review_board_app.mc`, and
+  `examples/real/review_board/src/review_board_ui.mc`.
+- Adjacent route and vocabulary surfaces to read second: `kernel/src/input_event.mc`
+  and `kernel/src/foreground_input_route.mc`.
+- Narrow owning test surfaces: `mc_tool_real_project_issue_rollup_unit`,
+  `mc_tool_real_project_review_board_unit`, and
+  `mc_tool_workflow_kernel_reset_lane_unit`.
+- If the result is documentation-only, the first validation target is editor
+  diagnostics on the touched planning or decision note.
+
+Relevant cookbook patterns
+~~~~~~~~~~~~~~~~~~~~~~~~~~
+- No cookbook pattern applies exactly because this phase may legitimately end
+  with either a tiny implementation extraction or an explicit negative audit.
+- Pattern 11 -- Add A Narrow UI Slice Owner is the nearest reminder: keep any
+  positive result tiny and adjacent rather than turning it into a framework.
+
+Relevant file-local invariants
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+- `kernel/src/issue_rollup_app.mc` and `kernel/src/review_board_app.mc` are
+  the current owners of app-local interaction meaning.
+- `kernel/src/input_event.mc` names the admitted event family and should not be
+  overloaded with app-control semantics.
+- `tests/tool/README.md` identifies the real-project UI targets and reset-lane
+  workflow target that should remain the primary proof surfaces for interaction
+  work.
+- `docs/plan/decision_log.txt` is the right adjacent surface if the audit must
+  record an intentional decision to keep semantics app-local.
+
+Dependency-ordered touch sequence
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+- Compare the current app-local control families first.
+- Land the audit result second: either one tiny shared naming surface or one
+  explicit negative decision record.
+- Update the direct consuming app owners third if a tiny shared family was
+  admitted.
+- Update or rerun the narrow hosted and reset-lane proofs last.
+
+Common breakage map
+~~~~~~~~~~~~~~~~~~~
+- Shared control extraction changes app behavior -> check app-local call sites
+  before editing route or event owners.
+- Claimed shared family is not actually shared -> back out to the audit result
+  and keep semantics app-local.
+- Documentation-only result leaves tests unchanged -> confirm that no public
+  workflow or target names changed before widening validation.
+- Route owner starts accumulating semantics -> move the behavior back to the
+  app owners before proceeding.
+
+Relevant test surfaces
+~~~~~~~~~~~~~~~~~~~~~~
+- Primary owning test family: the two hosted UI real-project targets plus the
+  grouped reset-lane workflow suite.
+- Narrowest first executable validation target if code changes land:
+  `mc_tool_real_project_issue_rollup_unit` and
+  `mc_tool_real_project_review_board_unit`.
+- Adjacent reset-lane target for shared interaction fallout:
+  `mc_tool_workflow_kernel_reset_lane_unit`.
+- If the result is planning-only, validate with editor diagnostics only.
+
+Test obligations
+----------------
+- if the phase lands code, run `Build debug`
+- if the phase lands code, run the hosted UI real-project target or targets
+  touched by the change
+- if the phase lands code that affects shared kernel interaction routing, run
+  `mc_tool_workflow_kernel_reset_lane_unit`
+- if the phase lands only an audit record, require editor diagnostics only
+
+Acceptance criteria
+-------------------
+- the repository has one explicit answer about whether a tiny shared control
+  family now exists across the admitted app pair
+- any positive extraction stays tiny and does not become a keybinding or
+  command framework
+- any negative result is recorded explicitly enough to prevent immediate
+  relitigation
+- the chosen outcome keeps hosted and reset-lane UI behavior intelligible
+
+Future follow-up
+----------------
+- Phase 298 should respect this audit rather than assuming shared text-entry or
+  filter controls by default.
+- If the audit outcome is negative, revisit shared control vocabulary only
+  after a later phase creates a third concrete repeated control family.

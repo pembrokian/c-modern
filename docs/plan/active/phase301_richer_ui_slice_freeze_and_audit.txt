@@ -1,0 +1,201 @@
+Phase 301 -- Richer UI Slice Freeze And Audit
+=============================================
+
+Status
+------
+PROPOSED
+
+Purpose
+-------
+State exactly what the post-Phase-294 richer UI slice now means, what evidence
+supports it, and which tempting expansions still remain explicitly deferred.
+
+This phase exists now because Band G should end with one durable freeze-and-
+audit note rather than letting the richer-UI wave dissolve into scattered code
+changes, implicit support claims, or silent framework pressure.
+
+Repository status note
+----------------------
+- Phase 294 chooses richer UI composition and interaction as the next explicit
+  branch.
+- Phase 295 through Phase 300 are expected to spend that branch on foreground
+  interaction parity, one richer detail or selection slice, one bounded typed-
+  input or filter slice, hosted/reset-lane parity, and one bounded persistence
+  follow-through.
+- Phase 293 already defines the previous user-facing support baseline and the
+  major non-claims the repository keeps explicit.
+- The repository still needs one note that says whether Band G succeeded, what
+  the richer UI slice now contains, and what still remains out of scope.
+
+Problem being solved
+--------------------
+- Without a freeze-and-audit note, later phases can overstate what richer UI
+  now means or forget which constraints kept the wave honest.
+- That would weaken the support story, blur the loser branches, and make it too
+  easy to reopen layout, input, packaging, or compiler work without a fresh
+  evidence-based decision.
+- The current-repo problem is therefore one missing durable account of the
+  richer-UI landing, not a missing implementation feature by itself.
+
+Non-goals
+---------
+- no new UI feature landing by default
+- no new branch selection beyond recording the richer-UI result
+- no broad roadmap rewrite unless the richer-UI outcome forces one narrow sync
+- no desktop, toolkit, or package-platform claim
+- no compiler reopening unless the audit proves a stronger blocker explicitly
+
+Invariants
+----------
+- The freeze must describe only landed repository truth.
+- The note must preserve the fixed-surface, key-only, launcher-selected,
+  app-local owner map unless a prior Band G phase changed it explicitly.
+- Deferred branches must remain explicit rather than becoming implied support.
+- The audit must say whether Band G succeeded on its own admitted terms or hit
+  an honest ceiling earlier than expected.
+- The result must stay tied to maintained hosted and reset-lane evidence
+  surfaces.
+
+Required surface changes
+------------------------
+1. Record what richer interaction, detail, parity, and persistence behavior the
+   repository now admits after Phase 295 through Phase 300.
+2. Record which broader expansions remain deferred and why.
+3. Sync only the narrow planning or support surfaces that must reflect the
+   richer-UI freeze.
+4. If Band G exposed a stronger next blocker, record that clearly enough for
+   the next planning decision.
+
+Forbidden changes
+-----------------
+- do not restate deferred layout, toolkit, packaging, or compiler branches as
+  already-admitted capability
+- do not widen the audit into a speculative wishlist
+- do not hide an early stop or failed richer-UI assumption if Band G hit one
+- do not rewrite support claims without tying them to maintained evidence
+- do not create a second freeze note in a parallel planning surface
+
+Phase role in the larger sequence
+---------------------------------
+- This phase closes Band G of the speculative post-294 roadmap.
+- It determines whether the repository should next reopen the byte-literal
+  compiler branch, broader packaging, or some newly exposed stronger pressure.
+- It preserves the implementation evidence of the richer-UI wave in one place
+  before the next branch decision or support update.
+
+Relevant backlog items this phase intentionally brings under pressure
+--------------------------------------------------------------------
+- keep richer UI claims bounded and evidence-backed
+- preserve explicit loser branches after a successful or partial UI wave
+- avoid silent drift from app-local bounded growth into framework ambitions
+
+Questions this phase must answer
+--------------------------------
+1. What exact richer UI capabilities did Band G land on the maintained slice?
+2. Which owner boundaries remained intact, and did any phase expose a tighter-
+  than-expected ceiling?
+3. Which next blocker is now strongest: compiler readability, packaging,
+  another UI-local follow-through, or something else?
+4. Which public or planning docs need narrow sync so the freeze stays durable?
+
+Preferred implementation shape
+------------------------------
+- Start from the landed outcomes of Phase 295 through Phase 300 and the Phase
+  293 support baseline.
+- Prefer one compact freeze note with one loser-branch matrix over many small
+  recap notes.
+- Update only the narrow planning or support docs that future work will
+  actually consult.
+- If Band G stopped early, record that honestly rather than forcing an inflated
+  “success” summary.
+
+Implementation accelerators
+---------------------------
+Main files and navigations
+~~~~~~~~~~~~~~~~~~~~~~~~~~
+- Primary input notes: `docs/plan/active/phase293_first_human_facing_support_statement.txt`,
+  `docs/plan/active/phase294_next_wave_decision_note.txt`, and the landed Phase
+  295 through Phase 300 notes.
+- Supporting evidence surfaces: `README.md`, `kernel/README.md`, and
+  `tests/tool/README.md`.
+- Deferred-branch comparison surfaces: `docs/plan/backlog.txt`,
+  `docs/plan/decision_log.txt`, and
+  `docs/plan/admin/speculative_roadmap_post_phase294.txt`.
+- Expected first validation target: editor diagnostics on the touched planning
+  or documentation files unless a public workflow command changes.
+
+Relevant cookbook patterns
+~~~~~~~~~~~~~~~~~~~~~~~~~~
+- No cookbook pattern applies exactly because this phase is a freeze-and-audit
+  note rather than a code feature.
+- Pattern 6 -- Add A Compiler Phase is relevant only as a reminder that any
+  next compiler branch still needs its own bounded phase plan rather than being
+  implied here.
+
+Relevant file-local invariants
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+- `README.md` and `kernel/README.md` should only carry claims backed by
+  maintained workflow evidence.
+- `tests/tool/README.md` remains the workflow-routing anchor for the admitted
+  user-facing proof surfaces.
+- `docs/plan/backlog.txt` inventories deferred themes; it should not silently
+  replace the freeze note as the summary of what Band G landed.
+- `docs/plan/admin/speculative_roadmap_post_phase294.txt` is the right narrow
+  admin surface to sync if the freeze changes the next-branch comparison.
+
+Dependency-ordered touch sequence
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+- Audit the landed outcomes of Phase 295 through Phase 300 first.
+- Land the richer-UI freeze note second.
+- Sync only the narrow support or roadmap surfaces that must reflect the final
+  richer-UI account third.
+- Draft the next branch-specific phase plan last and only after this freeze is
+  stable.
+
+Common breakage map
+~~~~~~~~~~~~~~~~~~~
+- Freeze note overstates richer UI success -> compare against the actual Band G
+  landings and maintained test evidence before editing support docs.
+- Deferred branches disappear from the summary -> the repo risks accidental
+  scope drift in the next planning cycle.
+- Support or roadmap sync widens too far -> planning churn expands beyond the
+  narrow freeze obligation.
+- Next blocker is implied but not named -> later branch selection loses the
+  evidence Band G was supposed to produce.
+
+Relevant test surfaces
+~~~~~~~~~~~~~~~~~~~~~~
+- Primary owning validation surface: editor diagnostics on the touched plan or
+  support docs.
+- Narrowest executable validation target only if public commands or target
+  names change: the exact owning hosted or reset-lane target referenced by the
+  changed text.
+- The canonical evidence references for the richer UI slice should remain tied
+  to the hosted UI real-project targets and `mc_tool_workflow_kernel_reset_lane_unit`.
+
+Test obligations
+----------------
+- require editor diagnostics on the freeze note and any narrowly synced support
+  docs
+- run executable validation only if the phase changes public workflow commands
+  or target names
+- if executable validation is needed, run only the narrow owning target named
+  by the changed text
+
+Acceptance criteria
+-------------------
+- the repository has one durable note that says what the richer UI slice now
+  includes
+- the note records which larger expansions remain deferred and why
+- any stronger next blocker exposed by Band G is visible enough to guide the
+  next phase band honestly
+- the richer UI freeze remains tied to maintained hosted and reset-lane proof
+  surfaces rather than implied ambition
+
+Future follow-up
+----------------
+- If Band G made source readability the clearest next blocker, use this freeze
+  as the handoff into the byte-literal compiler band.
+- If Band G instead exposed a stronger installed-program or platform pressure,
+  use this freeze as the bounded baseline for the next decision note or phase
+  band.
