@@ -161,7 +161,7 @@ func kernel_init() KernelBootState {
         connection: connection_cell,
         connection_restart_outcome: RestartOutcome.None,
         launcher: launcher_cell,
-        issue_rollup: issue_rollup_app.issue_rollup_app_init(),
+        issue_rollup: issue_rollup_app.issue_rollup_app_init(issue_rollup_app.ISSUE_ROLLUP_LAUNCH_STATUS_NONE),
         launcher_restart_outcome: RestartOutcome.None,
         display: display_cell,
         display_restart_outcome: RestartOutcome.None,

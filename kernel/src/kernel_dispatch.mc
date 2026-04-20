@@ -348,7 +348,7 @@ func dispatch_launcher(state: *boot.KernelBootState, msg: service_effect.Message
     next = boot.bootwith_update_store(next, result.update_store)
     if msg.payload_len == 1 && msg.payload[0] == launcher_service.LAUNCHER_OP_LAUNCH && service_effect.effect_reply_status(result.effect) == syscall.SyscallStatus.Ok {
         if launcher_service.launcher_foreground_id(result.state) == program_catalog.PROGRAM_ID_ISSUE_ROLLUP {
-            present := issue_rollup_app.issue_rollup_launch(next.update_store.state, next.display.state)
+            present := issue_rollup_app.issue_rollup_launch(result.state.status, next.update_store.state, next.display.state)
             next = boot.bootwith_issue_rollup(next, present.app)
             next = boot.bootwith_display(next, present.display)
         }

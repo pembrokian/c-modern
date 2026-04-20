@@ -107,7 +107,7 @@ func run_human_facing_app_probe() i32 {
     }
 
     effect = kernel_dispatch.kernel_dispatch_step(&state, display_query_obs())
-    if !expect_reply(effect, syscall.SyscallStatus.Ok, 4, 69, 77, 84, 89) {
+    if !expect_reply(effect, syscall.SyscallStatus.Ok, 4, 70, 82, 83, 72) {
         return FAIL_DISPLAY_EMPTY
     }
 

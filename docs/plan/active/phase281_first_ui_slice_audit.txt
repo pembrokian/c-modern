@@ -3,7 +3,7 @@ Phase 281 -- First UI Slice Audit
 
 Status
 ------
-PROPOSED
+COMPLETED
 
 Purpose
 -------
@@ -18,9 +18,9 @@ second layer of UI composition or alternate input work.
 Repository status note
 ----------------------
 - Phase 273 already classified the first UI band as the stronger next owner.
-- Phases 274 through 280 are expected to admit one bounded input owner, one
-  display owner, one single-foreground input route, one explicit present
-  contract, one fixed rendering path, one directly usable app proof, and one
+- Phases 274 through 280 now admit one bounded input owner, one display
+  owner, one single-foreground input route, one explicit present contract,
+  one fixed rendering path, one directly usable app proof, and one
   restart-or-update follow-through on that path.
 - The repository will then have touched genuine UI work, but only through one
   narrow human-facing lane.
@@ -149,6 +149,81 @@ Acceptance criteria
   and which remain deferred
 - the next stronger owner after the first UI wave is classified honestly
 - no new feature work is smuggled into the audit
+
+Implementation outcome
+----------------------
+- Band D is now classified as complete for its admitted slice.
+- The maintained first-UI truths are:
+  - one explicit input-event owner, `input_event.mc`, for the admitted
+    `I K <byte> !` path
+  - one fixed four-cell display owner, `display_surface.mc`, with explicit
+    present and query semantics
+  - one single-foreground input-routing seam, `foreground_input_route.mc`,
+    that consumes launcher-owned foreground truth instead of inventing a second
+    focus owner
+  - one app-owned present seam, `issue_rollup_app.mc`, that keeps render
+    policy in the `issue_rollup` render modules instead of widening display or
+    launcher ownership
+  - one fixed readable four-cell rendering contract,
+    `EMTY` or `STDY` or `BUSY` or `ATTN`, shared by the hosted and reset-lane
+    `issue_rollup` paths
+  - one directly usable human-facing `issue_rollup` app proof on that same
+    bounded path
+  - one launch-only restart-or-update overlay,
+    `FRSH` or `RSUM` or `INVD`, that reuses launcher and update-store truth
+    without introducing retained UI state
+- The audit found no stronger still-open Band D owner than Band E's next
+  bounded UI layer.
+- The still-open UI pressures remain real but weaker than the completed first
+  slice:
+  - one bounded composition or region owner only if a second real visible
+    region or app pressure appears
+  - one second input family only if a real admitted app needs more than the
+    current `I K <byte> !` path
+  - one bounded focus or selection or shared control owner only if repeated
+    app-local UI code proves it
+  - one bounded document or view persistence follow-through only if a real app
+    needs state beyond the current launch-only lifecycle overlay
+- The first human-facing proof did not expose a missing Band D owner in input,
+  display, routing, launcher, or the app-owned present path. It instead
+  confirmed that the current bounded split is sufficient for one narrow UI
+  lane.
+
+Validation
+----------
+- no new executable validation was required because Phase 281 is a bounded
+  planning audit and the earlier Band D phases already carried the owning
+  executable evidence
+
+Phase review against the spec
+-----------------------------
+- Preserved invariants:
+  - the audit classifies only the landed Phase 274 through Phase 280 outcomes
+  - closed surfaces stay bounded to one explicit input owner, one fixed
+    display owner, one single-foreground route, one app-owned present seam,
+    one fixed cell-rendering contract, one human-facing `issue_rollup` proof,
+    and one launch-only lifecycle overlay
+  - deferred pressures remain concrete and owner-local instead of being buried
+    under vague polish or toolkit language
+- Ownership boundaries did not weaken:
+  - `live_receive.mc` remains the hosted polling and frame-assembly owner
+  - `launcher_service.mc` remains the single-foreground and lifecycle-
+    classification owner
+  - `display_surface.mc` remains the fixed-surface owner only
+  - `issue_rollup_app.mc` remains the app-local present consumer rather than a
+    general UI framework owner
+  - shell and dispatch remain routing seams instead of becoming event, render,
+    or lifecycle policy owners
+- Accidental centers of gravity were avoided:
+  - no window system, widget toolkit, pointer stack, composition framework, or
+    retained UI-state owner was introduced by the audit
+  - no launcher-owned display policy, display-owned render policy, or
+    update-store-owned app lifecycle policy was claimed
+- Honest non-decisions and deferred work:
+  - no second visible region or surface owner yet
+  - no second input family yet
+  - no shared control vocabulary or focus model yet
+  - no document or view persistence beyond the launch-only overlay yet
 
 Future follow-up
 ----------------

@@ -10,8 +10,11 @@ enum IssueRollupPresentKind {
     Presented,
 }
 
+const ISSUE_ROLLUP_LAUNCH_STATUS_NONE: u8 = 0
+
 struct IssueRollupAppState {
     interactive: issue_rollup_interactive.IssueRollupInteractiveState
+    launch_status: u8
 }
 
 struct IssueRollupPresentResult {
@@ -20,12 +23,12 @@ struct IssueRollupPresentResult {
     kind: IssueRollupPresentKind
 }
 
-func issue_rollup_app_init() IssueRollupAppState {
-    return IssueRollupAppState{ interactive: issue_rollup_interactive.issue_rollup_interactive_init() }
+func issue_rollup_app_init(launch_status: u8) IssueRollupAppState {
+    return IssueRollupAppState{ interactive: issue_rollup_interactive.issue_rollup_interactive_init(), launch_status: launch_status }
 }
 
-func issue_rollupwith(interactive: issue_rollup_interactive.IssueRollupInteractiveState) IssueRollupAppState {
-    return IssueRollupAppState{ interactive: interactive }
+func issue_rollupwith(interactive: issue_rollup_interactive.IssueRollupInteractiveState, launch_status: u8) IssueRollupAppState {
+    return IssueRollupAppState{ interactive: interactive, launch_status: launch_status }
 }
 
 func issue_rollup_result(app: IssueRollupAppState, display: display_surface.DisplaySurfaceState, kind: IssueRollupPresentKind) IssueRollupPresentResult {
@@ -48,15 +51,20 @@ func issue_rollup_manifest(update_store: update_store_service.UpdateStoreService
 }
 
 func issue_rollup_present(app: IssueRollupAppState, update_store: update_store_service.UpdateStoreServiceState, display: display_surface.DisplaySurfaceState) IssueRollupPresentResult {
-    manifest := issue_rollup_manifest(update_store)
-    summary := issue_rollup_interactive.issue_rollup_summary(app.interactive)
-    cells := rollup_render.rollup_display_cells_with_manifest(summary, manifest)
+    cells: [4]u8
+    if app.launch_status != ISSUE_ROLLUP_LAUNCH_STATUS_NONE {
+        cells = rollup_render.rollup_display_cells_for_launch_status(app.launch_status)
+    } else {
+        manifest := issue_rollup_manifest(update_store)
+        summary := issue_rollup_interactive.issue_rollup_summary(app.interactive)
+        cells = rollup_render.rollup_display_cells_with_manifest(summary, manifest)
+    }
     result := display_surface.display_present(display, cells)
     return issue_rollup_result(app, result.state, IssueRollupPresentKind.Presented)
 }
 
-func issue_rollup_launch(update_store: update_store_service.UpdateStoreServiceState, display: display_surface.DisplaySurfaceState) IssueRollupPresentResult {
-    return issue_rollup_present(issue_rollup_app_init(), update_store, display)
+func issue_rollup_launch(launch_status: u8, update_store: update_store_service.UpdateStoreServiceState, display: display_surface.DisplaySurfaceState) IssueRollupPresentResult {
+    return issue_rollup_present(issue_rollup_app_init(launch_status), update_store, display)
 }
 
 func issue_rollup_input(app: IssueRollupAppState, update_store: update_store_service.UpdateStoreServiceState, display: display_surface.DisplaySurfaceState, key: u8) IssueRollupPresentResult {
@@ -64,5 +72,5 @@ func issue_rollup_input(app: IssueRollupAppState, update_store: update_store_ser
     if !next.changed {
         return issue_rollup_result(app, display, IssueRollupPresentKind.NoChange)
     }
-    return issue_rollup_present(issue_rollupwith(next.state), update_store, display)
+    return issue_rollup_present(issue_rollupwith(next.state, ISSUE_ROLLUP_LAUNCH_STATUS_NONE), update_store, display)
 }

@@ -3,7 +3,7 @@ Phase 280 -- UI App Restart And Update Follow-Through
 
 Status
 ------
-PROPOSED
+COMPLETED
 
 Purpose
 -------
@@ -25,6 +25,19 @@ Repository status note
   bounded path.
 - The repository still lacks one proof that the visible app path remains honest
   under restart or update pressure.
+
+Landed result
+-------------
+- `launcher_service.mc` remains the fresh-versus-resumed-versus-invalidated
+  owner.
+- `issue_rollup_app.mc` now consumes that existing classification only at
+  launch time and presents one bounded four-cell overlay (`FRSH`, `RSUM`,
+  `INVD`) before the first app-owned state change returns rendering to the
+  existing manifest-plus-summary path.
+- `update_store_service.mc` remains the durable owner of installed bytes and
+  launch-record comparison truth.
+- the reset-lane suite now carries one focused Phase 280 fixture proving fresh,
+  resumed, and invalidated relaunches on the admitted surface.
 
 Problem being solved
 --------------------

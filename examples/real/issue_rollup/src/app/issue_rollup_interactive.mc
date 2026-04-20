@@ -1,14 +1,12 @@
 import rollup_model
 import rollup_parse
+import strings
 
 const ISSUE_ROLLUP_TEXT_CAPACITY: usize = 96
 
 const ISSUE_ROLLUP_KEY_OPEN: u8 = 79
 const ISSUE_ROLLUP_KEY_PRIORITY: u8 = 80
 const ISSUE_ROLLUP_KEY_RESET: u8 = 82
-
-const ISSUE_ROLLUP_OPEN_LINE: [7]u8 = { 79, 32, 111, 112, 101, 110, 10 }
-const ISSUE_ROLLUP_PRIORITY_LINE: [10]u8 = { 79, 33, 32, 117, 114, 103, 101, 110, 116, 10 }
 
 struct IssueRollupInteractiveState {
     text: [ISSUE_ROLLUP_TEXT_CAPACITY]u8
@@ -42,11 +40,11 @@ func issue_rollup_summary(state: IssueRollupInteractiveState) rollup_model.Summa
 }
 
 func issue_rollup_open_line() Slice<u8> {
-    return Slice<u8>{ ptr: &ISSUE_ROLLUP_OPEN_LINE[0], len: 7 }
+    return strings.bytes("O open\n")
 }
 
 func issue_rollup_priority_line() Slice<u8> {
-    return Slice<u8>{ ptr: &ISSUE_ROLLUP_PRIORITY_LINE[0], len: 10 }
+    return strings.bytes("O! urgent\n")
 }
 
 func issue_rollup_append_line(state: IssueRollupInteractiveState, line: Slice<u8>) IssueRollupInteractiveResult {

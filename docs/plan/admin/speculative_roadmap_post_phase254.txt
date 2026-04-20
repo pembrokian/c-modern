@@ -352,10 +352,9 @@ Outcome checkpoint after Band C:
 
 Band D - Start The First Human-Facing Surface Conservatively
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-Phases 274 through 281 are the earliest honest place to start basic UI work,
-and even here the right target is still small: one input owner, one display
-owner, one presentation contract, and one or two app proofs. Phases 274 and
-275 are now landed as the first two explicit UI anchors.
+Phases 274 through 281 are now the completed first UI wave, and even here the
+right target stays small: one input owner, one display owner, one presentation
+contract, and one deliberately narrow app proof.
 
 Likely themes:
 - convert live input from shell-only decode into explicit event ownership
@@ -421,16 +420,35 @@ Phase 280 -- UI App Restart And Update Follow-Through
 - Exit criterion: one human-facing app remains honest under restart or update
   or relaunch pressure on the current surface without requiring a retained UI
   framework.
+- Landed result: the launcher-owned fresh-versus-resumed-versus-invalidated
+  classification now reaches the admitted issue_rollup surface through one
+  app-local launch overlay (`FRSH`, `RSUM`, `INVD`) that clears on the first
+  app-owned state change, so restart and update pressure stay explicit without
+  widening launcher, update_store, or display into a retained UI framework.
 
 Phase 281 -- First UI Slice Audit
 - Exit criterion: the repository states one first user-facing UI slice honestly,
   naming the admitted input, display, routing, and app proof boundaries while
   keeping windows, widgets, mouse, and graphics acceleration explicitly
   deferred.
+- Landed result: Band D is now explicitly closed for its admitted slice. The
+  maintained truths are one explicit `input_event.mc` owner for
+  `I K <byte> !`, one fixed `display_surface.mc` owner, one single-foreground
+  `foreground_input_route.mc` seam, one app-owned `issue_rollup_app.mc`
+  present path, one fixed readable four-cell rendering contract shared by the
+  hosted and reset-lane `issue_rollup` paths, one directly usable
+  `issue_rollup` app proof, and one launch-only `FRSH` or `RSUM` or `INVD`
+  overlay that reuses launcher and update-store truth without retained UI
+  state. No stronger still-open Band D owner was found than the next bounded
+  Band E layer.
 
 Outcome checkpoint after Band D:
-- the repository should now have touched genuine UI work, but only through one
-  deliberately narrow human-facing path.
+- the repository now has genuine UI work, but only through one deliberately
+  narrow human-facing path.
+- Phase 281 also keeps the next work honest by classifying Band E as the next
+  planning band while leaving composition, alternate input, shared controls,
+  retained UI state, windows, widgets, and broader graphics work explicitly
+  deferred until a later real consumer proves one of them stronger.
 
 Band E - Add One More Layer Of UI Without Freezing Bad Abstractions
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -488,7 +506,7 @@ Phase 289 -- Second UI Slice Freeze
 - Exit criterion: the repository states exactly what "basic UI" now means in
   the repo and what still remains intentionally closed.
 
-Outcome checkpoint after Band D:
+Outcome checkpoint after Band E:
 - the repository should have something closer to a tiny user-facing system,
   not merely a service shell plus one probe surface.
 

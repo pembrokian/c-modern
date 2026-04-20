@@ -1,6 +1,7 @@
 import boot
 import kernel_dispatch
 import program_catalog
+import scenario_assert
 import scenario_transport
 import serial_protocol
 import service_effect
@@ -58,7 +59,7 @@ func run_display_surface_probe() i32 {
     state := boot.kernel_init()
 
     effect := kernel_dispatch.kernel_dispatch_step(&state, display_query_obs())
-    if !expect_reply(effect, syscall.SyscallStatus.Ok, 4, 0, 0, 0, 0) {
+    if !scenario_assert.expect_display(effect, syscall.SyscallStatus.Ok, scenario_assert.DISPLAY_STATE_BLANK) {
         return FAIL_DISPLAY_BLANK
     }
 
@@ -104,7 +105,7 @@ func run_display_surface_probe() i32 {
     }
 
     effect = kernel_dispatch.kernel_dispatch_step(&state, display_query_obs())
-    if !expect_reply(effect, syscall.SyscallStatus.Ok, 4, 69, 77, 84, 89) {
+    if !scenario_assert.expect_display(effect, syscall.SyscallStatus.Ok, scenario_assert.DISPLAY_STATE_FRESH) {
         return FAIL_DISPLAY_PRESENT
     }
 
@@ -119,7 +120,7 @@ func run_display_surface_probe() i32 {
     }
 
     effect = kernel_dispatch.kernel_dispatch_step(&state, display_query_obs())
-    if !expect_reply(effect, syscall.SyscallStatus.Ok, 4, 0, 0, 0, 0) {
+    if !scenario_assert.expect_display(effect, syscall.SyscallStatus.Ok, scenario_assert.DISPLAY_STATE_BLANK) {
         return FAIL_DISPLAY_CLEARED
     }
 

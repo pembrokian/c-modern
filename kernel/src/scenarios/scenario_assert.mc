@@ -6,7 +6,22 @@ import boot
 import service_state
 import syscall
 
-func expect_restart_identity(before_endpoint: u32, before_pid: u32, before_generation: u32, after_endpoint: u32, after_pid: u32, after_generation: u32, base: i32) i32 {
+const DISPLAY_STATE_BLANK: [4]u8 = [4]u8{ 0, 0, 0, 0 }
+const DISPLAY_STATE_FRESH: [4]u8 = [4]u8{ 70, 82, 83, 72 }
+const DISPLAY_STATE_RESUMED: [4]u8 = [4]u8{ 82, 83, 85, 77 }
+const DISPLAY_STATE_INVALIDATED: [4]u8 = [4]u8{ 73, 78, 86, 68 }
+const DISPLAY_STATE_EMPTY: [4]u8 = [4]u8{ 69, 77, 84, 89 }
+const DISPLAY_STATE_STEADY: [4]u8 = [4]u8{ 83, 84, 68, 89 }
+const DISPLAY_STATE_BUSY: [4]u8 = [4]u8{ 66, 85, 83, 89 }
+const DISPLAY_STATE_ATTN: [4]u8 = [4]u8{ 65, 84, 84, 78 }
+
+func expect_restart_identity(before: service_identity.ServiceMark, after: service_identity.ServiceMark, base: i32) i32 {
+    before_endpoint: u32 = service_identity.mark_endpoint(before)
+    before_pid: u32 = service_identity.mark_pid(before)
+    before_generation: u32 = service_identity.mark_generation(before)
+    after_endpoint: u32 = service_identity.mark_endpoint(after)
+    after_pid: u32 = service_identity.mark_pid(after)
+    after_generation: u32 = service_identity.mark_generation(after)
     if before_endpoint != after_endpoint {
         return base
     }
@@ -116,4 +131,15 @@ func expect_summary(effect: service_effect.Effect, status: syscall.SyscallStatus
     payload: [4]u8 = service_effect.effect_reply_payload(effect)
     expected: [4]u8 = boot.summary_payload(participation, outcome, generation)
     return payload == expected
+}
+
+func expect_display(effect: service_effect.Effect, status: syscall.SyscallStatus, cells: [4]u8) bool {
+    if service_effect.effect_reply_status(effect) != status {
+        return false
+    }
+    if service_effect.effect_reply_payload_len(effect) != 4 {
+        return false
+    }
+    payload: [4]u8 = service_effect.effect_reply_payload(effect)
+    return payload == cells
 }

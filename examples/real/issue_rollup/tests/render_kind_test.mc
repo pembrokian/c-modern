@@ -53,5 +53,60 @@ func test_render_kind() *i32 {
     if err != nil {
         return err
     }
+
+    fresh_cells := rollup_render.rollup_display_cells_for_launch_status(rollup_render.ROLLUP_LAUNCH_STATUS_FRESH)
+    err = testing.expect_usize_eq(usize(fresh_cells[0]), 70)
+    if err != nil {
+        return err
+    }
+    err = testing.expect_usize_eq(usize(fresh_cells[1]), 82)
+    if err != nil {
+        return err
+    }
+    err = testing.expect_usize_eq(usize(fresh_cells[2]), 83)
+    if err != nil {
+        return err
+    }
+    err = testing.expect_usize_eq(usize(fresh_cells[3]), 72)
+    if err != nil {
+        return err
+    }
+
+    resumed_cells := rollup_render.rollup_display_cells_for_launch_status(rollup_render.ROLLUP_LAUNCH_STATUS_RESUMED)
+    err = testing.expect_usize_eq(usize(resumed_cells[0]), 82)
+    if err != nil {
+        return err
+    }
+    err = testing.expect_usize_eq(usize(resumed_cells[1]), 83)
+    if err != nil {
+        return err
+    }
+    err = testing.expect_usize_eq(usize(resumed_cells[2]), 85)
+    if err != nil {
+        return err
+    }
+    err = testing.expect_usize_eq(usize(resumed_cells[3]), 77)
+    if err != nil {
+        return err
+    }
+
+    invalidated_cells := rollup_render.rollup_display_cells_for_launch_status(rollup_render.ROLLUP_LAUNCH_STATUS_INVALIDATED)
+    err = testing.expect_usize_eq(usize(invalidated_cells[0]), 73)
+    if err != nil {
+        return err
+    }
+    err = testing.expect_usize_eq(usize(invalidated_cells[1]), 78)
+    if err != nil {
+        return err
+    }
+    err = testing.expect_usize_eq(usize(invalidated_cells[2]), 86)
+    if err != nil {
+        return err
+    }
+    err = testing.expect_usize_eq(usize(invalidated_cells[3]), 68)
+    if err != nil {
+        return err
+    }
+
     return nil
 }

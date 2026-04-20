@@ -2,6 +2,7 @@ import boot
 import input_event
 import kernel_dispatch
 import program_catalog
+import scenario_assert
 import scenario_transport
 import service_effect
 import service_topology
@@ -23,8 +24,8 @@ const FAIL_PRESENT_LAUNCH: i32 = 27711
 const FAIL_PRESENT_LAUNCH_DISPLAY: i32 = 27712
 const FAIL_PRESENT_NOOP_DELIVERED: i32 = 27713
 const FAIL_PRESENT_NOOP_DISPLAY: i32 = 27714
-const FAIL_PRESENT_BUSY_DELIVERED: i32 = 27715
-const FAIL_PRESENT_BUSY_DISPLAY: i32 = 27716
+const FAIL_PRESENT_STEADY_DELIVERED: i32 = 27715
+const FAIL_PRESENT_STEADY_DISPLAY: i32 = 27716
 
 func expect_reply(effect: service_effect.Effect, status: syscall.SyscallStatus, len: usize, b0: u8, b1: u8, b2: u8, b3: u8) bool {
     if service_effect.effect_reply_status(effect) != status {
@@ -60,7 +61,7 @@ func run_explicit_present_probe() i32 {
     state := boot.kernel_init()
 
     effect := kernel_dispatch.kernel_dispatch_step(&state, display_query_obs())
-    if !expect_reply(effect, syscall.SyscallStatus.Ok, 4, 0, 0, 0, 0) {
+    if !scenario_assert.expect_display(effect, syscall.SyscallStatus.Ok, scenario_assert.DISPLAY_STATE_BLANK) {
         return FAIL_PRESENT_BLANK
     }
 
@@ -102,7 +103,7 @@ func run_explicit_present_probe() i32 {
     }
 
     effect = kernel_dispatch.kernel_dispatch_step(&state, display_query_obs())
-    if !expect_reply(effect, syscall.SyscallStatus.Ok, 4, 0, 0, 0, 0) {
+    if !scenario_assert.expect_display(effect, syscall.SyscallStatus.Ok, scenario_assert.DISPLAY_STATE_BLANK) {
         return FAIL_PRESENT_SELECT_DISPLAY
     }
 
@@ -112,7 +113,7 @@ func run_explicit_present_probe() i32 {
     }
 
     effect = kernel_dispatch.kernel_dispatch_step(&state, display_query_obs())
-    if !expect_reply(effect, syscall.SyscallStatus.Ok, 4, 69, 77, 84, 89) {
+    if !scenario_assert.expect_display(effect, syscall.SyscallStatus.Ok, scenario_assert.DISPLAY_STATE_FRESH) {
         return FAIL_PRESENT_LAUNCH_DISPLAY
     }
 
@@ -122,18 +123,18 @@ func run_explicit_present_probe() i32 {
     }
 
     effect = kernel_dispatch.kernel_dispatch_step(&state, display_query_obs())
-    if !expect_reply(effect, syscall.SyscallStatus.Ok, 4, 69, 77, 84, 89) {
+    if !scenario_assert.expect_display(effect, syscall.SyscallStatus.Ok, scenario_assert.DISPLAY_STATE_FRESH) {
         return FAIL_PRESENT_NOOP_DISPLAY
     }
 
-    effect = kernel_dispatch.kernel_dispatch_step(&state, scenario_transport.cmd_input_key(66))
-    if !expect_reply(effect, syscall.SyscallStatus.Ok, 4, program_catalog.PROGRAM_ID_ISSUE_ROLLUP, input_event.INPUT_ROUTE_DELIVERED, input_event.INPUT_EVENT_KEY, 66) {
-        return FAIL_PRESENT_BUSY_DELIVERED
+    effect = kernel_dispatch.kernel_dispatch_step(&state, scenario_transport.cmd_input_key(79))
+    if !expect_reply(effect, syscall.SyscallStatus.Ok, 4, program_catalog.PROGRAM_ID_ISSUE_ROLLUP, input_event.INPUT_ROUTE_DELIVERED, input_event.INPUT_EVENT_KEY, 79) {
+        return FAIL_PRESENT_STEADY_DELIVERED
     }
 
     effect = kernel_dispatch.kernel_dispatch_step(&state, display_query_obs())
-    if !expect_reply(effect, syscall.SyscallStatus.Ok, 4, 66, 85, 83, 89) {
-        return FAIL_PRESENT_BUSY_DISPLAY
+    if !scenario_assert.expect_display(effect, syscall.SyscallStatus.Ok, scenario_assert.DISPLAY_STATE_STEADY) {
+        return FAIL_PRESENT_STEADY_DISPLAY
     }
 
     return 0

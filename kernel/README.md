@@ -13,7 +13,7 @@ Rules
 - Keep compiler, sema, MIR, backend, ABI, target, runtime, and `hal` surfaces closed unless a narrow blocker forces a local change.
 - Add modules only when a specific phase boundary needs them, at the lean behavioral minimum the four-section standard allows.
 
-Current scope (through Phase 278)
+Current scope (through Phase 281)
 
 - All three canonical service shapes are present: forwarding (`serial_service`, `shell_service`, `serial_shell_path`), append/tail (`log_service`), and key/value (`kv_service`).
 - The compact shell route now reaches `log_service` and `kv_service` over the real reset-lane path instead of stopping at shell-local echo behavior.
@@ -32,6 +32,9 @@ Current scope (through Phase 278)
 - Phase 276 adds one explicit `foreground_input_route.mc` seam that keeps event parsing in `input_event.mc`, keeps foreground truth in `launcher_service.mc`, and routes the admitted input family to exactly one current foreground app without widening launcher, display, or dispatch into a UI framework.
 - Phase 277 adds one explicit `issue_rollup_app.mc` owner for the first app-driven present path, keeps render classification in the `issue_rollup` render modules, and removes the old launcher-time display-token shortcut so launch/input now reach the surface only through an explicit app-to-display present request.
 - Phase 278 keeps the first rendering answer on that same app-to-display path by reusing the existing readable four-cell visible contract (`EMTY`, `STDY`, `BUSY`, `ATTN`) and aligning the hosted `issue_rollup` path to the same cell-shaped output rather than admitting a second rendering family.
+- Phase 279 adds one directly usable `issue_rollup` app proof through an app-local interactive reducer that appends bounded issue lines and reuses the existing parse-plus-render owners instead of widening the kernel into a second app framework.
+- Phase 280 keeps restart and update truth on the same visible path through one launch-only `FRSH` or `RSUM` or `INVD` overlay that reuses launcher and update-store truth without admitting retained UI state.
+- Phase 281 closes Band D as a planning audit: the maintained first-UI truth is now one bounded input plus display plus routing plus present plus fixed-cell rendering plus app-proof lane, while windows, widgets, composition frameworks, alternate input families, and retained UI-state work remain deferred until a stronger later owner appears.
 
 Source tree layout (Phase 219)
 
@@ -56,6 +59,31 @@ The following modules are deferred until the named phase boundary forces them:
 - `mmu` — probably never in this tree; hosted execution makes MMU stubs meaningless
 
 Recent service targets
+
+- Phase 281 (completed): first UI slice audit.
+  Band D is now explicitly closed for its admitted slice: `input_event.mc`,
+  `display_surface.mc`, `foreground_input_route.mc`, `issue_rollup_app.mc`,
+  the fixed readable four-cell rendering contract, the directly usable
+  `issue_rollup` app path, and the launch-only `FRSH`/`RSUM`/`INVD` overlay
+  are the maintained first-UI truths. No stronger still-open Band D owner was
+  found than the next bounded Band E layer, so windows, widgets, composition,
+  alternate input, shared controls, and retained UI-state work stay deferred.
+
+- Phase 280 (completed): UI app restart and update follow-through.
+  `issue_rollup_app.mc` now consumes the launcher-owned fresh-versus-resumed-
+  versus-invalidated classification only at launch time and presents one
+  bounded four-cell overlay before the first app-owned state change returns
+  rendering to the existing manifest-plus-summary path. The focused reset-lane
+  fixture is
+  `tests/system/kernel_reset_lane_phase280_ui_app_restart_and_update_follow_through`.
+
+- Phase 279 (completed): first human-facing app proof.
+  `issue_rollup` is now directly usable on the admitted UI path through one
+  app-local interactive reducer in
+  `examples/real/issue_rollup/src/app/issue_rollup_interactive.mc`, while
+  render policy remains on the existing parse-plus-render owners and the
+  kernel-side wrapper stays thin. The focused reset-lane fixture is
+  `tests/system/kernel_reset_lane_phase279_first_human_facing_app_proof`.
 
 - Phase 278 (landed): fixed-cell rendering path.
   The admitted readable rendering contract is the existing four-byte visible

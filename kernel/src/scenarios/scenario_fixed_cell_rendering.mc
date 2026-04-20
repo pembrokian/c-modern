@@ -2,6 +2,7 @@ import boot
 import input_event
 import kernel_dispatch
 import program_catalog
+import scenario_assert
 import scenario_transport
 import service_effect
 import service_topology
@@ -63,7 +64,7 @@ func run_fixed_cell_rendering_probe() i32 {
     state := boot.kernel_init()
 
     effect := kernel_dispatch.kernel_dispatch_step(&state, display_query_obs())
-    if !expect_reply(effect, syscall.SyscallStatus.Ok, 4, 0, 0, 0, 0) {
+    if !scenario_assert.expect_display(effect, syscall.SyscallStatus.Ok, scenario_assert.DISPLAY_STATE_BLANK) {
         return FAIL_RENDER_BLANK
     }
 
@@ -109,43 +110,43 @@ func run_fixed_cell_rendering_probe() i32 {
     }
 
     effect = kernel_dispatch.kernel_dispatch_step(&state, display_query_obs())
-    if !expect_reply(effect, syscall.SyscallStatus.Ok, 4, 69, 77, 84, 89) {
+    if !scenario_assert.expect_display(effect, syscall.SyscallStatus.Ok, scenario_assert.DISPLAY_STATE_FRESH) {
         return FAIL_RENDER_EMPTY
     }
 
-    effect = kernel_dispatch.kernel_dispatch_step(&state, scenario_transport.cmd_input_key(83))
-    if !expect_reply(effect, syscall.SyscallStatus.Ok, 4, program_catalog.PROGRAM_ID_ISSUE_ROLLUP, input_event.INPUT_ROUTE_DELIVERED, input_event.INPUT_EVENT_KEY, 83) {
+    effect = kernel_dispatch.kernel_dispatch_step(&state, scenario_transport.cmd_input_key(79))
+    if !expect_reply(effect, syscall.SyscallStatus.Ok, 4, program_catalog.PROGRAM_ID_ISSUE_ROLLUP, input_event.INPUT_ROUTE_DELIVERED, input_event.INPUT_EVENT_KEY, 79) {
         return FAIL_RENDER_STEADY_DELIVERED
     }
     effect = kernel_dispatch.kernel_dispatch_step(&state, display_query_obs())
-    if !expect_reply(effect, syscall.SyscallStatus.Ok, 4, 83, 84, 68, 89) {
+    if !scenario_assert.expect_display(effect, syscall.SyscallStatus.Ok, scenario_assert.DISPLAY_STATE_STEADY) {
         return FAIL_RENDER_STEADY
     }
 
-    effect = kernel_dispatch.kernel_dispatch_step(&state, scenario_transport.cmd_input_key(66))
-    if !expect_reply(effect, syscall.SyscallStatus.Ok, 4, program_catalog.PROGRAM_ID_ISSUE_ROLLUP, input_event.INPUT_ROUTE_DELIVERED, input_event.INPUT_EVENT_KEY, 66) {
+    effect = kernel_dispatch.kernel_dispatch_step(&state, scenario_transport.cmd_input_key(79))
+    if !expect_reply(effect, syscall.SyscallStatus.Ok, 4, program_catalog.PROGRAM_ID_ISSUE_ROLLUP, input_event.INPUT_ROUTE_DELIVERED, input_event.INPUT_EVENT_KEY, 79) {
         return FAIL_RENDER_BUSY_DELIVERED
     }
     effect = kernel_dispatch.kernel_dispatch_step(&state, display_query_obs())
-    if !expect_reply(effect, syscall.SyscallStatus.Ok, 4, 66, 85, 83, 89) {
+    if !scenario_assert.expect_display(effect, syscall.SyscallStatus.Ok, scenario_assert.DISPLAY_STATE_BUSY) {
         return FAIL_RENDER_BUSY
     }
 
-    effect = kernel_dispatch.kernel_dispatch_step(&state, scenario_transport.cmd_input_key(65))
-    if !expect_reply(effect, syscall.SyscallStatus.Ok, 4, program_catalog.PROGRAM_ID_ISSUE_ROLLUP, input_event.INPUT_ROUTE_DELIVERED, input_event.INPUT_EVENT_KEY, 65) {
+    effect = kernel_dispatch.kernel_dispatch_step(&state, scenario_transport.cmd_input_key(80))
+    if !expect_reply(effect, syscall.SyscallStatus.Ok, 4, program_catalog.PROGRAM_ID_ISSUE_ROLLUP, input_event.INPUT_ROUTE_DELIVERED, input_event.INPUT_EVENT_KEY, 80) {
         return FAIL_RENDER_ATTN_DELIVERED
     }
     effect = kernel_dispatch.kernel_dispatch_step(&state, display_query_obs())
-    if !expect_reply(effect, syscall.SyscallStatus.Ok, 4, 65, 84, 84, 78) {
+    if !scenario_assert.expect_display(effect, syscall.SyscallStatus.Ok, scenario_assert.DISPLAY_STATE_ATTN) {
         return FAIL_RENDER_ATTN
     }
 
-    effect = kernel_dispatch.kernel_dispatch_step(&state, scenario_transport.cmd_input_key(69))
-    if !expect_reply(effect, syscall.SyscallStatus.Ok, 4, program_catalog.PROGRAM_ID_ISSUE_ROLLUP, input_event.INPUT_ROUTE_DELIVERED, input_event.INPUT_EVENT_KEY, 69) {
+    effect = kernel_dispatch.kernel_dispatch_step(&state, scenario_transport.cmd_input_key(82))
+    if !expect_reply(effect, syscall.SyscallStatus.Ok, 4, program_catalog.PROGRAM_ID_ISSUE_ROLLUP, input_event.INPUT_ROUTE_DELIVERED, input_event.INPUT_EVENT_KEY, 82) {
         return FAIL_RENDER_RESET_DELIVERED
     }
     effect = kernel_dispatch.kernel_dispatch_step(&state, display_query_obs())
-    if !expect_reply(effect, syscall.SyscallStatus.Ok, 4, 69, 77, 84, 89) {
+    if !scenario_assert.expect_display(effect, syscall.SyscallStatus.Ok, scenario_assert.DISPLAY_STATE_EMPTY) {
         return FAIL_RENDER_RESET
     }
 

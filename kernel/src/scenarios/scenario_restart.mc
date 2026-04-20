@@ -19,6 +19,8 @@ const FAIL_RESTART_LOG_TAIL_1: i32 = 15
 const FAIL_RESTART_LOG_TAIL_2: i32 = 16
 const FAIL_RESTART_LOG_TAIL_3: i32 = 17
 const FAIL_RESTART_LOG_APPEND_STATUS: i32 = 18
+
+// KV restart checks.
 const FAIL_RESTART_KV_IDENTITY_BASE: i32 = 19
 const FAIL_RESTART_KV_COUNT_STATUS: i32 = 23
 const FAIL_RESTART_KV_COUNT_LEN: i32 = 24
@@ -29,6 +31,15 @@ const FAIL_RESTART_KV_GET_VALUE: i32 = 28
 const FAIL_RESTART_KV_OVERWRITE_STATUS: i32 = 29
 const FAIL_RESTART_KV_SECOND_GET_STATUS: i32 = 30
 const FAIL_RESTART_KV_SECOND_GET_VALUE: i32 = 31
+
+// Echo restart checks.
+const FAIL_RESTART_ECHO_IDENTITY_BASE: i32 = 32
+const FAIL_RESTART_ECHO_STATUS: i32 = 57
+const FAIL_RESTART_ECHO_LEN: i32 = 58
+const FAIL_RESTART_ECHO_PAYLOAD_0: i32 = 59
+const FAIL_RESTART_ECHO_PAYLOAD_1: i32 = 60
+
+// Queue restart checks.
 const FAIL_RESTART_QUEUE_ENQUEUE_0: i32 = 40
 const FAIL_RESTART_QUEUE_ENQUEUE_1: i32 = 41
 const FAIL_RESTART_QUEUE_ENQUEUE_2: i32 = 42
@@ -43,11 +54,8 @@ const FAIL_RESTART_QUEUE_DEQUEUE_2_VALUE: i32 = 53
 const FAIL_RESTART_QUEUE_DEQUEUE_3_STATUS: i32 = 54
 const FAIL_RESTART_QUEUE_DEQUEUE_3_VALUE: i32 = 55
 const FAIL_RESTART_QUEUE_EMPTY_STATUS: i32 = 56
-const FAIL_RESTART_ECHO_IDENTITY_BASE: i32 = 32
-const FAIL_RESTART_ECHO_STATUS: i32 = 57
-const FAIL_RESTART_ECHO_LEN: i32 = 58
-const FAIL_RESTART_ECHO_PAYLOAD_0: i32 = 59
-const FAIL_RESTART_ECHO_PAYLOAD_1: i32 = 60
+
+// Ticket restart checks.
 const FAIL_RESTART_TICKET_ISSUE_STATUS: i32 = 61
 const FAIL_RESTART_TICKET_ISSUE_LEN: i32 = 62
 const FAIL_RESTART_TICKET_IDENTITY_BASE: i32 = 63
@@ -69,13 +77,7 @@ func run_restart_probe(state: *boot.KernelBootState) i32 {
     *state = init.restart(*state, service_topology.LOG_ENDPOINT_ID)
     log_after: service_identity.ServiceMark = boot.boot_log_mark(*state)
 
-    log_before_endpoint: u32 = service_identity.mark_endpoint(log_before)
-    log_before_pid: u32 = service_identity.mark_pid(log_before)
-    log_before_generation: u32 = service_identity.mark_generation(log_before)
-    log_after_endpoint: u32 = service_identity.mark_endpoint(log_after)
-    log_after_pid: u32 = service_identity.mark_pid(log_after)
-    log_after_generation: u32 = service_identity.mark_generation(log_after)
-    log_id: i32 = scenario_assert.expect_restart_identity(log_before_endpoint, log_before_pid, log_before_generation, log_after_endpoint, log_after_pid, log_after_generation, FAIL_RESTART_LOG_IDENTITY_BASE)
+    log_id: i32 = scenario_assert.expect_restart_identity(log_before, log_after, FAIL_RESTART_LOG_IDENTITY_BASE)
     if log_id != 0 {
         return log_id
     }
@@ -110,13 +112,7 @@ func run_restart_probe(state: *boot.KernelBootState) i32 {
     *state = init.restart(*state, service_topology.KV_ENDPOINT_ID)
     kv_after: service_identity.ServiceMark = boot.boot_kv_mark(*state)
 
-    kv_before_endpoint: u32 = service_identity.mark_endpoint(kv_before)
-    kv_before_pid: u32 = service_identity.mark_pid(kv_before)
-    kv_before_generation: u32 = service_identity.mark_generation(kv_before)
-    kv_after_endpoint: u32 = service_identity.mark_endpoint(kv_after)
-    kv_after_pid: u32 = service_identity.mark_pid(kv_after)
-    kv_after_generation: u32 = service_identity.mark_generation(kv_after)
-    kv_id: i32 = scenario_assert.expect_restart_identity(kv_before_endpoint, kv_before_pid, kv_before_generation, kv_after_endpoint, kv_after_pid, kv_after_generation, FAIL_RESTART_KV_IDENTITY_BASE)
+    kv_id: i32 = scenario_assert.expect_restart_identity(kv_before, kv_after, FAIL_RESTART_KV_IDENTITY_BASE)
     if kv_id != 0 {
         return kv_id
     }
@@ -174,13 +170,7 @@ func run_restart_probe(state: *boot.KernelBootState) i32 {
     *state = init.restart(*state, service_topology.QUEUE_ENDPOINT_ID)
     queue_after: service_identity.ServiceMark = boot.boot_queue_mark(*state)
 
-    queue_before_endpoint: u32 = service_identity.mark_endpoint(queue_before)
-    queue_before_pid: u32 = service_identity.mark_pid(queue_before)
-    queue_before_generation: u32 = service_identity.mark_generation(queue_before)
-    queue_after_endpoint: u32 = service_identity.mark_endpoint(queue_after)
-    queue_after_pid: u32 = service_identity.mark_pid(queue_after)
-    queue_after_generation: u32 = service_identity.mark_generation(queue_after)
-    queue_id: i32 = scenario_assert.expect_restart_identity(queue_before_endpoint, queue_before_pid, queue_before_generation, queue_after_endpoint, queue_after_pid, queue_after_generation, FAIL_RESTART_QUEUE_IDENTITY_BASE)
+    queue_id: i32 = scenario_assert.expect_restart_identity(queue_before, queue_after, FAIL_RESTART_QUEUE_IDENTITY_BASE)
     if queue_id != 0 {
         return queue_id
     }
@@ -231,13 +221,7 @@ func run_restart_probe(state: *boot.KernelBootState) i32 {
     *state = init.restart(*state, service_topology.ECHO_ENDPOINT_ID)
     echo_after: service_identity.ServiceMark = boot.boot_echo_mark(*state)
 
-    echo_before_endpoint: u32 = service_identity.mark_endpoint(echo_before)
-    echo_before_pid: u32 = service_identity.mark_pid(echo_before)
-    echo_before_generation: u32 = service_identity.mark_generation(echo_before)
-    echo_after_endpoint: u32 = service_identity.mark_endpoint(echo_after)
-    echo_after_pid: u32 = service_identity.mark_pid(echo_after)
-    echo_after_generation: u32 = service_identity.mark_generation(echo_after)
-    echo_id: i32 = scenario_assert.expect_restart_identity(echo_before_endpoint, echo_before_pid, echo_before_generation, echo_after_endpoint, echo_after_pid, echo_after_generation, FAIL_RESTART_ECHO_IDENTITY_BASE)
+    echo_id: i32 = scenario_assert.expect_restart_identity(echo_before, echo_after, FAIL_RESTART_ECHO_IDENTITY_BASE)
     if echo_id != 0 {
         return echo_id
     }
@@ -269,13 +253,7 @@ func run_restart_probe(state: *boot.KernelBootState) i32 {
     *state = init.restart(*state, service_topology.TICKET_ENDPOINT_ID)
     ticket_after: service_identity.ServiceMark = boot.boot_ticket_mark(*state)
 
-    ticket_before_endpoint: u32 = service_identity.mark_endpoint(ticket_before)
-    ticket_before_pid: u32 = service_identity.mark_pid(ticket_before)
-    ticket_before_generation: u32 = service_identity.mark_generation(ticket_before)
-    ticket_after_endpoint: u32 = service_identity.mark_endpoint(ticket_after)
-    ticket_after_pid: u32 = service_identity.mark_pid(ticket_after)
-    ticket_after_generation: u32 = service_identity.mark_generation(ticket_after)
-    ticket_id: i32 = scenario_assert.expect_restart_identity(ticket_before_endpoint, ticket_before_pid, ticket_before_generation, ticket_after_endpoint, ticket_after_pid, ticket_after_generation, FAIL_RESTART_TICKET_IDENTITY_BASE)
+    ticket_id: i32 = scenario_assert.expect_restart_identity(ticket_before, ticket_after, FAIL_RESTART_TICKET_IDENTITY_BASE)
     if ticket_id != 0 {
         return ticket_id
     }

@@ -70,23 +70,11 @@ func run_retained_audit_coordination_probe(state: *boot.KernelBootState) i32 {
 
     kv_after: service_identity.ServiceMark = boot.boot_kv_mark(*state)
     log_after: service_identity.ServiceMark = boot.boot_log_mark(*state)
-    kv_before_endpoint: u32 = service_identity.mark_endpoint(kv_before)
-    kv_before_pid: u32 = service_identity.mark_pid(kv_before)
-    kv_before_generation: u32 = service_identity.mark_generation(kv_before)
-    kv_after_endpoint: u32 = service_identity.mark_endpoint(kv_after)
-    kv_after_pid: u32 = service_identity.mark_pid(kv_after)
-    kv_after_generation: u32 = service_identity.mark_generation(kv_after)
-    kv_id: i32 = scenario_assert.expect_restart_identity(kv_before_endpoint, kv_before_pid, kv_before_generation, kv_after_endpoint, kv_after_pid, kv_after_generation, FAIL_AUDIT_KV_IDENTITY_BASE)
+    kv_id: i32 = scenario_assert.expect_restart_identity(kv_before, kv_after, FAIL_AUDIT_KV_IDENTITY_BASE)
     if kv_id != 0 {
         return kv_id
     }
-    log_before_endpoint: u32 = service_identity.mark_endpoint(log_before)
-    log_before_pid: u32 = service_identity.mark_pid(log_before)
-    log_before_generation: u32 = service_identity.mark_generation(log_before)
-    log_after_endpoint: u32 = service_identity.mark_endpoint(log_after)
-    log_after_pid: u32 = service_identity.mark_pid(log_after)
-    log_after_generation: u32 = service_identity.mark_generation(log_after)
-    log_id: i32 = scenario_assert.expect_restart_identity(log_before_endpoint, log_before_pid, log_before_generation, log_after_endpoint, log_after_pid, log_after_generation, FAIL_AUDIT_LOG_IDENTITY_BASE)
+    log_id: i32 = scenario_assert.expect_restart_identity(log_before, log_after, FAIL_AUDIT_LOG_IDENTITY_BASE)
     if log_id != 0 {
         return log_id
     }
