@@ -3,7 +3,7 @@ Phase 293 -- First Human-Facing Support Statement
 
 Status
 ------
-PROPOSED
+COMPLETED
 
 Purpose
 -------
@@ -19,9 +19,9 @@ docs alone.
 Repository status note
 ----------------------
 - Phase 289 freezes basic UI after the second UI slice.
-- Phase 290 is expected to provide one coherent integrated system demo above
+- Phase 290 provides one coherent integrated system demo above
   the launcher, update, and UI owners.
-- Phase 291 and Phase 292 are expected to classify the strongest remaining
+- Phase 291 and Phase 292 classify the strongest remaining
   compiler and kernel-side pressures.
 - `README.md`, `kernel/README.md`, and `tests/tool/README.md` already describe
   parts of the current workflow and system shape, but the repository still
@@ -183,6 +183,33 @@ Acceptance criteria
 - still-unclaimed platform areas remain explicit
 - later readers can understand the current user-facing plateau without
   re-deriving it from many phase notes
+
+Implementation outcome
+----------------------
+- The bounded human-facing support statement now lands directly in `README.md`
+  as the top-level publication surface, with matching bounded wording in
+  `kernel/README.md` and the canonical executable evidence route called out in
+  `tests/tool/README.md`.
+- The admitted present-tense support claim is: Darwin arm64, build from
+  source, hosted `issue_rollup` and `review_board` on the ordinary `mc`
+  project workflow, plus one maintained reset-lane kernel small-system demo
+  built from `kernel/build.toml` with one launcher-selected foreground app,
+  one fixed four-cell visible surface, one key-only input family, one
+  installed `issue_rollup` path, one direct-launch `review_board` path, and
+  one bounded persisted `review_board` reload path.
+- The canonical evidence surfaces for that claim are
+  `mc_tool_real_project_issue_rollup_unit`,
+  `mc_tool_real_project_review_board_unit`, and
+  `mc_tool_workflow_kernel_reset_lane_unit`, while
+  `mc_tool_workflow_kernel_reset_lane_full_unit` remains the wider reset-lane
+  coverage and reuse surface rather than the default public proof.
+- The landed statement keeps the major non-claims explicit: no desktop shell,
+  widget toolkit, package manager, filesystem or general asset API, broader UI
+  framework, general host portability beyond Darwin arm64, or freestanding
+  `mc run`/`mc test` workflow admission.
+- No backlog, decision-log, or architecture sidecar change was required
+  because the phase clarified already-landed repository truth rather than
+  exposing a new deferred boundary or missing owner.
 
 Future follow-up
 ----------------

@@ -3,7 +3,7 @@ Phase 292 -- Post-UI Kernel Ownership Audit
 
 Status
 ------
-PROPOSED
+COMPLETED
 
 Purpose
 -------
@@ -19,13 +19,13 @@ boundary erosion.
 Repository status note
 ----------------------
 - Phase 289 freezes the current basic-UI owner map.
-- Phase 290 is expected to compose launcher, update, UI, and app owners into
-  one integrated small-system demo.
+- Phase 290 composes launcher, update, UI, and app owners into one
+  integrated small-system demo.
 - The current kernel already has explicit owners for launcher choice, input
   parsing, foreground routing, fixed-surface presentation, optional small
   composition, durable journal state, and app-local interaction truth.
-- The repository still lacks one post-UI audit that says where new convenience
-  pressure should and should not move.
+- This phase now records where new convenience pressure should and should not
+  move.
 
 Problem being solved
 --------------------
@@ -195,6 +195,90 @@ Acceptance criteria
 - unresolved ownership gaps, if any, are named narrowly and reviewably
 - Phase 294 can reuse this audit as one bounded system-side input to the next-
   wave decision
+
+Implementation outcome
+----------------------
+- The integrated Phase 290 flow does create new convenience pressure, but the
+  strongest pressures still fit the existing owner map cleanly rather than
+  arguing for a new kernel framework.
+- Launcher-side pressure remains narrow and already owned by
+  `kernel/src/services/launcher_service.mc`: foreground selection, installed
+  versus direct-launch choice, and launch-time fresh-versus-resumed-versus-
+  invalidated classification stay there. The integrated demo does not justify
+  moving app-local focus, body-versus-status choice, render refresh triggers,
+  or persisted app view state into launcher.
+- Display-side pressure remains bounded to
+  `kernel/src/services/display_surface.mc` plus
+  `kernel/src/services/surface_composition.mc`: visible four-cell storage and
+  the tiny two-region assembly seam stay display-owned, while token meaning,
+  overlay clearing, active-region truth, and app-specific redraw policy remain
+  app-local. The demo does not justify a compositor, layout engine, shared
+  render scheduler, or multi-surface policy.
+- Workflow and persistence pressure also stays on the current owners instead
+  of shifting into launcher or boot. `kernel/src/services/update_store_service.mc`
+  remains the durable owner of installed bytes and the installed-launch record,
+  `kernel/src/services/workflow/service.mc` remains the retained apply path,
+  and `kernel/src/services/journal_service.mc` remains the bounded persisted
+  `review_board` view-state lane. The integrated flow does not justify a new
+  launcher-owned status cache, a boot-owned persistence shim, or a shared app-
+  state store.
+- App-local interaction pressure remains strongest in the existing app wrappers
+  and app sources. `kernel/src/issue_rollup_app.mc` still owns the launch-only
+  overlay spend, manifest-shaped present policy, and active-region truth for
+  the first UI proof. `kernel/src/review_board_app.mc` plus
+  `examples/real/review_board/src/review_board_ui.mc` still own the second
+  app's direct interaction and view-state semantics. The integrated demo does
+  not justify a shared UI-state machine, common focus owner, or kernel-owned
+  app controller.
+- The most tempting convenience migrations into boot or dispatch should be
+  rejected explicitly:
+  centralizing app-specific redraw or overlay-clear policy in
+  `kernel/src/kernel_dispatch.mc`;
+  moving foreground-input branching or active-region policy into dispatch just
+  because all app traffic passes through it;
+  moving installed-versus-direct launch coordination into `kernel/src/boot/boot.mc`
+  or restart logic just because those files assemble state; and
+  treating boot as the place to synthesize durable app summaries for launcher
+  or display consumption. Those moves would turn routing or assembly seams into
+  hidden coordinators.
+- No genuinely unresolved kernel ownership gap outranks the existing deferred
+  areas. After the integrated demo, the strongest remaining tensions are still
+  intentionally closed rather than missing owners: richer input families,
+  multi-surface policy, a broader session or persistence model, second-app
+  install policy, and any general app or widget framework. The current repo
+  plateau remains a bounded launcher-plus-display-plus-app system, not a
+  partially hidden platform skeleton.
+- The only repeated awkwardness that still shows through the integrated path
+  without demanding a kernel owner shift is source-level readability around raw
+  UI byte constants and byte scanning; that remains the compiler-side pressure
+  recorded in Phase 291, not a reason to widen kernel boundaries here.
+
+Validation
+----------
+- No executable validation was needed because Phase 292 lands as an ownership
+  audit note only; the owning validation surface is editor diagnostics on the
+  touched documentation.
+
+Phase review against the spec
+-----------------------------
+- Preserved invariants:
+  - boot remains an assembly owner, not a runtime policy owner
+  - `kernel_dispatch.mc` remains a routing and effect-chasing seam rather than
+    a service-local or app-local coordinator
+  - launcher remains the single-foreground and launch-classification owner
+  - display and composition remain bounded visible-surface owners
+  - app-local interaction truth remains app-local
+- Ownership boundaries did not weaken:
+  - no new service, registry, framework, or persistence lane was introduced
+  - the audit rejects convenience migrations into boot, dispatch, launcher,
+    and display rather than normalizing them
+  - unresolved pressure is named as intentionally deferred scope, not hidden as
+    vague future cleanup
+- No accidental center of gravity emerged:
+  - this phase records the current owner split instead of moving more policy
+    into the main-path kernel files
+  - the next-wave decision can now compare one explicit system-side plateau
+    against the compiler-side pressure from Phase 291
 
 Future follow-up
 ----------------

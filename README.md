@@ -2,6 +2,12 @@
 
 This repository now contains the bootstrap semantic checker and typed MIR bring-up for the first Modern C implementation.
 
+Human-facing support statement:
+
+- The repository currently supports one bounded human-facing slice on Darwin arm64 when built from source: hosted `issue_rollup` and `review_board` stay on the ordinary `mc` project workflow, and the repository-owned reset-lane kernel supports one maintained small-system demo with one launcher-selected foreground app on one fixed four-cell visible surface, one key-only input family, one installed `issue_rollup` path, one direct-launch `review_board` path, and one bounded persisted `review_board` reload path.
+- The canonical evidence surfaces for that claim are `mc_tool_real_project_issue_rollup_unit`, `mc_tool_real_project_review_board_unit`, and `mc_tool_workflow_kernel_reset_lane_unit`; use `mc_tool_workflow_kernel_reset_lane_full_unit` only when reset-lane build reuse or grouped fixture coverage is under pressure.
+- This support statement does not claim a desktop shell, widget toolkit, filesystem or package-manager platform, general host portability beyond Darwin arm64, or freestanding `mc run`/`mc test` workflow admission.
+
 What is in place:
 
 - a repository layout that separates compiler, runtime, standard library, tests, examples, tools, and generated output

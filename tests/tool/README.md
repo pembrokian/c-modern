@@ -64,6 +64,7 @@ Layout rule
 Validation rule
 
 - During focused iteration, run the narrowest owning tool test target.
+- The canonical executable evidence for the current human-facing support statement is `mc_tool_real_project_issue_rollup_unit`, `mc_tool_real_project_review_board_unit`, and `mc_tool_workflow_kernel_reset_lane_unit`.
 - For the admitted UI-facing hosted projects, the owning real-project targets are `mc_tool_real_project_issue_rollup_unit` and `mc_tool_real_project_review_board_unit`.
 - Those hosted UI projects stay on the ordinary `mc run` and `mc test` workflow driven by `examples/real/issue_rollup/build.toml` and `examples/real/review_board/build.toml`; do not introduce a separate UI-specific runner or descriptor family.
 - For active reset-lane kernel changes, prefer `mc_tool_workflow_kernel_reset_lane_unit`; it now builds and runs the repository-owned `kernel/build.toml` directly.

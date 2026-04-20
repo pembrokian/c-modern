@@ -13,6 +13,12 @@ Rules
 - Keep compiler, sema, MIR, backend, ABI, target, runtime, and `hal` surfaces closed unless a narrow blocker forces a local change.
 - Add modules only when a specific phase boundary needs them, at the lean behavioral minimum the four-section standard allows.
 
+Human-facing support boundary
+
+- The current supported user-facing claim for this lane is one bounded small-system path built through [`kernel/build.toml`](build.toml) and evidenced by `mc_tool_workflow_kernel_reset_lane_unit`.
+- That claim is limited to one launcher-selected foreground app on one fixed four-cell visible surface, one admitted key-only input family, one installed `issue_rollup` path, one direct-launch `review_board` path, and one bounded persisted `review_board` reload path.
+- This lane does not currently claim a desktop shell, package manager, filesystem API, general app framework, alternate input family, or richer multi-surface UI model.
+
 Current scope (through Phase 283)
 
 - All three canonical service shapes are present: forwarding (`serial_service`, `shell_service`, `serial_shell_path`), append/tail (`log_service`), and key/value (`kv_service`).
