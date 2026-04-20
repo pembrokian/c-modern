@@ -1,0 +1,215 @@
+Phase 303 -- Byte-Oriented UI Source Readability Spend
+======================================================
+
+Status
+------
+PROPOSED
+
+Purpose
+-------
+Spend the admitted single-byte literal surface directly in the maintained UI
+and input owners so raw numeric ASCII spellings are replaced where that
+materially improves clarity, while parser, sema, MIR, and backend ownership
+stay narrow and deterministic.
+
+This phase exists now because a compiler readability feature is only honest in
+this repository when it improves maintained repository-owned consumers. After
+Phase 302 admits the surface, the next step is to spend it in the exact UI and
+input owners that made the pressure real.
+
+Repository status note
+----------------------
+- Phase 291 identifies repeated raw numeric byte spellings in maintained UI and
+  input owners as the only currently credible post-UI compiler pressure.
+- Phase 301 records that Band G intensified that same pressure in the richer
+  `review_board` interaction and persistence paths.
+- Phase 302 landed one bounded single-byte literal source surface in the
+  compiler.
+- The repository still needs one deliberate consumer spend so the compiler
+  feature is justified by clearer maintained code rather than by abstract
+  language completeness.
+
+Problem being solved
+--------------------
+- A literal surface that is never spent in maintained consumers remains only a
+  speculative language improvement.
+- The current UI and input owners still contain repeated numeric byte spellings
+  that hide obvious intent in key dispatch and visible cell rendering.
+- The current-repo problem is therefore missing direct readability spend in the
+  maintaining consumers, not missing additional compiler generality.
+
+Non-goals
+---------
+- no broader UI redesign beyond replacing source spellings where useful
+- no mass cleanup of unrelated numeric literals across the repo
+- no byte-string, text-engine, or collection-construction phase
+- no semantic rewrites of app logic that are unrelated to the new literal
+  surface
+- no new compiler surface beyond the bounded feature already admitted in Phase
+  302
+
+Invariants
+----------
+- The spend sites must remain the maintained consumers that originally created
+  the pressure.
+- Readability replacements must preserve behavior and deterministic dumps.
+- The phase must not widen from `u8`-shaped visible cells and key codes into a
+  general numeric-literal cleanup pass.
+- Compiler ownership remains where Phase 302 put it; this phase is primarily a
+  consumer spend plus narrow follow-through tests.
+- The phase should prefer the most human-facing repeated spellings first rather
+  than the largest possible textual churn.
+
+Required surface changes
+------------------------
+1. Replace raw numeric byte spellings with the new single-byte surface in the
+   maintained UI and input owners where that materially improves clarity.
+2. Update only the narrow tests and fixtures that directly exercise those spend
+   sites.
+3. Keep behavior, layout, persistence meaning, and routing semantics unchanged.
+4. Leave unrelated numeric literals or non-UI consumers untouched unless they
+   are needed to keep the spend sites compiling honestly.
+
+Forbidden changes
+-----------------
+- do not turn this into a repo-wide numeric literal restyling pass
+- do not change app behavior while replacing source spellings
+- do not widen the spend into string-like or multi-byte source forms
+- do not use the spend to reopen parser or sema design that Phase 302 already
+  settled
+- do not touch unrelated consumers simply because they also use `u8`
+
+Phase role in the larger sequence
+---------------------------------
+- This phase proves that the Band H compiler slice was earned by maintained
+  consumers.
+- It gives Phase 304 concrete evidence about whether the byte-literal slice now
+  fully spends the current compiler pressure or leaves a stronger follow-through
+  blocker.
+- It also keeps the compiler feature honest by tying it directly to visible
+  repository-owned app code.
+
+Relevant backlog items this phase intentionally brings under pressure
+--------------------------------------------------------------------
+- spend the parked byte-literal compiler slice directly in the maintained UI
+  and key-input owners
+- keep compiler follow-through consumer-local and bounded
+- avoid letting a readability feature become a repo-wide restyling campaign
+
+Questions this phase must answer
+--------------------------------
+1. Which maintained UI and input files are the strongest first spend sites?
+2. Which numeric byte spellings materially improve readability when replaced,
+   and which should remain untouched for now?
+3. Do any spend-site replacements expose missing compiler follow-through that
+   Phase 302 did not settle?
+4. Which narrow tests best show that the new surface improved code readability
+   without changing behavior?
+
+Preferred implementation shape
+------------------------------
+- Start with the highest-signal owners from Phase 291 and Phase 301:
+  `examples/real/review_board/src/review_board_ui.mc`,
+  `kernel/src/review_board_app.mc`, `kernel/src/input_event.mc`, and the
+  adjacent `issue_rollup` render or app-local sources that still carry repeated
+  visible byte spellings.
+- Prefer replacing visible cell and key-code spellings first, since that is
+  the exact pressure Band H was meant to spend.
+- Keep the change behavior-neutral and avoid reorganizing app logic at the same
+  time.
+- Validate first on the narrowest owning compiler and UI workflow surfaces.
+
+Implementation accelerators
+---------------------------
+Main files and navigations
+~~~~~~~~~~~~~~~~~~~~~~~~~~
+- Primary spend sites to open first: `examples/real/review_board/src/review_board_ui.mc`,
+  `kernel/src/review_board_app.mc`, `kernel/src/input_event.mc`,
+  `kernel/src/issue_rollup_app.mc`, and
+  `examples/real/issue_rollup/src/render/rollup_render.mc`.
+- Controlling compiler owner to keep nearby for follow-through:
+  the landed Phase 302 parser-plus-sema files.
+- Primary real-project and workflow proof surfaces to inspect before widening:
+  `tests/tool/README.md`, `tests/tool/tool_real_project_tests.cpp`, and
+  `tests/tool/tool_kernel_reset_lane_suite.cpp`.
+- Expected first validation target after the first spend-site edit:
+  `mc_tool_real_project_review_board_unit` or the narrowest owning UI target
+  touched by the replacement.
+
+Relevant cookbook patterns
+~~~~~~~~~~~~~~~~~~~~~~~~~~
+- Pattern 10 -- Parser + Sema + MIR Follow-Through is relevant only as the
+  compiler-side reminder that any missing follow-through still belongs in the
+  earliest honest compiler owner.
+- Pattern 11 -- Add A Narrow UI Slice Owner is relevant on the consumer side:
+  spend the feature in existing app-local owners rather than shared framework
+  surfaces.
+
+Relevant file-local invariants
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+- `examples/real/review_board/src/review_board_ui.mc` is the strongest current
+  app-local owner of visible cell and key semantics for the richer UI slice.
+- `kernel/src/input_event.mc` names the admitted key-only event family and is a
+  high-signal location for key-byte readability spend.
+- `kernel/src/issue_rollup_app.mc` and the `issue_rollup` render sources are
+  still valid spend sites where visible cell semantics are user-facing.
+- `tests/tool/README.md` keeps the owning UI validation route on the hosted
+  real-project targets and `mc_tool_workflow_kernel_reset_lane_unit`.
+
+Dependency-ordered touch sequence
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+- Land the compiler source surface first in Phase 302.
+- Replace the highest-signal consumer spellings second in one app-local owner.
+- Update adjacent kernel or render spend sites third only as needed.
+- Run the narrow owning hosted and reset-lane UI validation targets last.
+
+Common breakage map
+~~~~~~~~~~~~~~~~~~~
+- Replacement literal fails to parse or type-check -> step back to the landed
+  Phase 302 compiler owner before editing more spend sites.
+- UI behavior changes after readability replacement -> inspect the local spend
+  site for accidental logic edits, not the compiler, first.
+- Reset-lane proof drifts after a consumer spend -> check the paired app
+  wrapper or scenario expectation before widening workflow code.
+- Large textual churn appears tempting -> keep only the highest-signal UI and
+  key-code replacements in scope.
+
+Relevant test surfaces
+~~~~~~~~~~~~~~~~~~~~~~
+- Primary owning test family: the narrow compiler surface from Phase 302 plus
+  the hosted UI real-project targets and grouped reset-lane workflow suite.
+- Narrowest expected first executable validation target: the owning hosted UI
+  target for the first spend site touched.
+- Adjacent validation targets: `mc_tool_real_project_review_board_unit`,
+  `mc_tool_real_project_issue_rollup_unit`, and
+  `mc_tool_workflow_kernel_reset_lane_unit`.
+- Only rerun compiler fixtures if the spend exposes missing Phase 302 follow-
+  through rather than a consumer-local mistake.
+
+Test obligations
+----------------
+- run `Build debug`
+- run the narrowest owning hosted UI target for the first spend site touched
+- run adjacent hosted or reset-lane UI targets only when the replacements
+  actually touch those owners
+- rerun the narrow Phase 302 compiler fixtures only if the consumer spend
+  exposes missing source-surface follow-through
+
+Acceptance criteria
+-------------------
+- the maintained UI and input owners replace the most repeated raw numeric byte
+  spellings with the new bounded single-byte source surface
+- behavior remains unchanged while readability improves materially in the
+  targeted consumers
+- the spend stays narrow and consumer-driven rather than becoming a repo-wide
+  restyling pass
+- the phase produces concrete evidence for the post-spend compiler audit in
+  Phase 304
+
+Future follow-up
+----------------
+- Phase 304 should compare the post-spend repository state against the original
+  Phase 291 audit to decide whether the byte-literal slice is now honestly
+  spent.
+- If any remaining compiler pressure surfaces during this spend, it should be
+  classified narrowly in Phase 304 rather than expanded implicitly here.

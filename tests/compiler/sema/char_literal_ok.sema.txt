@@ -1,0 +1,4 @@
+SemanticModule
+  Const names=[ASCII_A] type=u8 values=[65]
+  Const names=[ASCII_B] type=u8 values=[66]
+  Function name=main params=[] returns=[u8]

@@ -294,6 +294,9 @@ Type InferLiteralType(const ast::Expr& expr) {
     if (!expr.text.empty() && expr.text.front() == '"') {
         return StringType();
     }
+    if (expr.secondary_text == "char_lit" || (!expr.text.empty() && expr.text.front() == '\'')) {
+        return IntLiteralType();
+    }
     if (expr.text.find_first_of(".eE") != std::string::npos) {
         return FloatLiteralType();
     }

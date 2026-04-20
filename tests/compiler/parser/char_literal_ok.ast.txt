@@ -1,0 +1,17 @@
+SourceFile
+  ModuleKind=ordinary
+  ConstDecl hasInitializer=true
+    NamePattern names=[ASCII_A]
+    type:
+      NamedType name=u8
+    values:
+      LiteralExpr text='A' kind=char_lit
+  FuncDecl name=main
+    returns:
+      NamedType name=u8
+    body:
+      BlockStmt
+        statements:
+          ReturnStmt
+            exprs:
+              LiteralExpr text='A' kind=char_lit

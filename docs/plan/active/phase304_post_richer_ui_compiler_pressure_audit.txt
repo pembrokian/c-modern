@@ -1,0 +1,206 @@
+Phase 304 -- Post-Richer-UI Compiler Pressure Audit
+===================================================
+
+Status
+------
+PROPOSED
+
+Purpose
+-------
+Record whether the richer UI wave plus the Band H byte-literal follow-through
+fully spent the current UI-facing compiler pressure or exposed one stronger
+bounded compiler front than the byte-literal slice.
+
+This phase exists now because the repository should not assume another
+compiler wave follows automatically after landing one readability repair. It
+needs one explicit post-spend audit to decide whether compiler pressure is now
+exhausted, still byte-literal-local, or newly shifted elsewhere.
+
+Repository status note
+----------------------
+- Phase 291 identifies the byte-literal slice as the only credible post-UI
+  compiler pressure before richer UI work was completed.
+- Phase 301 then records that Band G made that same pressure the strongest next
+  blocker after richer UI landed cleanly.
+- Phase 302 landed one bounded single-byte source surface, and Phase 303 is
+  expected to spend it directly in the maintained UI and input owners.
+- The repository still lacks one explicit post-spend audit that says whether
+  the compiler side is now honestly satisfied or whether another bounded front
+  became stronger.
+
+Problem being solved
+--------------------
+- Without a post-spend audit, the repository can drift into a second compiler
+  slice just because compiler work is already in motion.
+- Conversely, a genuinely stronger follow-through pressure could remain hidden
+  if the repository assumes the byte-literal repair automatically exhausted all
+  current compiler needs.
+- The current-repo problem is therefore one missing evidence-backed compiler
+  reclassification after the Band H spend, not another implementation feature.
+
+Non-goals
+---------
+- no new compiler feature by default
+- no automatic promotion of the next hypothetical compiler slice
+- no reopening of broad parser, sema, MIR, backend, or driver waves without a
+  stronger maintained consumer than the byte-literal slice
+- no UI or packaging planning rewrite disguised as a compiler audit
+
+Invariants
+----------
+- Compiler pressure must still be justified by maintained repository-owned
+  consumers.
+- The audit must compare the post-Phase-303 state against the earlier Phase 291
+  baseline rather than re-deriving the whole compiler roadmap from scratch.
+- The audit must be allowed to conclude that current compiler pressure is now
+  honestly spent.
+- If a stronger compiler front appears, it must be assigned to the earliest
+  honest compiler owner.
+- Planning surfaces must stay narrow; this is an audit note, not a broad new
+  roadmap band by itself.
+
+Required surface changes
+------------------------
+1. Compare the post-Phase-303 consumer code against the original Phase 291
+   compiler-pressure audit.
+2. Record whether the byte-literal slice is now honestly spent.
+3. If another bounded compiler pressure is now stronger, classify it by
+   controlling compiler layer and maintained consumer evidence.
+4. Update only the narrow planning or backlog surfaces that must reflect the
+   reclassification.
+
+Forbidden changes
+-----------------
+- do not land another compiler feature inside the audit by default
+- do not promote speculative language ambition without maintained consumer
+  evidence
+- do not confuse app-helper or stdlib pressure with compiler pressure
+- do not widen the audit into a general roadmap rewrite
+- do not ignore a legitimate “pressure exhausted” result just because a new
+  compiler band would be convenient
+
+Phase role in the larger sequence
+---------------------------------
+- This phase closes Band H by stating what the byte-literal repair actually
+  accomplished.
+- It determines whether the next strongest pressure is broader packaging,
+  another compiler slice, or a different deferred branch.
+- It gives later planning one durable decision point instead of momentum-driven
+  compiler drift.
+
+Relevant backlog items this phase intentionally brings under pressure
+--------------------------------------------------------------------
+- keep compiler reopening evidence-based after a bounded consumer-driven spend
+- compare the parked byte-literal task against the post-spend repository state
+- prevent convenience-driven compiler continuation after one successful slice
+
+Questions this phase must answer
+--------------------------------
+1. Did Phase 302 plus Phase 303 fully spend the current byte-oriented UI source
+   readability pressure?
+2. If not, what exact bounded compiler pressure remains or has newly emerged?
+3. Which maintained consumers prove that pressure, and which compiler layer
+   honestly owns it?
+4. Which planning surfaces need narrow synchronization so the result stays
+   durable and visible?
+
+Preferred implementation shape
+------------------------------
+- Start from the Phase 291 audit and the Phase 303 spend outcomes rather than
+  rediscovering compiler pressure from first principles.
+- Prefer a short ranked audit with one winner, one explanation for why the
+  byte-literal slice is or is not exhausted, and a short loser set.
+- If no stronger compiler front exists, say that explicitly and hand off to the
+  strongest non-compiler branch instead of forcing another compiler phase.
+- Update only the narrow backlog or roadmap surfaces that future planning will
+  actually consult.
+
+Implementation accelerators
+---------------------------
+Main files and navigations
+~~~~~~~~~~~~~~~~~~~~~~~~~~
+- Primary audit inputs: `docs/plan/active/phase291_post_ui_compiler_pressure_audit.txt`,
+  `docs/plan/active/phase301_richer_ui_slice_freeze_and_audit.txt`, and the
+  landed Phase 302 and Phase 303 notes.
+- Primary consumer evidence surfaces to recheck: `examples/real/issue_rollup/`,
+  `examples/real/review_board/`, `kernel/src/input_event.mc`, and the app
+  wrapper owners cited in the earlier audit.
+- Compiler routing prompts to keep open: `docs/agent/prompts/compiler_file_invariants.txt`,
+  `docs/agent/prompts/change_touch_sets.txt`, and
+  `docs/agent/prompts/patterns_cookbook.txt`.
+- Expected first validation target: editor diagnostics on the touched planning
+  docs unless the audit uncovers a missing evidence repair that must land.
+
+Relevant cookbook patterns
+~~~~~~~~~~~~~~~~~~~~~~~~~~
+- Pattern 6 -- Add A Compiler Phase is the closest fit because this is another
+  bounded compiler-planning audit rather than a feature landing by default.
+- The phase intentionally differs from a feature plan because it must permit a
+  negative result: the current compiler pressure may already be honestly spent.
+
+Relevant file-local invariants
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+- `compiler_file_invariants.txt` remains the routing truth for assigning any
+  newly observed pressure to parser, sema, MIR, backend, or driver.
+- `docs/plan/backlog.txt` is the right place to keep deferred compiler tasks
+  visible after reclassification, but it should not replace the audit note.
+- Maintained consumer sources remain evidence surfaces first; they should not be
+  rewritten just to make the audit cleaner.
+- If an observed remaining pressure still looks parser-shaped, the audit should
+  say so explicitly rather than implying a later-layer workaround.
+
+Dependency-ordered touch sequence
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+- Compare the Phase 303 consumer spend against the Phase 291 baseline first.
+- Land the post-spend compiler audit second.
+- Sync only the narrow backlog or roadmap surface that must reflect the result
+  third.
+- Repair a missing evidence gap last and only if the audit cannot stay honest
+  without it.
+
+Common breakage map
+~~~~~~~~~~~~~~~~~~~
+- Audit assumes the byte-literal slice is spent without checking the actual
+  consumer spend -> the note becomes aspirational rather than repo-driven.
+- Remaining pressure is misclassified as compiler work when it is really app or
+  library shape -> the next band starts in the wrong owner.
+- A stronger new compiler front is named without maintained consumer evidence ->
+  the audit regresses into wishlist planning.
+- Roadmap or backlog sync widens too far -> planning churn exceeds the bounded
+  reclassification need.
+
+Relevant test surfaces
+~~~~~~~~~~~~~~~~~~~~~~
+- Primary owning validation surface: editor diagnostics on the audit note and
+  any narrowly synced planning docs.
+- Narrowest expected executable validation target only if a missing evidence
+  gap must be repaired: the owning compiler or UI target implicated by that
+  gap.
+- Use `docs/agent/prompts/test_overview.txt` to route any necessary evidence
+  repair before broadening validation.
+
+Test obligations
+----------------
+- require editor diagnostics on the audit note and any narrowly synced planning
+  docs
+- run executable validation only if the audit uncovers a missing evidence gap
+  that must be repaired in code
+- if executable validation is required, run only the narrowest owning target
+  for that repaired gap first
+
+Acceptance criteria
+-------------------
+- the repository has one explicit post-spend account of whether the byte-
+  literal compiler pressure is now honestly spent
+- any newly stronger compiler pressure is tied to maintained consumers and the
+  earliest honest compiler owner
+- the audit permits a “compiler pressure exhausted” result if that is what the
+  post-spend repo state supports
+- later planning can use this note to choose the next band without guessing
+
+Future follow-up
+----------------
+- If the audit says current compiler pressure is spent, reopen the strongest
+  non-compiler deferred branch instead of forcing another compiler phase.
+- If the audit identifies one stronger bounded compiler front, use this note as
+  the contract source for the next concrete compiler phase plan.

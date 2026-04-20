@@ -43,6 +43,7 @@ enum class TokenKind {
     kIntLiteral,
     kFloatLiteral,
     kStringLiteral,
+    kCharLiteral,
     kLBrace,
     kRBrace,
     kLParen,

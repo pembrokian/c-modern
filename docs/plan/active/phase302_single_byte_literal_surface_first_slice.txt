@@ -1,0 +1,219 @@
+Phase 302 -- Single-Byte Literal Surface First Slice
+====================================================
+
+Status
+------
+COMPLETED
+
+Purpose
+-------
+Admit one bounded single-byte literal or character-literal source surface for
+`u8`-shaped UI cells and key codes, without widening into string frameworks,
+text engines, byte-string literals, or general literal inference.
+
+This phase exists now because Phase 301 records that Band G made the repeated
+raw numeric byte spelling in maintained UI owners the strongest next blocker.
+The next honest compiler move is therefore one narrow parser-plus-sema repair,
+not a broader text or literal wave.
+
+Repository status note
+----------------------
+- Phase 291 classifies byte-oriented UI source readability as the only
+  currently credible post-UI compiler pressure and assigns it to parser plus
+  sema rather than MIR, backend, or driver.
+- Phase 301 freezes Band G and records that the richer UI wave increased the
+  repeated `u8`-shaped pressure in the maintained `issue_rollup`,
+  `review_board`, and key-input owners.
+- `compiler/ast/ast.h` already carries one generic literal expression shape,
+  which means this phase may be able to reuse the current literal AST contract
+  rather than inventing a new syntax tree family.
+- The repository still lacks one explicit phase plan for admitting the bounded
+  single-byte source surface itself before spending it in UI code.
+
+Implementation outcome
+----------------------
+- Landed one bounded single-quoted character-literal token, `char_lit`, that
+  parses through `Expr::kLiteral` and reuses the existing integer-literal
+  typing and constant-evaluation paths.
+- The new surface is proven by narrow parser and sema fixtures, including one
+  accepted `u8` use case and one rejected non-`u8` binding.
+- No MIR or backend follow-through was required for this first slice.
+
+Problem being solved
+--------------------
+- The current admitted UI and input owners still spell visible cells and key
+  bytes as raw numeric ASCII values such as `65`, `70`, or `83`, even when the
+  human intent is obvious from context.
+- That makes the maintained code harder to read and review, but the pressure
+  is still narrower than a string, text, or collection-construction wave.
+- The current-repo problem is therefore one missing bounded source spelling for
+  a single byte value, not missing a general text literal system.
+
+Non-goals
+---------
+- no byte-string or multi-byte literal surface
+- no general string-literal reinterpretation for `u8`
+- no text engine, Unicode, escape-framework, or collection-construction wave
+- no broader literal inference or numeric-coercion reopening
+- no MIR, backend, or driver redesign unless parser or sema follow-through
+  proves it is strictly required
+
+Invariants
+----------
+- The new source surface must stay bounded to one single-byte value shape.
+- `compiler/lex` owns tokenization, `compiler/parse` owns syntax, and
+  `compiler/sema` owns legality and `u8`-targeted meaning.
+- `compiler/mir` and `compiler/codegen_llvm` must not become the first owners
+  of a parser or sema problem.
+- AST growth should stay minimal; reuse the existing generic literal expression
+  path unless a new stored syntax distinction is strictly necessary.
+- Parser, sema, and MIR dumps must remain deterministic if any fixture-visible
+  output changes.
+
+Required surface changes
+------------------------
+1. Define one bounded single-byte literal or character-literal source spelling.
+2. Teach the earliest honest compiler owners to recognize and type-check that
+   spelling for the admitted `u8`-shaped use case.
+3. Reuse the current literal AST contract if honest, or add only the smallest
+   bounded syntax distinction needed.
+4. Add the narrowest parser and sema fixtures that prove the admitted surface
+   and its rejection boundaries.
+
+Forbidden changes
+-----------------
+- do not widen this phase into string literals for arrays, slices, or buffers
+- do not add general escape semantics beyond what one single-byte surface
+  requires
+- do not patch the missing source surface in sema, MIR, or backend alone
+- do not treat this as permission to reopen broader numeric inference
+- do not spend the feature in large consumer rewrites before the source surface
+  itself is stable
+
+Phase role in the larger sequence
+---------------------------------
+- This phase opens Band H by landing the minimal compiler-owned source surface.
+- It prepares Phase 303, which will spend that surface directly in the
+  maintained UI and input owners.
+- It also prepares Phase 304, which will re-audit whether the byte-literal
+  slice fully spends the current compiler pressure or exposes a stronger
+  follow-through front.
+
+Relevant backlog items this phase intentionally brings under pressure
+--------------------------------------------------------------------
+- the parked compiler task in `docs/plan/backlog.txt` for one bounded
+  byte-literal or character-literal surface for `u8` UI cells and key codes
+- keep compiler growth consumer-driven and parser-plus-sema-local
+- resist turning UI readability pressure into a broader text or string wave
+
+Questions this phase must answer
+--------------------------------
+1. What exact single-byte source spelling is the smallest honest admitted
+   surface for the current repository pressure?
+2. Can the existing `Expr::kLiteral` AST path carry the new surface honestly,
+   or is one new syntax distinction required?
+3. Which legality checks belong in sema for the first slice, and which should
+   remain explicitly deferred?
+4. What parser and sema fixtures best define the admitted boundary without
+   widening to MIR or backend unless truly needed?
+
+Preferred implementation shape
+------------------------------
+- Start in `compiler/lex` and `compiler/parse` with the smallest possible
+  literal surface that can still be consumed honestly by `u8`-shaped UI code.
+- Prefer reusing `Expr::kLiteral` with one additional token-kind or literal-
+  kind distinction over creating a new AST node.
+- Keep sema responsible for deciding when the new literal is a valid `u8`
+  value or target, and keep MIR or backend follow-through strictly derivative.
+- Land parser and sema fixtures before consumer spend sites.
+
+Implementation accelerators
+---------------------------
+Main files and navigations
+~~~~~~~~~~~~~~~~~~~~~~~~~~
+- Primary controlling owners to open first: `compiler/lex/token.h`,
+  `compiler/lex/lexer.cpp`, `compiler/parse/parser.cpp`, and
+  `compiler/parse/parser_expr.cpp`.
+- First semantic owner to open second: `compiler/sema/check.cpp`, with
+  `compiler/sema/type.cpp` only if the literal kind affects checked type or
+  dump formatting.
+- Existing literal contract to inspect before adding AST shape:
+  `compiler/ast/ast.h` and `compiler/ast/ast.cpp`.
+- Expected first validation target after the owner change:
+  `tests/compiler/parser/` fixtures.
+
+Relevant cookbook patterns
+~~~~~~~~~~~~~~~~~~~~~~~~~~
+- Pattern 10 -- Parser + Sema + MIR Follow-Through fits best because the new
+  source surface is parser-owned but only becomes meaningful through sema.
+- Pattern 2 -- Add A Parser Keyword Or Syntax Form is relevant if the chosen
+  spelling requires a new token kind or lexer-owned spelling rule.
+- Pattern 1 -- Add A New AST Node is explicitly not the default here; only use
+  it if the current generic literal AST contract cannot carry the new surface
+  honestly.
+
+Relevant file-local invariants
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+- `compiler/lex/token.h` is the single source of truth for parser-facing token
+  vocabulary.
+- `compiler/lex/lexer.cpp` may decode lexical payloads, but type-targeted or
+  range-targeted meaning must stay in sema.
+- `compiler/parse/parser.cpp` already treats literals through the current
+  `IsLiteral` path, so the first question is whether the new surface can join
+  that route cleanly.
+- `compiler/ast/ast.h` already records literal token text, token kind name, and
+  decoded numeric payload on `Expr::kLiteral`, which should be preferred over a
+  larger AST expansion when practical.
+
+Dependency-ordered touch sequence
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+- Land the tokenization and parse-surface owner first.
+- Update the semantic legality or typing follow-through second.
+- Update AST dump or semantic dump support third only if the new surface is
+  fixture-visible.
+- Add or update parser and sema fixtures last.
+
+Common breakage map
+~~~~~~~~~~~~~~~~~~~
+- New token or spelling added -> check `token.h`, then `lexer.cpp`, then
+  parser literal admission before widening search.
+- New literal surface parsed but typed incorrectly -> check sema first rather
+  than MIR or backend.
+- AST dump churn after a literal change -> confirm whether the existing
+  `Expr::kLiteral` path can be reused before adding a new node shape.
+- MIR or backend failure after parser or sema change -> treat that as direct
+  follow-through only after the parser and sema owners are correct.
+
+Relevant test surfaces
+~~~~~~~~~~~~~~~~~~~~~~
+- Primary owning test family: `tests/compiler/parser/` followed by
+  `tests/compiler/sema/`.
+- Narrowest expected first executable validation target: the parser fixture
+  runner.
+- Adjacent validation target when legality or checked type changes:
+  `mc_sema_fixture_unit`.
+- Only widen to `mc_mir_fixture_unit` if the admitted literal surface changes
+  typed lowering truth rather than just syntax and checked meaning.
+
+Test obligations
+----------------
+- run `Build debug`
+- run the narrow parser fixture surface that owns the new literal syntax
+- run `mc_sema_fixture_unit` if sema legality or dump truth changes
+- run `mc_mir_fixture_unit` only if MIR-visible type or lowering truth changes
+
+Acceptance criteria
+-------------------
+- one bounded single-byte literal or character-literal surface is admitted for
+  the current `u8`-shaped UI and key-code pressure
+- the owning compiler layers remain parser plus sema, with only derivative
+  follow-through below them
+- the phase does not widen into strings, text, or broader literal inference
+- the admitted boundary is captured by narrow parser and sema fixtures
+
+Future follow-up
+----------------
+- Phase 303 should spend the new source surface directly in the maintained UI
+  and input owners that created the pressure.
+- Phase 304 should then re-audit whether the byte-literal slice fully spends
+  the current compiler pressure or exposes one stronger bounded front.

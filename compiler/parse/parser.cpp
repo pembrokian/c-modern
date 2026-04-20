@@ -208,7 +208,7 @@ void Parser::SynchronizeStatement() {
 
 bool Parser::IsLiteral(TokenKind kind) const {
     return kind == TokenKind::kIntLiteral || kind == TokenKind::kFloatLiteral || kind == TokenKind::kStringLiteral ||
-           kind == TokenKind::kTrue || kind == TokenKind::kFalse || kind == TokenKind::kNil;
+           kind == TokenKind::kCharLiteral || kind == TokenKind::kTrue || kind == TokenKind::kFalse || kind == TokenKind::kNil;
 }
 
 bool Parser::IsAggregateInitBase(const Expr& expr) const {

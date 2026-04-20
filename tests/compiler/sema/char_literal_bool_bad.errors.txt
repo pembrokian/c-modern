@@ -1,0 +1,1 @@
+global initializer type mismatch for NOT_BOOL: expected bool, got int_literal

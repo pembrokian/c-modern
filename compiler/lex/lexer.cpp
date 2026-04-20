@@ -96,6 +96,25 @@ std::optional<double> ParseFloatLiteralValue(std::string_view text) {
     return value;
 }
 
+std::optional<std::int64_t> DecodeCharEscape(char escape) {
+    switch (escape) {
+        case '\'':
+            return static_cast<std::int64_t>(static_cast<unsigned char>('\''));
+        case '\\':
+            return static_cast<std::int64_t>(static_cast<unsigned char>('\\'));
+        case 'n':
+            return static_cast<std::int64_t>(static_cast<unsigned char>('\n'));
+        case 'r':
+            return static_cast<std::int64_t>(static_cast<unsigned char>('\r'));
+        case 't':
+            return static_cast<std::int64_t>(static_cast<unsigned char>('\t'));
+        case '0':
+            return static_cast<std::int64_t>(static_cast<unsigned char>('\0'));
+        default:
+            return std::nullopt;
+    }
+}
+
 class Lexer {
   public:
     Lexer(std::string_view source_text,
@@ -131,6 +150,11 @@ class Lexer {
 
             if (current == '"') {
                 result.tokens.push_back(LexString(result.ok));
+                continue;
+            }
+
+            if (current == '\'') {
+                result.tokens.push_back(LexCharLiteral(result.ok));
                 continue;
             }
 
@@ -423,6 +447,99 @@ class Lexer {
         };
     }
 
+    Token LexCharLiteral(bool& ok) {
+        const auto start_position = CurrentPosition();
+        const auto start_index = index_;
+        Advance();
+
+        bool saw_value = false;
+        bool has_extra = false;
+        bool terminated = false;
+        bool invalid = false;
+        std::optional<std::int64_t> value;
+
+        while (!AtEnd()) {
+            const char current = Advance();
+            if (current == '\n' || current == '\r') {
+                break;
+            }
+            if (current == '\'') {
+                if (!saw_value) {
+                    invalid = true;
+                    ok = false;
+                    diagnostics_.Report({
+                        .file_path = file_path_,
+                        .span = {start_position, CurrentPosition()},
+                        .severity = DiagnosticSeverity::kError,
+                        .message = "empty character literal",
+                    });
+                }
+                terminated = true;
+                break;
+            }
+
+            std::optional<std::int64_t> decoded_value;
+            if (current == '\\') {
+                if (AtEnd()) {
+                    break;
+                }
+
+                const char escape = Advance();
+                decoded_value = DecodeCharEscape(escape);
+                if (!decoded_value.has_value()) {
+                    invalid = true;
+                    ok = false;
+                    diagnostics_.Report({
+                        .file_path = file_path_,
+                        .span = {start_position, CurrentPosition()},
+                        .severity = DiagnosticSeverity::kError,
+                        .message = "unsupported character escape",
+                    });
+                }
+            } else {
+                decoded_value = static_cast<std::int64_t>(static_cast<unsigned char>(current));
+            }
+
+            if (decoded_value.has_value()) {
+                if (!saw_value) {
+                    saw_value = true;
+                    value = *decoded_value;
+                } else {
+                    has_extra = true;
+                }
+            }
+        }
+
+        if (!terminated) {
+            invalid = true;
+            ok = false;
+            diagnostics_.Report({
+                .file_path = file_path_,
+                .span = {start_position, CurrentPosition()},
+                .severity = DiagnosticSeverity::kError,
+                .message = "unterminated character literal",
+            });
+        }
+
+        if (saw_value && has_extra) {
+            invalid = true;
+            ok = false;
+            diagnostics_.Report({
+                .file_path = file_path_,
+                .span = {start_position, CurrentPosition()},
+                .severity = DiagnosticSeverity::kError,
+                .message = "character literal may contain only one byte",
+            });
+        }
+
+        return {
+            .kind = TokenKind::kCharLiteral,
+            .lexeme = std::string(source_text_.substr(start_index, index_ - start_index)),
+            .integer_value = (!invalid && saw_value && terminated && !has_extra) ? value : std::nullopt,
+            .span = {start_position, CurrentPosition()},
+        };
+    }
+
     std::optional<Token> LexPunctuation(SourcePosition start) {
         const auto emit = [&](TokenKind kind, std::size_t width) -> Token {
             const auto start_index = index_;
@@ -600,6 +717,8 @@ std::string_view ToString(TokenKind kind) {
             return "float_lit";
         case TokenKind::kStringLiteral:
             return "string_lit";
+        case TokenKind::kCharLiteral:
+            return "char_lit";
         case TokenKind::kLBrace:
             return "{";
         case TokenKind::kRBrace:
