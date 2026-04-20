@@ -3,7 +3,7 @@ Phase 296 -- App-Local Selection Or Detail Surface First Slice
 
 Status
 ------
-PROPOSED
+COMPLETE
 
 Purpose
 -------
@@ -205,3 +205,19 @@ Future follow-up
   existing app pair to decide whether any tiny shared vocabulary is now honest.
 - Phase 300 can use the richer state from this phase as the candidate for one
   bounded persistence follow-through.
+
+Implementation notes
+--------------------
+- `examples/real/review_board/src/review_board_ui.mc` now owns one bounded
+  app-local detail selector with `Summary`, `Open`, `Closed`, and `Urgent`
+  views plus one app-local `D` key that cycles those views.
+- The default `Summary` view preserves the pre-Phase-296 four-cell review_board
+  output, so the richer state is additive and remains local to the app UI
+  owner rather than changing shared kernel display contracts.
+- The richer detail spend stays transient in this phase: `review_board_app.mc`
+  keeps the existing four-byte journal contract unchanged, and reload still
+  starts from the summary view until a later persistence phase proves that the
+  added view state is important enough to retain.
+- Hosted proof coverage now includes the `ui` target path `DDDOTFTUUU -> UEFB`,
+  and the reset-lane review_board UI proof now exercises the same urgent-detail
+  display through the existing grouped kernel workflow surface.

@@ -121,6 +121,25 @@ void TestRealReviewBoardProject(const std::filesystem::path& source_root,
                               "FEFB\n",
                               "phase286 review board explicit ui run");
 
+    const auto [ui_detail_run_outcome, ui_detail_run_output] = RunCommandCapture({mc_path.generic_string(),
+                                                                                  "run",
+                                                                                  "--project",
+                                                                                  project_path.generic_string(),
+                                                                                  "--target",
+                                                                                  "ui",
+                                                                                  "--build-dir",
+                                                                                  graph_build_dir.generic_string(),
+                                                                                  "--",
+                                                                                  "DDDOTFTUUU"},
+                                                                                 graph_build_dir / "review_board_ui_detail_run_output.txt",
+                                                                                 "review board explicit ui detail run");
+    if (!ui_detail_run_outcome.exited || ui_detail_run_outcome.exit_code != 0) {
+        Fail("review board explicit ui detail run should pass:\n" + ui_detail_run_output);
+    }
+    ExpectReviewBoardUiOutput(ui_detail_run_output,
+                              "UEFB\n",
+                              "phase296 review board explicit ui detail run");
+
     std::string audit_test_output = RunProjectTestTargetAndExpectSuccess(mc_path,
                                                                          project_path,
                                                                          graph_build_dir,

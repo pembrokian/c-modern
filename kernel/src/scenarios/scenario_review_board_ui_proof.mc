@@ -27,6 +27,10 @@ const FAIL_REVIEW_BOARD_INPUT_URGENT0: i32 = 28613
 const FAIL_REVIEW_BOARD_INPUT_URGENT1: i32 = 28614
 const FAIL_REVIEW_BOARD_INPUT_URGENT2: i32 = 28615
 const FAIL_REVIEW_BOARD_DISPLAY_ESCALATE: i32 = 28616
+const FAIL_REVIEW_BOARD_INPUT_DETAIL0: i32 = 28617
+const FAIL_REVIEW_BOARD_INPUT_DETAIL1: i32 = 28618
+const FAIL_REVIEW_BOARD_INPUT_DETAIL2: i32 = 28619
+const FAIL_REVIEW_BOARD_DISPLAY_DETAIL: i32 = 28620
 
 const DISPLAY_STATE_AUDIT_STABLE_BODY: [4]u8 = [4]u8{ 65, 83, 65, 66 }
 const DISPLAY_STATE_AUDIT_PAUSE_BODY: [4]u8 = [4]u8{ 65, 80, 65, 66 }
@@ -34,6 +38,7 @@ const DISPLAY_STATE_AUDIT_PAUSE_STATUS: [4]u8 = [4]u8{ 65, 80, 65, 83 }
 const DISPLAY_STATE_FOCUS_NORMAL_STATUS: [4]u8 = [4]u8{ 70, 78, 70, 83 }
 const DISPLAY_STATE_FOCUS_NORMAL_BODY: [4]u8 = [4]u8{ 70, 78, 70, 66 }
 const DISPLAY_STATE_FOCUS_ESCALATE_BODY: [4]u8 = [4]u8{ 70, 69, 70, 66 }
+const DISPLAY_STATE_FOCUS_URGENT_DETAIL_BODY: [4]u8 = [4]u8{ 85, 69, 70, 66 }
 
 func expect_delivered(effect: service_effect.Effect, value: u8) bool {
     return scenario_assert.expect_reply(effect, syscall.SyscallStatus.Ok, 4, program_catalog.PROGRAM_ID_REVIEW_BOARD, input_event.INPUT_ROUTE_DELIVERED, input_event.INPUT_EVENT_KEY, value)
@@ -111,6 +116,23 @@ func run_review_board_ui_proof_probe() i32 {
     effect = kernel_dispatch.kernel_dispatch_step(&state, scenario_transport.display_query_obs())
     if !scenario_assert.expect_display(effect, syscall.SyscallStatus.Ok, DISPLAY_STATE_FOCUS_ESCALATE_BODY) {
         return FAIL_REVIEW_BOARD_DISPLAY_ESCALATE
+    }
+
+    effect = kernel_dispatch.kernel_dispatch_step(&state, scenario_transport.cmd_input_key(review_board_ui.REVIEW_BOARD_KEY_DETAIL))
+    if !expect_delivered(effect, review_board_ui.REVIEW_BOARD_KEY_DETAIL) {
+        return FAIL_REVIEW_BOARD_INPUT_DETAIL0
+    }
+    effect = kernel_dispatch.kernel_dispatch_step(&state, scenario_transport.cmd_input_key(review_board_ui.REVIEW_BOARD_KEY_DETAIL))
+    if !expect_delivered(effect, review_board_ui.REVIEW_BOARD_KEY_DETAIL) {
+        return FAIL_REVIEW_BOARD_INPUT_DETAIL1
+    }
+    effect = kernel_dispatch.kernel_dispatch_step(&state, scenario_transport.cmd_input_key(review_board_ui.REVIEW_BOARD_KEY_DETAIL))
+    if !expect_delivered(effect, review_board_ui.REVIEW_BOARD_KEY_DETAIL) {
+        return FAIL_REVIEW_BOARD_INPUT_DETAIL2
+    }
+    effect = kernel_dispatch.kernel_dispatch_step(&state, scenario_transport.display_query_obs())
+    if !scenario_assert.expect_display(effect, syscall.SyscallStatus.Ok, DISPLAY_STATE_FOCUS_URGENT_DETAIL_BODY) {
+        return FAIL_REVIEW_BOARD_DISPLAY_DETAIL
     }
 
     return 0

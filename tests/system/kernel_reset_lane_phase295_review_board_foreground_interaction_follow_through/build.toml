@@ -1,5 +1,5 @@
 schema = 1
-project = "kernel-reset-lane-phase286-first-editor-or-installer-style-ui-proof"
+project = "kernel-reset-lane-phase295-review-board-foreground-interaction-follow-through"
 default = "app"
 
 [targets.app]

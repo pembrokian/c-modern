@@ -3,7 +3,7 @@ Phase 295 -- Review Board Foreground Interaction Follow-Through
 
 Status
 ------
-PROPOSED
+COMPLETED
 
 Purpose
 -------
@@ -26,9 +26,9 @@ Repository status note
   consumer of the admitted foreground-interaction path.
 - `kernel/src/review_board_app.mc` already owns app-local display and key
   handling, and `examples/real/review_board/` already proves hosted app logic.
-- The repository still lacks one explicit phase that makes `review_board` a
-  first-class consumer of the same foreground-input contract on the maintained
-  hosted and reset-lane surfaces.
+- This phase lands the explicit maintained proof that `review_board` now
+  participates as a first-class consumer of the same launcher-selected
+  foreground-input contract on both the reset-lane and hosted surfaces.
 
 Problem being solved
 --------------------
@@ -192,6 +192,13 @@ Test obligations
 - if the reset-lane route or fixture table changes, run
   `mc_tool_workflow_kernel_reset_lane_full_unit` after the narrow owner passes
 
+Validation completed
+--------------------
+- `Build debug`
+- `mc_tool_workflow_kernel_reset_lane_unit`
+- `mc_tool_real_project_review_board_unit`
+- `mc_tool_workflow_kernel_reset_lane_full_unit`
+
 Acceptance criteria
 -------------------
 - `review_board` consumes the admitted launcher-selected foreground-input path
@@ -201,6 +208,32 @@ Acceptance criteria
 - one maintained reset-lane proof demonstrates the path honestly
 - the hosted `review_board` proof remains aligned with the same interaction
   contract
+
+Implementation notes
+--------------------
+- The controlling route and app-local owners were already correctly split:
+  `foreground_input_route.mc` still selects the launcher-owned foreground app,
+  and `review_board_app.mc` still decides what keys mean for `review_board`.
+- The maintained reset-lane proof was re-homed under
+  `tests/system/kernel_reset_lane_phase295_review_board_foreground_interaction_follow_through/`
+  so the grouped workflow suite now records this interaction contract as a
+  distinct Phase 295 owner instead of leaving it on the older Phase 286 label.
+- The hosted `examples/real/review_board/` proof remained on the existing
+  app-local `ui` target, which keeps parity on the same key-handling contract
+  without adding a second runner or a review-board-specific input harness.
+
+Phase review against spec
+-------------------------
+- Preserved invariants:
+  `foreground_input_route.mc` stayed a thin routing seam, `launcher_service.mc`
+  stayed the owner of foreground-app truth, `review_board_app.mc` stayed the
+  owner of review-board key meaning, and `input_event.mc` remained key-only.
+- Ownership boundaries did not weaken:
+  no review-board key semantics moved into launcher or dispatch, and no shared
+  UI controller or extra input family landed.
+- Accidental centers of gravity were avoided:
+  the implementation stayed on one existing app-local UI owner, one existing
+  routing seam, one reset-lane fixture, and one hosted real-project proof.
 
 Future follow-up
 ----------------
