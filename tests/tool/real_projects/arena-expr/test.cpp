@@ -3,12 +3,13 @@
 
 #include "tests/support/process_utils.h"
 #include "tests/tool/tool_real_project_suite_internal.h"
+#include "tests/tool/tool_suite_common.h"
 
 namespace {
 
 using mc::test_support::ExpectOutputContains;
-using mc::test_support::Fail;
-using mc::test_support::RunCommandCapture;
+using mc::tool_tests::RunProjectAndExpectSuccess;
+using mc::tool_tests::RunProjectTestAndExpectSuccess;
 
 }  // namespace
 
@@ -24,34 +25,21 @@ void TestRealArenaExprToolProject(const std::filesystem::path& source_root,
 
     const std::string expected_output = "((1+2)+(3+4))\n(7+(8+9))\n";
 
-    const auto [run_outcome, run_output] = RunCommandCapture({mc_path.generic_string(),
-                                                              "run",
-                                                              "--project",
-                                                              project_path.generic_string(),
-                                                              "--build-dir",
-                                                              build_dir.generic_string(),
-                                                              "--",
-                                                              sample_path.generic_string()},
-                                                             build_dir / "arena_expr_run_output.txt",
-                                                             "arena expr run");
-    if (!run_outcome.exited || run_outcome.exit_code != 0) {
-        Fail("phase8 arena expr run should succeed:\n" + run_output);
-    }
+    const std::string run_output = RunProjectAndExpectSuccess(mc_path,
+                                                              project_path,
+                                                              build_dir,
+                                                              {sample_path.generic_string()},
+                                                              "arena_expr_run_output.txt",
+                                                              "arena expr run");
     ExpectOutputContains(run_output,
                          expected_output,
                          "phase8 arena expr should print deterministic normalized output for each scratch pass");
 
-    const auto [test_outcome, test_output] = RunCommandCapture({mc_path.generic_string(),
-                                                                "test",
-                                                                "--project",
-                                                                project_path.generic_string(),
-                                                                "--build-dir",
-                                                                build_dir.generic_string()},
-                                                               build_dir / "arena_expr_test_output.txt",
-                                                               "arena expr test");
-    if (!test_outcome.exited || test_outcome.exit_code != 0) {
-        Fail("phase8 arena expr tests should pass:\n" + test_output);
-    }
+    const std::string test_output = RunProjectTestAndExpectSuccess(mc_path,
+                                                                   project_path,
+                                                                   build_dir,
+                                                                   "arena_expr_test_output.txt",
+                                                                   "arena expr test");
     ExpectOutputContains(test_output,
                          "PASS normalize_text_test.test_normalize_text",
                          "phase8 arena expr ordinary tests should include normalization coverage");

@@ -4,13 +4,14 @@
 
 #include "tests/support/process_utils.h"
 #include "tests/tool/tool_real_project_suite_internal.h"
+#include "tests/tool/tool_suite_common.h"
 
 namespace {
 
 using mc::test_support::ExpectOutputContains;
-using mc::test_support::Fail;
-using mc::test_support::RunCommandCapture;
 using mc::test_support::WriteFile;
+using mc::tool_tests::RunProjectAndExpectSuccess;
+using mc::tool_tests::RunProjectTestAndExpectSuccess;
 
 }  // namespace
 
@@ -35,19 +36,12 @@ void TestRealBundleStageProject(const std::filesystem::path& source_root,
                                                 return acc + static_cast<unsigned char>(ch);
                                             });
 
-    const auto [run_outcome, run_output] = RunCommandCapture({mc_path.generic_string(),
-                                                              "run",
-                                                              "--project",
-                                                              project_path.generic_string(),
-                                                              "--build-dir",
-                                                              build_dir.generic_string(),
-                                                              "--",
-                                                              sample_path.generic_string()},
-                                                             build_dir / "bundle_stage_run_output.txt",
-                                                             "bundle stage run");
-    if (!run_outcome.exited || run_outcome.exit_code != 0) {
-        Fail("phase264 bundle stage run should succeed:\n" + run_output);
-    }
+    const std::string run_output = RunProjectAndExpectSuccess(mc_path,
+                                                              project_path,
+                                                              build_dir,
+                                                              {sample_path.generic_string()},
+                                                              "bundle_stage_run_output.txt",
+                                                              "bundle stage run");
     ExpectOutputContains(run_output,
                          "bundle-bytes=5000\n",
                          "phase264 bundle stage should report the staged byte count");
@@ -61,17 +55,11 @@ void TestRealBundleStageProject(const std::filesystem::path& source_root,
                          "sum=" + std::to_string(sample_sum) + "\n",
                          "phase264 bundle stage should report the deterministic byte sum");
 
-    const auto [test_outcome, test_output] = RunCommandCapture({mc_path.generic_string(),
-                                                                "test",
-                                                                "--project",
-                                                                project_path.generic_string(),
-                                                                "--build-dir",
-                                                                build_dir.generic_string()},
-                                                               build_dir / "bundle_stage_test_output.txt",
-                                                               "bundle stage test");
-    if (!test_outcome.exited || test_outcome.exit_code != 0) {
-        Fail("phase264 bundle stage tests should pass:\n" + test_output);
-    }
+    const std::string test_output = RunProjectTestAndExpectSuccess(mc_path,
+                                                                   project_path,
+                                                                   build_dir,
+                                                                   "bundle_stage_test_output.txt",
+                                                                   "bundle stage test");
     ExpectOutputContains(test_output,
                          "PASS run_rounding_test.test_run_rounds_to_granules",
                          "phase264 bundle stage tests should cover run rounding");

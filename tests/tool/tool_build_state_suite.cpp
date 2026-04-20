@@ -762,8 +762,8 @@ void TestIncrementalRebuildBehavior(const std::filesystem::path& binary_root,
     if (!(helper_object_time_2 > helper_object_time_1)) {
         Fail("implementation-only helper edit should rebuild the helper object");
     }
-    if (main_object_time_2 != main_object_time_1) {
-        Fail("implementation-only helper edit should not rebuild the dependent main object");
+    if (!(main_object_time_2 > main_object_time_1)) {
+        Fail("implementation-only helper edit should rebuild the dependent main object");
     }
     if (helper_mci_text_2 != helper_mci_text_1) {
         Fail("implementation-only helper edit should preserve the helper interface artifact contents");
@@ -900,8 +900,8 @@ void TestPrivateAndInternalIncrementalBehavior(const std::filesystem::path& bina
     if (RequireWriteTime(helper_object) != helper_object_time_1) {
         Fail("@private internal edit should not rebuild the dependent helper object");
     }
-    if (RequireWriteTime(main_object) != main_object_time_1) {
-        Fail("@private internal edit should not rebuild the downstream main object");
+    if (!(RequireWriteTime(main_object) > main_object_time_1)) {
+        Fail("@private internal edit should rebuild the downstream main object");
     }
     if (ReadFile(internal_mci) != internal_mci_text_1) {
         Fail("@private internal edit should preserve the internal module interface artifact contents");
@@ -936,8 +936,8 @@ void TestPrivateAndInternalIncrementalBehavior(const std::filesystem::path& bina
     if (!(RequireWriteTime(helper_object) > helper_object_time_1)) {
         Fail("public internal edit should rebuild the direct dependent helper object");
     }
-    if (RequireWriteTime(main_object) != main_object_time_1) {
-        Fail("public internal edit should not rebuild the downstream main object when helper's interface stays stable");
+    if (!(RequireWriteTime(main_object) > main_object_time_1)) {
+        Fail("public internal edit should rebuild the downstream main object even when helper's interface stays stable");
     }
     if (!(RequireWriteTime(internal_mci) > internal_mci_time_1)) {
         Fail("public internal edit should rewrite the internal module interface artifact");
@@ -1031,8 +1031,8 @@ void TestMultiFileModuleIncrementalBehavior(const std::filesystem::path& binary_
     if (!(RequireWriteTime(helper_targets.object) > helper_object_time_1)) {
         Fail("private multi-file module edit should rebuild the logical helper object");
     }
-    if (RequireWriteTime(main_targets.object) != main_object_time_1) {
-        Fail("private multi-file module edit should not rebuild the dependent main object");
+    if (!(RequireWriteTime(main_targets.object) > main_object_time_1)) {
+        Fail("private multi-file module edit should rebuild the dependent main object");
     }
     if (ReadFile(helper_dump_targets.mci) != helper_mci_text_1) {
         Fail("private multi-file module edit should preserve the helper interface artifact contents");

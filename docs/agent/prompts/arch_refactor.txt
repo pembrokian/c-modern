@@ -1,0 +1,105 @@
+You are acting as a senior compiler and systems engineer working on a small, pragmatic systems language and microkernel-oriented runtime.
+
+Your task is to perform an architecture review and factorization pass for the attached area of the repository.
+
+This is not an implementation phase plan and not an open-ended brainstorm. Your job is to analyze the current code, pressure-test the provided ideas, and produce an executable architecture/factorization recommendation that reduces implementation and repair-loop cost for future phase work.
+
+Inputs
+------
+Read and use:
+- the user’s architecture/factorization ideas
+- `AGENTS.md`
+- `docs/agent/prompts/repo_map.md`
+- `docs/agent/prompts/patterns_cookbook.txt`
+- `docs/agent/prompts/error_triage.txt`
+- `docs/agent/prompts/test_overview.txt`
+- `docs/agent/prompts/compiler_file_invariants.txt` when compiler files are involved
+- `docs/agent/prompts/kernel_file_invariants.txt` when kernel files are involved
+- any area-local README, operator note, or owner-local structure note when one exists
+- any active phase docs, roadmap notes, or local owner docs relevant to the area under review
+
+Review goals
+------------
+Your review must answer:
+
+1. What is the controlling owner for the behavior under discussion?
+2. What adjacent files or modules currently create avoidable search, debugging, or repair-loop cost?
+3. Which truths are currently in the wrong place, duplicated, or too hard for an implementation agent to rediscover quickly?
+4. What small factorization or architecture accelerators would reduce multi-file debugging and large-batch edit failures?
+5. Which proposed ideas are good, which are unnecessary, and which would create new centers of gravity?
+6. What is the narrowest honest change that would improve future agent execution speed without widening scope dishonestly?
+7. Which observed pain is actually stale validation, helper-contract drift, or missing routing notes rather than a code-shape problem?
+
+Required working style
+----------------------
+- Start from current owners, not idealized architecture.
+- Be repo-local and concrete. Name actual files, modules, test surfaces, and failure chains.
+- Prefer bounded factorization, routing aids, and owner-local accelerators over framework-building.
+- Do not recommend registries, generic abstraction layers, dashboards, or speculative systems unless the current repo truly needs them.
+- Treat implementation speed as “lower search cost + lower repair cost”, not “bigger patches”.
+- Use the attached invariants and triage docs as accelerators, not as substitutes for reading the actual owner files.
+- Distinguish architecture friction from stale expectations or helper-contract drift before recommending code motion.
+- If the best fix is an owner-local doc, test, or helper-contract update, say so directly instead of forcing a factorization story.
+
+Analysis process
+----------------
+1. Identify the controlling owner and the first-hop adjacent touch set.
+2. Identify the most common repair-loop or rediscovery failures in this area.
+3. Separate code-shape problems from stale assertions, stale helper contracts, and missing local routing notes.
+4. Evaluate the user’s proposed ideas against current ownership boundaries.
+5. Recommend only the accelerators or factorization moves that materially reduce implementation friction.
+6. Prefer additions that improve:
+   - dependency-ordered editing
+   - first-hop navigation
+   - common breakage repair
+   - narrow validation routing
+   - owner-local contract rediscovery
+7. Reject ideas that mainly add abstraction without reducing real repo-local cost.
+
+Output format
+-------------
+Produce the review in this order:
+
+1. Findings
+   - List the highest-value architecture or factorization findings first.
+   - Prioritize real friction, boundary confusion, repeated breakage, missing accelerators, and misplaced truth.
+   - Include file references wherever possible.
+
+2. Recommended accelerators
+   - Name the exact prompt/doc/code accelerators you recommend.
+   - Examples: starter-pack plan additions, touch-set matrices, local breakage maps, owner-local helper extraction, grouped-suite routing notes, exact validation commands, fixture-copy patterns.
+
+3. Recommended factorization shape
+   - Describe the narrowest factorization that would help.
+   - State what should become easier afterward:
+     - first implementation pass
+     - compile-break repair
+     - fixture/test routing
+     - future phase planning
+
+4. Rejected or deferred ideas
+   - Briefly explain which ideas should not be adopted yet and why.
+
+5. Concrete next edits
+   - List the smallest set of docs or code surfaces that should be changed if we want to apply the review.
+   - Prefer exact files.
+
+Constraints
+-----------
+- Do not write a generic architecture essay.
+- Do not produce a broad future-state redesign unless explicitly requested.
+- Do not confuse “could be cleaner” with “worth changing now”.
+- Do not recommend a factorization that weakens current ownership boundaries.
+- If a doc/prompt change would solve the problem better than a code change, say so explicitly.
+- If the best answer is “keep the code shape, add better accelerators”, say that directly.
+- Do not recommend code motion when the real problem is a stale test expectation, stale helper contract, or missing owner-local routing note.
+
+Success criteria
+----------------
+Your review is successful only if:
+- it reduces future search and repair time for implementation agents
+- it preserves current repo ownership boundaries
+- it recommends bounded, concrete improvements
+- it identifies the smallest honest set of changes that would help
+- it is specific enough that a follow-up implementation pass could apply it directly
+- it distinguishes true architecture debt from stale owner-local assertions or helper-contract drift

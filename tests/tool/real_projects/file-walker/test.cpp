@@ -3,12 +3,14 @@
 
 #include "tests/support/process_utils.h"
 #include "tests/tool/tool_real_project_suite_internal.h"
+#include "tests/tool/tool_suite_common.h"
 
 namespace {
 
 using mc::test_support::ExpectOutputContains;
 using mc::test_support::Fail;
-using mc::test_support::RunCommandCapture;
+using mc::tool_tests::RunProjectAndExpectSuccess;
+using mc::tool_tests::RunProjectTestAndExpectSuccess;
 
 }  // namespace
 
@@ -27,19 +29,12 @@ void TestRealFileWalkerProject(const std::filesystem::path& source_root,
     const std::string gamma_path = (sample_root / "nested/deeper/gamma.txt").generic_string() + "\n";
     const std::string directory_line = (sample_root / "nested").generic_string() + "\n";
 
-    const auto [run_outcome, run_output] = RunCommandCapture({mc_path.generic_string(),
-                                                              "run",
-                                                              "--project",
-                                                              project_path.generic_string(),
-                                                              "--build-dir",
-                                                              build_dir.generic_string(),
-                                                              "--",
-                                                              sample_root.generic_string()},
-                                                             build_dir / "file_walker_run_output.txt",
-                                                             "file walker run");
-    if (!run_outcome.exited || run_outcome.exit_code != 0) {
-        Fail("phase8 file walker run should succeed:\n" + run_output);
-    }
+    const std::string run_output = RunProjectAndExpectSuccess(mc_path,
+                                                              project_path,
+                                                              build_dir,
+                                                              {sample_root.generic_string()},
+                                                              "file_walker_run_output.txt",
+                                                              "file walker run");
     ExpectOutputContains(run_output, alpha_path, "phase8 file walker should print top-level files");
     ExpectOutputContains(run_output, beta_path, "phase8 file walker should recurse into nested directories");
     ExpectOutputContains(run_output, gamma_path, "phase8 file walker should recurse through deeper directories");
@@ -47,17 +42,11 @@ void TestRealFileWalkerProject(const std::filesystem::path& source_root,
         Fail("phase8 file walker should print files only, got:\n" + run_output);
     }
 
-    const auto [test_outcome, test_output] = RunCommandCapture({mc_path.generic_string(),
-                                                                "test",
-                                                                "--project",
-                                                                project_path.generic_string(),
-                                                                "--build-dir",
-                                                                build_dir.generic_string()},
-                                                               build_dir / "file_walker_test_output.txt",
-                                                               "file walker test");
-    if (!test_outcome.exited || test_outcome.exit_code != 0) {
-        Fail("phase8 file walker tests should pass:\n" + test_output);
-    }
+    const std::string test_output = RunProjectTestAndExpectSuccess(mc_path,
+                                                                   project_path,
+                                                                   build_dir,
+                                                                   "file_walker_test_output.txt",
+                                                                   "file walker test");
     ExpectOutputContains(test_output,
                          "PASS entry_name_test.test_entry_name",
                          "phase8 file walker ordinary tests should include entry-name coverage");

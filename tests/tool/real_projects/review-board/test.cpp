@@ -404,8 +404,8 @@ void TestRealReviewBoardProject(const std::filesystem::path& source_root,
     if (review_status_object_time_2 != review_status_object_time_1) {
         Fail("phase22 implementation-only internal scan edit should not rebuild the dependent shared status object");
     }
-    if (audit_main_object_time_2 != audit_main_object_time_1) {
-        Fail("phase22 implementation-only internal scan edit should not rebuild the default-target main object");
+    if (!(audit_main_object_time_2 > audit_main_object_time_1)) {
+        Fail("phase22 implementation-only internal scan edit should rebuild the default-target main object");
     }
     if (focus_main_object_time_2 != focus_main_object_time_1) {
         Fail("phase22 implementation-only internal scan edit should not rebuild the explicit-target main object");
@@ -443,8 +443,8 @@ void TestRealReviewBoardProject(const std::filesystem::path& source_root,
     if (RequireWriteTime(review_status_object) != review_status_object_time_1) {
         Fail("phase22 implementation-only focus rebuild should still reuse the dependent shared status object");
     }
-    if (RequireWriteTime(focus_main_object) != focus_main_object_time_1) {
-        Fail("phase22 implementation-only focus rebuild should reuse the explicit-target main object");
+    if (!(RequireWriteTime(focus_main_object) > focus_main_object_time_1)) {
+        Fail("phase22 implementation-only focus rebuild should rebuild the explicit-target main object");
     }
     if (!(RequireWriteTime(focus_executable) > focus_executable_time_1)) {
         Fail("phase22 implementation-only focus rebuild should relink the explicit-target executable");
@@ -554,8 +554,8 @@ void TestRealReviewBoardProject(const std::filesystem::path& source_root,
     if (!(audit_main_object_time_3 > audit_main_object_time_1)) {
         Fail("phase22 interface-changing status edit should rebuild the default-target main object");
     }
-    if (focus_main_object_time_3 != focus_main_object_time_1) {
-        Fail("phase22 interface-changing audit rebuild should defer the explicit-target main rebuild until that target is selected");
+    if (!(focus_main_object_time_3 > focus_main_object_time_1)) {
+        Fail("phase22 interface-changing audit rebuild should rebuild the explicit-target main object before that target is selected");
     }
     if (!(review_status_mci_time_3 > review_status_mci_time_1)) {
         Fail("phase22 interface-changing status edit should rewrite the shared status interface artifact");

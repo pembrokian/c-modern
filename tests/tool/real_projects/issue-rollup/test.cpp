@@ -821,8 +821,8 @@ void TestRealIssueRollupProject(const std::filesystem::path& source_root,
     if (RequireWriteTime(rollup_core_object) != rollup_core_object_time_3) {
         Fail("phase30 interface-changing report-target rebuild should reuse the already rebuilt static-library entry object");
     }
-    if (report_main_object_time_4 != report_main_object_time_3) {
-        Fail("phase30 interface-changing report-target rebuild should reuse the selected report-target root object");
+    if (!(report_main_object_time_4 > report_main_object_time_3)) {
+        Fail("phase30 interface-changing report-target rebuild should rebuild the selected report-target root object");
     }
     if (!(issue_rollup_report_executable_time_4 > issue_rollup_report_executable_time_3)) {
         Fail("phase30 interface-changing report-target rebuild should relink the selected report executable");

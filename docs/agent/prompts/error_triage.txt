@@ -28,6 +28,15 @@ Common first-break checks
 - Deterministic dump mismatch:
   check whether the owner contract changed intentionally before touching the
   golden; update the narrowest owning fixture only after the output is stable
+- Missing build artifact or path mismatch in tool, build-state, or real-project
+  tests:
+  check `compiler/support/dump_paths.*`, any owner-local artifact resolver,
+  and the actual emitted `obj/`, `bin/`, `mci/`, or `state/` tree before
+  changing compiler or workflow logic
+- Incremental rebuild or timestamp assertion failure:
+  check whether the assertion is stale before changing reuse logic; reproduce
+  the local build twice, inspect object or executable mtimes, and compare the
+  owner-local `.mci` truth before widening to shared infrastructure
 - Restart-visible kernel change:
   check persistence, reload, reset, restart classification, and scenario
   follow-through before widening to unrelated services
@@ -35,6 +44,10 @@ Common first-break checks
   check the owning grouped suite and its checked-in case or scenario first;
   do not start by widening CMake registration or sharding unless ownership
   actually changed
+- Broader grouped validation failure after a narrow owner fix:
+  step to the first failing owner-local case first; treat stale reuse
+  expectations and owner-local helper contracts as likely causes before
+  reopening shared runtime or workflow code
 - Reset-lane fixture addition broke the build:
   check the scenario registration row, any fixed-size `std::array` or scenario
   count, coverage-validation helpers, fixture naming, and the owning reset-lane

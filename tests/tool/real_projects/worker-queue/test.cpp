@@ -9,28 +9,8 @@
 namespace {
 
 using mc::test_support::ExpectOutputContains;
-using mc::test_support::Fail;
-using mc::test_support::RunCommandCapture;
+using mc::tool_tests::RunProjectAndExpectSuccess;
 using mc::tool_tests::RunProjectTestAndExpectSuccess;
-
-std::string RunWorkerQueueProjectAndExpectSuccess(const std::filesystem::path& mc_path,
-                                                  const std::filesystem::path& project_path,
-                                                  const std::filesystem::path& build_dir,
-                                                  std::string_view output_name,
-                                                  const std::string& context) {
-    const auto [outcome, output] = RunCommandCapture({mc_path.generic_string(),
-                                                      "run",
-                                                      "--project",
-                                                      project_path.generic_string(),
-                                                      "--build-dir",
-                                                      build_dir.generic_string()},
-                                                     build_dir / std::string(output_name),
-                                                     context);
-    if (!outcome.exited || outcome.exit_code != 0) {
-        Fail(context + " should pass:\n" + output);
-    }
-    return output;
-}
 
 void ExpectWorkerQueueRunOutput(std::string_view output,
                                 const std::string& context_prefix) {
@@ -75,11 +55,12 @@ void TestRealWorkerQueueProject(const std::filesystem::path& source_root,
     const std::filesystem::path run_test_rerun_build_dir = binary_root / "worker_queue_run_test_rerun_build";
     std::filesystem::remove_all(run_test_rerun_build_dir);
 
-    std::string run_output = RunWorkerQueueProjectAndExpectSuccess(mc_path,
-                                                                   project_path,
-                                                                   run_test_rerun_build_dir,
-                                                                   "worker_queue_run_output.txt",
-                                                                   "worker queue run before tests");
+    std::string run_output = RunProjectAndExpectSuccess(mc_path,
+                                                        project_path,
+                                                        run_test_rerun_build_dir,
+                                                        {},
+                                                        "worker_queue_run_output.txt",
+                                                        "worker queue run before tests");
     ExpectWorkerQueueRunOutput(run_output,
                                "phase20 worker queue run before tests");
 
@@ -91,11 +72,12 @@ void TestRealWorkerQueueProject(const std::filesystem::path& source_root,
     ExpectWorkerQueueTestOutput(test_output,
                                 "phase20 worker queue test after run");
 
-    run_output = RunWorkerQueueProjectAndExpectSuccess(mc_path,
-                                                       project_path,
-                                                       run_test_rerun_build_dir,
-                                                       "worker_queue_rerun_output.txt",
-                                                       "worker queue rerun after tests");
+    run_output = RunProjectAndExpectSuccess(mc_path,
+                                            project_path,
+                                            run_test_rerun_build_dir,
+                                            {},
+                                            "worker_queue_rerun_output.txt",
+                                            "worker queue rerun after tests");
     ExpectWorkerQueueRunOutput(run_output,
                                "phase20 worker queue rerun after tests");
 
@@ -110,11 +92,12 @@ void TestRealWorkerQueueProject(const std::filesystem::path& source_root,
     ExpectWorkerQueueTestOutput(test_output,
                                 "phase20 worker queue initial test");
 
-    run_output = RunWorkerQueueProjectAndExpectSuccess(mc_path,
-                                                       project_path,
-                                                       test_run_rerun_build_dir,
-                                                       "worker_queue_run_after_test_output.txt",
-                                                       "worker queue run after tests");
+    run_output = RunProjectAndExpectSuccess(mc_path,
+                                            project_path,
+                                            test_run_rerun_build_dir,
+                                            {},
+                                            "worker_queue_run_after_test_output.txt",
+                                            "worker queue run after tests");
     ExpectWorkerQueueRunOutput(run_output,
                                "phase20 worker queue run after tests");
 

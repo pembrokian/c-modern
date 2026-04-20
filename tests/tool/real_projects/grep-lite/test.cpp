@@ -3,12 +3,14 @@
 
 #include "tests/support/process_utils.h"
 #include "tests/tool/tool_real_project_suite_internal.h"
+#include "tests/tool/tool_suite_common.h"
 
 namespace {
 
 using mc::test_support::ExpectOutputContains;
 using mc::test_support::Fail;
-using mc::test_support::RunCommandCapture;
+using mc::tool_tests::RunProjectAndExpectSuccess;
+using mc::tool_tests::RunProjectTestAndExpectSuccess;
 
 }  // namespace
 
@@ -22,20 +24,12 @@ void TestRealGrepLiteProject(const std::filesystem::path& source_root,
     const std::filesystem::path build_dir = binary_root / "grep_lite_build";
     std::filesystem::remove_all(build_dir);
 
-    const auto [run_outcome, run_output] = RunCommandCapture({mc_path.generic_string(),
-                                                              "run",
-                                                              "--project",
-                                                              project_path.generic_string(),
-                                                              "--build-dir",
-                                                              build_dir.generic_string(),
-                                                              "--",
-                                                              "alpha",
-                                                              sample_path.generic_string()},
-                                                             build_dir / "grep_lite_run_output.txt",
-                                                             "grep-lite run");
-    if (!run_outcome.exited || run_outcome.exit_code != 0) {
-        Fail("phase8 grep-lite run should succeed:\n" + run_output);
-    }
+    const std::string run_output = RunProjectAndExpectSuccess(mc_path,
+                                                              project_path,
+                                                              build_dir,
+                                                              {"alpha", sample_path.generic_string()},
+                                                              "grep_lite_run_output.txt",
+                                                              "grep-lite run");
     ExpectOutputContains(run_output,
                          "alpha\nalphabet\n",
                          "phase8 grep-lite run should print matching lines only");
@@ -43,17 +37,11 @@ void TestRealGrepLiteProject(const std::filesystem::path& source_root,
         Fail("phase8 grep-lite run should not print non-matching lines, got:\n" + run_output);
     }
 
-    const auto [test_outcome, test_output] = RunCommandCapture({mc_path.generic_string(),
-                                                                "test",
-                                                                "--project",
-                                                                project_path.generic_string(),
-                                                                "--build-dir",
-                                                                build_dir.generic_string()},
-                                                               build_dir / "grep_lite_test_output.txt",
-                                                               "grep-lite test");
-    if (!test_outcome.exited || test_outcome.exit_code != 0) {
-        Fail("phase8 grep-lite tests should pass:\n" + test_output);
-    }
+    const std::string test_output = RunProjectTestAndExpectSuccess(mc_path,
+                                                                   project_path,
+                                                                   build_dir,
+                                                                   "grep_lite_test_output.txt",
+                                                                   "grep-lite test");
     ExpectOutputContains(test_output,
                          "PASS contains_match_test.test_contains_match",
                          "phase8 grep-lite ordinary tests should include contains-match coverage");

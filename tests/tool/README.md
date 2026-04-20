@@ -8,6 +8,8 @@ Current structure
 - `tool_suite_common.h` and `tool_suite_common.cpp`: shared project-writing,
   command-running, assertion helpers, and projected-MIR golden helpers used by
   the grouped tool suites.
+- `tool_kernel_common.h` and `tool_kernel_common.cpp`: freestanding-kernel and
+  reset-lane-specific helpers used by the workflow-owned kernel suites.
 - `tool_workflow_tests.cpp`: workflow validation driver.
 - `tool_workflow_orchestrator.cpp`: thin workflow suite entry that dispatches
   to the behavior-owned workflow families.

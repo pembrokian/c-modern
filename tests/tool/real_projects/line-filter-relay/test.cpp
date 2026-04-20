@@ -9,31 +9,8 @@
 namespace {
 
 using mc::test_support::ExpectOutputContains;
-using mc::test_support::Fail;
-using mc::test_support::RunCommandCapture;
+using mc::tool_tests::RunProjectAndExpectSuccess;
 using mc::tool_tests::RunProjectTestAndExpectSuccess;
-
-std::string RunLineFilterRelayProjectAndExpectSuccess(const std::filesystem::path& mc_path,
-                                                      const std::filesystem::path& project_path,
-                                                      const std::filesystem::path& build_dir,
-                                                      std::string_view input_text,
-                                                      std::string_view output_name,
-                                                      const std::string& context) {
-    const auto [outcome, output] = RunCommandCapture({mc_path.generic_string(),
-                                                      "run",
-                                                      "--project",
-                                                      project_path.generic_string(),
-                                                      "--build-dir",
-                                                      build_dir.generic_string(),
-                                                      "--",
-                                                      std::string(input_text)},
-                                                     build_dir / std::string(output_name),
-                                                     context);
-    if (!outcome.exited || outcome.exit_code != 0) {
-        Fail(context + " should pass:\n" + output);
-    }
-    return output;
-}
 
 void ExpectLineFilterRelayRunOutput(std::string_view output,
                                     const std::string& context_prefix) {
@@ -84,12 +61,12 @@ void TestRealLineFilterRelayProject(const std::filesystem::path& source_root,
     const std::filesystem::path run_test_rerun_build_dir = binary_root / "line_filter_relay_run_test_rerun_build";
     std::filesystem::remove_all(run_test_rerun_build_dir);
 
-    std::string run_output = RunLineFilterRelayProjectAndExpectSuccess(mc_path,
-                                                                       project_path,
-                                                                       run_test_rerun_build_dir,
-                                                                       "phase forty five",
-                                                                       "line_filter_relay_run_output.txt",
-                                                                       "line filter relay run before tests");
+    std::string run_output = RunProjectAndExpectSuccess(mc_path,
+                                                        project_path,
+                                                        run_test_rerun_build_dir,
+                                                        {"phase forty five"},
+                                                        "line_filter_relay_run_output.txt",
+                                                        "line filter relay run before tests");
     ExpectLineFilterRelayRunOutput(run_output,
                                    "phase46 line filter relay run before tests");
 
@@ -101,12 +78,12 @@ void TestRealLineFilterRelayProject(const std::filesystem::path& source_root,
     ExpectLineFilterRelayTestOutput(test_output,
                                     "phase46 line filter relay test after run");
 
-    run_output = RunLineFilterRelayProjectAndExpectSuccess(mc_path,
-                                                           project_path,
-                                                           run_test_rerun_build_dir,
-                                                           "phase forty five",
-                                                           "line_filter_relay_rerun_output.txt",
-                                                           "line filter relay rerun after tests");
+    run_output = RunProjectAndExpectSuccess(mc_path,
+                                            project_path,
+                                            run_test_rerun_build_dir,
+                                            {"phase forty five"},
+                                            "line_filter_relay_rerun_output.txt",
+                                            "line filter relay rerun after tests");
     ExpectLineFilterRelayRunOutput(run_output,
                                    "phase46 line filter relay rerun after tests");
 
@@ -121,12 +98,12 @@ void TestRealLineFilterRelayProject(const std::filesystem::path& source_root,
     ExpectLineFilterRelayTestOutput(test_output,
                                     "phase46 line filter relay initial test");
 
-    run_output = RunLineFilterRelayProjectAndExpectSuccess(mc_path,
-                                                           project_path,
-                                                           test_run_rerun_build_dir,
-                                                           "phase forty five",
-                                                           "line_filter_relay_run_after_test_output.txt",
-                                                           "line filter relay run after tests");
+    run_output = RunProjectAndExpectSuccess(mc_path,
+                                            project_path,
+                                            test_run_rerun_build_dir,
+                                            {"phase forty five"},
+                                            "line_filter_relay_run_after_test_output.txt",
+                                            "line filter relay run after tests");
     ExpectLineFilterRelayRunOutput(run_output,
                                    "phase46 line filter relay run after tests");
 

@@ -113,6 +113,12 @@ behavior family rather than one large monolith.
 - `tests/tool/tool_workflow_tests.cpp`: workflow validation driver
 - `tests/tool/tool_workflow_orchestrator.cpp`: thin workflow entry that routes
   to behavior-owned workflow families
+- `tests/tool/tool_suite_common.h` and `tests/tool/tool_suite_common.cpp`:
+  generic grouped tool helpers for project-writing, command-running, and shared
+  assertions
+- `tests/tool/tool_kernel_common.h` and `tests/tool/tool_kernel_common.cpp`:
+  workflow-owned reset-lane and freestanding-kernel helper surface; do not put
+  generic tool helpers here
 - `tests/tool/tool_help_suite.cpp`: help text, mode selection, and direct-source
   versus project workflow checks
 - `tests/tool/tool_test_command_suite.cpp`: ordinary test and `mc test`
@@ -128,6 +134,8 @@ behavior family rather than one large monolith.
   incremental rebuild validation
 - `tests/tool/tool_real_project_tests.cpp` and
   `tests/tool/tool_real_project_suite.cpp`: real-project workflow validation
+- `tests/tool/README.md`: owner-local tool-suite map and validation notes; use
+  this before inventing new grouped-suite structure
 - `tests/tool/tool_suite_tests.cpp` and `tests/tool/phase7_tool_tests.cpp`:
   compatibility runners only, not active implementation owners
 
@@ -176,6 +184,11 @@ Generated outputs belong under the active build tree.
 - grouped tool runs: `build/debug/tool/...`
 - grouped codegen executable runs: `build/debug/codegen/executable/...`
 
+Artifact-name rule:
+- project-build objects, executables, interface artifacts, and state files may
+  use hashed logical or source-key stems; prefer the owning helper or resolver
+  over hardcoded plain source filenames when asserting output paths
+
 Do not place generated executables, object files, or command-local build trees
 under `tests/`.
 
@@ -187,6 +200,12 @@ Local iteration guidance
 - when editing workflow build reuse or grouped build-state paths, run the
   owning target twice when practical: first for correctness, second for reuse
   behavior
+- if build-state or real-project reuse assertions fail, inspect the actual
+  emitted artifact names and mtimes before changing shared build logic; stale
+  owner-local expectations are common
+- after changing shared tool helpers or dump-path helpers, widen once to the
+  neighboring grouped workflow or real-project owners rather than assuming the
+  narrow owner target is sufficient
 - if reset-lane or grouped workflow time jumps, inspect per-scenario
   `cache=hit` or `cache=miss` summaries before changing suite shape
 
@@ -211,6 +230,10 @@ Common mistakes to avoid
   tool behavior
 - do not hide import or package metadata inside discovery magic for sema or MIR
   fixtures
+- do not hardcode plain artifact filenames in grouped tool, build-state, or
+  real-project assertions when the owning helper computes hashed stems
+- do not assume selected or non-selected target root objects remain untouched
+  across project rebuilds without checking the current owner behavior first
 - do not create new top-level `build/debug/phase*` output trees for checked-in
   repository-owned validation
 - do not recreate the retired freestanding proof lane

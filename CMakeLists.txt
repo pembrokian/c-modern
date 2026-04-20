@@ -134,6 +134,7 @@ target_link_libraries(mc_codegen_llvm_tests PRIVATE mc_codegen_llvm mc_mir mc_su
 add_executable(mc_tool_workflow_tests
     tests/tool/tool_workflow_tests.cpp
     tests/tool/tool_suite_common.cpp
+    tests/tool/tool_kernel_common.cpp
     tests/tool/tool_help_suite.cpp
     tests/tool/tool_test_command_suite.cpp
     tests/tool/tool_project_validation_suite.cpp

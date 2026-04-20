@@ -55,12 +55,17 @@ Routine fixture discovery is intentionally small and explicit:
 - `tests/compiler/parser/` is autodiscovered by adjacent `.ast.txt` or `.errors.txt` files
 - `tests/compiler/codegen/` backend dump fixtures are autodiscovered by adjacent `.backend.txt` files
 - `tests/compiler/sema/` and `tests/compiler/mir/` use a hybrid model: ordinary adjacent `.sema.txt`/`.mir.txt` and `.errors.txt` fixtures are autodiscovered, while explicit runner metadata remains only for import roots, imported modules, canonical-example sync, or package-identity overrides
+- `tests/smoke/` and `tests/system/` are behavior-owned project fixture trees rather than suffix-driven dump discovery lanes
+- a routine smoke or system case should live in one directory that carries its checked-in `build.toml` plus adjacent source inputs such as `src/main.mc`
+- smoke and system case registration remains explicit today; do not hide those suites behind broad file-glob discovery magic
+- when behavior-first coverage still needs grouped workflow orchestration to run, keep the checked-in case rooted in `tests/smoke/` or `tests/system/` and keep the temporary runner wiring explicit under `tests/tool/`
 
 Contributor rule of thumb:
 
 - a routine parser or backend dump fixture usually only needs new adjacent files
 - a routine sema or MIR fixture with adjacent expectations usually only needs new files
 - if a fixture needs import roots, imported helper modules, or package metadata, keep that metadata explicit rather than hiding it behind discovery magic
+- for smoke or system work, prefer one behavior-owned directory and read the local guidance in `tests/smoke/README.md` or `tests/system/README.md` before adding runner glue
 
 ## Build Output Rules
 

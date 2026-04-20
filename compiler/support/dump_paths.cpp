@@ -53,7 +53,11 @@ std::string HashArtifactKey(std::string_view text) {
 }  // namespace
 
 std::string SanitizeArtifactStem(const std::filesystem::path& source_path) {
-    return SanitizeArtifactStemText(source_path.lexically_normal().generic_string());
+    const std::string artifact_key = source_path.lexically_normal().generic_string();
+    std::string stem = SanitizeArtifactStemText(artifact_key);
+    stem += ".";
+    stem += HashArtifactKey(artifact_key);
+    return stem;
 }
 
 std::string SanitizeLogicalArtifactStem(std::string_view artifact_key) {
