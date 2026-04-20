@@ -136,8 +136,15 @@ Main files and navigations
 
 Relevant cookbook patterns
 ~~~~~~~~~~~~~~~~~~~~~~~~~~
-- Pattern 5 -- Add A Test File is the closest fit because the phase should end
-  in one more ambitious repository-owned proof backed by focused validation.
+- Pattern 11 -- Add A Narrow UI Slice Owner is the primary fit because this
+  phase should spend the admitted UI seams through one bounded direct consumer
+  without turning that proof into a framework, second surface family, or broad
+  launcher coordination layer.
+- This phase differs from the default Pattern 11 shape because the main owner
+  may stay program-local in `review_board` rather than landing as a brand-new
+  kernel-side owner.
+- Pattern 5 -- Add A Test File remains the supporting validation shape because
+  the proof still needs one focused real-project or reset-lane surface.
 
 Relevant file-local invariants
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~

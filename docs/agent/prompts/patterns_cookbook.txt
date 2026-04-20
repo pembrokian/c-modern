@@ -242,6 +242,42 @@ Recent shapes:
 - Phase 248: sema-centered extent normalization with MIR imported-module follow-through
 - Phase 249: parser-owned `[]`, sema-owned admissibility, MIR reuse of existing aggregate lowering
 
+Pattern 11 -- Add A Narrow UI Slice Owner
+-----------------------------------------
+Use when:
+- one kernel UI step needs a bounded owner adjacent to an existing surface or
+  app-present seam, without admitting a compositor, toolkit, second surface
+  family, or boot-wired service
+
+Usually edit:
+- the new adjacent owner in `kernel/src/services/` or another narrow kernel
+  owner path
+- the first direct app or present consumer such as `kernel/src/issue_rollup_app.mc`
+- one focused scenario under `kernel/src/scenarios/`
+- one reset-lane fixture under `tests/system/`
+- `tests/tool/tool_kernel_reset_lane_suite.cpp` if fixture registration is required
+- docs only if the new owner changes current kernel routing or status truth
+
+Validate:
+- `Build debug`
+- the owning reset-lane workflow target first
+- the maintained full reset-lane grouped case only after the narrow owner and
+  fixture pass
+
+Beware:
+- do not widen `display_surface.mc` into layout or composition policy
+- do not move UI coordination truth into `launcher_service.mc`,
+  `kernel_dispatch.mc`, or boot just to simplify the first consumer
+- do not add a generic compositor, layout engine, focus stack, or retained
+  widget framework unless the phase explicitly requires it
+- if the fixture is added to the reset-lane grouped suite, check the scenario
+  registration row, fixed-size table or scenario-count owner, and coverage
+  helper before reopening broader workflow code
+
+Recent shape:
+- Phase 282: bounded `surface_composition.mc` plus one custom-manifest
+  `issue_rollup` consumer and one focused reset-lane proof
+
 Quick Check Before Editing
 --------------------------
 1. Which layer owns the first honest definition of this behavior?

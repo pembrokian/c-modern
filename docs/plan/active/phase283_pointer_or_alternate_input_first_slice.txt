@@ -132,10 +132,15 @@ Main files and navigations
 
 Relevant cookbook patterns
 ~~~~~~~~~~~~~~~~~~~~~~~~~~
-- No exact cookbook pattern fits; this is a bounded extension of an existing
-  UI-owner seam.
-- Pattern 4 -- Add A Diagnostic may apply only if the phase explicitly keeps a
-  second input family rejected and makes that rejection user-visible.
+- Pattern 11 -- Add A Narrow UI Slice Owner is the default fit if a second
+  input family lands, because the phase should add one bounded UI-adjacent
+  owner or vocabulary path, spend it in one direct app consumer, and validate
+  it through one focused reset-lane proof before widening anything else.
+- This phase differs from the default Pattern 11 shape because the honest
+  outcome may still be "do not land a second owner yet".
+- Pattern 4 -- Add A Diagnostic applies only to that explicit defer path if
+  the phase keeps a second input family rejected and makes that rejection
+  user-visible.
 
 Relevant file-local invariants
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~

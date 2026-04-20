@@ -129,10 +129,15 @@ Main files and navigations
 
 Relevant cookbook patterns
 ~~~~~~~~~~~~~~~~~~~~~~~~~~
-- No exact cookbook pattern fits because the phase is deciding whether active-
-  state truth is shared yet or still app-local.
-- The plan should resist inventing a new service if a narrow helper or app-
-  local owner remains the honest fit.
+- Pattern 11 -- Add A Narrow UI Slice Owner is the likely fit if focus or
+  selection truth becomes one shared owner, because the phase should keep that
+  owner adjacent to the current UI seams, spend it in one direct app consumer,
+  and validate it through one focused reset-lane proof.
+- This phase intentionally differs from the default Pattern 11 shape because
+  the honest outcome may still be "keep focus truth app-local" rather than
+  land a shared owner.
+- The plan should still resist inventing a new service if a narrow helper or
+  app-local owner remains the honest fit.
 
 Relevant file-local invariants
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~

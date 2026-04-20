@@ -132,6 +132,11 @@ Relevant cookbook patterns
 ~~~~~~~~~~~~~~~~~~~~~~~~~~
 - Pattern 5 -- Add A Test File is again the closest fit because the phase is a
   bounded persistence follow-through on existing owners.
+- Pattern 11 -- Add A Narrow UI Slice Owner is only a secondary fit for the
+  visible-app follow-through portion of the phase; it should constrain the app-
+  side seam from turning `launcher_service`, boot, or the UI wrapper into a
+  coordination owner, but it does not replace the durability-first ownership
+  of this phase.
 
 Relevant file-local invariants
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
