@@ -3,7 +3,7 @@ Phase 291 -- Post-UI Compiler Pressure Audit
 
 Status
 ------
-PROPOSED
+COMPLETED
 
 Purpose
 -------
@@ -22,7 +22,7 @@ Repository status note
   compiler fronts deferred.
 - Bands C through E add installed-program, launcher, visible-surface, and
   user-facing app code that can now expose different source awkwardness.
-- Phase 290 is expected to exercise those owners as one integrated demo.
+- Phase 290 now exercises those owners as one integrated demo.
 - The repository still lacks one explicit post-UI classification of which new
   compiler pressures are now real and which remain premature.
 
@@ -74,8 +74,8 @@ Phase role in the larger sequence
 ---------------------------------
 - This phase consumes the integration evidence from Phase 290 and checks
   whether the repository is now ready for another bounded compiler wave.
-- It prepares Phase 294 by giving the next-wave decision one evidence-based
-  compiler branch alongside the system-side options.
+- It now prepares Phase 294 by giving the next-wave decision one evidence-
+  based compiler branch alongside the system-side options.
 
 Relevant backlog items this phase intentionally brings under pressure
 --------------------------------------------------------------------
@@ -105,7 +105,8 @@ Implementation accelerators
 ---------------------------
 Main files and navigations
 ~~~~~~~~~~~~~~~~~~~~~~~~~~
-- Primary audit inputs: `docs/plan/active/phase261_compiler_pressure_audit_after_the_generic_and_table_wave.txt`,
+- Primary audit inputs: the Phase 261 baseline as preserved in
+  `docs/plan/backlog.txt` and `docs/agent/prompts/repo_map.md`,
   `docs/plan/active/phase290_integrated_small_user_facing_system_demo.txt`,
   `examples/real/issue_rollup/src/`, and `examples/real/review_board/src/`.
 - Compiler routing prompts to open first: `docs/agent/prompts/compiler_file_invariants.txt`,
@@ -127,9 +128,10 @@ Relevant file-local invariants
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 - `compiler_file_invariants.txt` is the routing truth for deciding whether a
   pressure belongs to parser, sema, MIR, backend, or driver.
-- `phase261_compiler_pressure_audit_after_the_generic_and_table_wave.txt`
-  remains the immediate baseline for what was already deferred before the UI
-  and app wave matured.
+- The Phase 261 deferred baseline now survives concretely in
+  `docs/plan/backlog.txt` and `docs/agent/prompts/repo_map.md`, and this audit
+  should classify new pressure against that preserved baseline rather than
+  reopening the old wave from memory.
 - Maintained app and UI sources are evidence surfaces only; they should not be
   rewritten merely to make the audit easier.
 - If an audit claim implies a new source shape, check parser ownership first
@@ -137,7 +139,8 @@ Relevant file-local invariants
 
 Dependency-ordered touch sequence
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-- Audit the maintained consumer code and the Phase 261 deferred set first.
+- Audit the maintained consumer code and the preserved Phase 261 deferred set
+  first.
 - Land the ranked compiler-pressure audit second.
 - Update only the narrow roadmap, backlog, or decision-note surface that must
   reflect a newly credible compiler branch third.
@@ -150,8 +153,8 @@ Common breakage map
   wishlist territory.
 - Pressure assigned to the wrong compiler layer -> later implementation starts
   in MIR, backend, or driver for a parser or sema problem.
-- Audit forgets the Phase 261 deferred baseline -> already-rejected or still-
-  weak fronts get resurfaced without new evidence.
+- Audit forgets the preserved Phase 261 deferred baseline -> already-rejected
+  or still-weak fronts get resurfaced without new evidence.
 - Sidecar roadmap churn after the audit -> planning surfaces move more than the
   bounded reclassification requires.
 
@@ -183,9 +186,57 @@ Acceptance criteria
 - the Phase 294 decision note can reuse this audit as one bounded input rather
   than guessing about compiler needs
 
+Implementation outcome
+----------------------
+- The maintained post-UI consumers do expose one repeated compiler-local source
+  awkwardness, but only one narrow slice currently rises above background
+  annoyance: byte-oriented UI and input code is still forced to spell
+  user-facing cell values and key codes as raw numeric ASCII bytes instead of
+  source-level byte or character literals.
+- The strongest concrete evidence appears repeatedly in the current admitted
+  app and wrapper owners:
+  `examples/real/issue_rollup/src/render/rollup_render.mc`,
+  `examples/real/issue_rollup/src/app/issue_rollup_interactive.mc`,
+  `examples/real/review_board/src/review_board_ui.mc`, and
+  `kernel/src/issue_rollup_app.mc` all carry numeric byte constants or fixed
+  byte-cell arrays whose meaning is obvious to a human reader but hidden from
+  the source form.
+- The earliest honest owner for that pressure is parser plus sema, not MIR,
+  backend, or driver. The missing capability is a bounded source vocabulary
+  for single-byte values used in UI cells and key dispatch. Nothing in the
+  post-UI consumers shows a need for MIR reclassification, backend execution
+  changes, project-workflow changes, or another generic-body wave.
+- The audit therefore records one credible next compiler branch: a narrow
+  parser or sema-owned byte-literal surface sized for the existing `u8` and
+  fixed-cell owners. The audit does not yet recommend a broader byte-string,
+  text framework, or collection-construction wave.
+- The next strongest source awkwardness in the same consumers is duplicated
+  line scanning and byte counting in `rollup_parse.mc`, `review_scan.mc`, and
+  nearby entrypoints, but that pressure belongs to library or app helper shape,
+  not to compiler work. The current code is repetitive, yet it does not argue
+  for parser, sema, MIR, backend, or driver expansion.
+- Previously deferred Phase 261 compiler fronts remain speculative even after
+  the integrated UI demo:
+  broader imported generic-body completion still has no stronger post-UI
+  consumer than the already-landed helper path;
+  imported descriptor transport and descriptor-plus-procedure composition are
+  not requested by the current app wrappers or render helpers; and broader
+  type-position constant or global-constant execution is not what makes the
+  current UI sources awkward.
+- This audit does not promote a new compiler wave above the strongest
+  system-side options. The byte-literal slice is now credible and should stay
+  visible for Phase 294, but the integrated demo still reads as primarily a
+  kernel, launcher, display, and app-boundary plateau rather than a compiler-
+ blocked plateau.
+- No executable validation was needed because the phase lands as a planning
+  audit note only; the owning validation surface is editor diagnostics on this
+  note.
+
 Future follow-up
 ----------------
-- If one compiler pressure clearly wins, Phase 294 should record it as a real
-  next-wave branch alongside the strongest system-side options.
-- If no compiler pressure wins, keep compiler expansion deferred until a later
-  consumer makes one bounded slice unavoidable.
+- Phase 294 should treat the bounded byte-literal slice as the only currently
+  credible post-UI compiler branch and compare it directly against the
+  strongest system-side options.
+- If Phase 294 does not choose that branch, keep compiler expansion deferred
+  until a later consumer turns the same source awkwardness into a blocker
+  rather than a bounded readability cost.
