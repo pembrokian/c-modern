@@ -1,4 +1,12 @@
 ==== kernel/src/boot/boot.mc ====
+STRUCT_DECL: AppRuntimeState
+FUNCTION_DECL: app_runtime_state
+   Return: AppRuntimeState
+   Param: issue_rollup_app.IssueRollupAppState issue_rollup
+   Param: review_board_app.ReviewBoardAppState review_board
+FUNCTION_DECL: app_runtime_init
+   Return: AppRuntimeState
+   Param: journal_service.JournalServiceState journal
 STRUCT_DECL: KernelBootState
 FUNCTION_DECL: kernel_init
    Return: KernelBootState
@@ -86,6 +94,9 @@ FUNCTION_DECL: boot_connection_mark
    Return: service_identity.ServiceMark
    Param: KernelBootState s
 FUNCTION_DECL: boot_launcher_mark
+   Return: service_identity.ServiceMark
+   Param: KernelBootState s
+FUNCTION_DECL: boot_display_mark
    Return: service_identity.ServiceMark
    Param: KernelBootState s
 FUNCTION_DECL: boot_journal_mark
@@ -258,10 +269,30 @@ FUNCTION_DECL: bootwith_launcher
    Return: KernelBootState
    Param: KernelBootState s
    Param: launcher_service.LauncherServiceState launcher
+FUNCTION_DECL: bootwith_apps
+   Return: KernelBootState
+   Param: KernelBootState s
+   Param: AppRuntimeState apps
+FUNCTION_DECL: bootwith_issue_rollup
+   Return: KernelBootState
+   Param: KernelBootState s
+   Param: issue_rollup_app.IssueRollupAppState issue_rollup
+FUNCTION_DECL: bootwith_review_board
+   Return: KernelBootState
+   Param: KernelBootState s
+   Param: review_board_app.ReviewBoardAppState review_board
 FUNCTION_DECL: bootwith_launcher_restart_outcome
    Return: KernelBootState
    Param: KernelBootState s
    Param: RestartOutcome launcher_restart_outcome
+FUNCTION_DECL: bootwith_display
+   Return: KernelBootState
+   Param: KernelBootState s
+   Param: display_surface.DisplaySurfaceState display
+FUNCTION_DECL: bootwith_display_restart_outcome
+   Return: KernelBootState
+   Param: KernelBootState s
+   Param: RestartOutcome display_restart_outcome
 FUNCTION_DECL: bootrestart_connection
    Return: KernelBootState
    Param: KernelBootState s
@@ -270,6 +301,10 @@ FUNCTION_DECL: bootrestart_launcher
    Return: KernelBootState
    Param: KernelBootState s
    Param: launcher_service.LauncherServiceState launcher
+FUNCTION_DECL: bootrestart_display
+   Return: KernelBootState
+   Param: KernelBootState s
+   Param: display_surface.DisplaySurfaceState display
 FUNCTION_DECL: bootrestart_task
    Return: KernelBootState
    Param: KernelBootState s
@@ -402,6 +437,9 @@ FUNCTION_DECL: restart_connection
    Return: boot.KernelBootState
    Param: boot.KernelBootState state
 FUNCTION_DECL: restart_launcher
+   Return: boot.KernelBootState
+   Param: boot.KernelBootState state
+FUNCTION_DECL: restart_display
    Return: boot.KernelBootState
    Param: boot.KernelBootState state
 FUNCTION_DECL: restart_journal

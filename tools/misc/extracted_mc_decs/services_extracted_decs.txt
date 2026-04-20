@@ -146,6 +146,36 @@ FUNCTION_DECL: connection_state_code
    Param: ConnectionServiceState s
    Param: u8 slot
 
+==== kernel/src/services/display_surface.mc ====
+STRUCT_DECL: DisplaySurfaceState
+STRUCT_DECL: DisplayResult
+FUNCTION_DECL: display_result
+   Return: DisplayResult
+   Param: DisplaySurfaceState state
+   Param: service_effect.Effect effect
+FUNCTION_DECL: display_init
+   Return: DisplaySurfaceState
+   Param: u32 pid
+   Param: u32 slot
+FUNCTION_DECL: displaywith
+   Return: DisplaySurfaceState
+   Param: DisplaySurfaceState s
+   Param: [DISPLAY_CELL_COUNT]u8 cells
+FUNCTION_DECL: display_query
+   Return: DisplayResult
+   Param: DisplaySurfaceState s
+FUNCTION_DECL: display_present
+   Return: DisplayResult
+   Param: DisplaySurfaceState s
+   Param: [DISPLAY_CELL_COUNT]u8 cells
+FUNCTION_DECL: handle
+   Return: DisplayResult
+   Param: DisplaySurfaceState s
+   Param: service_effect.Message m
+FUNCTION_DECL: display_nonzero_count
+   Return: u8
+   Param: DisplaySurfaceState s
+
 ==== kernel/src/services/echo_service.mc ====
 STRUCT_DECL: EchoServiceState
 STRUCT_DECL: EchoResult
@@ -256,6 +286,12 @@ FUNCTION_DECL: journal_with_lane
    Param: JournalServiceState s
    Param: u8 name
    Param: JournalLane lane
+FUNCTION_DECL: journal_write_lane
+   Return: JournalServiceState
+   Param: JournalServiceState s
+   Param: u8 name
+   Param: usize len
+   Param: [JOURNAL_RECORD_CAPACITY]u8 data
 FUNCTION_DECL: lane_equal
    Return: bool
    Param: JournalLane left
@@ -340,11 +376,16 @@ FUNCTION_DECL: kv_count
 ==== kernel/src/services/launcher_service.mc ====
 STRUCT_DECL: LauncherServiceState
 STRUCT_DECL: LauncherResult
+STRUCT_DECL: LauncherContext
 FUNCTION_DECL: launcher_result
    Return: LauncherResult
    Param: LauncherServiceState state
    Param: update_store_service.UpdateStoreServiceState update_store
    Param: service_effect.Effect effect
+FUNCTION_DECL: launcher_context
+   Return: LauncherContext
+   Param: update_store_service.UpdateStoreServiceState update_store
+   Param: u32 generation
 FUNCTION_DECL: launcher_init
    Return: LauncherServiceState
    Param: u32 pid
@@ -355,6 +396,7 @@ FUNCTION_DECL: launcherwith
    Param: u8 selected
    Param: u8 foreground
    Param: u8 launches
+   Param: u8 status
 FUNCTION_DECL: launcher_reply
    Return: service_effect.Effect
    Param: syscall.SyscallStatus status
@@ -366,31 +408,45 @@ FUNCTION_DECL: launcher_reply
 FUNCTION_DECL: launcher_list
    Return: LauncherResult
    Param: LauncherServiceState s
-   Param: update_store_service.UpdateStoreServiceState update_store
+   Param: LauncherContext ctx
 FUNCTION_DECL: launcher_identify
    Return: LauncherResult
    Param: LauncherServiceState s
-   Param: update_store_service.UpdateStoreServiceState update_store
+   Param: LauncherContext ctx
 FUNCTION_DECL: launcher_select
    Return: LauncherResult
    Param: LauncherServiceState s
-   Param: update_store_service.UpdateStoreServiceState update_store
+   Param: LauncherContext ctx
    Param: u8 id
+FUNCTION_DECL: launcher_visible_status
+   Return: u8
+   Param: LauncherServiceState s
+   Param: LauncherContext ctx
+FUNCTION_DECL: launcher_query
+   Return: LauncherResult
+   Param: LauncherServiceState s
+   Param: LauncherContext ctx
 FUNCTION_DECL: launcher_launch_classification
    Return: u8
    Param: update_store_service.UpdateStoreServiceState update_store
    Param: u8 program
    Param: u32 launcher_generation
+FUNCTION_DECL: launcher_requires_installed_program
+   Return: bool
+   Param: u8 program
 FUNCTION_DECL: launcher_launch
    Return: LauncherResult
    Param: LauncherServiceState s
-   Param: update_store_service.UpdateStoreServiceState update_store
-   Param: u32 launcher_generation
+   Param: LauncherContext ctx
+FUNCTION_DECL: launcher_manifest
+   Return: LauncherResult
+   Param: LauncherServiceState s
+   Param: LauncherContext ctx
+   Param: usize idx
 FUNCTION_DECL: handle
    Return: LauncherResult
    Param: LauncherServiceState s
-   Param: update_store_service.UpdateStoreServiceState update_store
-   Param: u32 launcher_generation
+   Param: LauncherContext ctx
    Param: service_effect.Message m
 FUNCTION_DECL: launcher_foreground_id
    Return: u8
@@ -399,10 +455,17 @@ FUNCTION_DECL: launcher_foreground_id
 ==== kernel/src/services/lease_service.mc ====
 STRUCT_DECL: LeaseServiceState
 STRUCT_DECL: LeaseResult
+STRUCT_DECL: LeaseContext
 FUNCTION_DECL: lease_init
    Return: LeaseServiceState
    Param: u32 pid
    Param: u32 slot
+FUNCTION_DECL: lease_context
+   Return: LeaseContext
+   Param: object_store_service.ObjectStoreServiceState object_store
+   Param: u8 completion_generation
+   Param: u8 workset_generation
+   Param: u8 ticket_generation
 FUNCTION_DECL: leasewith
    Return: LeaseServiceState
    Param: LeaseServiceState s
@@ -484,11 +547,8 @@ FUNCTION_DECL: lease_consume_external_ticket
 FUNCTION_DECL: handle
    Return: LeaseResult
    Param: LeaseServiceState s
-   Param: object_store_service.ObjectStoreServiceState object_store
+   Param: LeaseContext ctx
    Param: service_effect.Message m
-   Param: u8 completion_generation
-   Param: u8 workset_generation
-   Param: u8 ticket_generation
 FUNCTION_DECL: lease_count
    Return: usize
    Param: LeaseServiceState s
@@ -669,6 +729,20 @@ FUNCTION_DECL: queue_len
 FUNCTION_DECL: queue_stall_count
    Return: usize
    Param: QueueServiceState s
+
+==== kernel/src/services/surface_composition.mc ====
+STRUCT_DECL: SurfaceComposition
+FUNCTION_DECL: surface_composition
+   Return: SurfaceComposition
+   Param: [SURFACE_REGION_CELL_COUNT]u8 body
+   Param: [SURFACE_REGION_CELL_COUNT]u8 status
+FUNCTION_DECL: compose_cells
+   Return: [display_surface.DISPLAY_CELL_COUNT]u8
+   Param: SurfaceComposition composition
+FUNCTION_DECL: compose_present
+   Return: display_surface.DisplayResult
+   Param: display_surface.DisplaySurfaceState display
+   Param: SurfaceComposition composition
 
 ==== kernel/src/services/task_service.mc ====
 STRUCT_DECL: TaskServiceState
@@ -1049,7 +1123,7 @@ FUNCTION_DECL: handle
    Param: UpdateStoreServiceState s
    Param: service_effect.Message m
 
-==== kernel/src/services/workflow_advance.mc ====
+==== kernel/src/services/workflow/advance.mc ====
 FUNCTION_DECL: workflow_execute_connection_ticket
    Return: workflow_core.WorkflowDelegatedConnectionResult
    Param: workflow_core.WorkflowServiceState s
@@ -1067,57 +1141,28 @@ FUNCTION_DECL: workflow_execute_update_apply_with_lease
 FUNCTION_DECL: workflow_advance_waiting
    Return: workflow_core.WorkflowAdvanceResult
    Param: workflow_core.WorkflowServiceState s
-   Param: timer_service.TimerServiceState timer
-   Param: task_service.TaskServiceState task
-   Param: object_store_service.ObjectStoreServiceState object_store
-   Param: update_store_service.UpdateStoreServiceState update_store
-   Param: lease_service.LeaseServiceState lease
-   Param: ticket_service.TicketServiceState ticket
-   Param: completion_mailbox_service.CompletionMailboxServiceState completion
-   Param: connection_service.ConnectionServiceState connection
-   Param: u8 workset_generation
-   Param: u8 ticket_generation
+   Param: workflow_core.WorkflowRuntimeContext runtime
 FUNCTION_DECL: workflow_advance_running
    Return: workflow_core.WorkflowAdvanceResult
    Param: workflow_core.WorkflowServiceState s
-   Param: timer_service.TimerServiceState timer
-   Param: task_service.TaskServiceState task
-   Param: object_store_service.ObjectStoreServiceState object_store
-   Param: update_store_service.UpdateStoreServiceState update_store
-   Param: lease_service.LeaseServiceState lease
-   Param: ticket_service.TicketServiceState ticket
-   Param: completion_mailbox_service.CompletionMailboxServiceState completion
-   Param: connection_service.ConnectionServiceState connection
+   Param: workflow_core.WorkflowRuntimeContext runtime
 FUNCTION_DECL: workflow_advance_delivering
    Return: workflow_core.WorkflowAdvanceResult
    Param: workflow_core.WorkflowServiceState s
-   Param: timer_service.TimerServiceState timer
-   Param: task_service.TaskServiceState task
-   Param: object_store_service.ObjectStoreServiceState object_store
-   Param: update_store_service.UpdateStoreServiceState update_store
-   Param: lease_service.LeaseServiceState lease
-   Param: ticket_service.TicketServiceState ticket
-   Param: completion_mailbox_service.CompletionMailboxServiceState completion
+   Param: workflow_core.WorkflowRuntimeContext runtime
 FUNCTION_DECL: workflow_advance
    Return: workflow_core.WorkflowAdvanceResult
    Param: workflow_core.WorkflowServiceState s
-   Param: timer_service.TimerServiceState timer
-   Param: task_service.TaskServiceState task
-   Param: object_store_service.ObjectStoreServiceState object_store
-   Param: update_store_service.UpdateStoreServiceState update_store
-   Param: lease_service.LeaseServiceState lease
-   Param: ticket_service.TicketServiceState ticket
-   Param: completion_mailbox_service.CompletionMailboxServiceState completion
-   Param: connection_service.ConnectionServiceState connection
-   Param: u8 workset_generation
-   Param: u8 ticket_generation
+   Param: workflow_core.WorkflowRuntimeContext runtime
 
-==== kernel/src/services/workflow_core.mc ====
+==== kernel/src/services/workflow/core.mc ====
 STRUCT_DECL: WorkflowServiceState
 STRUCT_DECL: WorkflowSnapshotRecord
 STRUCT_DECL: WorkflowResult
 STRUCT_DECL: WorkflowAdvanceResult
 STRUCT_DECL: WorkflowStepResult
+STRUCT_DECL: WorkflowRuntimeContext
+STRUCT_DECL: WorkflowStepContext
 STRUCT_DECL: WorkflowDeliveryResult
 STRUCT_DECL: WorkflowPayload
 STRUCT_DECL: WorkflowWaitingState
@@ -1137,6 +1182,22 @@ FUNCTION_DECL: workflow_advance_result
    Param: lease_service.LeaseServiceState lease
    Param: ticket_service.TicketServiceState ticket
    Param: completion_mailbox_service.CompletionMailboxServiceState completion
+FUNCTION_DECL: workflow_runtime_context
+   Return: WorkflowRuntimeContext
+   Param: timer_service.TimerServiceState timer
+   Param: task_service.TaskServiceState task
+   Param: object_store_service.ObjectStoreServiceState object_store
+   Param: update_store_service.UpdateStoreServiceState update_store
+   Param: lease_service.LeaseServiceState lease
+   Param: ticket_service.TicketServiceState ticket
+   Param: completion_mailbox_service.CompletionMailboxServiceState completion
+   Param: connection_service.ConnectionServiceState connection
+   Param: u8 workset_generation
+   Param: u8 ticket_generation
+FUNCTION_DECL: workflow_step_context
+   Return: WorkflowStepContext
+   Param: WorkflowRuntimeContext runtime
+   Param: journal_service.JournalServiceState journal
 FUNCTION_DECL: workflow_step_result
    Return: WorkflowStepResult
    Param: WorkflowServiceState workflow
@@ -1481,7 +1542,7 @@ FUNCTION_DECL: workflow_active_count
    Return: usize
    Param: WorkflowServiceState s
 
-==== kernel/src/services/workflow_protocol.mc ====
+==== kernel/src/services/workflow/protocol.mc ====
 FUNCTION_DECL: handle
    Return: workflow_core.WorkflowResult
    Param: workflow_core.WorkflowServiceState s
@@ -1489,31 +1550,15 @@ FUNCTION_DECL: handle
 FUNCTION_DECL: workflow_step_schedule
    Return: workflow_core.WorkflowStepResult
    Param: workflow_core.WorkflowServiceState workflow
-   Param: timer_service.TimerServiceState timer
-   Param: task_service.TaskServiceState task
-   Param: object_store_service.ObjectStoreServiceState object_store
-   Param: update_store_service.UpdateStoreServiceState update_store
-   Param: journal_service.JournalServiceState journal
-   Param: lease_service.LeaseServiceState lease
-   Param: ticket_service.TicketServiceState ticket
-   Param: completion_mailbox_service.CompletionMailboxServiceState completion
+   Param: workflow_core.WorkflowStepContext step
    Param: service_effect.Message msg
-   Param: u8 generation
 FUNCTION_DECL: workflow_step_schedule_connection
    Return: workflow_core.WorkflowStepResult
    Param: workflow_core.WorkflowServiceState workflow
-   Param: timer_service.TimerServiceState timer
-   Param: task_service.TaskServiceState task
-   Param: object_store_service.ObjectStoreServiceState object_store
-   Param: update_store_service.UpdateStoreServiceState update_store
-   Param: journal_service.JournalServiceState journal
-   Param: lease_service.LeaseServiceState lease
-   Param: ticket_service.TicketServiceState ticket
-   Param: completion_mailbox_service.CompletionMailboxServiceState completion
+   Param: workflow_core.WorkflowStepContext step
    Param: u8 id
    Param: u8 slot
    Param: u8 opcode
-   Param: u8 generation
 FUNCTION_DECL: workflow_execute_cancel
    Return: workflow_core.WorkflowCancelExecution
    Param: workflow_core.WorkflowServiceState workflow
@@ -1522,32 +1567,15 @@ FUNCTION_DECL: workflow_execute_cancel
 FUNCTION_DECL: workflow_step_cancel
    Return: workflow_core.WorkflowStepResult
    Param: workflow_core.WorkflowServiceState workflow
-   Param: timer_service.TimerServiceState timer
-   Param: task_service.TaskServiceState task
-   Param: object_store_service.ObjectStoreServiceState object_store
-   Param: update_store_service.UpdateStoreServiceState update_store
-   Param: journal_service.JournalServiceState journal
-   Param: lease_service.LeaseServiceState lease
-   Param: ticket_service.TicketServiceState ticket
-   Param: completion_mailbox_service.CompletionMailboxServiceState completion
+   Param: workflow_core.WorkflowStepContext step
    Param: service_effect.Message msg
 FUNCTION_DECL: step
    Return: workflow_core.WorkflowStepResult
    Param: workflow_core.WorkflowServiceState s
-   Param: timer_service.TimerServiceState timer
-   Param: task_service.TaskServiceState task
-   Param: object_store_service.ObjectStoreServiceState object_store
-   Param: update_store_service.UpdateStoreServiceState update_store
-   Param: journal_service.JournalServiceState journal
-   Param: lease_service.LeaseServiceState lease
-   Param: ticket_service.TicketServiceState ticket
-   Param: completion_mailbox_service.CompletionMailboxServiceState completion
-   Param: connection_service.ConnectionServiceState connection
+   Param: workflow_core.WorkflowStepContext step
    Param: service_effect.Message msg
-   Param: u8 generation
-   Param: u8 ticket_generation
 
-==== kernel/src/services/workflow_restart.mc ====
+==== kernel/src/services/workflow/restart.mc ====
 FUNCTION_DECL: workflow_sync_journal
    Return: journal_service.JournalServiceState
    Param: journal_service.JournalServiceState journal
@@ -1555,14 +1583,7 @@ FUNCTION_DECL: workflow_sync_journal
 FUNCTION_DECL: workflow_step_with_synced_journal
    Return: workflow_core.WorkflowStepResult
    Param: workflow_core.WorkflowServiceState workflow
-   Param: timer_service.TimerServiceState timer
-   Param: task_service.TaskServiceState task
-   Param: object_store_service.ObjectStoreServiceState object_store
-   Param: update_store_service.UpdateStoreServiceState update_store
-   Param: journal_service.JournalServiceState journal
-   Param: lease_service.LeaseServiceState lease
-   Param: ticket_service.TicketServiceState ticket
-   Param: completion_mailbox_service.CompletionMailboxServiceState completion
+   Param: workflow_core.WorkflowStepContext step
    Param: service_effect.Effect effect
 FUNCTION_DECL: workflow_lane_matches
    Return: bool
@@ -1577,5 +1598,5 @@ FUNCTION_DECL: workflow_restart_reload
    Param: bool keep
    Param: connection_service.ConnectionServiceState connection
 
-==== kernel/src/services/workflow_service.mc ====
+==== kernel/src/services/workflow/service.mc ====
 

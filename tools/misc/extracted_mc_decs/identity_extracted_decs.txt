@@ -168,6 +168,9 @@ FUNCTION_DECL: service_can_restart
 FUNCTION_DECL: service_restart_reloads_state
    Return: bool
    Param: u32 endpoint
+FUNCTION_DECL: service_is_retained
+   Return: bool
+   Param: u32 endpoint
 FUNCTION_DECL: service_authority_class
    Return: ServiceAuthorityClass
    Param: u32 endpoint

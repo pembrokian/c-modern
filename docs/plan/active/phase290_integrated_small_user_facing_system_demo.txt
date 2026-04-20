@@ -3,7 +3,7 @@ Phase 290 -- Integrated Small User-Facing System Demo
 
 Status
 ------
-PROPOSED
+COMPLETED
 
 Purpose
 -------
@@ -27,8 +27,8 @@ Repository status note
   `journal_service.mc`.
 - Phase 289 freezes post-Band-E basic UI as one launcher-selected foreground
   app on one fixed surface with one optional two-region composition seam.
-- The repository still lacks one coherent proof that these admitted owners now
-  read as a small user-facing system rather than as separate phase-local demos.
+- This phase now supplies one coherent proof that these admitted owners read
+  as a small user-facing system rather than as separate phase-local demos.
 
 Problem being solved
 --------------------
@@ -209,6 +209,29 @@ Acceptance criteria
   scope
 - later audits can point to one concrete integrated result rather than a set of
   disconnected owner proofs
+
+Implementation outcome
+----------------------
+- The integrated proof lands as one scenario owner in
+  `kernel/src/scenarios/scenario_integrated_small_system_demo_probe.mc`, one
+  checked-in reset-lane fixture under
+  `tests/system/kernel_reset_lane_phase290_integrated_small_user_facing_system_demo/`,
+  and one grouped-suite row in `tests/tool/tool_kernel_reset_lane_suite.cpp`.
+- The landed demo flow stays within the admitted owners: it stages and applies
+  one `issue_rollup` update, launches the installed `issue_rollup` path on the
+  fixed four-cell surface, switches through launcher to the direct-launch
+  `review_board` path, drives one bounded persisted `review_board` state, then
+  reboots and relaunches `review_board` while launcher still reports the
+  installed `issue_rollup` slot as activated.
+- No new launcher, update-store, display, composition, input, or persistence
+  owner was added. The phase spends the already-admitted launcher and app seams
+  rather than introducing a framework, registry, or second workflow stack.
+- The hosted real-project proofs remain unchanged because the integrated demo
+  did not alter either hosted app workflow contract.
+- Validation now consists of `Build debug` plus
+  `mc_tool_workflow_kernel_reset_lane_unit`; the broader
+  `mc_tool_workflow_kernel_reset_lane_full_unit` remains follow-on coverage only
+  when the maintained full grouped path needs rerun.
 
 Future follow-up
 ----------------

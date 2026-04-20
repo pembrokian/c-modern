@@ -72,11 +72,19 @@ FUNCTION_DECL: encode_launcher_list
    Return: [4]u8
 FUNCTION_DECL: encode_launcher_identify
    Return: [4]u8
+FUNCTION_DECL: encode_launcher_status
+   Return: [4]u8
+FUNCTION_DECL: encode_launcher_manifest
+   Return: [4]u8
+   Param: u8 index
 FUNCTION_DECL: encode_launcher_select
    Return: [4]u8
    Param: u8 id
 FUNCTION_DECL: encode_launcher_launch
    Return: [4]u8
+FUNCTION_DECL: encode_input_key
+   Return: [4]u8
+   Param: u8 value
 FUNCTION_DECL: encode_queue_stall_count
    Return: [4]u8
 FUNCTION_DECL: encode_ticket_issue
@@ -312,6 +320,13 @@ FUNCTION_DECL: pathwith
    Param: SerialShellPathState p
    Param: serial_service.SerialServiceState serial
    Param: shell_service.ShellServiceState shell
+FUNCTION_DECL: path_receive
+   Return: <none>
+   Param: *SerialShellPathState path
+   Param: syscall.ReceiveObservation obs
+FUNCTION_DECL: path_shell_message
+   Return: service_effect.Message
+   Param: SerialShellPathState path
 FUNCTION_DECL: build_reply_observation
    Return: syscall.ReceiveObservation
    Param: shell_service.ShellServiceState shell_state
@@ -478,6 +493,14 @@ FUNCTION_DECL: launcher_list
    Param: ShellServiceState s
    Param: service_effect.Message m
 FUNCTION_DECL: launcher_identify
+   Return: service_effect.Effect
+   Param: ShellServiceState s
+   Param: service_effect.Message m
+FUNCTION_DECL: launcher_status
+   Return: service_effect.Effect
+   Param: ShellServiceState s
+   Param: service_effect.Message m
+FUNCTION_DECL: launcher_manifest
    Return: service_effect.Effect
    Param: ShellServiceState s
    Param: service_effect.Message m

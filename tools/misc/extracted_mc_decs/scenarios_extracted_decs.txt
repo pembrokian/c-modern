@@ -1,12 +1,52 @@
+==== kernel/src/scenarios/scenario_alternate_input_first_slice.mc ====
+FUNCTION_DECL: expect_reply
+   Return: bool
+   Param: service_effect.Effect effect
+   Param: syscall.SyscallStatus status
+   Param: usize len
+   Param: u8 b0
+   Param: u8 b1
+   Param: u8 b2
+   Param: u8 b3
+FUNCTION_DECL: expect_workflow
+   Return: bool
+   Param: service_effect.Effect effect
+   Param: syscall.SyscallStatus status
+   Param: u8 state
+   Param: u8 restart
+FUNCTION_DECL: display_query_obs
+   Return: syscall.ReceiveObservation
+FUNCTION_DECL: alternate_input_obs
+   Return: syscall.ReceiveObservation
+   Param: u8 event
+   Param: u8 value
+FUNCTION_DECL: expect_display
+   Return: bool
+   Param: service_effect.Effect effect
+   Param: [4]u8 cells
+FUNCTION_DECL: run_alternate_input_first_slice_probe
+   Return: i32
+
 ==== kernel/src/scenarios/scenario_assert.mc ====
+FUNCTION_DECL: expect_reply
+   Return: bool
+   Param: service_effect.Effect effect
+   Param: syscall.SyscallStatus status
+   Param: usize len
+   Param: u8 b0
+   Param: u8 b1
+   Param: u8 b2
+   Param: u8 b3
+FUNCTION_DECL: expect_workflow
+   Return: bool
+   Param: service_effect.Effect effect
+   Param: syscall.SyscallStatus status
+   Param: u8 state
+   Param: u8 restart
 FUNCTION_DECL: expect_restart_identity
    Return: i32
-   Param: u32 before_endpoint
-   Param: u32 before_pid
-   Param: u32 before_generation
-   Param: u32 after_endpoint
-   Param: u32 after_pid
-   Param: u32 after_generation
+   Param: service_identity.ServiceMark before
+   Param: service_identity.ServiceMark after
    Param: i32 base
 FUNCTION_DECL: expect_lifecycle
    Return: bool
@@ -63,6 +103,11 @@ FUNCTION_DECL: expect_summary
    Param: boot.RetainedSummaryParticipation participation
    Param: boot.RestartOutcome outcome
    Param: u32 generation
+FUNCTION_DECL: expect_display
+   Return: bool
+   Param: service_effect.Effect effect
+   Param: syscall.SyscallStatus status
+   Param: [4]u8 cells
 
 ==== kernel/src/scenarios/scenario_audit_coordination.mc ====
 FUNCTION_DECL: run_retained_audit_coordination_probe
@@ -224,8 +269,50 @@ FUNCTION_DECL: expect_completion
 FUNCTION_DECL: run_delegated_named_object_processing_probe
    Return: i32
 
+==== kernel/src/scenarios/scenario_display_surface.mc ====
+FUNCTION_DECL: expect_reply
+   Return: bool
+   Param: service_effect.Effect effect
+   Param: syscall.SyscallStatus status
+   Param: usize len
+   Param: u8 b0
+   Param: u8 b1
+   Param: u8 b2
+   Param: u8 b3
+FUNCTION_DECL: expect_workflow
+   Return: bool
+   Param: service_effect.Effect effect
+   Param: syscall.SyscallStatus status
+   Param: u8 state
+   Param: u8 restart
+FUNCTION_DECL: display_query_obs
+   Return: syscall.ReceiveObservation
+FUNCTION_DECL: run_display_surface_probe
+   Return: i32
+
 ==== kernel/src/scenarios/scenario_durability.mc ====
 FUNCTION_DECL: run_retained_durable_boundary_probe
+   Return: i32
+
+==== kernel/src/scenarios/scenario_explicit_present.mc ====
+FUNCTION_DECL: expect_reply
+   Return: bool
+   Param: service_effect.Effect effect
+   Param: syscall.SyscallStatus status
+   Param: usize len
+   Param: u8 b0
+   Param: u8 b1
+   Param: u8 b2
+   Param: u8 b3
+FUNCTION_DECL: expect_workflow
+   Return: bool
+   Param: service_effect.Effect effect
+   Param: syscall.SyscallStatus status
+   Param: u8 state
+   Param: u8 restart
+FUNCTION_DECL: display_query_obs
+   Return: syscall.ReceiveObservation
+FUNCTION_DECL: run_explicit_present_probe
    Return: i32
 
 ==== kernel/src/scenarios/scenario_file_service.mc ====
@@ -251,18 +338,7 @@ FUNCTION_DECL: expect_read_prefix
 FUNCTION_DECL: run_file_service_probe
    Return: i32
 
-==== kernel/src/scenarios/scenario_journal_service.mc ====
-FUNCTION_DECL: expect_replay
-   Return: bool
-   Param: service_effect.Effect effect
-   Param: usize count
-   Param: u8 first
-   Param: u8 second
-   Param: u8 third
-FUNCTION_DECL: run_journal_service_probe
-   Return: i32
-
-==== kernel/src/scenarios/scenario_launcher_service.mc ====
+==== kernel/src/scenarios/scenario_fixed_cell_rendering.mc ====
 FUNCTION_DECL: expect_reply
    Return: bool
    Param: service_effect.Effect effect
@@ -278,6 +354,126 @@ FUNCTION_DECL: expect_workflow
    Param: syscall.SyscallStatus status
    Param: u8 state
    Param: u8 restart
+FUNCTION_DECL: display_query_obs
+   Return: syscall.ReceiveObservation
+FUNCTION_DECL: run_fixed_cell_rendering_probe
+   Return: i32
+
+==== kernel/src/scenarios/scenario_foreground_input_routing.mc ====
+FUNCTION_DECL: expect_reply
+   Return: bool
+   Param: service_effect.Effect effect
+   Param: syscall.SyscallStatus status
+   Param: usize len
+   Param: u8 b0
+   Param: u8 b1
+   Param: u8 b2
+   Param: u8 b3
+FUNCTION_DECL: expect_workflow
+   Return: bool
+   Param: service_effect.Effect effect
+   Param: syscall.SyscallStatus status
+   Param: u8 state
+   Param: u8 restart
+FUNCTION_DECL: run_foreground_input_routing_probe
+   Return: i32
+
+==== kernel/src/scenarios/scenario_helpers.mc ====
+STRUCT_DECL: ScenarioKernelSetupResult
+FUNCTION_DECL: scenario_setup_clean_kernel
+   Return: ScenarioKernelSetupResult
+FUNCTION_DECL: scenario_apply_issue_rollup_update
+   Return: i32
+   Param: *boot.KernelBootState state
+   Param: u8 version
+   Param: u8 b0
+   Param: u8 b1
+   Param: u8 b2
+   Param: i32 fail_base
+
+==== kernel/src/scenarios/scenario_input_event.mc ====
+FUNCTION_DECL: expect_reply
+   Return: bool
+   Param: service_effect.Effect effect
+   Param: syscall.SyscallStatus status
+   Param: usize len
+   Param: u8 b0
+   Param: u8 b1
+   Param: u8 b2
+   Param: u8 b3
+FUNCTION_DECL: expect_workflow
+   Return: bool
+   Param: service_effect.Effect effect
+   Param: syscall.SyscallStatus status
+   Param: u8 state
+   Param: u8 restart
+FUNCTION_DECL: run_input_event_probe
+   Return: i32
+
+==== kernel/src/scenarios/scenario_integrated_small_system_demo_probe.mc ====
+FUNCTION_DECL: display_query_obs
+   Return: syscall.ReceiveObservation
+FUNCTION_DECL: expect_display
+   Return: bool
+   Param: service_effect.Effect effect
+   Param: [4]u8 cells
+FUNCTION_DECL: expect_input_delivered
+   Return: bool
+   Param: service_effect.Effect effect
+   Param: u8 program
+   Param: u8 value
+FUNCTION_DECL: expect_launch_reply
+   Return: bool
+   Param: service_effect.Effect effect
+   Param: u8 program
+   Param: u8 classification
+FUNCTION_DECL: launch_program
+   Return: i32
+   Param: *boot.KernelBootState state
+   Param: u8 program
+   Param: u8 classification
+   Param: i32 fail_select
+   Param: i32 fail_launch
+FUNCTION_DECL: input_key
+   Return: i32
+   Param: *boot.KernelBootState state
+   Param: u8 program
+   Param: u8 key
+   Param: i32 fail
+FUNCTION_DECL: drive_review_board_state
+   Return: i32
+   Param: *boot.KernelBootState state
+FUNCTION_DECL: run_integrated_small_system_demo_probe
+   Return: i32
+
+==== kernel/src/scenarios/scenario_journal_service.mc ====
+FUNCTION_DECL: expect_replay
+   Return: bool
+   Param: service_effect.Effect effect
+   Param: usize count
+   Param: u8 first
+   Param: u8 second
+   Param: u8 third
+FUNCTION_DECL: run_journal_service_probe
+   Return: i32
+
+==== kernel/src/scenarios/scenario_launcher_demo_probe.mc ====
+FUNCTION_DECL: run_launcher_installed_workflow_demo_probe
+   Return: i32
+
+==== kernel/src/scenarios/scenario_launcher_manifest_probe.mc ====
+FUNCTION_DECL: run_launcher_manifest_probe
+   Return: i32
+
+==== kernel/src/scenarios/scenario_launcher_service.mc ====
+FUNCTION_DECL: run_launcher_service_probe
+   Return: i32
+FUNCTION_DECL: run_launcher_manifest_probe
+   Return: i32
+FUNCTION_DECL: run_launcher_installed_workflow_demo_probe
+   Return: i32
+
+==== kernel/src/scenarios/scenario_launcher_service_probe.mc ====
 FUNCTION_DECL: run_launcher_service_probe
    Return: i32
 
@@ -412,6 +608,73 @@ FUNCTION_DECL: run_retained_restart_identity_probe
 FUNCTION_DECL: run_retained_summary_probe
    Return: i32
 
+==== kernel/src/scenarios/scenario_review_board_state_persistence.mc ====
+FUNCTION_DECL: display_query_obs
+   Return: syscall.ReceiveObservation
+FUNCTION_DECL: expect_display
+   Return: bool
+   Param: service_effect.Effect effect
+   Param: [4]u8 cells
+FUNCTION_DECL: expect_delivered
+   Return: bool
+   Param: service_effect.Effect effect
+   Param: u8 value
+FUNCTION_DECL: launch_review_board
+   Return: i32
+   Param: *boot.KernelBootState state
+   Param: i32 fail_select
+   Param: i32 fail_launch
+FUNCTION_DECL: input_key
+   Return: i32
+   Param: *boot.KernelBootState state
+   Param: u8 key
+   Param: i32 fail
+FUNCTION_DECL: run_review_board_state_persistence_probe
+   Return: i32
+
+==== kernel/src/scenarios/scenario_review_board_ui_proof.mc ====
+FUNCTION_DECL: display_query_obs
+   Return: syscall.ReceiveObservation
+FUNCTION_DECL: expect_display
+   Return: bool
+   Param: service_effect.Effect effect
+   Param: [4]u8 cells
+FUNCTION_DECL: expect_delivered
+   Return: bool
+   Param: service_effect.Effect effect
+   Param: u8 value
+FUNCTION_DECL: run_review_board_ui_proof_probe
+   Return: i32
+
+==== kernel/src/scenarios/scenario_selection_and_focus_follow_through.mc ====
+FUNCTION_DECL: expect_reply
+   Return: bool
+   Param: service_effect.Effect effect
+   Param: syscall.SyscallStatus status
+   Param: usize len
+   Param: u8 b0
+   Param: u8 b1
+   Param: u8 b2
+   Param: u8 b3
+FUNCTION_DECL: expect_workflow
+   Return: bool
+   Param: service_effect.Effect effect
+   Param: syscall.SyscallStatus status
+   Param: u8 state
+   Param: u8 restart
+FUNCTION_DECL: display_query_obs
+   Return: syscall.ReceiveObservation
+FUNCTION_DECL: expect_delivered
+   Return: bool
+   Param: service_effect.Effect effect
+   Param: u8 value
+FUNCTION_DECL: expect_display
+   Return: bool
+   Param: service_effect.Effect effect
+   Param: [4]u8 cells
+FUNCTION_DECL: run_selection_and_focus_follow_through_probe
+   Return: i32
+
 ==== kernel/src/scenarios/scenario_service_state.mc ====
 FUNCTION_DECL: run_service_state_probe
    Return: i32
@@ -486,6 +749,35 @@ FUNCTION_DECL: step_matches
 FUNCTION_DECL: run_main
    Return: i32
    Param: *boot.KernelBootState state
+
+==== kernel/src/scenarios/scenario_surface_composition.mc ====
+FUNCTION_DECL: expect_reply
+   Return: bool
+   Param: service_effect.Effect effect
+   Param: syscall.SyscallStatus status
+   Param: usize len
+   Param: u8 b0
+   Param: u8 b1
+   Param: u8 b2
+   Param: u8 b3
+FUNCTION_DECL: expect_workflow
+   Return: bool
+   Param: service_effect.Effect effect
+   Param: syscall.SyscallStatus status
+   Param: u8 state
+   Param: u8 restart
+FUNCTION_DECL: display_query_obs
+   Return: syscall.ReceiveObservation
+FUNCTION_DECL: expect_delivered
+   Return: bool
+   Param: service_effect.Effect effect
+   Param: u8 value
+FUNCTION_DECL: expect_display
+   Return: bool
+   Param: service_effect.Effect effect
+   Param: [4]u8 cells
+FUNCTION_DECL: run_surface_composition_probe
+   Return: i32
 
 ==== kernel/src/scenarios/scenario_timer_task_service.mc ====
 FUNCTION_DECL: expect_status
@@ -596,11 +888,19 @@ FUNCTION_DECL: cmd_launcher_list
    Return: syscall.ReceiveObservation
 FUNCTION_DECL: cmd_launcher_identify
    Return: syscall.ReceiveObservation
+FUNCTION_DECL: cmd_launcher_status
+   Return: syscall.ReceiveObservation
+FUNCTION_DECL: cmd_launcher_manifest
+   Return: syscall.ReceiveObservation
+   Param: u8 index
 FUNCTION_DECL: cmd_launcher_select
    Return: syscall.ReceiveObservation
    Param: u8 id
 FUNCTION_DECL: cmd_launcher_launch
    Return: syscall.ReceiveObservation
+FUNCTION_DECL: cmd_input_key
+   Return: syscall.ReceiveObservation
+   Param: u8 value
 FUNCTION_DECL: cmd_queue_stall_count
    Return: syscall.ReceiveObservation
 FUNCTION_DECL: cmd_ticket_issue
@@ -748,6 +1048,25 @@ FUNCTION_DECL: cmd_connection_execute
 FUNCTION_DECL: kv_count_obs
    Return: syscall.ReceiveObservation
    Param: u32 pid
+
+==== kernel/src/scenarios/scenario_ui_app_restart_followthrough.mc ====
+FUNCTION_DECL: display_query_obs
+   Return: syscall.ReceiveObservation
+FUNCTION_DECL: expect_delivered
+   Return: bool
+   Param: service_effect.Effect effect
+   Param: u8 value
+FUNCTION_DECL: run_fresh_install_phase
+   Return: i32
+   Param: *boot.KernelBootState state
+FUNCTION_DECL: run_restart_resumed_phase
+   Return: i32
+   Param: *boot.KernelBootState state
+FUNCTION_DECL: run_update_invalidated_phase
+   Return: i32
+   Param: *boot.KernelBootState state
+FUNCTION_DECL: run_ui_app_restart_followthrough_probe
+   Return: i32
 
 ==== kernel/src/scenarios/scenario_update_apply_workflow.mc ====
 FUNCTION_DECL: expect_workflow
