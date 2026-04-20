@@ -1,0 +1,346 @@
+Phase 295 Through Phase 308 -- Speculative Post-Phase-294 Roadmap
+=================================================================
+
+Status
+------
+SPECULATIVE
+
+Purpose
+-------
+Sketch one plausible continuation after the completed Phase 294 next-wave
+decision so the repository can spend its chosen richer UI-composition-and-
+interaction direction honestly before reopening packaging, compiler, or other
+platform branches.
+
+This document is intentionally forward-looking and tentative.
+It does not replace `docs/plan/plan.txt`.
+It does not replace the concrete Phase 290 through Phase 294 notes.
+It gives one plausible ordering for the next repository wave if the repo keeps
+following the same evidence-first rules used so far:
+
+- one bounded owner pressure at a time
+- one real repository-owned consumer at a time
+- one explicit exit criterion per phase
+- no toolkit, package-manager, or framework widening before one smaller UI
+  outcome is already honest
+
+Relationship to companion notes
+-------------------------------
+This roadmap is meant to stay aligned with:
+
+- `docs/plan/admin/speculative_roadmap_post_phase254.txt`
+- `docs/plan/active/phase290_integrated_small_user_facing_system_demo.txt`
+- `docs/plan/active/phase291_post_ui_compiler_pressure_audit.txt`
+- `docs/plan/active/phase292_post_ui_kernel_ownership_audit.txt`
+- `docs/plan/active/phase293_first_human_facing_support_statement.txt`
+- `docs/plan/active/phase294_next_wave_decision_note.txt`
+- `docs/plan/backlog.txt`
+- `docs/plan/decision_log.txt`
+- `README.md`
+- `kernel/README.md`
+- `tests/tool/README.md`
+
+If those notes define the current admitted user-facing slice, the richer UI
+winner from Phase 294, and the still-deferred loser branches, this roadmap
+suggests one practical continuation after the repository proved that the first
+small user-facing system is real and then chose richer UI as the strongest next
+pressure.
+
+Repository numbering note
+-------------------------
+- Phase 255 through Phase 261 are occupied by the concrete late compiler
+  follow-through wave and its closeout audit.
+- Phase 262 through Phase 266 are occupied by the concrete memory-owner wave.
+- Phase 267 through Phase 273 are occupied by the concrete app-substrate wave.
+- Phase 274 through Phase 281 are occupied by the concrete first UI wave.
+- Phase 282 through Phase 289 are occupied by the concrete second UI slice and
+  its freeze.
+- Phase 290 through Phase 294 are occupied by the concrete integrated demo,
+  compiler audit, kernel ownership audit, support statement, and next-wave
+  decision.
+- Phase 294 now records one explicit winner: a bounded richer UI-
+  composition-and-interaction wave on the existing fixed-surface,
+  launcher-selected, app-local owner map.
+- The next speculative continuation therefore starts at Phase 295.
+
+Repository status note
+----------------------
+- The repository can now honestly claim one bounded user-facing slice on top
+  of the reset-lane kernel: two directly usable apps, one maintained
+  integrated small-system demo, one fixed four-cell visible contract, one
+  optional two-region composition seam, one key-only input family, one
+  launcher-selected foreground app model, and one bounded persisted
+  `review_board` view-state path.
+- That result matters because the strongest current ceiling is no longer basic
+  launch truth, restart truth, or missing owner splits. The current ceiling is
+  how little expressive room the admitted surface and interaction vocabulary
+  provide once users move beyond the first directly usable proof.
+- Phase 291 also records one credible compiler-side loser, the byte-literal
+  readability slice, but Phase 294 explicitly leaves it deferred because raw
+  byte spellings are currently a readability cost rather than the main blocker
+  on the admitted human-facing path.
+- Broader app packaging, networking, and durable file-like growth remain
+  explicit loser branches. None currently outrank the richer UI ceiling on the
+  maintained supported slice.
+
+What this roadmap is trying to answer
+-------------------------------------
+- How should the repository spend the Phase 294 richer-UI winner without
+  widening into a toolkit, desktop, or package platform?
+- Which bounded interaction and composition pressures are strongest once two
+  directly usable apps already exist on the same fixed surface?
+- When should the repository cash the repeated raw-byte source awkwardness into
+  the byte-literal compiler loser branch, and when should it keep deferring it?
+- What would have to become true before broader app packaging becomes stronger
+  than the richer UI wave?
+
+Core rule
+---------
+- Keep the current parser, sema, MIR, backend, launcher, display, routing,
+  workflow, persistence, and app-wrapper ownership boundaries intact unless a
+  real repository-owned consumer proves one boundary is now the controlling
+  blocker.
+- Spend the next wave first on richer behavior above the existing fixed
+  surface, not on new storage, packaging, desktop, or networking frameworks.
+- Prefer app-local interaction truth, tiny adjacent UI owners, and existing
+  workflow/test surfaces over new central coordinators.
+- Keep loser branches explicit. Do not smuggle packaging, compiler, or
+  filesystem work into a UI phase merely because it looks adjacent.
+
+Fixed-surface rule
+------------------
+The default assumption for every post-294 UI phase should be:
+
+- the surface stays one fixed four-cell visible target
+- the current optional two-region composition seam stays the only admitted
+  layout answer unless a real consumer proves otherwise
+- the input family stays key-only by default
+- foreground truth stays launcher-owned and single-foreground
+- interaction truth stays app-local unless two real consumers now repeat the
+  same control shape strongly enough to justify one tiny shared owner
+
+If a proposed phase cannot stay honest under those defaults, the roadmap should
+delay it until a stronger consumer exists rather than widening by convenience.
+
+Loser-branch reopening rule
+---------------------------
+- Reopen the byte-literal compiler branch only when richer UI work turns raw
+  byte spellings into a stronger blocker than the current interaction or
+  composition ceiling.
+- Reopen broader app packaging only when a second real installed-program path
+  becomes stronger than another UI-local follow-through.
+- Reopen networking only when a maintained user-facing app or launcher path is
+  materially blocked by missing network ownership rather than by UI limits.
+- Reopen durable file-like growth only when a current supported workflow can no
+  longer stay honest on the existing durable-owner split without a richer
+  file-like owner.
+
+Outcome bias
+------------
+This roadmap intentionally keeps the next wave narrow and user-facing:
+
+- first make the current UI slice more expressive on its admitted owners
+- then spend one compiler readability repair only if that richer UI wave truly
+  earns it
+- then reopen packaging only if the richer UI wave also creates a real second
+  installed-app pressure
+
+That bias is deliberate. The repository has already spent one full pause on
+choosing a direction. The next wave should now extract concrete user-facing
+value from that choice instead of reopening the whole loser matrix immediately.
+
+Roadmap bands
+-------------
+
+Band G - Deepen The Current UI Slice Without A Toolkit
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+Phases 295 through 301 should spend the Phase 294 winner directly: richer
+interaction and composition on the current fixed surface, with the current
+owner map preserved.
+
+Likely themes:
+- let the second admitted app consume the same honest foreground-input path as
+  the first
+- admit one richer detail, selection, or view-state pattern on the same fixed
+  surface
+- prove or reject one tiny shared control vocabulary only after two real apps
+  repeat it
+- stay on key-only input unless a stronger real app need appears
+- keep hosted and reset-lane UI behavior aligned on the same admitted
+  interaction contract
+
+Why this band comes first:
+- Phase 294 explicitly chose richer UI as the strongest next pressure.
+- The current supported slice already has enough stable substrate below it.
+- The strongest current user-facing limit is interaction and composition above
+  that substrate, not another app-substrate or compiler-internals wave.
+
+Why this band remains bounded:
+- this is not a desktop shell wave
+- this is not a widget toolkit wave
+- this is not a second input-family wave by default
+- this is not a larger display-system or compositor wave
+- this is not a packaging or installer wave in disguise
+
+Possible phases in this band:
+
+Phase 295 -- Review Board Foreground Interaction Follow-Through
+- Exit criterion: `review_board` can consume the admitted key-only
+  foreground-input path through its own app-local owner without widening
+  `input_event.mc`, `foreground_input_route.mc`, or `launcher_service.mc` into
+  a shared UI controller.
+
+Phase 296 -- App-Local Selection Or Detail Surface First Slice
+- Exit criterion: one admitted app can expose one richer selection, detail,
+  or active-item view on the same fixed surface and optional two-region seam
+  without admitting a layout engine, list framework, or shared focus owner.
+
+Phase 297 -- Cross-App Small Control Vocabulary Audit
+- Exit criterion: the repository either proves one tiny shared control family
+  across `issue_rollup` and `review_board`, or records that control semantics
+  still belong app-local after the second real consumer comparison.
+
+Phase 298 -- Key-Only Text Entry Or Filter Input First Slice
+- Exit criterion: one admitted app can accept one bounded typed-input or
+  filter-edit path over the existing key-only event family without admitting
+  pointer input, text engines, IME policy, or a general editing framework.
+
+Phase 299 -- Hosted And Reset-Lane UI Interaction Parity Follow-Through
+- Exit criterion: the richer interaction contract for the admitted UI apps
+  stays aligned across hosted project workflows and the reset-lane proof path
+  without creating a separate UI runner, presentation family, or packaging
+  path.
+
+Phase 300 -- Bounded UI Interaction Persistence Follow-Through
+- Exit criterion: one richer interaction state beyond the current launch
+  overlay and single `review_board` view-state byte can persist honestly
+  through existing journal, launcher, and app owners without admitting a
+  retained UI-state framework.
+
+Phase 301 -- Richer UI Slice Freeze And Audit
+- Exit criterion: the repository states exactly what the post-Phase-294 richer
+  UI slice now means and which tempting expansions still remain explicitly
+  deferred.
+
+Outcome checkpoint after Band G:
+- the repository should have a more expressive human-facing slice while still
+  looking like one bounded fixed-surface system rather than a hidden toolkit.
+- If that checkpoint cannot be reached honestly without broader surface or
+  input claims, the repository should stop early and record that the current
+  UI plateau is tighter than Phase 294 predicted.
+
+Band H - Cash Repeated UI Source Friction Into One Compiler Repair Only If Earned
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+Phases 302 through 304 should reopen compiler work only if Band G makes the
+byte-literal loser branch materially stronger than another UI-local follow-
+through.
+
+Likely themes:
+- one bounded single-byte literal or character-literal surface for `u8`
+- spend that surface directly in the admitted UI and input owners
+- re-audit whether the richer UI wave exposed any stronger compiler pressure
+  than the current byte-literal slice
+
+Why this band comes second:
+- Phase 291 already recorded the byte-literal branch as credible.
+- Phase 294 still left it deferred because the UI ceiling was stronger.
+- Band G is the cleanest way to find out whether that compiler loser remains a
+  readability nuisance or becomes the next honest blocker.
+
+Why this band remains bounded:
+- this is not a general text or string wave
+- this is not a byte-string or collection-construction wave
+- this is not a broad parser or sema ergonomics reopening
+- this is not permission to widen into general literal inference
+
+Possible phases in this band:
+
+Phase 302 -- Single-Byte Literal Surface First Slice
+- Exit criterion: one bounded single-byte literal surface becomes available for
+  `u8`-shaped UI cells and key codes without widening into string frameworks,
+  text engines, or broader literal inference.
+
+Phase 303 -- Byte-Oriented UI Source Readability Spend
+- Exit criterion: the admitted UI and input owners can replace the current raw
+  ASCII byte spellings where that materially improves clarity, while parser,
+  sema, MIR, and backend ownership stay narrow and deterministic.
+
+Phase 304 -- Post-Richer-UI Compiler Pressure Audit
+- Exit criterion: the repository records whether the richer UI wave exhausted
+  the current compiler pressure honestly or exposed one stronger bounded
+  compiler front than the byte-literal slice.
+
+Outcome checkpoint after Band H:
+- the repository should know whether the current UI-facing compiler pressure is
+  now genuinely spent or whether another compiler follow-through has become
+  stronger than packaging and the remaining loser branches.
+
+Band I - Reopen App Packaging Only If The UI Wave Produces A Real Second Installed Consumer
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+Phases 305 through 308 should reopen packaging only if the richer UI wave now
+creates a real second installed-program pressure rather than merely a more
+interesting direct-launch demo.
+
+Likely themes:
+- compare the current `issue_rollup` installed path against the richer
+  `review_board` path after Band G
+- admit a second installed-program slice only if that comparison is now the
+  strongest honest blocker
+- keep launcher/update-store/storage splits intact while broadening the
+  supported app pair carefully
+
+Why this band comes third:
+- Phase 294 explicitly kept packaging deferred because one installed app plus
+  one direct-launch app was still an honest plateau.
+- If Band G succeeds, the repository may finally have two strong UI-facing
+  consumers worth comparing under install/update truth.
+- If that comparison still does not create a real packaging blocker, the
+  repository should keep packaging deferred rather than forcing it.
+
+Why this band remains bounded:
+- this is not a package manager wave
+- this is not a filesystem or asset-platform wave
+- this is not a session or process-management wave
+- this is not multi-user or discovery policy
+
+Possible phases in this band:
+
+Phase 305 -- Second Installed Program Pressure Audit
+- Exit criterion: the repository decides whether the current `issue_rollup`-
+  only installed path is now the strongest blocker on the richer UI slice or
+  whether packaging should remain deferred.
+
+Phase 306 -- Second Installed Program First Slice
+- Exit criterion: one second repository-owned UI app can be staged and
+  identified through the existing `update_store_service` plus
+  `launcher_service` split without widening into multi-package policy,
+  manifest frameworks, or launcher-owned storage.
+
+Phase 307 -- Two-App Installed Status And Resume Follow-Through
+- Exit criterion: launcher/update surfaces can report honest installed,
+  foreground, and restart-visible truth for the admitted two-app set without
+  becoming a registry, dashboard, or session framework.
+
+Phase 308 -- Post-Second-App Platform Direction Audit
+- Exit criterion: the repository records whether the next strongest pressure
+  after the richer UI and any second-install slice is broader packaging,
+  networking, durable file-like growth, or another compiler wave.
+
+Outcome checkpoint after Band I:
+- the repository should either have one honest two-app install story or one
+  explicit decision that packaging is still not the strongest next wave.
+
+Interpretation guide
+--------------------
+- Treat this as a rough map, not a contract.
+- If Band G reveals that the current fixed-surface rule is already too tight,
+  the repository should prefer an early audit and explicit stop over a forced
+  expansion into broader layout or input work.
+- If Band G lands cleanly and the byte-literal compiler pressure becomes the
+  clearest next blocker, Band H should be preferred before any packaging step.
+- If Band G lands cleanly but no second installed-program pressure appears,
+  Band I should be delayed rather than forced.
+- If networking or durable file-like growth suddenly gains one stronger real
+  maintained consumer than the current UI or packaging pressures, the
+  repository should say so explicitly and treat that as a new direction note
+  rather than quietly mutating this roadmap's assumptions.

@@ -549,10 +549,12 @@ Phase 293 -- First Human-Facing Support Statement
   not claimed.
 
 Phase 294 -- Next-Wave Decision Note
-- Exit criterion: the repository records whether the strongest next pressure is
-  broader app packaging, richer UI composition, networking, durable file-like
-  growth, or another compiler follow-through wave, instead of assuming the next
-  expansion automatically.
+- Landed result: Band F now closes with one explicit winner, a bounded richer
+  UI-composition-and-interaction wave on the existing fixed-surface,
+  launcher-selected, app-local owner map. Broader app packaging, networking,
+  durable file-like growth, and the credible-but-still-losing byte-literal
+  compiler follow-through remain explicitly deferred until stronger maintained
+  consumers outrank the current visible UI ceiling.
 
 Likely ordering bias
 --------------------

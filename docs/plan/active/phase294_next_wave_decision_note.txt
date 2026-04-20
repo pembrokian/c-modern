@@ -3,7 +3,7 @@ Phase 294 -- Next-Wave Decision Note
 
 Status
 ------
-PROPOSED
+COMPLETED
 
 Purpose
 -------
@@ -186,9 +186,72 @@ Acceptance criteria
 - the post-Band-F plateau closes with a durable decision instead of open-ended
   momentum
 
+Implementation outcome
+----------------------
+- The repository now records one explicit next-wave winner: a bounded richer
+  UI-composition-and-interaction wave on the existing launcher-selected,
+  fixed-surface, app-local owner map.
+- That branch wins because the current supported slice has already reached a
+  human-facing plateau with two directly usable apps, one maintained integrated
+  small-system demo, one fixed four-cell visible contract, one optional
+  two-region composition seam, and one bounded persisted `review_board`
+  view-state path. The strongest present ceiling in that admitted slice is no
+  longer launcher truth, installed-slot truth, or kernel owner confusion; it is
+  how little expressive room the current visible surface and app-local
+  interaction vocabulary provide above that already-stable substrate.
+- Phase 292 is the decisive system-side input: it shows that boot, dispatch,
+  launcher, display, workflow, persistence, and app wrappers already have an
+  honest owner split, and that the remaining meaningful pressure is not another
+  ownership repair but what bounded user-facing layer should be admitted next
+  without turning the kernel into a toolkit or framework.
+- Phase 291 remains the strongest compiler-side loser input, but it loses
+  narrowly and explicitly. One byte-literal or character-literal slice is now
+  credible because raw ASCII bytes make current UI and input code harder to
+  read, yet that pressure is still a readability cost rather than the main
+  blocker on the admitted user-facing path. The repository can continue to ship
+  the current slice honestly without that compiler follow-through, while the UI
+  ceiling is now the clearest limitation of what users can do.
+- Broader app packaging remains deferred because the current maintained install
+  story still has only one installed-program path (`issue_rollup`) plus one
+  direct-launch second app (`review_board`). The evidence still does not justify
+  package-manager semantics, multi-app install policy, richer launcher-owned
+  metadata, or a broader app execution platform.
+- Networking remains deferred because the repository already has bounded hosted
+  and reset-lane ingress proofs, but the current human-facing plateau is not
+  blocked on richer network ownership. No maintained user-facing app or
+  launcher/update path currently depends on another networking wave to become
+  more coherent or more usable.
+- Durable file-like growth remains deferred because `file_service` is still an
+  isolated pressure probe rather than the controlling owner of any current
+  supported user-facing workflow. Nothing in the integrated demo, support
+  statement, or current app pair argues that filesystem-style growth now beats
+  the visible UI ceiling.
+- The winning branch stays bounded. This note does not choose a desktop shell,
+  widget toolkit, package manager, filesystem platform, or broad app framework.
+  It chooses only the next major direction: one more deliberate UI-facing wave
+  on the already-frozen owner map.
+- The narrow roadmap sync is now recorded in
+  `docs/plan/admin/speculative_roadmap_post_phase254.txt`, which names richer
+  UI growth as the Band-F winner and leaves packaging, networking, durable
+  file-like growth, and the byte-literal compiler slice explicitly deferred.
+
+Validation
+----------
+- No executable validation was needed because Phase 294 lands as a planning
+  decision note only; the owning validation surface is editor diagnostics on
+  this note and the synced roadmap entry.
+
 Future follow-up
 ----------------
-- The next concrete planning band should be drafted only after this decision
-  note lands.
-- Reopen the loser branches only when new maintained consumers or new audit
-  evidence make one of them stronger than the recorded winner.
+- The next concrete planning band should be drafted as one bounded richer
+  UI-facing wave above the current fixed-surface and app-local owner split,
+  not as a packaging or compiler wave by default.
+- Reopen broader app packaging only when a second real installed-program path
+  exists or when launcher/update callers need app-facing truth that cannot stay
+  honest on the current installed-slot plus direct-launch split.
+- Reopen the byte-literal compiler branch only when the current raw-byte source
+  awkwardness becomes a stronger blocker than the admitted UI-growth pressure,
+  or when a narrower UI-facing phase depends directly on that readability repair.
+- Reopen networking or durable file-like growth only when a maintained
+  repository-owned consumer makes one of those owners the clearest next blocker
+  on the supported user-facing slice.
