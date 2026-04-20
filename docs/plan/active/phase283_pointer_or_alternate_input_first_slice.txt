@@ -3,7 +3,7 @@ Phase 283 -- Pointer Or Alternate Input First Slice
 
 Status
 ------
-PROPOSED
+COMPLETED
 
 Purpose
 -------
@@ -212,3 +212,52 @@ Future follow-up
   focus or selection model requires it.
 - If the pressure is still weak, keep alternate input deferred until a later UI
   proof actually needs it.
+
+Implementation outcome
+----------------------
+- The repository now has one explicit evidence-based non-landing for a second
+  input family.
+- `issue_rollup_app.mc` remains a key-only consumer through its existing
+  app-local reducer, and no other admitted foreground app exposes stronger
+  alternate-input pressure.
+- The input owner and foreground route remain unchanged; the phase instead adds
+  one focused reset-lane reject proof that sends a non-key `I <event> <value> !`
+  frame through the existing path and proves that it returns one explicit
+  unsupported outcome without changing visible app state.
+
+Implemented decisions
+---------------------
+1. The current admitted UI consumer set does not justify a second shared input
+   family yet.
+2. The narrowest honest Phase 283 landing is therefore an explicit defer path,
+   not a pointer, directional-navigation, or other alternate-input owner.
+3. The focused proof uses one pointer-shaped probe frame only as a reject case;
+   it does not admit pointer semantics into `input_event.mc`,
+   `foreground_input_route.mc`, or `issue_rollup_app.mc`.
+4. The repository keeps alternate input deferred until one real consumer needs
+   more than the existing `I K <byte> !` path.
+
+Validation
+----------
+- `Build debug` via the focused `mc_tool_workflow_tests` target
+- `mc_tool_workflow_kernel_reset_lane_unit`
+
+Phase review against the spec
+-----------------------------
+- Preserved invariants:
+  - `input_event.mc` remains the owner of input vocabulary and was not widened
+    into a second-family parser.
+  - `foreground_input_route.mc` remains the single-foreground handoff owner and
+    did not absorb new input semantics.
+  - the repository still has one bounded input family only, and the phase ends
+    with an explicit honest answer rather than speculative growth.
+- Ownership boundaries did not weaken:
+  - no new input broker, device stack, subscription path, or app-local hidden
+    byte parsing was introduced
+  - shell, dispatch, launcher, and display remain outside alternate-input
+    policy ownership
+- Accidental centers of gravity were avoided:
+  - no shared control framework, pointer stack, focus model, or generalized UI
+    event layer emerged
+  - the new proof stays local to one scenario, one fixture, and the grouped
+    reset-lane owner

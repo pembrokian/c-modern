@@ -13,7 +13,7 @@ Rules
 - Keep compiler, sema, MIR, backend, ABI, target, runtime, and `hal` surfaces closed unless a narrow blocker forces a local change.
 - Add modules only when a specific phase boundary needs them, at the lean behavioral minimum the four-section standard allows.
 
-Current scope (through Phase 281)
+Current scope (through Phase 283)
 
 - All three canonical service shapes are present: forwarding (`serial_service`, `shell_service`, `serial_shell_path`), append/tail (`log_service`), and key/value (`kv_service`).
 - The compact shell route now reaches `log_service` and `kv_service` over the real reset-lane path instead of stopping at shell-local echo behavior.
@@ -35,6 +35,7 @@ Current scope (through Phase 281)
 - Phase 279 adds one directly usable `issue_rollup` app proof through an app-local interactive reducer that appends bounded issue lines and reuses the existing parse-plus-render owners instead of widening the kernel into a second app framework.
 - Phase 280 keeps restart and update truth on the same visible path through one launch-only `FRSH` or `RSUM` or `INVD` overlay that reuses launcher and update-store truth without admitting retained UI state.
 - Phase 281 closes Band D as a planning audit: the maintained first-UI truth is now one bounded input plus display plus routing plus present plus fixed-cell rendering plus app-proof lane, while windows, widgets, composition frameworks, alternate input families, and retained UI-state work remain deferred until a stronger later owner appears.
+- Phase 283 keeps alternate input deferred after an evidence-based audit: the maintained app path still only needs key events, and one focused reject proof now confirms that non-key `I <event> <value> !` frames stay explicitly unsupported without changing visible app state.
 
 Source tree layout (Phase 219)
 
@@ -59,6 +60,13 @@ The following modules are deferred until the named phase boundary forces them:
 - `mmu` — probably never in this tree; hosted execution makes MMU stubs meaningless
 
 Recent service targets
+
+- Phase 283 (completed): pointer or alternate input first slice.
+  The repository now has one explicit evidence-based non-landing for a second
+  input family. `input_event.mc`, `foreground_input_route.mc`, and
+  `issue_rollup_app.mc` remain unchanged as the maintained key-only path, and
+  the focused reset-lane fixture is
+  `tests/system/kernel_reset_lane_phase283_pointer_or_alternate_input_first_slice`.
 
 - Phase 281 (completed): first UI slice audit.
   Band D is now explicitly closed for its admitted slice: `input_event.mc`,
