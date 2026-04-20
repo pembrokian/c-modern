@@ -1,0 +1,181 @@
+Phase 285 -- Small Control Vocabulary Audit
+===========================================
+
+Status
+------
+PROPOSED
+
+Purpose
+-------
+Decide whether the second UI slice now justifies one tiny shared control
+vocabulary or whether app-local drawing and interaction still remain the more
+honest owners.
+
+This phase exists now because Band E may expose repeated small UI patterns such
+as button-like actions, list-item activation, or tab-like selection. The
+repository needs one explicit audit before it promotes those repeated patterns
+into a shared control family.
+
+Repository status note
+----------------------
+- Phase 281 explicitly kept shared controls deferred after the first UI slice.
+- Phase 282 through Phase 284 are expected to test whether composition,
+  alternate input, and focus or selection really produce repeated interaction
+  pressure.
+- `issue_rollup_app.mc` still owns the current directly usable app-local UI
+  behavior.
+- The repository still has no shared control vocabulary, widget family, or
+  reusable interaction primitives.
+
+Problem being solved
+--------------------
+- Once Band E adds one more UI layer, the repository may start seeing repeated
+  micro-patterns that look like controls.
+- Without an explicit audit, those patterns could either be copied ad hoc
+  across apps until they become accidental shared truth, or they could be
+  prematurely promoted into a widget vocabulary without enough evidence.
+- The current-repo problem is therefore to classify whether shared control
+  vocabulary now wins honestly over app-local drawing and interaction.
+
+Non-goals
+---------
+- no widget toolkit
+- no theming or style system
+- no layout engine
+- no generalized event-callback framework
+- no desktop shell or menu framework
+
+Invariants
+----------
+- The audit must classify actual repeated UI pressure only.
+- A tiny shared control vocabulary must land only if at least one real second
+  consumer or one clearly repeated pattern proves it.
+- App-local drawing and interaction remain the default honest owner unless the
+  audit proves otherwise.
+- The phase must be allowed to conclude that no shared control vocabulary
+  should land yet.
+
+Required surface changes
+------------------------
+1. Audit the actual repeated UI patterns exposed by Phases 282 through 284.
+2. If justified, define one tiny shared control family with a very small
+   bounded vocabulary.
+3. If not justified, record the deferral explicitly and keep control truth in
+   app-local owners.
+4. Add focused validation for whichever result is honest.
+
+Forbidden changes
+-----------------
+- do not land a widget toolkit or generic control registry
+- do not add a callback framework, signal system, or event bus
+- do not promote one app-local pattern into a shared control family without a
+  real repeat-use argument
+- do not hide the decision inside narrative prose only
+
+Phase role in the larger sequence
+---------------------------------
+- This phase is the Band E gate between repeated UI friction and a real shared
+  control vocabulary.
+- It prepares Phase 286 by clarifying whether the next more ambitious app proof
+  should use shared controls or still stay fully app-local.
+- It also protects the repository from freezing bad UI abstractions too early.
+
+Relevant backlog items this phase intentionally brings under pressure
+--------------------------------------------------------------------
+- keep UI abstractions driven by repeated real pressure rather than by habit
+- keep app-local interaction owners intact until at least one tiny shared
+  family is clearly stronger
+
+Questions this phase must answer
+--------------------------------
+1. Are there now repeated UI patterns strong enough to justify one tiny shared
+   control vocabulary?
+2. If yes, what is the smallest honest control family?
+3. Which consumer or consumers prove the repeat-use pressure?
+4. If no, what exact evidence keeps controls app-local for now?
+
+Preferred implementation shape
+------------------------------
+- Start with an audit against the actual Band E consumers.
+- Prefer concluding "still app-local" unless a very small shared control set is
+  clearly justified.
+- If a control family lands, keep it flat, explicit, and limited to one tiny
+  set of repeated interaction shapes.
+
+Implementation accelerators
+---------------------------
+Main files and navigations
+~~~~~~~~~~~~~~~~~~~~~~~~~~
+- Primary controlling owners: the Phase 282 through Phase 284 owners and the
+  current app-local UI logic under `kernel/src/issue_rollup_app.mc` and the
+  relevant hosted app trees.
+- First-hop adjacent files: `docs/plan/backlog.txt`,
+  `docs/plan/decision_log.txt`, `kernel/src/display_surface.mc`, and the
+  current Band E fixtures.
+- Nearby accelerator docs: `docs/agent/prompts/test_overview.txt`,
+  `docs/plan/active/phase281_first_ui_slice_audit.txt`, and the Band E plan
+  docs that precede this audit.
+- Expected first validation target when the owner changes: none new beyond the
+  focused evidence already required by the preceding Band E phases unless one
+  tiny shared control family actually lands.
+
+Relevant cookbook patterns
+~~~~~~~~~~~~~~~~~~~~~~~~~~
+- No exact cookbook pattern fits because this is a bounded UI pressure audit.
+
+Relevant file-local invariants
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+- `issue_rollup_app.mc` remains the default owner for current app-local UI
+  interaction truth.
+- `display_surface.mc` and any composition owner should not silently absorb
+  control semantics.
+- `docs/plan/backlog.txt` and `docs/plan/decision_log.txt` should capture only
+  bounded still-open control pressure if the audit keeps controls deferred.
+
+Dependency-ordered touch sequence
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+- Audit the actual repeated control pressure in the current app owners first.
+- Land one tiny shared control owner second only if the audit proves it; if
+  not, land the explicit deferral in the phase-local documentation instead.
+- Update the one consumer that spends the shared vocabulary, or the narrow
+  backlog or decision-log entry, third.
+- Update only the focused validation surface that demonstrates the audit result
+  last.
+
+Common breakage map
+~~~~~~~~~~~~~~~~~~~
+- Promoted app-local interaction shape -> accidental control semantics leaking
+  into display or composition owners instead of one bounded control owner.
+- Changed tiny control enum or action shape -> render branches, input handlers,
+  focused fixtures.
+- Documentation-only audit drift -> backlog or decision-log entries widen into
+  framework promises instead of bounded pressure notes.
+
+Relevant test surfaces
+~~~~~~~~~~~~~~~~~~~~~~
+- Primary owning validation surface: the focused Band E executable and fixture
+  evidence already required by Phases 282 through 284.
+- Narrowest expected first executable validation target: none new unless a tiny
+  shared control family actually lands.
+- If one does land, rerun only the narrowest UI fixture that spends it.
+
+Test obligations
+----------------
+- no new executable validation by default
+- if a tiny shared control family lands, run `Build debug` plus one focused UI
+  fixture that spends it
+
+Acceptance criteria
+-------------------
+- the repository has one explicit honest answer on shared control pressure
+- if a shared control family lands, it is tiny, bounded, and justified by real
+  repeated use
+- if no shared control family lands, that deferral is explicit and reviewable
+- the phase avoids freezing a widget toolkit or generic control framework
+
+Future follow-up
+----------------
+- Phase 286 should consume the audit result directly: either stay app-local or
+  spend the tiny shared control family in one more ambitious app proof.
+- Reopen broader shared controls only when a second real UI app or second clear
+  repeated pattern makes the next pressure unavoidable.

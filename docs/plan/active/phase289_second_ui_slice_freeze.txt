@@ -1,0 +1,170 @@
+Phase 289 -- Second UI Slice Freeze
+===================================
+
+Status
+------
+PROPOSED
+
+Purpose
+-------
+State exactly what "basic UI" means in the repository after Band E and what
+still remains intentionally closed.
+
+This phase exists now because Band E deliberately broadens the first UI slice
+only a little. The repository needs one explicit freeze point before later
+platform or system-direction decisions reuse these UI results as if they were a
+complete app or desktop model.
+
+Repository status note
+----------------------
+- Phase 281 already froze the first UI slice after the `issue_rollup` proof.
+- Phases 282 through 288 are expected to admit, reject, or defer one additional
+  composition, interaction, control, proof, persistence, and workflow layer.
+- After Band E, the repository should have a clearer but still bounded account
+  of user-facing capability.
+- What remains missing must be stated as intentionally closed rather than left
+  ambiguous.
+
+Problem being solved
+--------------------
+- UI waves are especially vulnerable to accidental overclaim: once two app-like
+  proofs exist, readers can easily assume the repository now has a broader UI
+  platform than it actually does.
+- Without one explicit freeze document, later planning could treat bounded Band
+  E owners as if they solved windows, widgets, accessibility, sessions, or app
+  packaging.
+- The current-repo problem is therefore one missing honesty checkpoint on the
+  post-Band-E UI surface.
+
+Non-goals
+---------
+- no new UI feature work
+- no app framework, window system, or desktop shell
+- no widget toolkit or theming platform
+- no accessibility, text-system, or session framework
+- no broader product or roadmap reset than the UI slice itself requires
+
+Invariants
+----------
+- The freeze must describe actual landed repository truth only.
+- Deferred UI capabilities must stay explicitly deferred.
+- Existing owners must be named clearly so later phases do not reopen boundary
+  confusion.
+- The freeze must distinguish admitted user-facing capability from broader
+  platform expectations.
+
+Required surface changes
+------------------------
+1. Audit the actual landed results of Phases 282 through 288.
+2. State the exact meaning of "basic UI" after Band E.
+3. State the major still-closed areas explicitly.
+4. Cross-link the owning validation and workflow surfaces that support the
+   frozen claim set.
+
+Forbidden changes
+-----------------
+- do not add new UI features while writing the freeze
+- do not rewrite deferred work as implied future promises
+- do not leave major closed areas implicit
+- do not describe speculative platform direction as already admitted repo truth
+
+Phase role in the larger sequence
+---------------------------------
+- This phase is the Band E closeout and honesty checkpoint.
+- It prepares the broader post-UI platform reassessment by giving later phases
+  a precise current baseline.
+
+Relevant backlog items this phase intentionally brings under pressure
+--------------------------------------------------------------------
+- keep roadmap claims aligned with landed owner boundaries and maintained test
+  surfaces
+- keep future platform direction grounded in what Band E actually proved
+
+Questions this phase must answer
+--------------------------------
+1. After Band E, what exact user-facing capabilities are now admitted in the
+   repo?
+2. Which owners define those capabilities?
+3. What larger UI or platform areas remain intentionally closed?
+4. Which tests and workflows provide the supporting evidence for the frozen
+   claim set?
+
+Preferred implementation shape
+------------------------------
+- Follow the style of the first UI audit from Phase 281: short, explicit, and
+  ownership-focused.
+- Enumerate only landed truths and still-closed areas.
+- Tie each admitted claim to an owner and an evidence surface.
+
+Implementation accelerators
+---------------------------
+Main files and navigations
+~~~~~~~~~~~~~~~~~~~~~~~~~~
+- Primary comparison baseline: `docs/plan/active/phase281_first_ui_slice_audit.txt`.
+- Expected owning inputs: the landed docs for Phases 282 through 288, the
+  current UI-owner files in `kernel/src/`, and the maintained UI-facing tests
+  under `tests/system/` and `tests/tool/`.
+- Nearby accelerator docs: `docs/plan/admin/speculative_roadmap_post_phase254.txt`,
+  `docs/plan/backlog.txt`, and `docs/plan/decision_log.txt`.
+- Expected first validation target when the freeze lands: no new executable
+  validation beyond the evidence already required by the preceding phases.
+
+Relevant cookbook patterns
+~~~~~~~~~~~~~~~~~~~~~~~~~~
+- No cookbook pattern applies directly because this is an audit and freeze
+  document, not a new code feature.
+
+Relevant file-local invariants
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+- `docs/plan/active/phase281_first_ui_slice_audit.txt` is the immediate style
+  and scope baseline for a UI freeze document.
+- `docs/plan/backlog.txt` should receive only truly deferred work items that
+  remain actionable.
+- `docs/plan/decision_log.txt` should capture only deliberate limited-solution
+  choices that need durable rationale.
+
+Dependency-ordered touch sequence
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+- Audit the landed Phase 282 through Phase 288 outcomes first.
+- Land the freeze document second.
+- Update only the narrow supporting backlog, decision-log, or roadmap note that
+  reflects a newly durable fact third.
+- Repair an evidence gap in the owning earlier phase before widening the freeze
+  claims if the audit exposes one.
+
+Common breakage map
+~~~~~~~~~~~~~~~~~~~
+- Claimed UI capability has no owning evidence -> return to the earlier phase
+  doc or owning test surface before freezing the claim.
+- Deferred scope restated as admitted truth -> backlog and decision-log drift,
+  roadmap overclaim.
+- Freeze language stops naming owners -> later phases lose the boundary map and
+  start treating Band E as a platform instead of a bounded slice.
+
+Relevant test surfaces
+~~~~~~~~~~~~~~~~~~~~~~
+- Primary owning validation surface: the already-landed test surfaces from
+  Phases 282 through 288.
+- Narrowest expected first executable validation target: none new unless the
+  freeze discovers a missing evidence gap that must be repaired first.
+
+Test obligations
+----------------
+- no new executable validation by default
+- if the freeze exposes a missing evidence gap, repair that gap in the owning
+  phase surface before treating the slice as frozen
+
+Acceptance criteria
+-------------------
+- the repository states exactly what "basic UI" means after Band E
+- the admitted scope is tied to explicit owners and evidence surfaces
+- still-closed UI and platform areas are called out explicitly
+- later planning can reuse this document as an honest baseline instead of a
+  vague impression
+
+Future follow-up
+----------------
+- The next platform-direction band should consume this freeze as the current
+  user-facing baseline.
+- Reopen broader UI work only when later phases identify one bounded pressure
+  that is stronger than the still-closed areas recorded here.

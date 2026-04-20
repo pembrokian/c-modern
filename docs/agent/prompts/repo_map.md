@@ -10,6 +10,8 @@ This file is a fast orientation map for agents working in this repository.
 - `stdlib/`: standard library modules; `stdlib/mem.mc` now owns the admitted fixed-size `mem.Pool` byte-slot contract from Phase 262, the explicit `Arena` init/reset/new/deinit scratch-work contract landed in Phase 263, and the page-rounded raw-byte `mem.Run` contract landed in Phase 264; Phase 265 then explicitly keeps slab-style small-object reuse deferred because the maintained consumers still fit pool, arena, and run ownership honestly, and Phase 266 closes Band B with explicit selection guidance for when to choose buffers, pools, arenas, and runs
 - `kernel/`: repository-owned Veya kernel bring-up tree; currently through the completed Phase 281 first UI slice audit over the hosted reset-lane workflow surface, with the Phase 255 through Phase 260 Band A compiler follow-through wave landed on adjacent boot/helper, topology, render-table, and record-construction owners, the Phase 261 audit classifying Band B as the stronger next owner, Phase 267 through Phase 272 closing Band C with explicit runtime program identity, one bounded launcher owner, one fixed installed-program slot, one bounded fresh-versus-resumed-versus-invalidated launch classification, one issue-rollup-only admitted manifest family, and one explicit launcher-owned installed-workflow status query for the first `issue_rollup` demo path, Phase 273 classifying the first UI work as next, Phase 274 then admitting one explicit foreground-input owner for the tiny `I K <byte> !` event family, Phase 275 admitting one explicit fixed display owner, Phase 276 adding one explicit foreground-routing seam that forwards the admitted input family to exactly one launcher-selected foreground app, Phase 277 replacing the old launcher-time display token shortcut with one app-owned present request path that keeps render policy in the `issue_rollup` render modules and surface update semantics in `display_surface.mc`, Phase 278 aligning the hosted and reset-lane `issue_rollup` paths on the same readable four-cell visible contract instead of admitting a second rendering family, Phase 279 then moving the first direct app interaction model into the repository-owned `issue_rollup` app tree so the visible UI proof now runs through app-local text-plus-parse-plus-render logic instead of a kernel-local placeholder state machine, Phase 280 finally spending the launcher-owned restart classification on that same app path through one launch-only `FRSH` or `RSUM` or `INVD` overlay that clears on the first app-owned state change rather than widening launcher, update_store, or display into retained UI-state owners, and Phase 281 then closing Band D as one deliberately narrow human-facing lane while keeping composition, alternate input, shared control vocabulary, and retained UI-state work deferred until a later real consumer proves one of them stronger
 - `docs/agent/prompts/plan_spec.txt`: normative spec for the required structure of new per-phase plan documents
+- `docs/agent/prompts/change_touch_sets.txt`: short cross-reference matrix for common owner changes and their likely follow-through files
+- `docs/agent/prompts/error_triage.txt`: tiny compiler and kernel compile-break triage sheet for first-failure repair
 - `docs/plan/admin/canopus_repo_layout_and_test_policy.txt`: current repository policy for Veya source, build, and test placement
 - `docs/plan/plan.txt`: authoritative multi-phase implementation plan
 - `docs/plan/backlog.txt`: implementation backlog and recurring follow-up themes
@@ -259,8 +261,18 @@ This file is a fast orientation map for agents working in this repository.
 1. Read `docs/plan/plan.txt` and confirm the target phase boundary.
 2. Check whether the request is about bootstrap behavior or full plan completion.
 3. Change the smallest correct layer.
-4. Update the narrowest relevant fixtures.
-5. Run `cmake --build build/debug -j4 && ctest --test-dir build/debug --output-on-failure` when behavior changes, or use `ctest --test-dir build/debug -j4 --output-on-failure` for an explicit parallel full-suite pass.
+4. Land the controlling owner cleanly before editing predicted transitive consumers.
+5. Prefer sequential dependency-ordered edits over broad synchronized patches.
+6. Use `docs/agent/prompts/change_touch_sets.txt` and `docs/agent/prompts/error_triage.txt` to stage the next local hop instead of reopening broad exploration after the first compile break.
+7. Update the narrowest relevant fixtures after the owner and its direct consumers stabilize.
+8. Run the narrowest relevant validation target after each owner-level batch.
+9. Run `cmake --build build/debug -j4 && ctest --test-dir build/debug --output-on-failure` when behavior changes, or use `ctest --test-dir build/debug -j4 --output-on-failure` for an explicit parallel full-suite pass.
+
+Repair-loop guidance:
+
+- Prefer the earliest root-cause compile or type error over later fallout.
+- Fix the owner and its direct fallout before widening the edit set.
+- Large synchronized patches tend to fail in this repository; avoid predictive mass edits.
 
 Focused grouped-suite checks that are often enough for tool or workflow work:
 

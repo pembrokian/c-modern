@@ -1,0 +1,37 @@
+Compiler And Kernel Error Triage
+================================
+
+Purpose
+-------
+Use this as the first-pass cheat sheet after a compile, typecheck, or fixture
+break. Repair the earliest root-cause error and its direct fallout before
+returning to feature work.
+
+Common first-break checks
+-------------------------
+
+- Unknown field:
+  check the owning struct or record definition first, then init sites, reset or
+  reload helpers, clone or `with` builders, debug dumps, and fixtures
+- Unknown enum or tag case:
+  check the enum owner, then switch exhaustiveness, printers or dumps,
+  classifier helpers, and tests that assert visible names
+- Unresolved symbol:
+  check the owning module path, import or namespace change, renamed helper
+  callers, and generated or descriptor wiring if the symbol is table-driven
+- Type mismatch after signature change:
+  check sibling helpers, direct call sites, fixture builders, and expected
+  diagnostics before editing more distant consumers
+- Parser or AST shape mismatch:
+  check the parser owner, AST dump, sema reader, MIR lowering entry, and
+  owning fixtures in that order
+- Deterministic dump mismatch:
+  check whether the owner contract changed intentionally before touching the
+  golden; update the narrowest owning fixture only after the output is stable
+- Restart-visible kernel change:
+  check persistence, reload, reset, restart classification, and scenario
+  follow-through before widening to unrelated services
+- Grouped workflow failure:
+  check the owning grouped suite and its checked-in case or scenario first;
+  do not start by widening CMake registration or sharding unless ownership
+  actually changed

@@ -1,0 +1,202 @@
+Phase 282 -- Surface Composition Or Region Owner First Slice
+============================================================
+
+Status
+------
+PROPOSED
+
+Purpose
+-------
+Admit one bounded surface-composition owner that can manage a very small number
+of visible regions for the current foreground UI path without turning the
+repository's first UI slice into a window system.
+
+This phase exists now because Phase 281 closes Band D with one fixed single-
+surface path. The next honest UI pressure, if it exists at all, is whether one
+foreground app now needs a second visible region such as a status strip,
+sidebar, or split view that cannot stay honest inside the current flat display
+owner.
+
+Repository status note
+----------------------
+- Phase 275 already admits `display_surface.mc` as the fixed four-cell visible
+  surface owner.
+- Phase 276 keeps `foreground_input_route.mc` as the single-foreground routing
+  seam.
+- Phase 277 keeps app-owned present policy in `issue_rollup_app.mc` rather
+  than inside launcher or display.
+- Phase 279 and Phase 280 prove one directly usable `issue_rollup` path with a
+  launch-only lifecycle overlay.
+- The repository still has no owner for more than one visible region and no
+  explicit rule for where region composition should live if it becomes real.
+
+Problem being solved
+--------------------
+- The first UI slice is deliberately flat. If Band E is real, the next pressure
+  is not more rendering in the same one-region contract but whether one small
+  number of visible regions is now unavoidable for the admitted app path.
+- Without an explicit composition owner, a second region would either be hidden
+  inside `display_surface.mc` as surface policy or inside `issue_rollup_app.mc`
+  as app-local layout policy that later consumers cannot reuse honestly.
+- The phase therefore needs to answer one repo-local ownership question: where
+  does two-region visible composition live without implying windows,
+  overlapping surfaces, or a compositor framework?
+
+Non-goals
+---------
+- no window manager
+- no overlapping layers or z-order system
+- no generic compositor or scene graph
+- no widget layout engine
+- no multi-app desktop or session model
+- no pointer, selection, or control-vocabulary work unless the composition
+  slice proves it is the controlling blocker
+
+Invariants
+----------
+- `display_surface.mc` remains the low-level visible surface owner rather than
+  becoming a layout or policy engine.
+- Launcher remains the single-foreground policy owner.
+- The first composition slice must stay bounded to a tiny fixed number of
+  regions for one foreground path.
+- App-local render policy must remain app-local unless a shared composition
+  owner is clearly stronger.
+- The current fixed deterministic visible contract must stay deterministic.
+
+Required surface changes
+------------------------
+1. Choose the narrowest honest owner for bounded region composition, likely a
+   new composition module adjacent to `display_surface.mc` rather than a new
+   service family.
+2. Admit one fixed tiny region model for one foreground path.
+3. Spend that region model in one repository-owned UI app or UI overlay.
+4. Add one focused reset-lane fixture proving the composed visible result.
+5. Keep any shell or launcher changes limited to calling the new owner rather
+   than carrying composition policy themselves.
+
+Forbidden changes
+-----------------
+- do not widen `display_surface.mc` into a compositor or layout framework
+- do not move composition truth into `launcher_service.mc` or
+  `kernel_dispatch.mc`
+- do not admit overlapping windows, arbitrary region graphs, or retained scene
+  trees
+- do not create a second display backend or visual surface family in the same
+  phase
+
+Phase role in the larger sequence
+---------------------------------
+- This phase is the first honest Band E structural owner if the first UI slice
+  now needs more than one visible region.
+- It prepares Phase 284 and Phase 285 by clarifying whether focus, selection,
+  or shared control pressure is actually composition-local or still app-local.
+- It also prepares Phase 286 if an editor- or installer-style proof needs a
+  second visible zone.
+
+Relevant backlog items this phase intentionally brings under pressure
+--------------------------------------------------------------------
+- keep UI growth bounded to explicit owners rather than toolkit drift
+- keep display and launcher owners narrow while adding only one second-layer UI
+  owner when a real consumer proves it
+
+Questions this phase must answer
+--------------------------------
+1. What is the narrowest honest composition owner: one region helper next to
+   `display_surface.mc`, one app-local layout owner, or another explicit seam?
+2. Which current consumer proves the need first: `issue_rollup`, `review_board`,
+   or a later editor or installer path?
+3. How many regions are enough for the first slice without smuggling in a
+   general layout model?
+4. What visible behavior should remain app-local even after the region owner
+   lands?
+
+Preferred implementation shape
+------------------------------
+- Prefer one tiny composition owner that translates a fixed small region set
+  into the existing display-surface contract.
+- Keep the first region model static and deterministic.
+- Reuse current single-foreground routing and app-owned present logic.
+- Spend the phase on one consumer only.
+
+Implementation accelerators
+---------------------------
+Main files and navigations
+~~~~~~~~~~~~~~~~~~~~~~~~~~
+- Primary controlling owners: `kernel/src/display_surface.mc`,
+  `kernel/src/issue_rollup_app.mc`, and any new region-composition module.
+- First-hop adjacent files: `kernel/src/kernel_dispatch.mc`,
+  `kernel/src/foreground_input_route.mc`, `kernel/src/boot/boot.mc`, and the
+  current UI scenarios under `kernel/src/scenarios/`.
+- Nearby accelerator docs: `docs/agent/prompts/kernel_file_invariants.txt`,
+  `docs/arch/veya/kernel_style_guide.txt`, and
+  `docs/plan/active/phase281_first_ui_slice_audit.txt`.
+- Expected first validation target when the owner changes: `Build debug`, then
+  one focused composition reset-lane fixture.
+
+Relevant cookbook patterns
+~~~~~~~~~~~~~~~~~~~~~~~~~~
+- No exact cookbook pattern fits because this is a cross-owner UI composition
+  seam rather than a standard new service or parser feature.
+- Pattern 9 -- Add A New Runtime Service does not fit by default; composition
+  should stay lighter than a new boot-wired service unless the implementation
+  evidence proves otherwise.
+
+Relevant file-local invariants
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+- `display_surface.mc` owns surface update semantics, not layout policy.
+- `issue_rollup_app.mc` owns app-local present behavior and should only give up
+  layout decisions that clearly become shared composition truth.
+- `kernel_dispatch.mc` may call the composition owner but must not become the
+  layout coordinator.
+
+Dependency-ordered touch sequence
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+- Land the bounded composition owner first.
+- Update the app-present seam or chosen consumer second.
+- Update dispatch-call plumbing, scenarios, and any visible dump or fixture
+  expectations third.
+- Update the focused reset-lane proof last.
+
+Common breakage map
+~~~~~~~~~~~~~~~~~~~
+- Changed region record or composition state -> owner-local init or reset,
+  app-present call sites, visible-cell expectations, fixture goldens.
+- Changed present or compose signature -> direct callers in the app seam,
+  dispatch handoff, focused scenario helpers.
+- Changed visible region ordering -> deterministic surface output and reset-
+  lane expected cells.
+
+Relevant test surfaces
+~~~~~~~~~~~~~~~~~~~~~~
+- Primary owning validation surface: one focused reset-lane system fixture for
+  the new region or composition path.
+- Narrowest expected first executable validation target: the new Phase 282
+  fixture plus `mc_tool_workflow_kernel_reset_lane_unit`.
+- Supporting validation: the narrow `issue_rollup` or `review_board` real-
+  project proof if the chosen consumer touches hosted app code.
+
+Test obligations
+----------------
+- `Build debug`
+- one focused reset-lane fixture proving the bounded region owner
+- `mc_tool_workflow_kernel_reset_lane_unit`
+- `mc_tool_workflow_kernel_reset_lane_full_unit`
+- one narrow real-project validation only if the chosen consumer touches a
+  maintained hosted app
+
+Acceptance criteria
+-------------------
+- one bounded region or composition owner exists for the current foreground UI
+  path
+- the first slice manages only a tiny fixed number of visible regions
+- `display_surface.mc`, `launcher_service.mc`, and app-local render owners all
+  keep their existing boundaries
+- the landing does not imply a window system, compositor, or toolkit
+
+Future follow-up
+----------------
+- If the composition owner lands, Phase 284 may spend it on one explicit focus
+  or selection contract only if that pressure is now real.
+- If the chosen consumer still works honestly with one flat region, record the
+  composition pressure as deferred in `docs/plan/backlog.txt` rather than
+  widening this phase by assumption.

@@ -31,10 +31,19 @@ Documentation routing:
 
 - Preserve the phase boundaries: parser builds syntax, sema owns language meaning, MIR owns typed lowered control flow.
 - Prefer minimal, targeted changes. Do not refactor unrelated code while doing feature work.
+- Prefer sequential, dependency-ordered edits over broad synchronized patches.
+- Stabilize the controlling owner first, then direct consumers, then secondary consumers, then tests.
+- Large synchronized patches tend to fail in this repository. Prefer landing the root owner cleanly before editing transitive consumers.
 - Keep semantic and MIR dumps deterministic. If behavior changes intentionally, update the relevant fixture goldens.
 - Do not paper over missing semantics by pushing logic into MIR or the driver when it belongs in sema.
 - Do not mark incomplete bootstrap behavior as spec-complete.
 - Respect the existing repository style: straightforward C++20, small helper functions, deterministic tests.
+
+Repair-loop guidance:
+
+- After the first owner-level change, run the narrowest relevant build or test surface before widening the patch.
+- When compile or type errors appear, fix the earliest root-cause error and its direct fallout before resuming feature work.
+- Use `docs/agent/prompts/change_touch_sets.txt` and `docs/agent/prompts/error_triage.txt` to choose the next local repair hop instead of reopening broad repo exploration.
 
 ## Validation
 

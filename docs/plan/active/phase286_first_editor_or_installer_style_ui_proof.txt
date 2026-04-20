@@ -1,0 +1,191 @@
+Phase 286 -- First Editor Or Installer-Style UI Proof
+=====================================================
+
+Status
+------
+PROPOSED
+
+Purpose
+-------
+Make one more ambitious repository-owned UI program directly usable on the
+admitted surface so Band E proves more than one fixed app-local interaction
+path.
+
+This phase exists now because Band E only earns its extra composition,
+interaction, or control work if one stronger consumer actually spends it. The
+next honest slice is one maintained editor-style or installer-style proof, not
+an app framework.
+
+Repository status note
+----------------------
+- Phase 279 and Phase 280 make `issue_rollup` the first directly usable
+  foreground UI proof.
+- Phase 281 closes that first slice and explicitly leaves broader UI work open.
+- `examples/real/review_board/` already exists as a maintained real project and
+  is the strongest current editor-style candidate because it already has
+  audited and focus-oriented entry points.
+- `launcher_service.mc`, `display_surface.mc`, `foreground_input_route.mc`, and
+  `issue_rollup_app.mc` are the current admitted UI seams.
+- No second repository-owned UI program is yet directly usable on that surface.
+
+Problem being solved
+--------------------
+- The first UI slice could still be misleading if it only proves one narrowly
+  tailored app and one app-local interaction model.
+- Band E needs one stronger consumer to show whether the admitted UI seams are
+  reusable or whether they were only shaped for `issue_rollup`.
+- The current-repo problem is therefore one missing second UI proof on real
+  maintained code, not the absence of a general application framework.
+
+Non-goals
+---------
+- no app framework or reusable GUI toolkit
+- no plugin model or extension surface
+- no package manager or app-store workflow
+- no multi-app desktop shell
+- no editor framework, text engine, or full installer workflow beyond one
+  bounded proof
+
+Invariants
+----------
+- One repository-owned UI program must remain the unit of proof.
+- Existing UI owners remain explicit: launcher for foreground choice, input
+  owner for input-family parsing, display owner for visible surface updates,
+  and any Phase 282 through Phase 285 owners only for the bounded truths they
+  introduced.
+- The chosen proof must reuse current real-project build and test surfaces.
+- The phase must not imply a reusable application platform.
+
+Required surface changes
+------------------------
+1. Choose one maintained repository-owned program as the Band E proof target.
+2. Thread that program through the admitted UI path.
+3. Reuse the new Band E UI seams only where the consumer genuinely needs them.
+4. Add one focused reset-lane or workflow proof for the chosen UI program.
+5. Add narrow real-project validation for the chosen program.
+
+Forbidden changes
+-----------------
+- do not create a general app framework or GUI toolkit
+- do not add multiple new UI programs in the same phase
+- do not widen launcher or dispatch into a general program-runtime surface
+- do not claim a packaging or installer stack if the chosen proof is only a
+  bounded editor-style path
+
+Phase role in the larger sequence
+---------------------------------
+- This phase is the first reuse proof for the Band E UI layer.
+- It prepares Phase 287 by giving one stronger consumer that may need bounded
+  document or view persistence.
+- It also gives Phase 288 a concrete build, launch, and test path to audit.
+
+Relevant backlog items this phase intentionally brings under pressure
+--------------------------------------------------------------------
+- prove that the admitted UI owners can serve more than one repository-owned
+  app-shaped consumer
+- keep app-platform ambitions deferred until at least one stronger proof exists
+
+Questions this phase must answer
+--------------------------------
+1. Is `review_board` the strongest current editor-style proof target, or does
+   an installer or update-manager path provide a more honest stress case?
+2. Which Band E seams does the chosen proof actually need, and which remain
+   unnecessary?
+3. What is the narrowest validation surface that proves the program is directly
+   usable on the admitted UI path?
+4. What app-framework temptations must stay deferred even after this proof
+   lands?
+
+Preferred implementation shape
+------------------------------
+- Prefer `examples/real/review_board/` as the first Band E proof target
+  because it is already maintained, already exercised by real-project tests,
+  and already exposes focus-oriented behavior.
+- If `review_board` cannot consume the admitted UI seams honestly, fall back to
+  one bounded installer or update-manager proof on the existing launcher and
+  update-store path.
+- Keep the proof single-program and explicit.
+
+Implementation accelerators
+---------------------------
+Main files and navigations
+~~~~~~~~~~~~~~~~~~~~~~~~~~
+- Primary candidate consumer: `examples/real/review_board/src/` and its build
+  manifest under `examples/real/review_board/build.toml`.
+- Alternate bounded consumer if needed: the current update or install path
+  rooted in `kernel/src/services/update_store_service.mc` and launcher-visible
+  state.
+- First-hop kernel owners: `kernel/src/launcher_service.mc`,
+  `kernel/src/foreground_input_route.mc`, `kernel/src/display_surface.mc`, and
+  the current app-local UI owners that will host the second proof.
+- Nearby accelerator docs: `docs/plan/active/phase279_first_human_facing_app_proof.txt`,
+  `docs/plan/active/phase281_first_ui_slice_audit.txt`, and
+  `docs/agent/prompts/test_overview.txt`.
+- Expected first validation target when the proof lands: `Build debug`, then
+  one focused system or workflow proof for the chosen UI program.
+
+Relevant cookbook patterns
+~~~~~~~~~~~~~~~~~~~~~~~~~~
+- Pattern 5 -- Add A Test File is the closest fit because the phase should end
+  in one more ambitious repository-owned proof backed by focused validation.
+
+Relevant file-local invariants
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+- `review_board` remains a real project first, not an app-framework template.
+- Launcher remains the single-foreground program owner.
+- Any app-local UI wrapper introduced for the chosen proof must stay bounded to
+  that program rather than becoming a shared app layer by default.
+
+Dependency-ordered touch sequence
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+- Land the chosen program-local proof path first in the selected consumer.
+- Update the kernel-side launcher, input, or display seam it directly needs
+  second.
+- Update the focused workflow or scenario wiring and any program-visible output
+  expectations third.
+- Update the narrow real-project and reset-lane proofs last.
+
+Common breakage map
+~~~~~~~~~~~~~~~~~~~
+- Changed program entry or UI wrapper contract -> build manifest, launcher
+  handoff, focused workflow case.
+- Changed shared UI seam to admit the new proof -> existing `issue_rollup`
+  proof, reset-lane expectations, narrow real-project coverage.
+- Changed consumer-visible state names or outputs -> workflow assertions,
+  scenario logs, hosted proof expectations.
+
+Relevant test surfaces
+~~~~~~~~~~~~~~~~~~~~~~
+- Primary owning validation surface: one focused reset-lane or workflow proof
+  for the chosen program.
+- Narrowest expected first executable validation target: that proof plus the
+  narrow real-project test for the chosen consumer.
+- Supporting validation: `mc_tool_workflow_kernel_reset_lane_unit` if the
+  kernel-owned UI path is involved.
+
+Test obligations
+----------------
+- `Build debug`
+- one focused system or workflow proof for the chosen UI program
+- one narrow real-project validation for the chosen consumer
+- `mc_tool_workflow_kernel_reset_lane_unit` if the admitted kernel UI path is
+  touched
+- `mc_tool_workflow_kernel_reset_lane_full_unit` only if the maintained reset-
+  lane path is widened
+
+Acceptance criteria
+-------------------
+- one second repository-owned UI program is directly usable on the admitted
+  surface
+- the proof reuses existing UI owners honestly instead of introducing an app
+  framework
+- the chosen consumer has narrow, maintained validation
+- the phase increases UI evidence without widening into packaging or platform
+  scope
+
+Future follow-up
+----------------
+- Phase 287 may now spend one bounded persistence slice if the chosen program
+  genuinely needs to preserve one view or document state.
+- Phase 288 should audit the build, launch, and test path exposed by the two
+  admitted UI-facing programs.

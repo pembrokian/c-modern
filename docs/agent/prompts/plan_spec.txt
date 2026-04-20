@@ -300,12 +300,14 @@ accelerators while the problem is still being framed.
 This section MUST stay implementation-facing rather than contractual. It does
 not replace `Invariants`, `Required surface changes`, or `Acceptance criteria`.
 
-It MUST include four parts:
+It MUST include six parts:
 
 1. `Main files and navigations`
 2. `Relevant cookbook patterns`
 3. `Relevant file-local invariants`
-4. `Relevant test surfaces`
+4. `Dependency-ordered touch sequence`
+5. `Common breakage map`
+6. `Relevant test surfaces`
 
 Main files and navigations
 ~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -361,6 +363,44 @@ shorter phase-local form.
 
 This subsection MUST NOT duplicate the entire contents of a file-invariants
 document. It should extract only the invariants relevant to the current phase.
+
+Dependency-ordered touch sequence
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+This subsection is REQUIRED.
+
+Its purpose is to keep implementation work staged in the order that most
+often minimizes churn in this repository.
+
+It MUST identify:
+
+- the controlling owner that should land first
+- the direct consumer or follow-through layer that should move second
+- the secondary consumer, printer, dump, or fixture layer that usually moves
+	after the owner and direct consumers
+- the test layer that should move last unless it is the only way to expose the
+	owner contract clearly
+
+It SHOULD stay short and execution-facing. It is not a complete task list.
+
+Common breakage map
+~~~~~~~~~~~~~~~~~~~
+This subsection is REQUIRED.
+
+Its purpose is to reduce repair-loop rediscovery by naming the most likely
+first-hop fallout after the controlling owner changes.
+
+It MUST name the common local failure chains that an implementer should check
+first, for example:
+
+- changed enum or tag -> switch exhaustiveness, printer or dump surfaces, tests
+- changed record or state field -> init, reset, reload, clone, debug, tests
+- changed AST node or parse shape -> parser owner, dumper, sema reader,
+	lowering, fixtures
+- changed signature or helper contract -> sibling helpers, call sites,
+	fixture builders, expected diagnostics
+
+This subsection MUST remain local and selective. It is not a substitute for a
+full design rationale.
 
 Relevant test surfaces
 ~~~~~~~~~~~~~~~~~~~~~~
@@ -638,6 +678,16 @@ Relevant file-local invariants
 - must not move ...
 - usual narrow validation ...
 
+Dependency-ordered touch sequence
+- controlling owner first ...
+- direct follow-through second ...
+- secondary consumers or dumps third ...
+- tests last ...
+
+Common breakage map
+- changed owner field or enum -> nearest fallout ...
+- changed helper or signature -> sibling callers, fixtures ...
+
 Relevant test surfaces
 - owning test family ...
 - first executable validation target ...
@@ -667,8 +717,9 @@ yes:
 2. Does it state what the phase will not do?
 3. Does it protect the critical invariants explicitly?
 4. Does it enumerate the required surface changes rather than hinting at them?
-5. Does it extract the main files, navigations, relevant patterns, and
-	owner-local invariants that will shorten implementation work?
+5. Does it extract the main files, navigations, relevant patterns, owner-local
+	invariants, dependency order, and common breakage map that will shorten
+	implementation work?
 6. Does it enumerate forbidden implementation moves?
 7. Does it define concrete test obligations?
 8. Does it define acceptance criteria that can actually be checked?

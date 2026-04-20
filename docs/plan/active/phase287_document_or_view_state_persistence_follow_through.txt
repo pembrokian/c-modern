@@ -1,0 +1,184 @@
+Phase 287 -- Document Or View State Persistence Follow-Through
+==============================================================
+
+Status
+------
+PROPOSED
+
+Purpose
+-------
+Let one admitted UI app preserve one bounded document or view state through an
+existing durable owner without introducing a UI-state framework.
+
+This phase exists now because a second UI proof becomes materially stronger if
+it can survive one honest restart or reload of user-visible state. The next
+slice must remain narrow: one persisted view or document fragment, not a full
+session model.
+
+Repository status note
+----------------------
+- Phase 280 already proves restart and update follow-through for the first UI
+  path by reusing `launcher_service.mc` and `update_store_service.mc`.
+- The repository already has a durable owner in `journal_service.mc` for small
+  persisted journal data.
+- Phase 286 should choose one stronger UI consumer that may now benefit from a
+  bounded persisted view or document state.
+- No admitted UI app yet preserves user-visible state across restart through an
+  existing durable owner.
+
+Problem being solved
+--------------------
+- A more ambitious UI proof can still be misleading if all user-visible state
+  disappears across restart even when the repo already has durable owners that
+  could carry one bounded state slice honestly.
+- Without one explicit persistence follow-through, later UI work would be
+  tempted either to invent a UI-state framework or to duplicate ad hoc file or
+  blob handling inside app code.
+- The current-repo problem is therefore one missing bounded persistence story
+  for one admitted UI app, not a missing general document system.
+
+Non-goals
+---------
+- no session restore framework
+- no generic document storage layer
+- no background sync or autosave framework
+- no multi-document persistence model
+- no retained UI tree or generalized app-state serialization framework
+
+Invariants
+----------
+- Durability must reuse an existing durable owner such as `journal_service.mc`
+  or another already-admitted durable seam.
+- Launcher remains restart classification owner only.
+- UI apps remain consumers of durable state, not durability frameworks.
+- The persisted state must stay bounded, explicit, and reviewable.
+- The phase must not imply a general save or sync platform.
+
+Required surface changes
+------------------------
+1. Choose one admitted UI app and one bounded persisted state shape.
+2. Route that state through one existing durable owner.
+3. Reload the state through the existing boot or launch path.
+4. Add one focused proof that the chosen state survives restart honestly.
+
+Forbidden changes
+-----------------
+- do not invent a UI-state service or app framework
+- do not overload `launcher_service.mc` with durable state ownership
+- do not widen `update_store_service.mc` into a generic document store if a
+  narrower existing durable owner already fits
+- do not claim multi-document or session semantics from one bounded persistence
+  slice
+
+Phase role in the larger sequence
+---------------------------------
+- This phase is the durability follow-through for the second UI proof.
+- It prepares Phase 288 by making the UI build and test path include one
+  restart-sensitive state proof.
+- It also gives Phase 289 a concrete answer on what "basic UI" now includes in
+  the repository.
+
+Relevant backlog items this phase intentionally brings under pressure
+--------------------------------------------------------------------
+- reuse existing durable owners instead of inventing UI-specific persistence
+- keep user-visible restart follow-through bounded to one honest persisted
+  state slice
+
+Questions this phase must answer
+--------------------------------
+1. Which admitted UI app is the honest consumer for the first persisted view or
+   document state?
+2. Is `journal_service.mc` the narrowest durable owner for that state, or is
+   another already-admitted durable seam stronger?
+3. What exact state shape is bounded enough for this slice?
+4. What evidence proves persistence without implying a broader save framework?
+
+Preferred implementation shape
+------------------------------
+- Prefer one tiny persisted state shape such as current view mode, selected
+  pane, last filter, or one bounded document fragment.
+- Prefer `journal_service.mc` if the state shape fits the existing durable
+  journal boundary.
+- Reload the state through existing boot or app-launch plumbing rather than
+  inventing a new restore stack.
+
+Implementation accelerators
+---------------------------
+Main files and navigations
+~~~~~~~~~~~~~~~~~~~~~~~~~~
+- Primary durable owner: `kernel/src/services/journal_service.mc`.
+- First-hop launch and restart owners: `kernel/src/services/launcher_service.mc`,
+  `kernel/src/boot/init.mc`, and any existing restart follow-through seams from
+  Phase 280.
+- Candidate consumers: the Phase 286 proof target and the current `issue_rollup`
+  interactive state under `examples/real/issue_rollup/src/app/issue_rollup_interactive.mc`
+  if that remains the strongest bounded persisted state example.
+- Nearby accelerator docs: `docs/plan/active/phase280_ui_app_restart_and_update_follow_through.txt`,
+  `docs/plan/active/phase286_first_editor_or_installer_style_ui_proof.txt`,
+  and the durable journal notes already captured in repository memory.
+- Expected first validation target when persistence lands: `Build debug`, then
+  one restart-sensitive fixture for the chosen UI app.
+
+Relevant cookbook patterns
+~~~~~~~~~~~~~~~~~~~~~~~~~~
+- Pattern 5 -- Add A Test File is again the closest fit because the phase is a
+  bounded persistence follow-through on existing owners.
+
+Relevant file-local invariants
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+- `journal_service.mc` owns persistence and replay for its bounded artifact
+  shape.
+- `boot/init.mc` owns reload on restart and must not become a UI-state policy
+  layer.
+- The chosen UI app owns the semantic meaning of its state but not the durable
+  persistence framework.
+
+Dependency-ordered touch sequence
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+- Land the bounded durable state shape in the owning persistence service first.
+- Update restart or reload plumbing and the chosen app consumer second.
+- Update boot, launch, and scenario follow-through expectations third.
+- Update the restart-sensitive fixture last.
+
+Common breakage map
+~~~~~~~~~~~~~~~~~~~
+- Changed persisted state record -> journal serialization, reload helpers,
+  app-state projection, restart fixtures.
+- Changed restart or reload signature -> boot-init callers, launcher follow-
+  through, scenario builders.
+- Changed visible persisted outcome -> app render state, debug observations,
+  restart-sensitive expected outputs.
+
+Relevant test surfaces
+~~~~~~~~~~~~~~~~~~~~~~
+- Primary owning validation surface: one focused restart-sensitive reset-lane
+  or system fixture for the chosen UI app.
+- Narrowest expected first executable validation target: that fixture plus one
+  narrow real-project validation for the app if hosted code changes.
+- Supporting validation: `mc_tool_workflow_kernel_reset_lane_unit` and the
+  relevant real-project suite for the chosen consumer.
+
+Test obligations
+----------------
+- `Build debug`
+- one focused restart-sensitive fixture for the chosen persisted state slice
+- one narrow real-project validation for the chosen UI consumer if its hosted
+  code changes
+- `mc_tool_workflow_kernel_reset_lane_unit` if the reset-lane path is touched
+- `mc_tool_workflow_kernel_reset_lane_full_unit` only if the maintained full
+  path gains the new persistence proof
+
+Acceptance criteria
+-------------------
+- one admitted UI app preserves one bounded document or view state honestly
+- the persistence path reuses an existing durable owner
+- no UI-state framework, session system, or generic document store is
+  introduced
+- the persisted state and restart proof are both explicit and reviewable
+
+Future follow-up
+----------------
+- Phase 288 should audit the practical build, launch, test, and restart path
+  for the admitted UI-facing programs after persistence lands.
+- Reopen broader document or save semantics only when multiple real consumers
+  require something stronger than the bounded slice admitted here.

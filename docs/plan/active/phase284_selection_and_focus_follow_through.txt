@@ -1,0 +1,183 @@
+Phase 284 -- Selection And Focus Follow-Through
+===============================================
+
+Status
+------
+PROPOSED
+
+Purpose
+-------
+Make one bounded focus or selection model explicit for the admitted UI app
+family so the second UI slice can express one active region or active item
+without widening into accessibility, scene-graph, or desktop policy.
+
+This phase exists now because once Band E introduces either a second visible
+region or a second input family, the next likely pressure is a single explicit
+answer to "what is currently active?" The repository should name that owner
+instead of leaving focus or selection implicit in app-local rendering only.
+
+Repository status note
+----------------------
+- Phase 282 may admit one bounded region owner if a second visible region is
+  real.
+- Phase 283 may admit one second input family if a real consumer requires it.
+- `launcher_service.mc` already owns single-foreground app truth but not in-
+  app focus or selection.
+- The current app proof still keeps all intra-app active-state logic local to
+  `issue_rollup_app.mc`.
+
+Problem being solved
+--------------------
+- A second UI layer can expose the need to distinguish one active region, one
+  active item, or one active control, but the repository has no explicit owner
+  for that truth yet.
+- Without one focus or selection contract, the next UI app proof would either
+  duplicate active-state rules inside each app or hide them inside a new
+  composition owner that is not actually responsible for semantic selection.
+- The current-repo problem is therefore one missing bounded active-state owner,
+  not a broad interaction framework.
+
+Non-goals
+---------
+- no accessibility framework
+- no scene graph or retained interaction tree
+- no multi-window focus policy
+- no keyboard shortcut framework or command palette system
+- no general text selection engine unless a real editor proof makes it the
+  controlling blocker
+
+Invariants
+----------
+- Launcher remains the owner of foreground-app choice only.
+- Focus or selection truth must stay bounded to one admitted UI app family or
+  one tiny shared owner.
+- The first model must distinguish only the active region or active item truth
+  that current consumers really need.
+- The phase must not imply a general control hierarchy or accessibility stack.
+
+Required surface changes
+------------------------
+1. Choose the narrowest honest owner for focus or selection truth.
+2. Define one explicit bounded focus or selection model.
+3. Spend that model in one admitted UI consumer.
+4. Add one focused reset-lane fixture proving the active-state behavior.
+
+Forbidden changes
+-----------------
+- do not widen focus into a desktop-wide policy
+- do not move active-state truth into `launcher_service.mc`
+- do not introduce retained UI trees, accessibility metadata, or generalized
+  event routing frameworks
+- do not add a command or keybinding framework as a substitute for explicit
+  focus truth
+
+Phase role in the larger sequence
+---------------------------------
+- This phase clarifies whether Band E now has a real shared interaction owner
+  beyond raw input and visible composition.
+- It prepares Phase 285 by exposing whether repeated app-local control logic is
+  now strong enough for a tiny shared vocabulary.
+- It also prepares Phase 286 if an editor- or installer-style proof needs one
+  active region or item.
+
+Relevant backlog items this phase intentionally brings under pressure
+--------------------------------------------------------------------
+- keep intra-app interaction truth explicit and bounded
+- keep launcher, composition, and app-local owners from absorbing one another's
+  policy by convenience
+
+Questions this phase must answer
+--------------------------------
+1. Does the strongest current pressure belong to a shared focus owner or does
+   active-state truth still remain app-local?
+2. Is the first bounded model about active region, active item, or both?
+3. Which current app proof should spend the first focus or selection model?
+4. What can remain deferred without making the UI slice dishonest?
+
+Preferred implementation shape
+------------------------------
+- Prefer one tiny active-state owner or one tiny shared helper over a large
+  interaction framework.
+- Keep the first model flat and explicit.
+- Reuse current input and composition owners rather than building a parallel
+  interaction stack.
+- Spend the model in one app only.
+
+Implementation accelerators
+---------------------------
+Main files and navigations
+~~~~~~~~~~~~~~~~~~~~~~~~~~
+- Primary controlling owners: the landed or planned Phase 282 and Phase 283
+  owners plus `kernel/src/issue_rollup_app.mc`.
+- First-hop adjacent files: `kernel/src/foreground_input_route.mc`,
+  `kernel/src/display_surface.mc`, and the relevant UI scenarios.
+- Nearby accelerator docs: `docs/agent/prompts/kernel_file_invariants.txt`,
+  `docs/plan/active/phase281_first_ui_slice_audit.txt`, and the Phase 282 or
+  Phase 283 plan docs that actually landed.
+- Expected first validation target when the owner changes: `Build debug`, then
+  one focused focus-or-selection fixture.
+
+Relevant cookbook patterns
+~~~~~~~~~~~~~~~~~~~~~~~~~~
+- No exact cookbook pattern fits because the phase is deciding whether active-
+  state truth is shared yet or still app-local.
+- The plan should resist inventing a new service if a narrow helper or app-
+  local owner remains the honest fit.
+
+Relevant file-local invariants
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+- `launcher_service.mc` must remain a foreground-app owner, not an intra-app
+  focus owner.
+- `foreground_input_route.mc` routes input but should not accumulate active-
+  state policy beyond what the chosen owner already defines.
+- `issue_rollup_app.mc` may keep focus truth app-local if no shared owner wins.
+
+Dependency-ordered touch sequence
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+- Land the bounded focus or selection owner first, or record the explicit
+  app-local outcome there if no shared owner is honest.
+- Update the chosen consumer and the existing input or composition seam second.
+- Update visible-state or scenario expectations third.
+- Update the focused focus-or-selection fixture last.
+
+Common breakage map
+~~~~~~~~~~~~~~~~~~~
+- Changed active-state record or enum -> app-local render branches, input-route
+  handoff, visible-state fixtures.
+- Changed focus helper or selection signature -> direct callers, scenario
+  builders, reset-lane expectations.
+- Moved active truth across owners by accident -> launcher or route files start
+  accumulating semantic selection logic that should move back to the chosen
+  focus owner.
+
+Relevant test surfaces
+~~~~~~~~~~~~~~~~~~~~~~
+- Primary owning validation surface: one focused reset-lane fixture for the new
+  focus or selection path.
+- Narrowest expected first executable validation target: that fixture plus
+  `mc_tool_workflow_kernel_reset_lane_unit`.
+- Supporting validation: one narrow app-facing real-project proof only if the
+  chosen consumer's hosted app logic changes.
+
+Test obligations
+----------------
+- `Build debug`
+- one focused focus-or-selection reset-lane fixture
+- `mc_tool_workflow_kernel_reset_lane_unit`
+- `mc_tool_workflow_kernel_reset_lane_full_unit` only if the new owner lands on
+  the maintained UI path
+
+Acceptance criteria
+-------------------
+- the repository has one explicit honest answer on focus or selection truth for
+  the admitted UI app family
+- the first model stays bounded and deterministic
+- launcher, input, and composition owners preserve their current boundaries
+- no retained interaction framework or accessibility layer is introduced
+
+Future follow-up
+----------------
+- If repeated app-local control logic is now clearly stronger, Phase 285 may
+  classify whether one tiny shared control vocabulary is justified.
+- If the chosen consumer still works honestly with app-local active-state
+  truth, record that and keep shared focus deferred.

@@ -1,0 +1,187 @@
+Phase 283 -- Pointer Or Alternate Input First Slice
+===================================================
+
+Status
+------
+PROPOSED
+
+Purpose
+-------
+Admit one second input family only if a real repository-owned UI consumer now
+needs more than the existing `I K <byte> !` key-event path.
+
+This phase exists now because Phase 274 deliberately kept input tiny and
+single-family. Band E should only widen that surface if one current foreground
+UI app now needs a second input mode that cannot be represented honestly as the
+existing key-event vocabulary.
+
+Repository status note
+----------------------
+- `input_event.mc` already owns the first input family.
+- `foreground_input_route.mc` already owns the single-foreground handoff from
+  parsed input events to the current foreground app.
+- `issue_rollup_app.mc` is the current directly usable app proof on that path.
+- The repository still has no pointer, rotary, drag, focus-navigation, or other
+  second input owner.
+
+Problem being solved
+--------------------
+- A second UI layer may expose pressure for something like pointer or alternate
+  directional input, but the repository does not yet know whether that is real
+  or just habitual design drift.
+- Without one explicit phase gate, a second input family could be smuggled into
+  app-local handlers, `foreground_input_route.mc`, or shell decode as ad hoc
+  extra bytes.
+- The current-repo problem is therefore to decide whether any real consumer now
+  needs a second input family strongly enough to justify a new owner-local
+  vocabulary.
+
+Non-goals
+---------
+- no generalized event broker
+- no device framework or input-driver stack
+- no subscriptions, queues, or multi-recipient input dispatch
+- no accessibility framework
+- no text-input, IME, or rich editing stack unless one admitted consumer makes
+  it the controlling blocker
+
+Invariants
+----------
+- `input_event.mc` remains the owner of input-event parsing and vocabulary.
+- `foreground_input_route.mc` remains the owner of single-foreground handoff,
+  not input-family semantics.
+- The second input family must be explicit and bounded.
+- One second input family must not imply arbitrary input extensibility.
+- The phase must be allowed to conclude that the existing key-input path is
+  still sufficient.
+
+Required surface changes
+------------------------
+1. Audit whether one real current UI consumer now needs a second input family.
+2. If yes, add one explicit bounded second input vocabulary under the input
+   owner.
+3. Thread that vocabulary through the existing foreground route for exactly one
+   chosen consumer.
+4. Add one focused reset-lane fixture proving the new family.
+5. If no, document the non-landing explicitly and keep the current input owner
+   unchanged.
+
+Forbidden changes
+-----------------
+- do not add a generic event broker or registration system
+- do not hide a new input family inside app-local byte parsing
+- do not widen shell or dispatch into input policy owners
+- do not infer that pointer input is needed just because many UI systems have
+  one
+
+Phase role in the larger sequence
+---------------------------------
+- This phase is the pressure gate for alternate input during Band E.
+- It prepares Phase 284 and Phase 286 only if the second input family becomes
+  real.
+- It also protects the repository from inventing a broader input framework too
+  early.
+
+Relevant backlog items this phase intentionally brings under pressure
+--------------------------------------------------------------------
+- keep input growth bounded to one explicit owner and one admitted consumer
+- keep app-local interaction work app-local until a shared second input family
+  is clearly stronger
+
+Questions this phase must answer
+--------------------------------
+1. Does any real admitted UI consumer now need a second input family?
+2. If yes, what is the narrowest honest second family: pointer-like position,
+   directional navigation, or another small bounded shape?
+3. Should the first second-family consumer be `issue_rollup`, `review_board`,
+   or a later Band E app proof?
+4. If no, what exact evidence keeps the second input family deferred?
+
+Preferred implementation shape
+------------------------------
+- Start with an audit against the current UI consumers.
+- If a second family lands, keep it under `input_event.mc` as one bounded
+  additive vocabulary.
+- Reuse `foreground_input_route.mc` for delivery rather than creating a new
+  routing owner.
+- Spend the feature on one consumer only.
+
+Implementation accelerators
+---------------------------
+Main files and navigations
+~~~~~~~~~~~~~~~~~~~~~~~~~~
+- Primary controlling owners: `kernel/src/input_event.mc` and
+  `kernel/src/foreground_input_route.mc`.
+- First-hop adjacent files: `kernel/src/issue_rollup_app.mc`,
+  `kernel/src/kernel_dispatch.mc`, and the current input-facing scenarios.
+- Nearby accelerator docs: `docs/agent/prompts/kernel_file_invariants.txt`,
+  `docs/plan/active/phase274_input_event_owner_first_slice.txt`, and
+  `docs/plan/active/phase281_first_ui_slice_audit.txt`.
+- Expected first validation target when the owner changes: `Build debug`, then
+  one focused alternate-input reset-lane fixture.
+
+Relevant cookbook patterns
+~~~~~~~~~~~~~~~~~~~~~~~~~~
+- No exact cookbook pattern fits; this is a bounded extension of an existing
+  UI-owner seam.
+- Pattern 4 -- Add A Diagnostic may apply only if the phase explicitly keeps a
+  second input family rejected and makes that rejection user-visible.
+
+Relevant file-local invariants
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+- `input_event.mc` owns event-family semantics and should remain the first
+  honest owner for a second input vocabulary.
+- `foreground_input_route.mc` consumes parsed input but must not redefine the
+  input-family model.
+- The chosen app may consume the new input family, but it should not invent the
+  shared event semantics itself.
+
+Dependency-ordered touch sequence
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+- Land the bounded second input vocabulary in `input_event.mc` first, or land
+  the explicit defer result there if the audit rejects expansion.
+- Update `foreground_input_route.mc` and the chosen consumer second.
+- Update dispatch plumbing, scenarios, and visible outcome expectations third.
+- Update the focused alternate-input fixture last.
+
+Common breakage map
+~~~~~~~~~~~~~~~~~~~
+- Changed input-event enum or payload shape -> route switch exhaustiveness,
+  app handlers, unsupported-outcome tests.
+- Changed frame parsing contract -> live receive or scenario frame builders,
+  route callers, fixture bytes.
+- Changed alternate-input outcome names -> dumps, diagnostics, and reset-lane
+  expected observations.
+
+Relevant test surfaces
+~~~~~~~~~~~~~~~~~~~~~~
+- Primary owning validation surface: one focused reset-lane fixture for the new
+  input family or for the decision to defer it.
+- Narrowest expected first executable validation target: that fixture plus
+  `mc_tool_workflow_kernel_reset_lane_unit`.
+- Supporting validation: one narrow hosted app proof only if the chosen
+  consumer's real-project code changes.
+
+Test obligations
+----------------
+- `Build debug`
+- one focused alternate-input reset-lane fixture or one explicit defer-and-
+  reject proof
+- `mc_tool_workflow_kernel_reset_lane_unit`
+- `mc_tool_workflow_kernel_reset_lane_full_unit` only if the second input
+  family actually lands
+
+Acceptance criteria
+-------------------
+- the repository has one explicit honest answer on second-input pressure
+- if a second input family lands, it is bounded, owner-local, and spent in one
+  admitted consumer only
+- if no second input family lands, that deferral is explicit and evidence-based
+- no broker, device stack, or generic event framework is introduced
+
+Future follow-up
+----------------
+- If a second input family lands, Phase 284 may use it only where one explicit
+  focus or selection model requires it.
+- If the pressure is still weak, keep alternate input deferred until a later UI
+  proof actually needs it.

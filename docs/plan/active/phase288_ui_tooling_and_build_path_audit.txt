@@ -1,0 +1,191 @@
+Phase 288 -- UI Tooling And Build Path Audit
+============================================
+
+Status
+------
+PROPOSED
+
+Purpose
+-------
+Document and validate the build, launch, and test path for the repository's
+UI-facing programs without creating a separate platform, packaging, or app-
+distribution stack.
+
+This phase exists now because once Band E has more than one UI-facing proof,
+the repository needs one explicit answer on how those programs are built,
+launched, exercised, and rechecked locally and in CI. The next honest move is
+an audit and cleanup of the existing path, not a new application platform.
+
+Repository status note
+----------------------
+- `issue_rollup` already has maintained real-project coverage under
+  `tests/tool/real_projects/issue-rollup/`.
+- `review_board` already has maintained real-project coverage under
+  `tests/tool/real_projects/review-board/`.
+- The reset-lane suite already carries the first UI proof and related grouped
+  workflow coverage.
+- The repository still lacks one explicit statement of the standard build,
+  launch, run, and test path for UI-facing programs as a coherent maintained
+  workflow.
+
+Problem being solved
+--------------------
+- Band E can become difficult to use or review if the UI-facing programs only
+  remain validated through scattered build dirs, implicit test knowledge, or
+  one-off commands.
+- Without one explicit tooling audit, pressure for convenience could turn into
+  a separate packaging or app-runner stack that is broader than the repository
+  actually needs.
+- The current-repo problem is therefore one missing maintained workflow account
+  for UI-facing programs, not a lack of app-platform infrastructure.
+
+Non-goals
+---------
+- no separate packaging format
+- no app installer or distribution channel
+- no desktop runtime or launcher daemon
+- no new platform abstraction layer
+- no replacement of the current `mc` project workflow with a UI-specific tool
+
+Invariants
+----------
+- The standard `mc` build, run, check, and test workflow remains the core tool
+  path.
+- UI-facing programs remain ordinary repository-owned projects.
+- Real-project tests remain the primary hosted validation surface for UI-facing
+  programs.
+- Reset-lane coverage remains grouped and bounded rather than split into manual
+  shards.
+- The audit must be allowed to recommend documentation or target cleanup
+  without inventing new platform infrastructure.
+
+Required surface changes
+------------------------
+1. Audit the maintained build, run, and test path for the admitted UI-facing
+   programs.
+2. Document the canonical local commands and owning tests.
+3. Add or tighten the narrowest missing validation if the audit finds a real
+   gap.
+4. Keep all resulting workflow changes inside the current `mc` and grouped-test
+   surfaces.
+
+Forbidden changes
+-----------------
+- do not add a UI-specific package manager, runner, or build tool
+- do not introduce a second parallel workflow for UI-facing projects
+- do not move ordinary project responsibilities out of the current real-project
+  and reset-lane surfaces
+- do not treat documentation-only cleanup as an excuse for broad tool refactors
+
+Phase role in the larger sequence
+---------------------------------
+- This phase turns the Band D and Band E UI proofs into a stable, teachable,
+  and reviewable workflow.
+- It prepares Phase 289 by making the second UI slice explicit in both
+  behavior and validation.
+
+Relevant backlog items this phase intentionally brings under pressure
+--------------------------------------------------------------------
+- keep UI-facing programs on the same ordinary project workflow as other repo-
+  owned programs
+- keep validation narrow, maintained, and reusable rather than ad hoc
+
+Questions this phase must answer
+--------------------------------
+1. What are the canonical build, run, and test commands for the admitted
+   UI-facing programs?
+2. Which owning real-project and reset-lane tests are the required narrow
+   validation surfaces?
+3. Are there any actual workflow gaps that require a small additive test or
+   documentation update?
+4. What tempting packaging or app-platform steps remain intentionally closed?
+
+Preferred implementation shape
+------------------------------
+- Prefer documentation and small validation-surface fixes over tool widening.
+- Reuse `tests/tool/real_projects/issue-rollup/test.cpp`,
+  `tests/tool/real_projects/review-board/test.cpp`, and the grouped reset-lane
+  suite as the core proof surfaces.
+- Keep any new commands or examples expressed in the existing `mc` workflow.
+
+Implementation accelerators
+---------------------------
+Main files and navigations
+~~~~~~~~~~~~~~~~~~~~~~~~~~
+- Primary workflow surfaces: `tests/tool/real_projects/issue-rollup/test.cpp`,
+  `tests/tool/real_projects/review-board/test.cpp`, and
+  `tests/tool/tool_kernel_reset_lane_suite.cpp`.
+- Candidate documentation surfaces: `README.md`, `tests/README.md`,
+  `tools/README.md`, and any UI-facing phase plan docs that need cross-links.
+- Project manifests to keep in view: `examples/real/issue_rollup/build.toml`
+  and `examples/real/review_board/build.toml`.
+- Nearby accelerator docs: `docs/agent/prompts/test_overview.txt` and
+  `docs/plan/active/phase281_first_ui_slice_audit.txt`.
+- Expected first validation target when audit changes land: only the narrow
+  affected real-project or reset-lane surfaces.
+
+Relevant cookbook patterns
+~~~~~~~~~~~~~~~~~~~~~~~~~~
+- Pattern 5 -- Add A Test File may apply only if the audit reveals one missing
+  narrow validation surface.
+- Otherwise this phase should stay mostly documentation and workflow cleanup.
+
+Relevant file-local invariants
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+- `tests/tool/real_projects/*` remain the owner-local proof surfaces for hosted
+  project workflows.
+- `tests/tool/tool_kernel_reset_lane_suite.cpp` remains the grouped system path
+  for reset-lane UI and workflow validation.
+- `build.toml` project manifests remain the user-facing build entrypoints; no
+  alternate app manifest family should be introduced.
+
+Dependency-ordered touch sequence
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+- Audit the existing real-project and reset-lane workflow surfaces first.
+- Land the narrow documentation or workflow-owner clarification second.
+- Land any missing focused test or manifest follow-through third only if the
+  audit finds a real gap.
+- Rerun only the exact workflow surface touched last.
+
+Common breakage map
+~~~~~~~~~~~~~~~~~~~
+- Changed canonical command or workflow note -> README and test README drift,
+  real-project proof assumptions, operator docs.
+- Changed grouped workflow wiring -> owning grouped suite, checked-in case or
+  descriptor, manifest expectations.
+- Changed project-manifest examples -> real-project tests and local command
+  examples that assume the old entrypoint.
+
+Relevant test surfaces
+~~~~~~~~~~~~~~~~~~~~~~
+- Primary owning validation surface: the narrow real-project tests for the
+  admitted UI-facing programs.
+- Narrowest expected first executable validation target: the exact test or
+  tests whose workflow documentation or coverage changed.
+- Supporting validation: the grouped reset-lane suite only if the audit changes
+  one of its owned paths.
+
+Test obligations
+----------------
+- no blanket full-suite run by default
+- run the narrow real-project test or grouped reset-lane case that matches the
+  workflow surface touched by the audit
+- `Build debug` only if documentation changes are accompanied by tool or test
+  edits
+
+Acceptance criteria
+-------------------
+- the repository has one explicit maintained account of how UI-facing programs
+  are built, launched, and tested
+- any workflow or validation gaps are addressed with the narrowest additive
+  change
+- no UI-specific platform or packaging stack is introduced
+- Band E ends with a reviewable workflow surface rather than scattered tribal
+  knowledge
+
+Future follow-up
+----------------
+- Phase 289 should freeze the second UI slice using the documented workflow and
+  validation picture produced here.
+- Reopen broader tooling only if multiple future platform-facing consumers
+  prove that the ordinary `mc` project workflow is no longer sufficient.

@@ -1,0 +1,71 @@
+Change Touch Sets
+=================
+
+Purpose
+-------
+Use this file to stage owner-first edits and to avoid rediscovering the same
+follow-through files after the first compile break.
+
+The touch sets below are short default repair maps, not exhaustive inventories.
+Start with the controlling owner, then move only to the listed direct and
+secondary follow-through surfaces that actually apply.
+
+Compiler touch sets
+-------------------
+
+- Token kind change:
+  `compiler/lex/token.*`, lexer owner, parser consumers, token printer or dump,
+  parser fixtures or lexer-facing tests
+- AST node or parse-shape change:
+  `compiler/ast/*`, parser owner, AST dump, sema readers, MIR lowerer only if
+  the typed form changes, parser fixtures
+- Semantic type or rule change:
+  `compiler/sema/check.cpp` or `compiler/sema/type.*`, sema dump, MIR only if
+  checked type identity or lowering input changes, sema fixtures
+- MIR value or control-flow change:
+  `compiler/mir/*`, MIR dump or validator, backend only if MIR-visible contract
+  changes, MIR fixtures or MIR unit tests
+- Driver or project-workflow change:
+  `compiler/driver/driver.cpp`, adjacent support helpers, grouped tool suites,
+  real-project or workflow tests, project docs only if user-facing commands or
+  owned layout changed
+- Backend executable signature or lowering change:
+  `compiler/codegen_llvm/backend.cpp` or the split executable lowering owners,
+  backend internal contract, executable tests, real-project executable proofs
+
+Kernel and workflow touch sets
+------------------------------
+
+- Service state field change:
+  owning service file, owner-local init or reset helpers, reload or restart
+  path, debug or observation dump, owning scenario or fixture
+- Service descriptor or enum change:
+  `kernel/src/identity/service_topology.mc`, same-owner label or classifier
+  helpers, printers or dumps, tests that assert visible names or outcomes
+- Input vocabulary change:
+  `kernel/src/input_event.mc`, `kernel/src/foreground_input_route.mc`, chosen
+  app consumer, narrow reset-lane fixture
+- Display or composition change:
+  `kernel/src/services/display_surface.mc` or the composition owner,
+  app-present seam, scenario or fixture, only then broader grouped reset-lane
+  coverage
+- Launcher or program-identity change:
+  `kernel/src/services/launcher_service.mc`, `kernel/src/identity/program_catalog.mc`,
+  update-store follow-through if installed truth changes, launcher-facing
+  fixtures or workflow proofs
+- Durable state shape change:
+  owning durable service, reload or boot follow-through, chosen consumer,
+  restart-sensitive fixture
+
+Grouped test touch sets
+-----------------------
+
+- Tool workflow change:
+  owning grouped suite implementation, checked-in case descriptor or fixture,
+  generated registration only if descriptor shape changed
+- Real-project workflow change:
+  `tests/tool/real_projects/<case>/test.cpp`, that case's descriptor or
+  manifest, grouped real-project dispatcher only if shared wiring changed
+- Reset-lane change:
+  narrow scenario or fixture first, then `tests/tool/tool_kernel_reset_lane_suite.cpp`,
+  then the maintained full grouped case only after the narrow owner passes
