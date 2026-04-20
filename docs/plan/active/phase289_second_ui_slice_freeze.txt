@@ -162,6 +162,9 @@ Relevant test surfaces
 - Routing note: if an evidence gap is test-owned, repair it in the narrowest
   owning target named by the earlier phase rather than rerunning broad grouped
   coverage first.
+- Low-signal note: if the narrow owner-local validation target fails on a
+  known unrelated assertion, record that target as low-signal and step to the
+  next closest owner-local surface that still exercises the frozen claim.
 
 Test obligations
 ----------------

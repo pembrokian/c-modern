@@ -190,6 +190,9 @@ Relevant test surfaces
 - Routing note: consult `tests/tool/README.md` and prefer the active grouped
   owner named there rather than compatibility runners such as
   `tests/tool/tool_suite_tests.cpp`.
+- If the grouped reset-lane or workflow target gets slower after a helper or
+  probe change, inspect the per-scenario `cache=hit` or `cache=miss` summary
+  before changing suite shape.
 
 Test obligations
 ----------------

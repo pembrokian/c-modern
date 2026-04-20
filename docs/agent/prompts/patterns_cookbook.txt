@@ -279,6 +279,35 @@ Recent shape:
 - Phase 282: bounded `surface_composition.mc` plus one custom-manifest
   `issue_rollup` consumer and one focused reset-lane proof
 
+Pattern 12 -- Split A Crowded Scenario Or Probe Module
+------------------------------------------------------
+Use when:
+- one scenario or probe file carries multiple concerns and should become one
+  helper home plus one probe per file, without changing behavior
+
+Usually edit:
+- the crowded scenario or probe owner
+- one or more new helper or assertion files if duplication is real
+- one split probe file per concern
+- a thin facade file only if existing imports should remain stable
+- the narrowest owner-local test or scenario surface that exercises the split
+
+Validate:
+- `Build debug`
+- the narrowest owner-local executable target that directly exercises the split
+- if that target is already baseline-red for unrelated reasons, step to the
+  next closest owner-local surface instead of widening immediately
+
+Beware:
+- do not mix behavior changes into a move-only or factorization pass
+- do not break import surfaces if a thin facade avoids churn honestly
+- do not treat an unrelated longstanding failing target as evidence of local
+  fallout; record it as low-signal and choose the next best owner-local check
+
+Recent shape:
+- launcher scenario split into shared helpers plus focused probe files while
+  preserving a thin facade import surface
+
 Quick Check Before Editing
 --------------------------
 1. Which layer owns the first honest definition of this behavior?

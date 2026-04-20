@@ -53,6 +53,11 @@ Common first-break checks
   step to the first failing owner-local case first; treat stale reuse
   expectations and owner-local helper contracts as likely causes before
   reopening shared runtime or workflow code
+- Unrelated baseline-failing target:
+  if the chosen narrow executable target fails on a known unrelated assertion
+  or longstanding red surface, do not widen code search immediately; record
+  that the target is low-signal for this change, then step to the next closest
+  owner-local validation surface that still exercises the edited files
 - Reset-lane fixture addition broke the build:
   check the scenario registration row, any fixed-size `std::array` or scenario
   count, coverage-validation helpers, fixture naming, and the owning reset-lane

@@ -182,6 +182,9 @@ Relevant test surfaces
 - Routing note: use the grouped reset-lane suite for restart workflow
   follow-through and use `tests/system/` only if the change is primarily direct
   runtime persistence behavior rather than tool-driven restart coverage.
+- Low-signal note: if the first restart-sensitive fixture is failing on a known
+  unrelated assertion, treat it as low-signal and step to the next closest
+  owner-local surface that still exercises the persistence path.
 - Exact first command when the reset-lane path is touched:
   `ctest --test-dir build/debug -R mc_tool_workflow_kernel_reset_lane_unit --output-on-failure`.
 

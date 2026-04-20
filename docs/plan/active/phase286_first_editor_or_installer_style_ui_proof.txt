@@ -193,6 +193,9 @@ Relevant test surfaces
   chosen `tests/tool/real_projects/<case>/test.cpp` when the proof is mainly a
   hosted project path; use `tests/tool/tool_kernel_reset_lane_suite.cpp` only
   for the reset-lane workflow follow-through.
+- Low-signal note: if the first narrow real-project target is already red on an
+  unrelated assertion, record it as low-signal and step to the next closest
+  owner-local surface that still exercises the edited files before widening.
 - Exact first command when `review_board` remains the chosen consumer:
   `ctest --test-dir build/debug -R 'mc_tool_real_project_.*review.*|mc_tool_real_project_.*review_board.*' --output-on-failure`.
 
