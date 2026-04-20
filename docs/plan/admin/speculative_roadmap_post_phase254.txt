@@ -411,6 +411,11 @@ Phase 279 -- First Human-Facing App Proof
 - Exit criterion: one repository-owned app such as a log viewer, queue viewer,
   task inspector, or similar utility becomes directly usable through the first
   admitted UI surface.
+- Landed result: `issue_rollup` is now directly usable on the admitted UI path
+  through one app-local interactive reducer that appends bounded issue lines,
+  reuses the existing parse-plus-render owners, and proves deterministic
+  `EMTY` -> `STDY` -> `BUSY` -> `ATTN` -> `EMTY` visible interaction without
+  widening into widgets, text-entry frameworks, or a second app.
 
 Phase 280 -- UI App Restart And Update Follow-Through
 - Exit criterion: one human-facing app remains honest under restart or update

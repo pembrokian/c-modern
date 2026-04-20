@@ -1,7 +1,7 @@
 import display_surface
+import issue_rollup_interactive
 import program_catalog
 import rollup_manifest
-import rollup_model
 import rollup_render
 import update_store_service
 
@@ -11,7 +11,7 @@ enum IssueRollupPresentKind {
 }
 
 struct IssueRollupAppState {
-    summary: rollup_model.Summary
+    interactive: issue_rollup_interactive.IssueRollupInteractiveState
 }
 
 struct IssueRollupPresentResult {
@@ -21,11 +21,11 @@ struct IssueRollupPresentResult {
 }
 
 func issue_rollup_app_init() IssueRollupAppState {
-    return IssueRollupAppState{ summary: { open_items: 0, closed_items: 0, blocked_items: 0, priority_items: 0 } }
+    return IssueRollupAppState{ interactive: issue_rollup_interactive.issue_rollup_interactive_init() }
 }
 
-func issue_rollupwith(summary: rollup_model.Summary) IssueRollupAppState {
-    return IssueRollupAppState{ summary: summary }
+func issue_rollupwith(interactive: issue_rollup_interactive.IssueRollupInteractiveState) IssueRollupAppState {
+    return IssueRollupAppState{ interactive: interactive }
 }
 
 func issue_rollup_result(app: IssueRollupAppState, display: display_surface.DisplaySurfaceState, kind: IssueRollupPresentKind) IssueRollupPresentResult {
@@ -49,7 +49,8 @@ func issue_rollup_manifest(update_store: update_store_service.UpdateStoreService
 
 func issue_rollup_present(app: IssueRollupAppState, update_store: update_store_service.UpdateStoreServiceState, display: display_surface.DisplaySurfaceState) IssueRollupPresentResult {
     manifest := issue_rollup_manifest(update_store)
-    cells := rollup_render.rollup_display_cells_with_manifest(app.summary, manifest)
+    summary := issue_rollup_interactive.issue_rollup_summary(app.interactive)
+    cells := rollup_render.rollup_display_cells_with_manifest(summary, manifest)
     result := display_surface.display_present(display, cells)
     return issue_rollup_result(app, result.state, IssueRollupPresentKind.Presented)
 }
@@ -58,38 +59,10 @@ func issue_rollup_launch(update_store: update_store_service.UpdateStoreServiceSt
     return issue_rollup_present(issue_rollup_app_init(), update_store, display)
 }
 
-func issue_rollup_summary_equal(left: rollup_model.Summary, right: rollup_model.Summary) bool {
-    if left.open_items != right.open_items {
-        return false
-    }
-    if left.closed_items != right.closed_items {
-        return false
-    }
-    if left.blocked_items != right.blocked_items {
-        return false
-    }
-    return left.priority_items == right.priority_items
-}
-
-func issue_rollup_summary_for_key(current: rollup_model.Summary, key: u8) rollup_model.Summary {
-    switch key {
-    case 69:
-        return issue_rollup_app_init().summary
-    case 83:
-        return rollup_model.Summary{ open_items: 1, closed_items: 0, blocked_items: 0, priority_items: 0 }
-    case 66:
-        return rollup_model.Summary{ open_items: 2, closed_items: 0, blocked_items: 0, priority_items: 0 }
-    case 65:
-        return rollup_model.Summary{ open_items: 0, closed_items: 0, blocked_items: 2, priority_items: 0 }
-    default:
-        return current
-    }
-}
-
 func issue_rollup_input(app: IssueRollupAppState, update_store: update_store_service.UpdateStoreServiceState, display: display_surface.DisplaySurfaceState, key: u8) IssueRollupPresentResult {
-    next_summary := issue_rollup_summary_for_key(app.summary, key)
-    if issue_rollup_summary_equal(next_summary, app.summary) {
+    next := issue_rollup_interactive.issue_rollup_handle_key(app.interactive, key)
+    if !next.changed {
         return issue_rollup_result(app, display, IssueRollupPresentKind.NoChange)
     }
-    return issue_rollup_present(issue_rollupwith(next_summary), update_store, display)
+    return issue_rollup_present(issue_rollupwith(next.state), update_store, display)
 }

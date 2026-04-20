@@ -223,7 +223,9 @@ std::string LoadKernelResetLaneFixtureFile(const std::filesystem::path& source_r
     }
 
     const std::string kernel_src = (source_root / "kernel" / "src").generic_string();
+    const std::string issue_rollup_app_src = (source_root / "examples" / "real" / "issue_rollup" / "src" / "app").generic_string();
     const std::string issue_rollup_model_src = (source_root / "examples" / "real" / "issue_rollup" / "src" / "model").generic_string();
+    const std::string issue_rollup_parse_src = (source_root / "examples" / "real" / "issue_rollup" / "src" / "parse").generic_string();
     const std::string issue_rollup_render_src = (source_root / "examples" / "real" / "issue_rollup" / "src" / "render").generic_string();
     const std::string stdlib_src = (source_root / "stdlib").generic_string();
     size_t pos = 0;
@@ -232,17 +234,33 @@ std::string LoadKernelResetLaneFixtureFile(const std::filesystem::path& source_r
         pos += kernel_src.size();
     }
     const std::string transport_entry = kernel_src + "/transport";
+    const std::string issue_rollup_app_entry = "\"" + issue_rollup_app_src + "\"";
     const std::string issue_rollup_model_entry = "\"" + issue_rollup_model_src + "\"";
+    const std::string issue_rollup_parse_entry = "\"" + issue_rollup_parse_src + "\"";
     const std::string issue_rollup_render_entry = "\"" + issue_rollup_render_src + "\"";
     const std::string stdlib_entry = "\"" + stdlib_src + "\"";
     const size_t transport_pos = text.find(transport_entry);
-    if (transport_pos != std::string::npos && text.find(issue_rollup_model_entry) == std::string::npos) {
+    if (transport_pos != std::string::npos) {
         const size_t insert_pos = transport_pos + transport_entry.size() + 1;
-        text.insert(insert_pos, ",\n\t\"" + issue_rollup_model_src + "\",\n\t\"" + issue_rollup_render_src + "\"");
-    }
-    if (transport_pos != std::string::npos && text.find(stdlib_entry) == std::string::npos) {
-        const size_t insert_pos = transport_pos + transport_entry.size() + 1;
-        text.insert(insert_pos, ",\n\t\"" + stdlib_src + "\"");
+        std::string insert_text;
+        if (text.find(issue_rollup_app_entry) == std::string::npos) {
+            insert_text += ",\n\t\"" + issue_rollup_app_src + "\"";
+        }
+        if (text.find(issue_rollup_parse_entry) == std::string::npos) {
+            insert_text += ",\n\t\"" + issue_rollup_parse_src + "\"";
+        }
+        if (text.find(issue_rollup_model_entry) == std::string::npos) {
+            insert_text += ",\n\t\"" + issue_rollup_model_src + "\"";
+        }
+        if (text.find(issue_rollup_render_entry) == std::string::npos) {
+            insert_text += ",\n\t\"" + issue_rollup_render_src + "\"";
+        }
+        if (text.find(stdlib_entry) == std::string::npos) {
+            insert_text += ",\n\t\"" + stdlib_src + "\"";
+        }
+        if (!insert_text.empty()) {
+            text.insert(insert_pos, insert_text);
+        }
     }
     return text;
 }
@@ -510,7 +528,7 @@ void RunKernelRepoLiveReceiveScenario(const std::filesystem::path& source_root,
     }
 }
 
-constexpr std::array<ResetLaneScenario, 74> kResetLaneScenarios = {{
+constexpr std::array<ResetLaneScenario, 75> kResetLaneScenarios = {{
     {.label = "repo project", .scenario_key = "repo", .target_name = "kernel", .include_in_fast = true, .build_warn_ms = 2000},
     {.label = "smoke", .fixture_relative_path = "tests/smoke/kernel_reset_lane_serial_round_trip", .scenario_key = "smoke", .target_name = "app", .include_in_fast = true},
     {.label = "retained state", .fixture_relative_path = "tests/system/kernel_reset_lane_retained_log", .scenario_key = "retained_state", .context_label = "retained-state", .target_name = "app", .include_in_fast = true},
@@ -577,6 +595,7 @@ constexpr std::array<ResetLaneScenario, 74> kResetLaneScenarios = {{
     {.label = "foreground app input routing", .fixture_relative_path = "tests/system/kernel_reset_lane_phase276_foreground_app_input_routing", .scenario_key = "phase276_foreground_app_input_routing", .context_label = "phase 276 foreground app input routing", .target_name = "app", .include_in_fast = true, .build_warn_ms = 1000},
     {.label = "explicit present contract", .fixture_relative_path = "tests/system/kernel_reset_lane_phase277_explicit_present_contract", .scenario_key = "phase277_explicit_present_contract", .context_label = "phase 277 explicit present contract", .target_name = "app", .include_in_fast = true, .build_warn_ms = 1000},
     {.label = "fixed cell rendering", .fixture_relative_path = "tests/system/kernel_reset_lane_phase278_fixed_cell_rendering", .scenario_key = "phase278_fixed_cell_rendering", .context_label = "phase 278 fixed cell rendering", .target_name = "app", .include_in_fast = true, .build_warn_ms = 1000},
+    {.label = "human-facing app proof", .fixture_relative_path = "tests/system/kernel_reset_lane_phase279_first_human_facing_app_proof", .scenario_key = "phase279_first_human_facing_app_proof", .context_label = "phase 279 human-facing app proof", .target_name = "app", .include_in_fast = true, .build_warn_ms = 1000},
     {.label = "connection backed workflow", .fixture_relative_path = "tests/system/kernel_reset_lane_phase239_connection_backed_workflow", .scenario_key = "phase239_connection_backed_workflow", .context_label = "phase 239 connection backed workflow", .target_name = "app", .include_in_fast = true, .build_warn_ms = 1000},
     {.label = "external ingress completion pressure", .fixture_relative_path = "tests/system/kernel_reset_lane_phase240_external_ingress_completion_pressure", .scenario_key = "phase240_external_ingress_completion_pressure", .context_label = "phase 240 external ingress completion pressure", .target_name = "app", .include_in_fast = true, .build_warn_ms = 1000},
     {.label = "delegated external request handling", .fixture_relative_path = "tests/system/kernel_reset_lane_phase241_delegated_external_request_handling", .scenario_key = "phase241_delegated_external_request_handling", .context_label = "phase 241 delegated external request handling", .target_name = "app", .include_in_fast = true, .build_warn_ms = 1000},

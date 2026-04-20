@@ -3,7 +3,7 @@ Phase 279 -- First Human-Facing App Proof
 
 Status
 ------
-PROPOSED
+COMPLETED
 
 Purpose
 -------
@@ -101,6 +101,25 @@ Preferred implementation shape
 - Keep app logic inside `examples/real/issue_rollup/`; only the explicit UI
   contracts should be shared.
 
+Implementation summary
+----------------------
+- Reuse `issue_rollup` as the first directly usable app and keep the new
+  interaction model app-local in
+  `examples/real/issue_rollup/src/app/issue_rollup_interactive.mc`.
+- Keep the visible interaction bounded to one tiny key vocabulary over the
+  admitted input path: `O` appends one ordinary open issue, `P` appends one
+  priority open issue, and `R` resets the app back to an empty rollup.
+- Recompute visible state through the existing repository-owned app path:
+  app-local text buffer -> `rollup_parse.summarize_text(...)` ->
+  `rollup_render.rollup_display_cells_with_manifest(...)` ->
+  `display_surface.display_present(...)`.
+- Keep launcher on foreground-app policy, display on visible-cell ownership,
+  and the kernel-side `issue_rollup_app.mc` as a thin wrapper over the
+  repository-owned app logic instead of a second app-policy owner.
+- Add one app-local real-project regression and one focused reset-lane fixture
+  that prove the visible `EMTY` -> `STDY` -> `BUSY` -> `ATTN` -> `EMTY`
+  interaction path without widening into text editing, widgets, or another app.
+
 Implementation accelerators
 ---------------------------
 Main files and navigations
@@ -146,6 +165,13 @@ Test obligations
 - `mc_tool_workflow_kernel_reset_lane_unit`
 - `mc_tool_workflow_kernel_reset_lane_full_unit`
 
+Validation completed
+--------------------
+- `Build debug`
+- `mc_tool_real_project_issue_rollup_unit`
+- `mc_tool_workflow_kernel_reset_lane_unit`
+- `mc_tool_workflow_kernel_reset_lane_full_unit`
+
 Acceptance criteria
 -------------------
 - one repository-owned app is directly usable through the admitted UI path
@@ -154,6 +180,25 @@ Acceptance criteria
 - the proof remains single-app and deterministic
 - the phase leaves one concrete basis for restart-follow-through and the UI
   audit
+
+Phase review against spec
+-------------------------
+- Met: `issue_rollup` remains the single repository-owned app proof and now has
+  one directly usable visible interaction path on the admitted UI surface.
+- Met: app logic stayed app-local. The new interaction reducer lives under
+  `examples/real/issue_rollup/` and the kernel wrapper now delegates to that
+  owner instead of carrying a second summary-state machine.
+- Met: launcher remains the foreground-policy owner and display remains the
+  fixed-cell surface owner. Neither owner absorbed app parsing, issue state, or
+  render policy.
+- Met: the proof stayed deterministic and bounded to one tiny key vocabulary,
+  one four-cell surface, and one explicit installed-app path.
+- Preserved invariants: no second app, no widget family, no window manager,
+  no session model, and no package-management widening landed as part of the
+  proof.
+- Deferred intentionally: richer text entry, broader app-local editing,
+  restart-follow-through for the first app, and any repeated UI friction that
+  still needs a later audit.
 
 Future follow-up
 ----------------
