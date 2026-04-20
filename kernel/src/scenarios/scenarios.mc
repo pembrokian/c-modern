@@ -15,7 +15,7 @@ import scenario_foreground_input_routing
 import scenario_delegated_object_processing
 import scenario_durability
 import scenario_journal_service
-import scenario_launcher_service
+import scenario_launcher_demo_probe
 import scenario_lease_service
 import scenario_named_object_delivery_pressure
 import scenario_lifecycle
@@ -39,7 +39,8 @@ import scenario_update_store_service
 import scenario_workset_identity
 
 func run(state: *boot.KernelBootState) i32 {
-    result := scenario_steps.run_main(state)
+    // Shared-state probes spend continuity from the caller-provided boot state.
+    result := scenario_steps.run_transport_step_table_probe(state)
     if result != 0 {
         return result
     }
@@ -78,6 +79,8 @@ func run(state: *boot.KernelBootState) i32 {
     if result != 0 {
         return result
     }
+
+    // Standalone probes own their own initialization or use one-off fresh state.
     result = scenario_retained_policy.run_retained_policy_probe()
     if result != 0 {
         return result
@@ -107,7 +110,7 @@ func run(state: *boot.KernelBootState) i32 {
     if result != 0 {
         return result
     }
-    result = scenario_launcher_service.run_launcher_installed_workflow_demo_probe()
+    result = scenario_launcher_demo_probe.run_launcher_installed_workflow_demo_probe()
     if result != 0 {
         return result
     }

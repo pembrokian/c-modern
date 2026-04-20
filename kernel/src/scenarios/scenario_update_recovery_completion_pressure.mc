@@ -39,33 +39,11 @@ const FAIL_UPDATE_PRESSURE_DRAIN_2: i32 = 24538
 const FAIL_UPDATE_PRESSURE_FETCH: i32 = 24539
 const FAIL_UPDATE_PRESSURE_ACK_FINAL: i32 = 24540
 
-func expect_workflow(effect: service_effect.Effect, status: syscall.SyscallStatus, state: u8, restart: u8) bool {
-    if service_effect.effect_reply_status(effect) != status {
-        return false
-    }
-    if service_effect.effect_reply_payload_len(effect) != 4 {
-        return false
-    }
-    payload := service_effect.effect_reply_payload(effect)
-    return payload[0] == state && payload[1] == restart
-}
-
 func expect_delivery_outcome(effect: service_effect.Effect, outcome: u8) bool {
     if service_effect.effect_reply_payload_len(effect) != 4 {
         return false
     }
     return service_effect.effect_reply_payload(effect)[2] == outcome
-}
-
-func expect_completion(effect: service_effect.Effect, id: u8, state: u8, restart: u8, generation: u8) bool {
-    if service_effect.effect_reply_status(effect) != syscall.SyscallStatus.Ok {
-        return false
-    }
-    if service_effect.effect_reply_payload_len(effect) != 4 {
-        return false
-    }
-    payload := service_effect.effect_reply_payload(effect)
-    return payload[0] == id && payload[1] == state && payload[2] == restart && payload[3] == generation
 }
 
 func expect_applied_target(s: update_store_service.UpdateStoreServiceState, version: u8, len: usize, b0: u8, b1: u8) bool {
@@ -102,12 +80,12 @@ func run_update_recovery_completion_pressure_probe() i32 {
         }
 
         running_effect := kernel_dispatch.kernel_dispatch_step(&state, scenario_transport.cmd_workflow_query(u8(id)))
-        if !expect_workflow(running_effect, syscall.SyscallStatus.Ok, workflow_core.WORKFLOW_STATE_RUNNING, workflow_core.WORKFLOW_RESTART_NONE) {
+        if !scenario_assert.expect_workflow_state(running_effect, syscall.SyscallStatus.Ok, workflow_core.WORKFLOW_STATE_RUNNING, workflow_core.WORKFLOW_RESTART_NONE) {
             return FAIL_UPDATE_PRESSURE_FILL_RUNNING_BASE + (id - 11)
         }
 
         done_effect := kernel_dispatch.kernel_dispatch_step(&state, scenario_transport.cmd_workflow_query(u8(id)))
-        if !expect_workflow(done_effect, syscall.SyscallStatus.Ok, workflow_core.WORKFLOW_STATE_DONE, workflow_core.WORKFLOW_RESTART_NONE) {
+        if !scenario_assert.expect_workflow_state(done_effect, syscall.SyscallStatus.Ok, workflow_core.WORKFLOW_STATE_DONE, workflow_core.WORKFLOW_RESTART_NONE) {
             return FAIL_UPDATE_PRESSURE_FILL_DONE_BASE + (id - 11)
         }
     }
@@ -151,12 +129,12 @@ func run_update_recovery_completion_pressure_probe() i32 {
     apply_id := service_effect.effect_reply_payload(schedule_apply_effect)[0]
 
     waiting_effect := kernel_dispatch.kernel_dispatch_step(&state, scenario_transport.cmd_workflow_query(apply_id))
-    if !expect_workflow(waiting_effect, syscall.SyscallStatus.Ok, workflow_core.WORKFLOW_STATE_WAITING, workflow_core.WORKFLOW_RESTART_NONE) {
+    if !scenario_assert.expect_workflow_state(waiting_effect, syscall.SyscallStatus.Ok, workflow_core.WORKFLOW_STATE_WAITING, workflow_core.WORKFLOW_RESTART_NONE) {
         return FAIL_UPDATE_PRESSURE_WAITING
     }
 
     exhausted_effect := kernel_dispatch.kernel_dispatch_step(&state, scenario_transport.cmd_workflow_query(apply_id))
-    if !expect_workflow(exhausted_effect, syscall.SyscallStatus.Exhausted, workflow_core.WORKFLOW_STATE_DELIVERING, workflow_core.WORKFLOW_RESTART_NONE) {
+    if !scenario_assert.expect_workflow_state(exhausted_effect, syscall.SyscallStatus.Exhausted, workflow_core.WORKFLOW_STATE_DELIVERING, workflow_core.WORKFLOW_RESTART_NONE) {
         return FAIL_UPDATE_PRESSURE_EXHAUSTED
     }
     if !expect_delivery_outcome(exhausted_effect, workflow_core.WORKFLOW_STATE_UPDATE_APPLIED) {
@@ -173,7 +151,7 @@ func run_update_recovery_completion_pressure_probe() i32 {
     }
 
     resumed_effect := kernel_dispatch.kernel_dispatch_step(&state, scenario_transport.cmd_workflow_query(apply_id))
-    if !expect_workflow(resumed_effect, syscall.SyscallStatus.WouldBlock, workflow_core.WORKFLOW_STATE_DELIVERING, workflow_core.WORKFLOW_RESTART_RESUMED) {
+    if !scenario_assert.expect_workflow_state(resumed_effect, syscall.SyscallStatus.WouldBlock, workflow_core.WORKFLOW_STATE_DELIVERING, workflow_core.WORKFLOW_RESTART_RESUMED) {
         return FAIL_UPDATE_PRESSURE_RESUMED
     }
     if !expect_delivery_outcome(resumed_effect, workflow_core.WORKFLOW_STATE_UPDATE_APPLIED) {
@@ -190,7 +168,7 @@ func run_update_recovery_completion_pressure_probe() i32 {
     }
 
     recovered_effect := kernel_dispatch.kernel_dispatch_step(&state, scenario_transport.cmd_workflow_query(apply_id))
-    if !expect_workflow(recovered_effect, syscall.SyscallStatus.Ok, workflow_core.WORKFLOW_STATE_UPDATE_APPLIED, workflow_core.WORKFLOW_RESTART_RESUMED) {
+    if !scenario_assert.expect_workflow_state(recovered_effect, syscall.SyscallStatus.Ok, workflow_core.WORKFLOW_STATE_UPDATE_APPLIED, workflow_core.WORKFLOW_RESTART_RESUMED) {
         return FAIL_UPDATE_PRESSURE_RECOVERED
     }
 
@@ -213,7 +191,7 @@ func run_update_recovery_completion_pressure_probe() i32 {
     }
 
     fetch_effect := kernel_dispatch.kernel_dispatch_step(&state, scenario_transport.cmd_completion_fetch())
-    if !expect_completion(fetch_effect, apply_id, workflow_core.WORKFLOW_STATE_UPDATE_APPLIED, workflow_core.WORKFLOW_RESTART_RESUMED, 1) {
+    if !scenario_assert.expect_completion(fetch_effect, apply_id, workflow_core.WORKFLOW_STATE_UPDATE_APPLIED, workflow_core.WORKFLOW_RESTART_RESUMED, 1) {
         return FAIL_UPDATE_PRESSURE_FETCH
     }
 

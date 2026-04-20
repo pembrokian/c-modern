@@ -43,11 +43,11 @@ func scenario_apply_issue_rollup_update(state: *boot.KernelBootState, version: u
     apply_id := service_effect.effect_reply_payload(effect)[0]
 
     effect = kernel_dispatch.kernel_dispatch_step(state, scenario_transport.cmd_workflow_query(apply_id))
-    if !scenario_assert.expect_workflow(effect, syscall.SyscallStatus.Ok, workflow_core.WORKFLOW_STATE_WAITING, workflow_core.WORKFLOW_RESTART_NONE) {
+    if !scenario_assert.expect_workflow_state(effect, syscall.SyscallStatus.Ok, workflow_core.WORKFLOW_STATE_WAITING, workflow_core.WORKFLOW_RESTART_NONE) {
         return fail_base + 5
     }
     effect = kernel_dispatch.kernel_dispatch_step(state, scenario_transport.cmd_workflow_query(apply_id))
-    if !scenario_assert.expect_workflow(effect, syscall.SyscallStatus.Ok, workflow_core.WORKFLOW_STATE_UPDATE_APPLIED, workflow_core.WORKFLOW_RESTART_NONE) {
+    if !scenario_assert.expect_workflow_state(effect, syscall.SyscallStatus.Ok, workflow_core.WORKFLOW_STATE_UPDATE_APPLIED, workflow_core.WORKFLOW_RESTART_NONE) {
         return fail_base + 6
     }
 

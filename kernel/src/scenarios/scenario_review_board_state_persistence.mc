@@ -30,14 +30,6 @@ const FAIL_REVIEW_BOARD_PERSIST_DISPLAY1: i32 = 28715
 
 const DISPLAY_STATE_FOCUS_ESCALATE_STATUS: [4]u8 = [4]u8{ 70, 69, 70, 83 }
 
-func display_query_obs() syscall.ReceiveObservation {
-    return syscall.ReceiveObservation{ status: syscall.SyscallStatus.Ok, block_reason: syscall.BlockReason.None, endpoint_id: service_topology.DISPLAY_ENDPOINT_ID, source_pid: 1, payload_len: 0, received_handle_slot: 0, received_handle_count: 0, payload: { 0, 0, 0, 0 } }
-}
-
-func expect_display(effect: service_effect.Effect, cells: [4]u8) bool {
-    return scenario_assert.expect_reply(effect, syscall.SyscallStatus.Ok, 4, cells[0], cells[1], cells[2], cells[3])
-}
-
 func expect_delivered(effect: service_effect.Effect, value: u8) bool {
     return scenario_assert.expect_reply(effect, syscall.SyscallStatus.Ok, 4, program_catalog.PROGRAM_ID_REVIEW_BOARD, input_event.INPUT_ROUTE_DELIVERED, input_event.INPUT_EVENT_KEY, value)
 }
@@ -110,8 +102,8 @@ func run_review_board_state_persistence_probe() i32 {
         return result
     }
 
-    effect := kernel_dispatch.kernel_dispatch_step(&state, display_query_obs())
-    if !expect_display(effect, DISPLAY_STATE_FOCUS_ESCALATE_STATUS) {
+    effect := kernel_dispatch.kernel_dispatch_step(&state, scenario_transport.display_query_obs())
+    if !scenario_assert.expect_display(effect, syscall.SyscallStatus.Ok, DISPLAY_STATE_FOCUS_ESCALATE_STATUS) {
         return FAIL_REVIEW_BOARD_PERSIST_DISPLAY0
     }
 
@@ -122,8 +114,8 @@ func run_review_board_state_persistence_probe() i32 {
         return result
     }
 
-    effect = kernel_dispatch.kernel_dispatch_step(&restarted, display_query_obs())
-    if !expect_display(effect, DISPLAY_STATE_FOCUS_ESCALATE_STATUS) {
+    effect = kernel_dispatch.kernel_dispatch_step(&restarted, scenario_transport.display_query_obs())
+    if !scenario_assert.expect_display(effect, syscall.SyscallStatus.Ok, DISPLAY_STATE_FOCUS_ESCALATE_STATUS) {
         return FAIL_REVIEW_BOARD_PERSIST_DISPLAY1
     }
 

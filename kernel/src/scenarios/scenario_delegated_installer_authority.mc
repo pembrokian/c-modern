@@ -44,28 +44,6 @@ const FAIL_INSTALLER_COMPLETION_RESET: i32 = 24433
 const FAIL_INSTALLER_WORKFLOW_RESET: i32 = 24434
 const FAIL_INSTALLER_UPDATE_STORE_RESET: i32 = 24435
 
-func expect_workflow(effect: service_effect.Effect, status: syscall.SyscallStatus, state: u8, restart: u8) bool {
-    if service_effect.effect_reply_status(effect) != status {
-        return false
-    }
-    if service_effect.effect_reply_payload_len(effect) != 4 {
-        return false
-    }
-    payload := service_effect.effect_reply_payload(effect)
-    return payload[0] == state && payload[1] == restart
-}
-
-func expect_completion(effect: service_effect.Effect, id: u8, state: u8, restart: u8, generation: u8) bool {
-    if service_effect.effect_reply_status(effect) != syscall.SyscallStatus.Ok {
-        return false
-    }
-    if service_effect.effect_reply_payload_len(effect) != 4 {
-        return false
-    }
-    payload := service_effect.effect_reply_payload(effect)
-    return payload[0] == id && payload[1] == state && payload[2] == restart && payload[3] == generation
-}
-
 func run_delegated_installer_authority_probe() i32 {
     if !update_store_service.update_store_persist(update_store_service.update_store_init(7, 1)) {
         return FAIL_INSTALLER_SETUP
@@ -126,12 +104,12 @@ func run_delegated_installer_authority_probe() i32 {
     apply_id := service_effect.effect_reply_payload(effect)[0]
 
     effect = kernel_dispatch.kernel_dispatch_step(&state, scenario_transport.cmd_workflow_query(apply_id))
-    if !expect_workflow(effect, syscall.SyscallStatus.Ok, workflow_core.WORKFLOW_STATE_WAITING, workflow_core.WORKFLOW_RESTART_NONE) {
+    if !scenario_assert.expect_workflow_state(effect, syscall.SyscallStatus.Ok, workflow_core.WORKFLOW_STATE_WAITING, workflow_core.WORKFLOW_RESTART_NONE) {
         return FAIL_INSTALLER_WAITING
     }
 
     effect = kernel_dispatch.kernel_dispatch_step(&state, scenario_transport.cmd_workflow_query(apply_id))
-    if !expect_workflow(effect, syscall.SyscallStatus.Ok, workflow_core.WORKFLOW_STATE_UPDATE_APPLIED, workflow_core.WORKFLOW_RESTART_NONE) {
+    if !scenario_assert.expect_workflow_state(effect, syscall.SyscallStatus.Ok, workflow_core.WORKFLOW_STATE_UPDATE_APPLIED, workflow_core.WORKFLOW_RESTART_NONE) {
         return FAIL_INSTALLER_DONE
     }
 
@@ -141,7 +119,7 @@ func run_delegated_installer_authority_probe() i32 {
     }
 
     effect = kernel_dispatch.kernel_dispatch_step(&state, scenario_transport.cmd_completion_fetch())
-    if !expect_completion(effect, apply_id, workflow_core.WORKFLOW_STATE_UPDATE_APPLIED, workflow_core.WORKFLOW_RESTART_NONE, 1) {
+    if !scenario_assert.expect_completion(effect, apply_id, workflow_core.WORKFLOW_STATE_UPDATE_APPLIED, workflow_core.WORKFLOW_RESTART_NONE, 1) {
         return FAIL_INSTALLER_FETCH
     }
 
@@ -167,17 +145,17 @@ func run_delegated_installer_authority_probe() i32 {
     consumed_id := service_effect.effect_reply_payload(effect)[0]
 
     effect = kernel_dispatch.kernel_dispatch_step(&state, scenario_transport.cmd_workflow_query(consumed_id))
-    if !expect_workflow(effect, syscall.SyscallStatus.Ok, workflow_core.WORKFLOW_STATE_WAITING, workflow_core.WORKFLOW_RESTART_NONE) {
+    if !scenario_assert.expect_workflow_state(effect, syscall.SyscallStatus.Ok, workflow_core.WORKFLOW_STATE_WAITING, workflow_core.WORKFLOW_RESTART_NONE) {
         return FAIL_INSTALLER_CONSUMED_WAITING
     }
 
     effect = kernel_dispatch.kernel_dispatch_step(&state, scenario_transport.cmd_workflow_query(consumed_id))
-    if !expect_workflow(effect, syscall.SyscallStatus.Ok, workflow_core.WORKFLOW_STATE_UPDATE_LEASE_CONSUMED, workflow_core.WORKFLOW_RESTART_NONE) {
+    if !scenario_assert.expect_workflow_state(effect, syscall.SyscallStatus.Ok, workflow_core.WORKFLOW_STATE_UPDATE_LEASE_CONSUMED, workflow_core.WORKFLOW_RESTART_NONE) {
         return FAIL_INSTALLER_CONSUMED_DONE
     }
 
     effect = kernel_dispatch.kernel_dispatch_step(&state, scenario_transport.cmd_completion_fetch())
-    if !expect_completion(effect, consumed_id, workflow_core.WORKFLOW_STATE_UPDATE_LEASE_CONSUMED, workflow_core.WORKFLOW_RESTART_NONE, 1) {
+    if !scenario_assert.expect_completion(effect, consumed_id, workflow_core.WORKFLOW_STATE_UPDATE_LEASE_CONSUMED, workflow_core.WORKFLOW_RESTART_NONE, 1) {
         return FAIL_INSTALLER_CONSUMED_FETCH
     }
 
@@ -193,17 +171,17 @@ func run_delegated_installer_authority_probe() i32 {
     invalid_id := service_effect.effect_reply_payload(effect)[0]
 
     effect = kernel_dispatch.kernel_dispatch_step(&state, scenario_transport.cmd_workflow_query(invalid_id))
-    if !expect_workflow(effect, syscall.SyscallStatus.Ok, workflow_core.WORKFLOW_STATE_WAITING, workflow_core.WORKFLOW_RESTART_NONE) {
+    if !scenario_assert.expect_workflow_state(effect, syscall.SyscallStatus.Ok, workflow_core.WORKFLOW_STATE_WAITING, workflow_core.WORKFLOW_RESTART_NONE) {
         return FAIL_INSTALLER_INVALID_WAITING
     }
 
     effect = kernel_dispatch.kernel_dispatch_step(&state, scenario_transport.cmd_workflow_query(invalid_id))
-    if !expect_workflow(effect, syscall.SyscallStatus.Ok, workflow_core.WORKFLOW_STATE_UPDATE_LEASE_INVALID, workflow_core.WORKFLOW_RESTART_NONE) {
+    if !scenario_assert.expect_workflow_state(effect, syscall.SyscallStatus.Ok, workflow_core.WORKFLOW_STATE_UPDATE_LEASE_INVALID, workflow_core.WORKFLOW_RESTART_NONE) {
         return FAIL_INSTALLER_INVALID_DONE
     }
 
     effect = kernel_dispatch.kernel_dispatch_step(&state, scenario_transport.cmd_completion_fetch())
-    if !expect_completion(effect, invalid_id, workflow_core.WORKFLOW_STATE_UPDATE_LEASE_INVALID, workflow_core.WORKFLOW_RESTART_NONE, 1) {
+    if !scenario_assert.expect_completion(effect, invalid_id, workflow_core.WORKFLOW_STATE_UPDATE_LEASE_INVALID, workflow_core.WORKFLOW_RESTART_NONE, 1) {
         return FAIL_INSTALLER_INVALID_FETCH
     }
 
@@ -219,7 +197,7 @@ func run_delegated_installer_authority_probe() i32 {
     stale_id := service_effect.effect_reply_payload(effect)[0]
 
     effect = kernel_dispatch.kernel_dispatch_step(&state, scenario_transport.cmd_workflow_query(stale_id))
-    if !expect_workflow(effect, syscall.SyscallStatus.Ok, workflow_core.WORKFLOW_STATE_WAITING, workflow_core.WORKFLOW_RESTART_NONE) {
+    if !scenario_assert.expect_workflow_state(effect, syscall.SyscallStatus.Ok, workflow_core.WORKFLOW_STATE_WAITING, workflow_core.WORKFLOW_RESTART_NONE) {
         return FAIL_INSTALLER_STALE_WAITING
     }
 
@@ -229,12 +207,12 @@ func run_delegated_installer_authority_probe() i32 {
     }
 
     effect = kernel_dispatch.kernel_dispatch_step(&state, scenario_transport.cmd_workflow_query(stale_id))
-    if !expect_workflow(effect, syscall.SyscallStatus.Ok, workflow_core.WORKFLOW_STATE_UPDATE_LEASE_STALE, workflow_core.WORKFLOW_RESTART_NONE) {
+    if !scenario_assert.expect_workflow_state(effect, syscall.SyscallStatus.Ok, workflow_core.WORKFLOW_STATE_UPDATE_LEASE_STALE, workflow_core.WORKFLOW_RESTART_NONE) {
         return FAIL_INSTALLER_STALE_DONE
     }
 
     effect = kernel_dispatch.kernel_dispatch_step(&state, scenario_transport.cmd_completion_fetch())
-    if !expect_completion(effect, stale_id, workflow_core.WORKFLOW_STATE_UPDATE_LEASE_STALE, workflow_core.WORKFLOW_RESTART_NONE, 1) {
+    if !scenario_assert.expect_completion(effect, stale_id, workflow_core.WORKFLOW_STATE_UPDATE_LEASE_STALE, workflow_core.WORKFLOW_RESTART_NONE, 1) {
         return FAIL_INSTALLER_STALE_FETCH
     }
 

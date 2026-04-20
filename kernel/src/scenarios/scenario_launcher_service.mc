@@ -1,3 +1,5 @@
+// Compatibility facade for launcher scenario imports used by repo-owned projects.
+
 import scenario_launcher_demo_probe
 import scenario_launcher_manifest_probe
 import scenario_launcher_service_probe

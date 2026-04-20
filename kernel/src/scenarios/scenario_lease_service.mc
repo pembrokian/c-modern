@@ -29,17 +29,6 @@ const FAIL_LEASE_CONSUME_8_PAYLOAD: i32 = 23317
 const FAIL_LEASE_CONSUMED_TWICE_STATUS: i32 = 23318
 const FAIL_LEASE_CONSUMED_TWICE_CODE: i32 = 23319
 
-func expect_workflow(effect: service_effect.Effect, status: syscall.SyscallStatus, state: u8, restart: u8) bool {
-    if service_effect.effect_reply_status(effect) != status {
-        return false
-    }
-    if service_effect.effect_reply_payload_len(effect) != 4 {
-        return false
-    }
-    payload := service_effect.effect_reply_payload(effect)
-    return payload[0] == state && payload[1] == restart
-}
-
 func lease_issue_obs(pid: u32, workflow: u8) syscall.ReceiveObservation {
     return scenario_transport.serial_obs(service_topology.SERIAL_ENDPOINT_ID, pid, serial_protocol.encode_lease_issue(workflow))
 }
@@ -56,11 +45,11 @@ func run_lease_service_probe() i32 {
         return FAIL_LEASE_SCHEDULE_7
     }
     effect = kernel_dispatch.kernel_dispatch_step(&state, scenario_transport.cmd_workflow_query(7))
-    if !expect_workflow(effect, syscall.SyscallStatus.Ok, workflow_core.WORKFLOW_STATE_RUNNING, workflow_core.WORKFLOW_RESTART_NONE) {
+    if !scenario_assert.expect_workflow_state(effect, syscall.SyscallStatus.Ok, workflow_core.WORKFLOW_STATE_RUNNING, workflow_core.WORKFLOW_RESTART_NONE) {
         return FAIL_LEASE_RUNNING_7
     }
     effect = kernel_dispatch.kernel_dispatch_step(&state, scenario_transport.cmd_workflow_query(7))
-    if !expect_workflow(effect, syscall.SyscallStatus.Ok, workflow_core.WORKFLOW_STATE_DONE, workflow_core.WORKFLOW_RESTART_NONE) {
+    if !scenario_assert.expect_workflow_state(effect, syscall.SyscallStatus.Ok, workflow_core.WORKFLOW_STATE_DONE, workflow_core.WORKFLOW_RESTART_NONE) {
         return FAIL_LEASE_DONE_7
     }
 
@@ -87,11 +76,11 @@ func run_lease_service_probe() i32 {
         return FAIL_LEASE_SCHEDULE_8
     }
     effect = kernel_dispatch.kernel_dispatch_step(&state, scenario_transport.cmd_workflow_query(8))
-    if !expect_workflow(effect, syscall.SyscallStatus.Ok, workflow_core.WORKFLOW_STATE_RUNNING, workflow_core.WORKFLOW_RESTART_NONE) {
+    if !scenario_assert.expect_workflow_state(effect, syscall.SyscallStatus.Ok, workflow_core.WORKFLOW_STATE_RUNNING, workflow_core.WORKFLOW_RESTART_NONE) {
         return FAIL_LEASE_RUNNING_8
     }
     effect = kernel_dispatch.kernel_dispatch_step(&state, scenario_transport.cmd_workflow_query(8))
-    if !expect_workflow(effect, syscall.SyscallStatus.Ok, workflow_core.WORKFLOW_STATE_DONE, workflow_core.WORKFLOW_RESTART_NONE) {
+    if !scenario_assert.expect_workflow_state(effect, syscall.SyscallStatus.Ok, workflow_core.WORKFLOW_STATE_DONE, workflow_core.WORKFLOW_RESTART_NONE) {
         return FAIL_LEASE_DONE_8
     }
 

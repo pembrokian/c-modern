@@ -18,6 +18,10 @@ func serial_obs(endpoint: u32, pid: u32, payload: [4]u8) syscall.ReceiveObservat
     return syscall.ReceiveObservation{ status: syscall.SyscallStatus.Ok, block_reason: syscall.BlockReason.None, endpoint_id: endpoint, source_pid: pid, payload_len: 4, received_handle_slot: 0, received_handle_count: 0, payload: payload }
 }
 
+func display_query_obs() syscall.ReceiveObservation {
+    return syscall.ReceiveObservation{ status: syscall.SyscallStatus.Ok, block_reason: syscall.BlockReason.None, endpoint_id: service_topology.DISPLAY_ENDPOINT_ID, source_pid: DEFAULT_SERIAL_ROUTE.pid, payload_len: 0, received_handle_slot: 0, received_handle_count: 0, payload: { 0, 0, 0, 0 } }
+}
+
 // cmd_* are single-client convenience wrappers: serial endpoint, pid=1.
 func cmd_log_append(value: u8) syscall.ReceiveObservation {
     return serial_obs(DEFAULT_SERIAL_ROUTE.endpoint, DEFAULT_SERIAL_ROUTE.pid, serial_protocol.encode_log_append(value))

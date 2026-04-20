@@ -3,6 +3,7 @@ import input_event
 import kernel_dispatch
 import launcher_service
 import program_catalog
+import scenario_assert
 import scenario_transport
 import service_effect
 import service_topology
@@ -25,28 +26,6 @@ const FAIL_ROUTE_SELECT_REVIEW: i32 = 27612
 const FAIL_ROUTE_SELECTED: i32 = 27613
 const FAIL_ROUTE_DELIVERED: i32 = 27614
 
-func expect_reply(effect: service_effect.Effect, status: syscall.SyscallStatus, len: usize, b0: u8, b1: u8, b2: u8, b3: u8) bool {
-    if service_effect.effect_reply_status(effect) != status {
-        return false
-    }
-    if service_effect.effect_reply_payload_len(effect) != len {
-        return false
-    }
-    payload := service_effect.effect_reply_payload(effect)
-    return payload[0] == b0 && payload[1] == b1 && payload[2] == b2 && payload[3] == b3
-}
-
-func expect_workflow(effect: service_effect.Effect, status: syscall.SyscallStatus, state: u8, restart: u8) bool {
-    if service_effect.effect_reply_status(effect) != status {
-        return false
-    }
-    if service_effect.effect_reply_payload_len(effect) != 4 {
-        return false
-    }
-    payload := service_effect.effect_reply_payload(effect)
-    return payload[0] == state && payload[1] == restart
-}
-
 func run_foreground_input_routing_probe() i32 {
     if !update_store_service.update_store_persist(update_store_service.update_store_init(service_topology.UPDATE_STORE_SLOT.pid, 1)) {
         return FAIL_ROUTE_STAGE0
@@ -55,7 +34,7 @@ func run_foreground_input_routing_probe() i32 {
     state := boot.kernel_init()
 
     effect := kernel_dispatch.kernel_dispatch_step(&state, scenario_transport.cmd_input_key(65))
-    if !expect_reply(effect, syscall.SyscallStatus.Ok, 4, 0, input_event.INPUT_ROUTE_NO_FOREGROUND, input_event.INPUT_EVENT_KEY, 65) {
+    if !scenario_assert.expect_reply(effect, syscall.SyscallStatus.Ok, 4, 0, input_event.INPUT_ROUTE_NO_FOREGROUND, input_event.INPUT_EVENT_KEY, 65) {
         return FAIL_ROUTE_NO_FOREGROUND
     }
 
@@ -83,16 +62,16 @@ func run_foreground_input_routing_probe() i32 {
     apply_id := service_effect.effect_reply_payload(effect)[0]
 
     effect = kernel_dispatch.kernel_dispatch_step(&state, scenario_transport.cmd_workflow_query(apply_id))
-    if !expect_workflow(effect, syscall.SyscallStatus.Ok, workflow_core.WORKFLOW_STATE_WAITING, workflow_core.WORKFLOW_RESTART_NONE) {
+    if !scenario_assert.expect_workflow_state(effect, syscall.SyscallStatus.Ok, workflow_core.WORKFLOW_STATE_WAITING, workflow_core.WORKFLOW_RESTART_NONE) {
         return FAIL_ROUTE_APPLY_WAITING
     }
     effect = kernel_dispatch.kernel_dispatch_step(&state, scenario_transport.cmd_workflow_query(apply_id))
-    if !expect_workflow(effect, syscall.SyscallStatus.Ok, workflow_core.WORKFLOW_STATE_UPDATE_APPLIED, workflow_core.WORKFLOW_RESTART_NONE) {
+    if !scenario_assert.expect_workflow_state(effect, syscall.SyscallStatus.Ok, workflow_core.WORKFLOW_STATE_UPDATE_APPLIED, workflow_core.WORKFLOW_RESTART_NONE) {
         return FAIL_ROUTE_APPLY_DONE
     }
 
     effect = kernel_dispatch.kernel_dispatch_step(&state, scenario_transport.cmd_launcher_select(program_catalog.PROGRAM_ID_ISSUE_ROLLUP))
-    if !expect_reply(effect, syscall.SyscallStatus.Ok, 2, program_catalog.PROGRAM_ID_ISSUE_ROLLUP, 0, 0, 0) {
+    if !scenario_assert.expect_reply(effect, syscall.SyscallStatus.Ok, 2, program_catalog.PROGRAM_ID_ISSUE_ROLLUP, 0, 0, 0) {
         return FAIL_ROUTE_SELECT_ISSUE
     }
     effect = kernel_dispatch.kernel_dispatch_step(&state, scenario_transport.cmd_launcher_launch())
@@ -104,7 +83,7 @@ func run_foreground_input_routing_probe() i32 {
     }
 
     effect = kernel_dispatch.kernel_dispatch_step(&state, scenario_transport.cmd_launcher_select(program_catalog.PROGRAM_ID_REVIEW_BOARD))
-    if !expect_reply(effect, syscall.SyscallStatus.Ok, 2, program_catalog.PROGRAM_ID_REVIEW_BOARD, program_catalog.PROGRAM_ID_ISSUE_ROLLUP, 0, 0) {
+    if !scenario_assert.expect_reply(effect, syscall.SyscallStatus.Ok, 2, program_catalog.PROGRAM_ID_REVIEW_BOARD, program_catalog.PROGRAM_ID_ISSUE_ROLLUP, 0, 0) {
         return FAIL_ROUTE_SELECT_REVIEW
     }
     if state.launcher.state.selected != program_catalog.PROGRAM_ID_REVIEW_BOARD {
@@ -115,7 +94,7 @@ func run_foreground_input_routing_probe() i32 {
     }
 
     effect = kernel_dispatch.kernel_dispatch_step(&state, scenario_transport.cmd_input_key(66))
-    if !expect_reply(effect, syscall.SyscallStatus.Ok, 4, program_catalog.PROGRAM_ID_ISSUE_ROLLUP, input_event.INPUT_ROUTE_DELIVERED, input_event.INPUT_EVENT_KEY, 66) {
+    if !scenario_assert.expect_reply(effect, syscall.SyscallStatus.Ok, 4, program_catalog.PROGRAM_ID_ISSUE_ROLLUP, input_event.INPUT_ROUTE_DELIVERED, input_event.INPUT_EVENT_KEY, 66) {
         return FAIL_ROUTE_DELIVERED
     }
 

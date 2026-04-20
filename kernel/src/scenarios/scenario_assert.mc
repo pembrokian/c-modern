@@ -26,7 +26,7 @@ func expect_reply(effect: service_effect.Effect, status: syscall.SyscallStatus, 
     return payload[0] == b0 && payload[1] == b1 && payload[2] == b2 && payload[3] == b3
 }
 
-func expect_workflow(effect: service_effect.Effect, status: syscall.SyscallStatus, state: u8, restart: u8) bool {
+func expect_workflow_state(effect: service_effect.Effect, status: syscall.SyscallStatus, state: u8, restart: u8) bool {
     if service_effect.effect_reply_status(effect) != status {
         return false
     }
@@ -35,6 +35,37 @@ func expect_workflow(effect: service_effect.Effect, status: syscall.SyscallStatu
     }
     payload := service_effect.effect_reply_payload(effect)
     return payload[0] == state && payload[1] == restart
+}
+
+func expect_workflow_task(effect: service_effect.Effect, status: syscall.SyscallStatus, state: u8, restart: u8, task: u8) bool {
+    if !expect_workflow_state(effect, status, state, restart) {
+        return false
+    }
+    payload := service_effect.effect_reply_payload(effect)
+    return payload[2] == task
+}
+
+func expect_workflow_value(effect: service_effect.Effect, status: syscall.SyscallStatus, state: u8, restart: u8, value: u8) bool {
+    if !expect_workflow_state(effect, status, state, restart) {
+        return false
+    }
+    payload := service_effect.effect_reply_payload(effect)
+    return payload[2] == value
+}
+
+func expect_completion(effect: service_effect.Effect, id: u8, state: u8, restart: u8, generation: u8) bool {
+    if service_effect.effect_reply_status(effect) != syscall.SyscallStatus.Ok {
+        return false
+    }
+    if service_effect.effect_reply_payload_len(effect) != 4 {
+        return false
+    }
+    payload := service_effect.effect_reply_payload(effect)
+    return payload[0] == id && payload[1] == state && payload[2] == restart && payload[3] == generation
+}
+
+func expect_workflow(effect: service_effect.Effect, status: syscall.SyscallStatus, state: u8, restart: u8) bool {
+    return expect_workflow_state(effect, status, state, restart)
 }
 
 func expect_restart_identity(before: service_identity.ServiceMark, after: service_identity.ServiceMark, base: i32) i32 {

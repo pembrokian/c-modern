@@ -170,7 +170,7 @@ func step_matches(spec: StepSpec, state: *boot.KernelBootState, effect: service_
     }
 }
 
-func run_main(state: *boot.KernelBootState) i32 {
+func run_transport_step_table_probe(state: *boot.KernelBootState) i32 {
     specs: [31]StepSpec = step_table()
 
     for step in 0..STEP_COUNT {

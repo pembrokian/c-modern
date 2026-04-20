@@ -42,28 +42,6 @@ func expect_schedule(effect: service_effect.Effect, id: u8) bool {
     return payload[0] == id && payload[1] == workflow_core.WORKFLOW_STATE_WAITING
 }
 
-func expect_workflow(effect: service_effect.Effect, status: syscall.SyscallStatus, state: u8, restart: u8) bool {
-    if service_effect.effect_reply_status(effect) != status {
-        return false
-    }
-    if service_effect.effect_reply_payload_len(effect) != 4 {
-        return false
-    }
-    payload := service_effect.effect_reply_payload(effect)
-    return payload[0] == state && payload[1] == restart
-}
-
-func expect_completion(effect: service_effect.Effect, id: u8, state: u8, restart: u8, generation: u8) bool {
-    if service_effect.effect_reply_status(effect) != syscall.SyscallStatus.Ok {
-        return false
-    }
-    if service_effect.effect_reply_payload_len(effect) != 4 {
-        return false
-    }
-    payload := service_effect.effect_reply_payload(effect)
-    return payload[0] == id && payload[1] == state && payload[2] == restart && payload[3] == generation
-}
-
 func run_connection_backed_workflow_probe() i32 {
     state := boot.kernel_init()
 
@@ -83,22 +61,22 @@ func run_connection_backed_workflow_probe() i32 {
     }
 
     effect = kernel_dispatch.kernel_dispatch_step(&state, scenario_transport.cmd_workflow_query(1))
-    if !expect_workflow(effect, syscall.SyscallStatus.Ok, workflow_core.WORKFLOW_STATE_WAITING, workflow_core.WORKFLOW_RESTART_NONE) {
+    if !scenario_assert.expect_workflow_state(effect, syscall.SyscallStatus.Ok, workflow_core.WORKFLOW_STATE_WAITING, workflow_core.WORKFLOW_RESTART_NONE) {
         return FAIL_EXECUTE_WAITING
     }
 
     effect = kernel_dispatch.kernel_dispatch_step(&state, scenario_transport.cmd_workflow_query(1))
-    if !expect_workflow(effect, syscall.SyscallStatus.Ok, workflow_core.WORKFLOW_STATE_RUNNING, workflow_core.WORKFLOW_RESTART_NONE) {
+    if !scenario_assert.expect_workflow_state(effect, syscall.SyscallStatus.Ok, workflow_core.WORKFLOW_STATE_RUNNING, workflow_core.WORKFLOW_RESTART_NONE) {
         return FAIL_EXECUTE_RUNNING
     }
 
     effect = kernel_dispatch.kernel_dispatch_step(&state, scenario_transport.cmd_workflow_query(1))
-    if !expect_workflow(effect, syscall.SyscallStatus.Ok, workflow_core.WORKFLOW_STATE_CONNECTION_EXECUTED, workflow_core.WORKFLOW_RESTART_NONE) {
+    if !scenario_assert.expect_workflow_state(effect, syscall.SyscallStatus.Ok, workflow_core.WORKFLOW_STATE_CONNECTION_EXECUTED, workflow_core.WORKFLOW_RESTART_NONE) {
         return FAIL_EXECUTE_DONE
     }
 
     effect = kernel_dispatch.kernel_dispatch_step(&state, scenario_transport.cmd_completion_fetch())
-    if !expect_completion(effect, 1, workflow_core.WORKFLOW_STATE_CONNECTION_EXECUTED, workflow_core.WORKFLOW_RESTART_NONE, 1) {
+    if !scenario_assert.expect_completion(effect, 1, workflow_core.WORKFLOW_STATE_CONNECTION_EXECUTED, workflow_core.WORKFLOW_RESTART_NONE, 1) {
         return FAIL_EXECUTE_FETCH
     }
 
@@ -123,12 +101,12 @@ func run_connection_backed_workflow_probe() i32 {
     }
 
     effect = kernel_dispatch.kernel_dispatch_step(&state, scenario_transport.cmd_workflow_query(2))
-    if !expect_workflow(effect, syscall.SyscallStatus.Ok, workflow_core.WORKFLOW_STATE_CONNECTION_CANCELLED, workflow_core.WORKFLOW_RESTART_NONE) {
+    if !scenario_assert.expect_workflow_state(effect, syscall.SyscallStatus.Ok, workflow_core.WORKFLOW_STATE_CONNECTION_CANCELLED, workflow_core.WORKFLOW_RESTART_NONE) {
         return FAIL_CANCEL_DONE
     }
 
     effect = kernel_dispatch.kernel_dispatch_step(&state, scenario_transport.cmd_completion_fetch())
-    if !expect_completion(effect, 2, workflow_core.WORKFLOW_STATE_CONNECTION_CANCELLED, workflow_core.WORKFLOW_RESTART_NONE, 1) {
+    if !scenario_assert.expect_completion(effect, 2, workflow_core.WORKFLOW_STATE_CONNECTION_CANCELLED, workflow_core.WORKFLOW_RESTART_NONE, 1) {
         return FAIL_CANCEL_FETCH
     }
 
@@ -163,12 +141,12 @@ func run_connection_backed_workflow_probe() i32 {
     }
 
     effect = kernel_dispatch.kernel_dispatch_step(&state, scenario_transport.cmd_workflow_query(3))
-    if !expect_workflow(effect, syscall.SyscallStatus.Ok, workflow_core.WORKFLOW_STATE_CONNECTION_RESTART_CANCELLED, workflow_core.WORKFLOW_RESTART_CANCELLED) {
+    if !scenario_assert.expect_workflow_state(effect, syscall.SyscallStatus.Ok, workflow_core.WORKFLOW_STATE_CONNECTION_RESTART_CANCELLED, workflow_core.WORKFLOW_RESTART_CANCELLED) {
         return FAIL_RESTART_DONE
     }
 
     effect = kernel_dispatch.kernel_dispatch_step(&state, scenario_transport.cmd_completion_fetch())
-    if !expect_completion(effect, 3, workflow_core.WORKFLOW_STATE_CONNECTION_RESTART_CANCELLED, workflow_core.WORKFLOW_RESTART_CANCELLED, 1) {
+    if !scenario_assert.expect_completion(effect, 3, workflow_core.WORKFLOW_STATE_CONNECTION_RESTART_CANCELLED, workflow_core.WORKFLOW_RESTART_CANCELLED, 1) {
         return FAIL_RESTART_FETCH
     }
 

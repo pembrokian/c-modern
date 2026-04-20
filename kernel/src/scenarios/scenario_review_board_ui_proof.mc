@@ -35,14 +35,6 @@ const DISPLAY_STATE_FOCUS_NORMAL_STATUS: [4]u8 = [4]u8{ 70, 78, 70, 83 }
 const DISPLAY_STATE_FOCUS_NORMAL_BODY: [4]u8 = [4]u8{ 70, 78, 70, 66 }
 const DISPLAY_STATE_FOCUS_ESCALATE_BODY: [4]u8 = [4]u8{ 70, 69, 70, 66 }
 
-func display_query_obs() syscall.ReceiveObservation {
-    return syscall.ReceiveObservation{ status: syscall.SyscallStatus.Ok, block_reason: syscall.BlockReason.None, endpoint_id: service_topology.DISPLAY_ENDPOINT_ID, source_pid: 1, payload_len: 0, received_handle_slot: 0, received_handle_count: 0, payload: { 0, 0, 0, 0 } }
-}
-
-func expect_display(effect: service_effect.Effect, cells: [4]u8) bool {
-    return scenario_assert.expect_reply(effect, syscall.SyscallStatus.Ok, 4, cells[0], cells[1], cells[2], cells[3])
-}
-
 func expect_delivered(effect: service_effect.Effect, value: u8) bool {
     return scenario_assert.expect_reply(effect, syscall.SyscallStatus.Ok, 4, program_catalog.PROGRAM_ID_REVIEW_BOARD, input_event.INPUT_ROUTE_DELIVERED, input_event.INPUT_EVENT_KEY, value)
 }
@@ -63,8 +55,8 @@ func run_review_board_ui_proof_probe() i32 {
     if !scenario_assert.expect_reply(effect, syscall.SyscallStatus.Ok, 4, program_catalog.PROGRAM_ID_REVIEW_BOARD, program_catalog.PROGRAM_KIND_CODE_HOSTED_EXE, 1, launcher_service.LAUNCHER_RESUME_FRESH) {
         return FAIL_REVIEW_BOARD_LAUNCH
     }
-    effect = kernel_dispatch.kernel_dispatch_step(&state, display_query_obs())
-    if !expect_display(effect, DISPLAY_STATE_AUDIT_STABLE_BODY) {
+    effect = kernel_dispatch.kernel_dispatch_step(&state, scenario_transport.display_query_obs())
+    if !scenario_assert.expect_display(effect, syscall.SyscallStatus.Ok, DISPLAY_STATE_AUDIT_STABLE_BODY) {
         return FAIL_REVIEW_BOARD_DISPLAY_INIT
     }
 
@@ -72,8 +64,8 @@ func run_review_board_ui_proof_probe() i32 {
     if !expect_delivered(effect, review_board_ui.REVIEW_BOARD_KEY_OPEN) {
         return FAIL_REVIEW_BOARD_INPUT_OPEN
     }
-    effect = kernel_dispatch.kernel_dispatch_step(&state, display_query_obs())
-    if !expect_display(effect, DISPLAY_STATE_AUDIT_PAUSE_BODY) {
+    effect = kernel_dispatch.kernel_dispatch_step(&state, scenario_transport.display_query_obs())
+    if !scenario_assert.expect_display(effect, syscall.SyscallStatus.Ok, DISPLAY_STATE_AUDIT_PAUSE_BODY) {
         return FAIL_REVIEW_BOARD_DISPLAY_PAUSE
     }
 
@@ -81,8 +73,8 @@ func run_review_board_ui_proof_probe() i32 {
     if !expect_delivered(effect, review_board_ui.REVIEW_BOARD_KEY_TOGGLE_REGION) {
         return FAIL_REVIEW_BOARD_INPUT_STATUS
     }
-    effect = kernel_dispatch.kernel_dispatch_step(&state, display_query_obs())
-    if !expect_display(effect, DISPLAY_STATE_AUDIT_PAUSE_STATUS) {
+    effect = kernel_dispatch.kernel_dispatch_step(&state, scenario_transport.display_query_obs())
+    if !scenario_assert.expect_display(effect, syscall.SyscallStatus.Ok, DISPLAY_STATE_AUDIT_PAUSE_STATUS) {
         return FAIL_REVIEW_BOARD_DISPLAY_STATUS
     }
 
@@ -90,8 +82,8 @@ func run_review_board_ui_proof_probe() i32 {
     if !expect_delivered(effect, review_board_ui.REVIEW_BOARD_KEY_FOCUS) {
         return FAIL_REVIEW_BOARD_INPUT_MODE
     }
-    effect = kernel_dispatch.kernel_dispatch_step(&state, display_query_obs())
-    if !expect_display(effect, DISPLAY_STATE_FOCUS_NORMAL_STATUS) {
+    effect = kernel_dispatch.kernel_dispatch_step(&state, scenario_transport.display_query_obs())
+    if !scenario_assert.expect_display(effect, syscall.SyscallStatus.Ok, DISPLAY_STATE_FOCUS_NORMAL_STATUS) {
         return FAIL_REVIEW_BOARD_DISPLAY_MODE
     }
 
@@ -99,8 +91,8 @@ func run_review_board_ui_proof_probe() i32 {
     if !expect_delivered(effect, review_board_ui.REVIEW_BOARD_KEY_TOGGLE_REGION) {
         return FAIL_REVIEW_BOARD_INPUT_BODY
     }
-    effect = kernel_dispatch.kernel_dispatch_step(&state, display_query_obs())
-    if !expect_display(effect, DISPLAY_STATE_FOCUS_NORMAL_BODY) {
+    effect = kernel_dispatch.kernel_dispatch_step(&state, scenario_transport.display_query_obs())
+    if !scenario_assert.expect_display(effect, syscall.SyscallStatus.Ok, DISPLAY_STATE_FOCUS_NORMAL_BODY) {
         return FAIL_REVIEW_BOARD_DISPLAY_BODY
     }
 
@@ -116,8 +108,8 @@ func run_review_board_ui_proof_probe() i32 {
     if !expect_delivered(effect, review_board_ui.REVIEW_BOARD_KEY_URGENT) {
         return FAIL_REVIEW_BOARD_INPUT_URGENT2
     }
-    effect = kernel_dispatch.kernel_dispatch_step(&state, display_query_obs())
-    if !expect_display(effect, DISPLAY_STATE_FOCUS_ESCALATE_BODY) {
+    effect = kernel_dispatch.kernel_dispatch_step(&state, scenario_transport.display_query_obs())
+    if !scenario_assert.expect_display(effect, syscall.SyscallStatus.Ok, DISPLAY_STATE_FOCUS_ESCALATE_BODY) {
         return FAIL_REVIEW_BOARD_DISPLAY_ESCALATE
     }
 

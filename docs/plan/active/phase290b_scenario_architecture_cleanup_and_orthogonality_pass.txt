@@ -3,7 +3,23 @@ Phase 290B -- Scenario Architecture Cleanup And Orthogonality Pass
 
 Status
 ------
-PROPOSED
+COMPLETE
+
+Resolution summary
+------------------
+- Shared reply, workflow, completion, and display-query helpers now route
+  through `scenario_assert.mc` and `scenario_transport.mc` instead of local
+  per-scenario copies.
+- `scenario_steps.mc` stays as the explicit linear transport-step owner, with
+  an entrypoint named `run_transport_step_table_probe` so its role is visible
+  at orchestration call sites.
+- `scenario_launcher_service.mc` stays as a documented compatibility facade
+  because repo-owned reset-lane launcher projects still import that module
+  directly.
+- `scenarios.mc` now marks the shared-state versus standalone probe split
+  explicitly at the orchestration boundary.
+- Validation passed with `Build debug` and
+  `ctest --test-dir build/debug -R '^mc_tool_workflow_kernel_reset_lane_unit$' --output-on-failure`.
 
 Purpose
 -------

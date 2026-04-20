@@ -47,10 +47,6 @@ const FAIL_UI_SELECT_INVALIDATED: i32 = 28028
 const FAIL_UI_LAUNCH_INVALIDATED: i32 = 28029
 const FAIL_UI_DISPLAY_INVALIDATED: i32 = 28030
 
-func display_query_obs() syscall.ReceiveObservation {
-    return syscall.ReceiveObservation{ status: syscall.SyscallStatus.Ok, block_reason: syscall.BlockReason.None, endpoint_id: service_topology.DISPLAY_ENDPOINT_ID, source_pid: 1, payload_len: 0, received_handle_slot: 0, received_handle_count: 0, payload: { 0, 0, 0, 0 } }
-}
-
 func expect_delivered(effect: service_effect.Effect, value: u8) bool {
     return scenario_assert.expect_reply(effect, syscall.SyscallStatus.Ok, 4, program_catalog.PROGRAM_ID_ISSUE_ROLLUP, input_event.INPUT_ROUTE_DELIVERED, input_event.INPUT_EVENT_KEY, value)
 }
@@ -69,7 +65,7 @@ func run_fresh_install_phase(state: *boot.KernelBootState) i32 {
     if service_effect.effect_reply_status(effect) != syscall.SyscallStatus.Ok {
         return FAIL_UI_LAUNCH_FRESH
     }
-    effect = kernel_dispatch.kernel_dispatch_step(state, display_query_obs())
+    effect = kernel_dispatch.kernel_dispatch_step(state, scenario_transport.display_query_obs())
     if !scenario_assert.expect_display(effect, syscall.SyscallStatus.Ok, scenario_assert.DISPLAY_STATE_FRESH) {
         return FAIL_UI_DISPLAY_FRESH
     }
@@ -77,7 +73,7 @@ func run_fresh_install_phase(state: *boot.KernelBootState) i32 {
     if !expect_delivered(effect, 79) {
         return FAIL_UI_INPUT_FRESH
     }
-    effect = kernel_dispatch.kernel_dispatch_step(state, display_query_obs())
+    effect = kernel_dispatch.kernel_dispatch_step(state, scenario_transport.display_query_obs())
     if !scenario_assert.expect_display(effect, syscall.SyscallStatus.Ok, scenario_assert.DISPLAY_STATE_STEADY) {
         return FAIL_UI_DISPLAY_FRESH_STEADY
     }
@@ -99,7 +95,7 @@ func run_restart_resumed_phase(state: *boot.KernelBootState) i32 {
     if service_effect.effect_reply_status(effect) != syscall.SyscallStatus.Ok {
         return FAIL_UI_LAUNCH_RESUMED
     }
-    effect = kernel_dispatch.kernel_dispatch_step(state, display_query_obs())
+    effect = kernel_dispatch.kernel_dispatch_step(state, scenario_transport.display_query_obs())
     if !scenario_assert.expect_display(effect, syscall.SyscallStatus.Ok, scenario_assert.DISPLAY_STATE_RESUMED) {
         return FAIL_UI_DISPLAY_RESUMED
     }
@@ -107,7 +103,7 @@ func run_restart_resumed_phase(state: *boot.KernelBootState) i32 {
     if !expect_delivered(effect, 79) {
         return FAIL_UI_INPUT_RESUMED
     }
-    effect = kernel_dispatch.kernel_dispatch_step(state, display_query_obs())
+    effect = kernel_dispatch.kernel_dispatch_step(state, scenario_transport.display_query_obs())
     if !scenario_assert.expect_display(effect, syscall.SyscallStatus.Ok, scenario_assert.DISPLAY_STATE_STEADY) {
         return FAIL_UI_DISPLAY_RESUMED_STEADY
     }
@@ -138,7 +134,7 @@ func run_update_invalidated_phase(state: *boot.KernelBootState) i32 {
     if service_effect.effect_reply_status(effect) != syscall.SyscallStatus.Ok {
         return FAIL_UI_LAUNCH_INVALIDATED
     }
-    effect = kernel_dispatch.kernel_dispatch_step(state, display_query_obs())
+    effect = kernel_dispatch.kernel_dispatch_step(state, scenario_transport.display_query_obs())
     if !scenario_assert.expect_display(effect, syscall.SyscallStatus.Ok, scenario_assert.DISPLAY_STATE_INVALIDATED) {
         return FAIL_UI_DISPLAY_INVALIDATED
     }

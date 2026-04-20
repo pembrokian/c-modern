@@ -2,6 +2,7 @@ import boot
 import input_event
 import kernel_dispatch
 import program_catalog
+import scenario_assert
 import scenario_transport
 import serial_protocol
 import service_effect
@@ -28,41 +29,11 @@ const INPUT_EVENT_POINTER_PROBE: u8 = 80
 const INPUT_POINTER_VALUE_PROBE: u8 = 1
 const DISPLAY_STATE_STEADY_DEFAULT: [4]u8 = [4]u8{ 83, 84, 68, 89 }
 
-func expect_reply(effect: service_effect.Effect, status: syscall.SyscallStatus, len: usize, b0: u8, b1: u8, b2: u8, b3: u8) bool {
-    if service_effect.effect_reply_status(effect) != status {
-        return false
-    }
-    if service_effect.effect_reply_payload_len(effect) != len {
-        return false
-    }
-    payload := service_effect.effect_reply_payload(effect)
-    return payload[0] == b0 && payload[1] == b1 && payload[2] == b2 && payload[3] == b3
-}
-
-func expect_workflow(effect: service_effect.Effect, status: syscall.SyscallStatus, state: u8, restart: u8) bool {
-    if service_effect.effect_reply_status(effect) != status {
-        return false
-    }
-    if service_effect.effect_reply_payload_len(effect) != 4 {
-        return false
-    }
-    payload := service_effect.effect_reply_payload(effect)
-    return payload[0] == state && payload[1] == restart
-}
-
-func display_query_obs() syscall.ReceiveObservation {
-    return syscall.ReceiveObservation{ status: syscall.SyscallStatus.Ok, block_reason: syscall.BlockReason.None, endpoint_id: service_topology.DISPLAY_ENDPOINT_ID, source_pid: 1, payload_len: 0, received_handle_slot: 0, received_handle_count: 0, payload: { 0, 0, 0, 0 } }
-}
-
 func alternate_input_obs(event: u8, value: u8) syscall.ReceiveObservation {
     return scenario_transport.serial_obs(
         scenario_transport.DEFAULT_SERIAL_ROUTE.endpoint,
         scenario_transport.DEFAULT_SERIAL_ROUTE.pid,
         [4]u8{ serial_protocol.CMD_I, event, value, serial_protocol.CMD_BANG })
-}
-
-func expect_display(effect: service_effect.Effect, cells: [4]u8) bool {
-    return expect_reply(effect, syscall.SyscallStatus.Ok, 4, cells[0], cells[1], cells[2], cells[3])
 }
 
 func run_alternate_input_first_slice_probe() i32 {
@@ -96,16 +67,16 @@ func run_alternate_input_first_slice_probe() i32 {
     apply_id := service_effect.effect_reply_payload(effect)[0]
 
     effect = kernel_dispatch.kernel_dispatch_step(&state, scenario_transport.cmd_workflow_query(apply_id))
-    if !expect_workflow(effect, syscall.SyscallStatus.Ok, workflow_core.WORKFLOW_STATE_WAITING, workflow_core.WORKFLOW_RESTART_NONE) {
+    if !scenario_assert.expect_workflow_state(effect, syscall.SyscallStatus.Ok, workflow_core.WORKFLOW_STATE_WAITING, workflow_core.WORKFLOW_RESTART_NONE) {
         return FAIL_ALT_APPLY_WAITING
     }
     effect = kernel_dispatch.kernel_dispatch_step(&state, scenario_transport.cmd_workflow_query(apply_id))
-    if !expect_workflow(effect, syscall.SyscallStatus.Ok, workflow_core.WORKFLOW_STATE_UPDATE_APPLIED, workflow_core.WORKFLOW_RESTART_NONE) {
+    if !scenario_assert.expect_workflow_state(effect, syscall.SyscallStatus.Ok, workflow_core.WORKFLOW_STATE_UPDATE_APPLIED, workflow_core.WORKFLOW_RESTART_NONE) {
         return FAIL_ALT_APPLY_DONE
     }
 
     effect = kernel_dispatch.kernel_dispatch_step(&state, scenario_transport.cmd_launcher_select(program_catalog.PROGRAM_ID_ISSUE_ROLLUP))
-    if !expect_reply(effect, syscall.SyscallStatus.Ok, 2, program_catalog.PROGRAM_ID_ISSUE_ROLLUP, 0, 0, 0) {
+    if !scenario_assert.expect_reply(effect, syscall.SyscallStatus.Ok, 2, program_catalog.PROGRAM_ID_ISSUE_ROLLUP, 0, 0, 0) {
         return FAIL_ALT_SELECT
     }
     effect = kernel_dispatch.kernel_dispatch_step(&state, scenario_transport.cmd_launcher_launch())
@@ -114,20 +85,20 @@ func run_alternate_input_first_slice_probe() i32 {
     }
 
     effect = kernel_dispatch.kernel_dispatch_step(&state, scenario_transport.cmd_input_key(79))
-    if !expect_reply(effect, syscall.SyscallStatus.Ok, 4, program_catalog.PROGRAM_ID_ISSUE_ROLLUP, input_event.INPUT_ROUTE_DELIVERED, input_event.INPUT_EVENT_KEY, 79) {
+    if !scenario_assert.expect_reply(effect, syscall.SyscallStatus.Ok, 4, program_catalog.PROGRAM_ID_ISSUE_ROLLUP, input_event.INPUT_ROUTE_DELIVERED, input_event.INPUT_EVENT_KEY, 79) {
         return FAIL_ALT_INPUT_KEY
     }
-    effect = kernel_dispatch.kernel_dispatch_step(&state, display_query_obs())
-    if !expect_display(effect, DISPLAY_STATE_STEADY_DEFAULT) {
+    effect = kernel_dispatch.kernel_dispatch_step(&state, scenario_transport.display_query_obs())
+    if !scenario_assert.expect_display(effect, syscall.SyscallStatus.Ok, DISPLAY_STATE_STEADY_DEFAULT) {
         return FAIL_ALT_DISPLAY_KEY
     }
 
     effect = kernel_dispatch.kernel_dispatch_step(&state, alternate_input_obs(INPUT_EVENT_POINTER_PROBE, INPUT_POINTER_VALUE_PROBE))
-    if !expect_reply(effect, syscall.SyscallStatus.Ok, 4, program_catalog.PROGRAM_ID_ISSUE_ROLLUP, input_event.INPUT_ROUTE_UNSUPPORTED, INPUT_EVENT_POINTER_PROBE, INPUT_POINTER_VALUE_PROBE) {
+    if !scenario_assert.expect_reply(effect, syscall.SyscallStatus.Ok, 4, program_catalog.PROGRAM_ID_ISSUE_ROLLUP, input_event.INPUT_ROUTE_UNSUPPORTED, INPUT_EVENT_POINTER_PROBE, INPUT_POINTER_VALUE_PROBE) {
         return FAIL_ALT_INPUT_UNSUPPORTED
     }
-    effect = kernel_dispatch.kernel_dispatch_step(&state, display_query_obs())
-    if !expect_display(effect, DISPLAY_STATE_STEADY_DEFAULT) {
+    effect = kernel_dispatch.kernel_dispatch_step(&state, scenario_transport.display_query_obs())
+    if !scenario_assert.expect_display(effect, syscall.SyscallStatus.Ok, DISPLAY_STATE_STEADY_DEFAULT) {
         return FAIL_ALT_DISPLAY_UNSUPPORTED
     }
 
