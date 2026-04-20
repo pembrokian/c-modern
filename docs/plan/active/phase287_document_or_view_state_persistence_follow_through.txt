@@ -107,17 +107,26 @@ Implementation accelerators
 Main files and navigations
 ~~~~~~~~~~~~~~~~~~~~~~~~~~
 - Primary durable owner: `kernel/src/services/journal_service.mc`.
+- Open `kernel/src/services/journal_service.mc` first, then the chosen app
+  consumer second.
 - First-hop launch and restart owners: `kernel/src/services/launcher_service.mc`,
   `kernel/src/boot/init.mc`, and any existing restart follow-through seams from
   Phase 280.
 - Candidate consumers: the Phase 286 proof target and the current `issue_rollup`
   interactive state under `examples/real/issue_rollup/src/app/issue_rollup_interactive.mc`
   if that remains the strongest bounded persisted state example.
+- Copy or mirror example restart-sensitive proof surfaces from the existing
+  reset-lane workflow fixtures before widening grouped workflow wiring.
 - Nearby accelerator docs: `docs/plan/active/phase280_ui_app_restart_and_update_follow_through.txt`,
   `docs/plan/active/phase286_first_editor_or_installer_style_ui_proof.txt`,
-  and the durable journal notes already captured in repository memory.
+  `docs/agent/prompts/change_touch_sets.txt`,
+  `docs/agent/prompts/error_triage.txt`, and the durable journal notes already
+  captured in repository memory.
 - Expected first validation target when persistence lands: `Build debug`, then
   one restart-sensitive fixture for the chosen UI app.
+- Exact first command if the starter pack is enough: `cmake --build build/debug -j4`.
+- If the durable owner, one consumer, and one restart-sensitive proof target
+  are already clear, stop broad rereads and begin the owner-local batch.
 
 Relevant cookbook patterns
 ~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -148,6 +157,10 @@ Common breakage map
   through, scenario builders.
 - Changed visible persisted outcome -> app render state, debug observations,
   restart-sensitive expected outputs.
+- Added or changed restart-sensitive reset-lane row -> scenario registration
+  row, fixed-size scenario table or count, coverage helper expectations,
+  fixture naming, and the owning reset-lane CTest target before reopening
+  broader workflow code.
 
 Relevant test surfaces
 ~~~~~~~~~~~~~~~~~~~~~~
@@ -157,6 +170,8 @@ Relevant test surfaces
   narrow real-project validation for the app if hosted code changes.
 - Supporting validation: `mc_tool_workflow_kernel_reset_lane_unit` and the
   relevant real-project suite for the chosen consumer.
+- Exact first command when the reset-lane path is touched:
+  `ctest --test-dir build/debug -R mc_tool_workflow_kernel_reset_lane_unit --output-on-failure`.
 
 Test obligations
 ----------------

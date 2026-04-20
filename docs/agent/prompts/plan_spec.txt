@@ -331,6 +331,20 @@ when they materially reduce search time, for example:
 
 This subsection MUST stay selective. It is not a full file inventory.
 
+It SHOULD act like a compact starter pack for implementation. Good starter-pack
+content includes:
+
+- one controlling owner to open first
+- one small adjacent touch set to open second
+- one fixture, scenario, or grouped-suite file to copy or mirror when the
+	phase follows an existing pattern
+- one exact first validation target or command when the repository already
+	knows it
+
+If the likely implementation shape becomes clear after this starter pack plus
+the required accelerator subsections below, the plan SHOULD avoid sending the
+implementer on a broad reread of neighboring files.
+
 Relevant cookbook patterns
 ~~~~~~~~~~~~~~~~~~~~~~~~~~
 This subsection MUST identify any existing cookbook pattern that cleanly fits
@@ -460,6 +474,10 @@ than leaving it to the coding pass.
 	a future implementer. It should answer where to start, what to read next,
 	which pattern applies, which local truths must be preserved, and which test
 	surface should be run first.
+8. Add only the minimum starter-pack detail needed to begin.
+	If the controlling owner, adjacent touch set, likely follow-through order,
+	and first validation target are already clear, do not keep expanding the
+	accelerator section into a broad reading list.
 
 Authors SHOULD prefer extraction over restatement. If an existing prompt or
 repo-local helper already captures the truth well, the plan should point to it
@@ -527,6 +545,7 @@ Recommended optional sections
 The following sections are OPTIONAL but recommended when they materially help:
 
 - `Files expected to change`
+- `Implementation starter pack`
 - `Accelerator source notes`
 - `Concrete examples this phase should make possible`
 - `Failure modes to watch for`
@@ -668,6 +687,7 @@ Main files and navigations
 - controlling owner ...
 - first-hop adjacent files ...
 - first validation target ...
+- copy or mirror example fixture or scenario if one exists ...
 
 Relevant cookbook patterns
 - Pattern ... because ...
@@ -692,6 +712,7 @@ Relevant test surfaces
 - owning test family ...
 - first executable validation target ...
 - fixture or output-layout rule ...
+- exact first command if the repository already knows it ...
 
 Test obligations
 ----------------

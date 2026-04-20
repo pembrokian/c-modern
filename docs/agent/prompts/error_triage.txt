@@ -35,3 +35,7 @@ Common first-break checks
   check the owning grouped suite and its checked-in case or scenario first;
   do not start by widening CMake registration or sharding unless ownership
   actually changed
+- Reset-lane fixture addition broke the build:
+  check the scenario registration row, any fixed-size `std::array` or scenario
+  count, coverage-validation helpers, fixture naming, and the owning reset-lane
+  CTest target before reopening broader workflow code

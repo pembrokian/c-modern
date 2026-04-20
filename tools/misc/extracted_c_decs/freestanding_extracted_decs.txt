@@ -1,6 +1,0 @@
-==== runtime/freestanding/mc_bootstrap_main.c ====
-FUNCTION_DECL: bootstrap_main
-   Return: int
-FUNCTION_DECL: main
-   Return: int
-

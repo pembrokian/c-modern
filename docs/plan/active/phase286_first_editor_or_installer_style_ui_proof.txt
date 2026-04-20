@@ -112,17 +112,27 @@ Main files and navigations
 ~~~~~~~~~~~~~~~~~~~~~~~~~~
 - Primary candidate consumer: `examples/real/review_board/src/` and its build
   manifest under `examples/real/review_board/build.toml`.
+- Open the chosen consumer first, then the one kernel-side UI seam it directly
+  needs second.
 - Alternate bounded consumer if needed: the current update or install path
   rooted in `kernel/src/services/update_store_service.mc` and launcher-visible
   state.
 - First-hop kernel owners: `kernel/src/launcher_service.mc`,
   `kernel/src/foreground_input_route.mc`, `kernel/src/display_surface.mc`, and
   the current app-local UI owners that will host the second proof.
+- Copy or mirror example proof surfaces from
+  `tests/tool/real_projects/review-board/test.cpp` or the nearest existing
+  reset-lane UI case before inventing new workflow wiring.
 - Nearby accelerator docs: `docs/plan/active/phase279_first_human_facing_app_proof.txt`,
   `docs/plan/active/phase281_first_ui_slice_audit.txt`, and
-  `docs/agent/prompts/test_overview.txt`.
+  `docs/agent/prompts/test_overview.txt`,
+  `docs/agent/prompts/change_touch_sets.txt`, and
+  `docs/agent/prompts/error_triage.txt`.
 - Expected first validation target when the proof lands: `Build debug`, then
   one focused system or workflow proof for the chosen UI program.
+- Exact first command if the starter pack is enough: `cmake --build build/debug -j4`.
+- If the chosen consumer, one kernel seam, and one focused proof target are
+  already clear, stop broad rereads and start the consumer-local batch.
 
 Relevant cookbook patterns
 ~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -153,6 +163,10 @@ Common breakage map
   proof, reset-lane expectations, narrow real-project coverage.
 - Changed consumer-visible state names or outputs -> workflow assertions,
   scenario logs, hosted proof expectations.
+- Added or changed reset-lane proof row -> scenario registration row,
+  fixed-size scenario table or count, coverage helper expectations, fixture
+  naming, and the owning reset-lane CTest target before reopening broader
+  workflow code.
 
 Relevant test surfaces
 ~~~~~~~~~~~~~~~~~~~~~~
@@ -162,6 +176,8 @@ Relevant test surfaces
   narrow real-project test for the chosen consumer.
 - Supporting validation: `mc_tool_workflow_kernel_reset_lane_unit` if the
   kernel-owned UI path is involved.
+- Exact first command when `review_board` remains the chosen consumer:
+  `ctest --test-dir build/debug -R 'mc_tool_real_project_.*review.*|mc_tool_real_project_.*review_board.*' --output-on-failure`.
 
 Test obligations
 ----------------

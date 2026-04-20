@@ -101,13 +101,21 @@ Implementation accelerators
 Main files and navigations
 ~~~~~~~~~~~~~~~~~~~~~~~~~~
 - Primary comparison baseline: `docs/plan/active/phase281_first_ui_slice_audit.txt`.
+- Open the strongest changed Band E phase doc first, then the Phase 281 audit
+  baseline second.
 - Expected owning inputs: the landed docs for Phases 282 through 288, the
   current UI-owner files in `kernel/src/`, and the maintained UI-facing tests
   under `tests/system/` and `tests/tool/`.
 - Nearby accelerator docs: `docs/plan/admin/speculative_roadmap_post_phase254.txt`,
-  `docs/plan/backlog.txt`, and `docs/plan/decision_log.txt`.
+  `docs/plan/backlog.txt`, `docs/plan/decision_log.txt`, and
+  `docs/agent/prompts/change_touch_sets.txt`.
 - Expected first validation target when the freeze lands: no new executable
   validation beyond the evidence already required by the preceding phases.
+- Copy or mirror the short owner-and-evidence style from
+  `docs/plan/active/phase281_first_ui_slice_audit.txt` rather than widening
+  into a new roadmap narrative.
+- If the owning phases and their evidence surfaces are already clear, stop
+  broader doc exploration and write the freeze directly from those sources.
 
 Relevant cookbook patterns
 ~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -122,6 +130,8 @@ Relevant file-local invariants
   remain actionable.
 - `docs/plan/decision_log.txt` should capture only deliberate limited-solution
   choices that need durable rationale.
+- After the freeze is reviewably green, do not widen into extra roadmap or
+  repo-map churn unless the audit exposed a new durable boundary fact.
 
 Dependency-ordered touch sequence
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -140,6 +150,8 @@ Common breakage map
   roadmap overclaim.
 - Freeze language stops naming owners -> later phases lose the boundary map and
   start treating Band E as a platform instead of a bounded slice.
+- Post-green sidecar drift -> extra admin or architecture docs move even though
+  the freeze only clarified already-landed Band E truth.
 
 Relevant test surfaces
 ~~~~~~~~~~~~~~~~~~~~~~

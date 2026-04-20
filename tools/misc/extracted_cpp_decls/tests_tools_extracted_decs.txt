@@ -1,0 +1,1143 @@
+==== tests/tool/bootstrap_tests.cpp ====
+NAMESPACE: 
+FUNCTION_DECL: Expect
+   Return: void
+   Param: bool condition
+   Param: const int & message
+FUNCTION_DECL: MakeTempFile
+   Return: int
+FUNCTION_DECL: ParseText
+   Return: int
+   Param: const int & source
+   Param: int & diagnostics
+FUNCTION_DECL: MakeNestedAggregateExpr
+   Return: int
+   Param: int depth
+FUNCTION_DECL: CountOccurrences
+   Return: int
+   Param: const int & text
+   Param: const int & needle
+FUNCTION_DECL: TestDiagnosticFormatting
+   Return: void
+FUNCTION_DECL: TestSourceManagerLoad
+   Return: void
+FUNCTION_DECL: TestDumpPaths
+   Return: void
+FUNCTION_DECL: TestMciRoundTrip
+   Return: void
+FUNCTION_DECL: TestSemaLookupFallsBackToModuleContents
+   Return: void
+FUNCTION_DECL: TestLexerTracksKeywordsAndSeparators
+   Return: void
+FUNCTION_DECL: TestParserBuildsDeterministicAstDump
+   Return: void
+FUNCTION_DECL: TestParserHandlesTypesAndLoopForms
+   Return: void
+FUNCTION_DECL: TestParserReportsMalformedInput
+   Return: void
+FUNCTION_DECL: TestParserAcceptsArrayLiteralCallArgument
+   Return: void
+FUNCTION_DECL: TestParserAcceptsInferredBraceAggregateArgument
+   Return: void
+FUNCTION_DECL: TestParserHandlesMultiTargetAssignment
+   Return: void
+FUNCTION_DECL: TestParserPreservesBindingAssignmentAmbiguity
+   Return: void
+FUNCTION_DECL: TestAstDumpDepthLimitAppliesThroughHelperBoundaries
+   Return: void
+FUNCTION_DECL: main
+   Return: int
+
+==== tests/tool/codegen_llvm_tests.cpp ====
+NAMESPACE: 
+FUNCTION_DECL: Expect
+   Return: void
+   Param: bool condition
+   Param: const int & message
+FUNCTION_DECL: MakeMinimalSupportedModule
+   Return: int
+FUNCTION_DECL: MakePanicModule
+   Return: int
+FUNCTION_DECL: TestBootstrapTargetConfigIsStable
+   Return: void
+FUNCTION_DECL: TestLowerModuleAcceptsStageOneSlice
+   Return: void
+FUNCTION_DECL: TestLowerModuleLowersStoreBranchAndCompare
+   Return: void
+FUNCTION_DECL: TestLowerModuleRejectsUnsupportedTarget
+   Return: void
+FUNCTION_DECL: TestLowerModuleAcceptsFreestandingBootstrapTarget
+   Return: void
+FUNCTION_DECL: TestLowerModuleRejectsUnsupportedInstruction
+   Return: void
+FUNCTION_DECL: TestBuildObjectFileRejectsUnsupportedExecutableInstructionBeforeIrEmission
+   Return: void
+FUNCTION_DECL: TestBuildObjectFileRejectsReturnWithoutDeclaredValue
+   Return: void
+FUNCTION_DECL: TestBuildObjectFileRejectsMalformedIndirectCallSignatureMetadata
+   Return: void
+FUNCTION_DECL: TestBuildObjectFileUsesDirectCalleeDeclarationForCallSignature
+   Return: void
+FUNCTION_DECL: TestBuildObjectFileEscapesSourceFilenameInModuleHeader
+   Return: void
+FUNCTION_DECL: TestBuildObjectFileFreestandingOmitsHostedRuntimePrologue
+   Return: void
+FUNCTION_DECL: TestBuildObjectFileLowersPanicTerminator
+   Return: void
+FUNCTION_DECL: TestLowerModuleLowersCheckedIntegerSemantics
+   Return: void
+FUNCTION_DECL: TestLowerModuleLowersRepresentationPreservingConversions
+   Return: void
+FUNCTION_DECL: TestEnumPayloadLayoutUsesSharedAlignedStorage
+   Return: void
+FUNCTION_DECL: TestPayloadFreeEnumEqualityBuildsScalarTagCompare
+   Return: void
+FUNCTION_DECL: TestPayloadBearingEnumEqualityBuildsTagAndPayloadCompare
+   Return: void
+FUNCTION_DECL: TestPayloadBearingEnumOrderingBuildsTagAndFieldLexicographicCompare
+   Return: void
+FUNCTION_DECL: TestNestedPayloadBearingEnumOrderingBuildsRecursiveCompare
+   Return: void
+FUNCTION_DECL: main
+   Return: int
+
+==== tests/tool/real_projects/arena-expr/test.cpp ====
+NAMESPACE: 
+NAMESPACE: mc
+NAMESPACE: tool_tests
+FUNCTION_DECL: TestRealArenaExprToolProject
+   Return: void
+   Param: const int & source_root
+   Param: const int & binary_root
+   Param: const int & mc_path
+
+==== tests/tool/real_projects/bundle-stage/test.cpp ====
+NAMESPACE: 
+NAMESPACE: mc
+NAMESPACE: tool_tests
+FUNCTION_DECL: TestRealBundleStageProject
+   Return: void
+   Param: const int & source_root
+   Param: const int & binary_root
+   Param: const int & mc_path
+
+==== tests/tool/real_projects/evented-echo/test.cpp ====
+NAMESPACE: 
+FUNCTION_DECL: BuildPartialWriteResponse
+   Return: int
+   Param: int size
+FUNCTION_DECL: ExerciseEventedEchoRoundTrip
+   Return: void
+   Param: const int & mc_path
+   Param: const int & project_path
+   Param: const int & build_dir
+   Param: int output_name
+   Param: const int & context
+FUNCTION_DECL: ExercisePartialWriteRoundTrip
+   Return: void
+   Param: const int & mc_path
+   Param: const int & project_path
+   Param: const int & build_dir
+   Param: int output_name
+   Param: const int & context
+FUNCTION_DECL: ExpectEventedEchoTestOutput
+   Return: void
+   Param: int output
+   Param: const int & context_prefix
+FUNCTION_DECL: ExpectPartialWriteTestOutput
+   Return: void
+   Param: int output
+   Param: const int & context_prefix
+FUNCTION_DECL: ExerciseProjectRunTestRerunSequence
+   Return: void
+   Param: const int & mc_path
+   Param: const int & project_path
+   Param: const int & build_dir
+   Param: const int & run_round_trip
+   Param: const int & verify_test_output
+   Param: int first_run_output_name
+   Param: int test_output_name
+   Param: int second_run_output_name
+   Param: const int & context_prefix
+FUNCTION_DECL: ExerciseProjectTestRunRerunSequence
+   Return: void
+   Param: const int & mc_path
+   Param: const int & project_path
+   Param: const int & build_dir
+   Param: const int & run_round_trip
+   Param: const int & verify_test_output
+   Param: int first_test_output_name
+   Param: int run_output_name
+   Param: int second_test_output_name
+   Param: const int & context_prefix
+NAMESPACE: mc
+NAMESPACE: tool_tests
+FUNCTION_DECL: TestRealEventedEchoProject
+   Return: void
+   Param: const int & source_root
+   Param: const int & binary_root
+   Param: const int & mc_path
+
+==== tests/tool/real_projects/file-walker/test.cpp ====
+NAMESPACE: 
+NAMESPACE: mc
+NAMESPACE: tool_tests
+FUNCTION_DECL: TestRealFileWalkerProject
+   Return: void
+   Param: const int & source_root
+   Param: const int & binary_root
+   Param: const int & mc_path
+
+==== tests/tool/real_projects/grep-lite/test.cpp ====
+NAMESPACE: 
+NAMESPACE: mc
+NAMESPACE: tool_tests
+FUNCTION_DECL: TestRealGrepLiteProject
+   Return: void
+   Param: const int & source_root
+   Param: const int & binary_root
+   Param: const int & mc_path
+
+==== tests/tool/real_projects/hash-tool/test.cpp ====
+NAMESPACE: 
+NAMESPACE: mc
+NAMESPACE: tool_tests
+FUNCTION_DECL: TestRealHashToolProject
+   Return: void
+   Param: const int & source_root
+   Param: const int & binary_root
+   Param: const int & mc_path
+
+==== tests/tool/real_projects/issue-rollup-imported-aggregate-const/test.cpp ====
+NAMESPACE: 
+FUNCTION_DECL: ExpectIssueRollupRunOutput
+   Return: void
+   Param: int output
+   Param: int expected_line
+   Param: const int & context_prefix
+NAMESPACE: mc
+NAMESPACE: tool_tests
+FUNCTION_DECL: TestIssueRollupImportedAggregateConstPressure
+   Return: void
+   Param: const int & source_root
+   Param: const int & binary_root
+   Param: const int & mc_path
+
+==== tests/tool/real_projects/issue-rollup/test.cpp ====
+NAMESPACE: 
+FUNCTION_DECL: ResolveProjectArtifactPath
+   Return: int
+   Param: const int & expected_path
+FUNCTION_DECL: ResolveProjectBuildArtifactTargets
+   Return: int
+   Param: const int & source_path
+   Param: const int & build_dir
+FUNCTION_DECL: ResolveProjectDumpTargets
+   Return: int
+   Param: const int & source_path
+   Param: const int & build_dir
+FUNCTION_DECL: ExpectIssueRollupRunOutput
+   Return: void
+   Param: int output
+   Param: int expected_line
+   Param: const int & context_prefix
+FUNCTION_DECL: ExpectIssueRollupTestOutput
+   Return: void
+   Param: int output
+   Param: const int & context_prefix
+NAMESPACE: mc
+NAMESPACE: tool_tests
+FUNCTION_DECL: TestRealIssueRollupProject
+   Return: void
+   Param: const int & source_root
+   Param: const int & binary_root
+   Param: const int & mc_path
+
+==== tests/tool/real_projects/line-filter-relay/test.cpp ====
+NAMESPACE: 
+FUNCTION_DECL: RunLineFilterRelayProjectAndExpectSuccess
+   Return: int
+   Param: const int & mc_path
+   Param: const int & project_path
+   Param: const int & build_dir
+   Param: int input_text
+   Param: int output_name
+   Param: const int & context
+FUNCTION_DECL: ExpectLineFilterRelayRunOutput
+   Return: void
+   Param: int output
+   Param: const int & context_prefix
+FUNCTION_DECL: ExpectLineFilterRelayTestOutput
+   Return: void
+   Param: int output
+   Param: const int & context_prefix
+NAMESPACE: mc
+NAMESPACE: tool_tests
+FUNCTION_DECL: TestRealLineFilterRelayProject
+   Return: void
+   Param: const int & source_root
+   Param: const int & binary_root
+   Param: const int & mc_path
+
+==== tests/tool/real_projects/module-set-imported-const/test.cpp ====
+NAMESPACE: 
+NAMESPACE: mc
+NAMESPACE: tool_tests
+FUNCTION_DECL: TestModuleSetImportedConstFollowThrough
+   Return: void
+   Param: const int & source_root
+   Param: const int & binary_root
+   Param: const int & mc_path
+
+==== tests/tool/real_projects/pipe-handoff/test.cpp ====
+NAMESPACE: 
+FUNCTION_DECL: RunPipeHandoffProjectAndExpectSuccess
+   Return: int
+   Param: const int & mc_path
+   Param: const int & project_path
+   Param: const int & build_dir
+   Param: int output_name
+   Param: const int & context
+FUNCTION_DECL: ExpectPipeHandoffRunOutput
+   Return: void
+   Param: int output
+   Param: const int & context_prefix
+FUNCTION_DECL: ExpectPipeHandoffTestOutput
+   Return: void
+   Param: int output
+   Param: const int & context_prefix
+NAMESPACE: mc
+NAMESPACE: tool_tests
+FUNCTION_DECL: TestRealPipeHandoffProject
+   Return: void
+   Param: const int & source_root
+   Param: const int & binary_root
+   Param: const int & mc_path
+
+==== tests/tool/real_projects/pipe-ready/test.cpp ====
+NAMESPACE: 
+FUNCTION_DECL: RunPipeReadyProjectAndExpectSuccess
+   Return: int
+   Param: const int & mc_path
+   Param: const int & project_path
+   Param: const int & build_dir
+   Param: int output_name
+   Param: const int & context
+FUNCTION_DECL: ExpectPipeReadyRunOutput
+   Return: void
+   Param: int output
+   Param: const int & context_prefix
+FUNCTION_DECL: ExpectPipeReadyTestOutput
+   Return: void
+   Param: int output
+   Param: const int & context_prefix
+NAMESPACE: mc
+NAMESPACE: tool_tests
+FUNCTION_DECL: TestRealPipeReadyProject
+   Return: void
+   Param: const int & source_root
+   Param: const int & binary_root
+   Param: const int & mc_path
+
+==== tests/tool/real_projects/pool-rows/test.cpp ====
+NAMESPACE: 
+NAMESPACE: mc
+NAMESPACE: tool_tests
+FUNCTION_DECL: TestRealPoolRowsProject
+   Return: void
+   Param: const int & source_root
+   Param: const int & binary_root
+   Param: const int & mc_path
+
+==== tests/tool/real_projects/review-board/test.cpp ====
+NAMESPACE: 
+FUNCTION_DECL: ExpectReviewBoardRunOutput
+   Return: void
+   Param: int output
+   Param: int expected_line
+   Param: const int & context_prefix
+FUNCTION_DECL: ExpectReviewBoardTestOutput
+   Return: void
+   Param: int output
+   Param: int target_name
+   Param: const int & context_prefix
+NAMESPACE: mc
+NAMESPACE: tool_tests
+FUNCTION_DECL: TestRealReviewBoardProject
+   Return: void
+   Param: const int & source_root
+   Param: const int & binary_root
+   Param: const int & mc_path
+
+==== tests/tool/real_projects/worker-queue/test.cpp ====
+NAMESPACE: 
+FUNCTION_DECL: RunWorkerQueueProjectAndExpectSuccess
+   Return: int
+   Param: const int & mc_path
+   Param: const int & project_path
+   Param: const int & build_dir
+   Param: int output_name
+   Param: const int & context
+FUNCTION_DECL: ExpectWorkerQueueRunOutput
+   Return: void
+   Param: int output
+   Param: const int & context_prefix
+FUNCTION_DECL: ExpectWorkerQueueTestOutput
+   Return: void
+   Param: int output
+   Param: const int & context_prefix
+NAMESPACE: mc
+NAMESPACE: tool_tests
+FUNCTION_DECL: TestRealWorkerQueueProject
+   Return: void
+   Param: const int & source_root
+   Param: const int & binary_root
+   Param: const int & mc_path
+
+==== tests/tool/tool_build_state_suite.cpp ====
+NAMESPACE: 
+FUNCTION_DECL: TestProjectBuildAndMciEmission
+   Return: void
+   Param: const int & binary_root
+   Param: const int & mc_path
+FUNCTION_DECL: TestProjectTestTargetBuildsAndRuns
+   Return: void
+   Param: const int & binary_root
+   Param: const int & mc_path
+FUNCTION_DECL: TestProjectImportedGlobalMirDeclarations
+   Return: void
+   Param: const int & binary_root
+   Param: const int & mc_path
+FUNCTION_DECL: TestProjectImportedAbiTypeMirDeclarations
+   Return: void
+   Param: const int & binary_root
+   Param: const int & mc_path
+FUNCTION_DECL: TestProjectImportedGenericNominalIdentity
+   Return: void
+   Param: const int & binary_root
+   Param: const int & mc_path
+FUNCTION_DECL: TestProjectImportedGenericVariantConstructor
+   Return: void
+   Param: const int & binary_root
+   Param: const int & mc_path
+FUNCTION_DECL: TestProjectImportedGenericVariantInspection
+   Return: void
+   Param: const int & binary_root
+   Param: const int & mc_path
+FUNCTION_DECL: TestCorruptedInterfaceArtifactFailsBuild
+   Return: void
+   Param: const int & binary_root
+   Param: const int & mc_path
+FUNCTION_DECL: TestStaleInterfaceArtifactFormatFailsBuild
+   Return: void
+   Param: const int & binary_root
+   Param: const int & mc_path
+FUNCTION_DECL: TestModuleBuildStateIsVersionedAndDeterministic
+   Return: void
+   Param: const int & binary_root
+   Param: const int & mc_path
+FUNCTION_DECL: TestForeignInterfaceArtifactFailsBuild
+   Return: void
+   Param: const int & binary_root
+   Param: const int & mc_path
+FUNCTION_DECL: TestInvalidStateFileForcesRebuild
+   Return: void
+   Param: const int & binary_root
+   Param: const int & mc_path
+FUNCTION_DECL: TestIncrementalRebuildBehavior
+   Return: void
+   Param: const int & binary_root
+   Param: const int & mc_path
+FUNCTION_DECL: TestPrivateAndInternalIncrementalBehavior
+   Return: void
+   Param: const int & binary_root
+   Param: const int & mc_path
+FUNCTION_DECL: TestMultiFileModuleIncrementalBehavior
+   Return: void
+   Param: const int & binary_root
+   Param: const int & mc_path
+NAMESPACE: mc
+NAMESPACE: tool_tests
+FUNCTION_DECL: RunBuildStateToolSuite
+   Return: void
+   Param: const int & binary_root
+   Param: const int & mc_path
+
+==== tests/tool/tool_build_state_tests.cpp ====
+FUNCTION_DECL: main
+   Return: int
+   Param: int argc
+   Param: char ** argv
+
+==== tests/tool/tool_help_suite.cpp ====
+NAMESPACE: 
+FUNCTION_DECL: TestHelpMentionsRun
+   Return: void
+   Param: const int & binary_root
+   Param: const int & mc_path
+FUNCTION_DECL: TestMixedDirectSourceAndProjectOptionsFail
+   Return: void
+   Param: const int & binary_root
+   Param: const int & mc_path
+FUNCTION_DECL: TestProjectTestRejectsDirectSourceInvocation
+   Return: void
+   Param: const int & binary_root
+   Param: const int & mc_path
+FUNCTION_DECL: TestRunExitCodeAndArgs
+   Return: void
+   Param: const int & binary_root
+   Param: const int & mc_path
+NAMESPACE: mc
+NAMESPACE: tool_tests
+FUNCTION_DECL: RunWorkflowHelpSuite
+   Return: void
+   Param: const int & binary_root
+   Param: const int & mc_path
+
+==== tests/tool/tool_kernel_reset_lane_suite.cpp ====
+NAMESPACE: 
+STRUCT_DECL: ResetLaneScenario
+STRUCT_DECL: ResetLaneScenarioTiming
+STRUCT_DECL: InFlightScenario
+ENUM_DECL: ResetLaneMode
+FUNCTION_DECL: FormatDuration
+   Return: int
+   Param: int duration
+FUNCTION_DECL: ParsePositiveEnvOrDefault
+   Return: int
+   Param: const char * name
+   Param: int fallback
+FUNCTION_DECL: DetermineResetLaneParallelism
+   Return: int
+   Param: int scenario_count
+FUNCTION_DECL: ResetLaneContextLabel
+   Return: int
+   Param: const ResetLaneScenario & scenario
+FUNCTION_DECL: ResetLaneScenarioStem
+   Return: int
+   Param: const ResetLaneScenario & scenario
+FUNCTION_DECL: ResetLaneProjectDirName
+   Return: int
+   Param: const ResetLaneScenario & scenario
+FUNCTION_DECL: ResetLaneBuildDirName
+   Return: int
+   Param: const ResetLaneScenario & scenario
+FUNCTION_DECL: ResetLaneBuildOutputName
+   Return: int
+   Param: const ResetLaneScenario & scenario
+FUNCTION_DECL: ResetLaneRunOutputName
+   Return: int
+   Param: const ResetLaneScenario & scenario
+FUNCTION_DECL: ResetLaneBuildContext
+   Return: int
+   Param: const ResetLaneScenario & scenario
+FUNCTION_DECL: ResetLaneRunContext
+   Return: int
+   Param: const ResetLaneScenario & scenario
+FUNCTION_DECL: TimingFlagsForScenario
+   Return: int
+   Param: const ResetLaneScenario & scenario
+   Param: const ResetLaneScenarioTiming & timing
+   Param: bool enable_per_scenario_warnings
+   Param: int * slow_build_count
+   Param: int * slow_run_count
+FUNCTION_DECL: ResetLaneWallWarnMs
+   Return: int
+   Param: ResetLaneMode mode
+FUNCTION_DECL: ParseBuiltExecutablePath
+   Return: int
+   Param: int build_output
+   Param: int context
+FUNCTION_DECL: LoadKernelResetLaneFixtureFile
+   Return: int
+   Param: const int & source_root
+   Param: const int & fixture_root
+   Param: const int & relative_path
+FUNCTION_DECL: TreeHasNewerWriteTime
+   Return: bool
+   Param: const int & path
+   Param: int reference_time
+FUNCTION_DECL: CanReuseResetLaneBuild
+   Return: bool
+   Param: const int & source_root
+   Param: const int & project_root
+   Param: const int & project_path
+   Param: const int & build_dir
+   Param: const int & mc_path
+   Param: const ResetLaneScenario & scenario
+   Param: int * executable_path
+FUNCTION_DECL: WriteFileIfChanged
+   Return: void
+   Param: const int & path
+   Param: int contents
+FUNCTION_DECL: RemoveExtraneousFixtureProjectEntries
+   Return: void
+   Param: const int & fixture_root
+   Param: const int & project_root
+FUNCTION_DECL: CollectResetLaneFixtureRelativePaths
+   Return: int
+   Param: const int & source_root
+   Param: const int & relative_root
+FUNCTION_DECL: InstallKernelResetLaneFixtureProject
+   Return: int
+   Param: const int & source_root
+   Param: const int & fixture_root
+   Param: const int & project_root
+FUNCTION_DECL: ExpectKernelResetLaneRunSuccess
+   Return: void
+   Param: const ResetLaneScenario & scenario
+   Param: const int & outcome
+   Param: int output
+FUNCTION_DECL: RunKernelResetLaneScenario
+   Return: ResetLaneScenarioTiming
+   Param: const int & source_root
+   Param: const int & binary_root
+   Param: const int & mc_path
+   Param: const ResetLaneScenario & scenario
+FUNCTION_DECL: RunKernelRepoLiveReceiveScenario
+   Return: void
+   Param: const int & source_root
+   Param: const int & binary_root
+   Param: const int & mc_path
+FUNCTION_DECL: SelectResetLaneScenarios
+   Return: int
+   Param: ResetLaneMode mode
+FUNCTION_DECL: CollectCoveredResetLaneFixturePaths
+   Return: int
+FUNCTION_DECL: ValidateResetLaneScenarioCoverage
+   Return: void
+   Param: const int & source_root
+NAMESPACE: mc
+NAMESPACE: tool_tests
+FUNCTION_DECL: RunWorkflowKernelResetLaneSuiteImpl
+   Return: void
+   Param: const int & source_root
+   Param: const int & binary_root
+   Param: const int & mc_path
+   Param: ResetLaneMode mode
+FUNCTION_DECL: RunWorkflowKernelResetLaneSuite
+   Return: void
+   Param: const int & source_root
+   Param: const int & binary_root
+   Param: const int & mc_path
+FUNCTION_DECL: RunWorkflowKernelResetLaneFullSuite
+   Return: void
+   Param: const int & source_root
+   Param: const int & binary_root
+   Param: const int & mc_path
+
+==== tests/tool/tool_multifile_module_suite.cpp ====
+NAMESPACE: 
+FUNCTION_DECL: TestProjectModeMultiFileModulesBuildAndRun
+   Return: void
+   Param: const int & binary_root
+   Param: const int & mc_path
+FUNCTION_DECL: TestDuplicateModuleSetFileOwnershipFails
+   Return: void
+   Param: const int & binary_root
+   Param: const int & mc_path
+FUNCTION_DECL: TestDuplicateTopLevelAcrossModulePartsFails
+   Return: void
+   Param: const int & binary_root
+   Param: const int & mc_path
+NAMESPACE: mc
+NAMESPACE: tool_tests
+FUNCTION_DECL: RunWorkflowMultifileModuleSuite
+   Return: void
+   Param: const int & binary_root
+   Param: const int & mc_path
+
+==== tests/tool/tool_project_validation_suite.cpp ====
+NAMESPACE: 
+FUNCTION_DECL: TestUnknownTargetListsAvailableTargets
+   Return: void
+   Param: const int & binary_root
+   Param: const int & mc_path
+FUNCTION_DECL: TestMissingDefaultTargetFails
+   Return: void
+   Param: const int & binary_root
+   Param: const int & mc_path
+FUNCTION_DECL: TestProjectMissingImportRootFails
+   Return: void
+   Param: const int & source_root
+   Param: const int & binary_root
+   Param: const int & mc_path
+FUNCTION_DECL: TestProjectAmbiguousImportFails
+   Return: void
+   Param: const int & source_root
+   Param: const int & binary_root
+   Param: const int & mc_path
+FUNCTION_DECL: TestDuplicateModuleRootFailsEarly
+   Return: void
+   Param: const int & binary_root
+   Param: const int & mc_path
+FUNCTION_DECL: TestDuplicateTargetRootsFailEarly
+   Return: void
+   Param: const int & binary_root
+   Param: const int & mc_path
+FUNCTION_DECL: TestTargetValidationUsesTargetStanzaSpan
+   Return: void
+   Param: const int & binary_root
+   Param: const int & mc_path
+FUNCTION_DECL: TestExecutableTargetRejectsNonStaticLibraryLink
+   Return: void
+   Param: const int & binary_root
+   Param: const int & mc_path
+FUNCTION_DECL: TestUnsupportedFreestandingBootstrapTargetEmitsNotes
+   Return: void
+   Param: const int & binary_root
+   Param: const int & mc_path
+FUNCTION_DECL: TestMissingFreestandingBootstrapTargetEmitsNotes
+   Return: void
+   Param: const int & binary_root
+   Param: const int & mc_path
+FUNCTION_DECL: TestSelectorRegistrationIntegrityFollowsDescriptors
+   Return: void
+   Param: const int & source_root
+   Param: const int & binary_root
+NAMESPACE: mc
+NAMESPACE: tool_tests
+FUNCTION_DECL: RunWorkflowProjectValidationSuite
+   Return: void
+   Param: const int & source_root
+   Param: const int & binary_root
+   Param: const int & mc_path
+
+==== tests/tool/tool_real_project_suite.cpp ====
+NAMESPACE: 
+NAMESPACE: mc
+NAMESPACE: tool_tests
+NAMESPACE: 
+STRUCT_DECL: RealProjectTestCase
+FUNCTION_DECL: FindRealProjectTestCase
+   Return: const RealProjectTestCase *
+   Param: int case_name
+FUNCTION_DECL: RunRealProjectToolSuite
+   Return: void
+   Param: const int & source_root
+   Param: const int & binary_root
+   Param: const int & mc_path
+FUNCTION_DECL: RunRealProjectToolSuiteCase
+   Return: void
+   Param: const int & source_root
+   Param: const int & binary_root
+   Param: const int & mc_path
+   Param: int case_name
+
+==== tests/tool/tool_real_project_suite_internal.h ====
+
+==== tests/tool/tool_real_project_tests.cpp ====
+FUNCTION_DECL: main
+   Return: int
+   Param: int argc
+   Param: char ** argv
+
+==== tests/tool/tool_suite_common.cpp ====
+NAMESPACE: mc
+NAMESPACE: tool_tests
+ENUM_DECL: RunContractKind
+ENUM_DECL: MirContractKind
+ENUM_DECL: ArtifactAuditKind
+ENUM_DECL: ProjectCommandExpectation
+ENUM_DECL: ProjectCommandOutputMode
+FUNCTION_DECL: ValidateFreestandingKernelRuntimePhaseDescriptor
+   Return: void
+   Param: const int & phase_check
+   Param: const int & phase_toml_path
+   Param: int shard
+FUNCTION_DECL: NormalizeProjectionText
+   Return: int
+   Param: int text
+FUNCTION_DECL: SplitLines
+   Return: int
+   Param: int text
+FUNCTION_DECL: TrimCopy
+   Return: int
+   Param: int text
+FUNCTION_DECL: ParseQuotedSetting
+   Return: int
+   Param: int line
+   Param: int key
+FUNCTION_DECL: ParseIntSetting
+   Return: int
+   Param: int line
+   Param: int key
+FUNCTION_DECL: ParseArrayEntry
+   Return: int
+   Param: int line
+FUNCTION_DECL: ParseInlineQuotedArray
+   Return: int
+   Param: int line
+   Param: int key
+FUNCTION_DECL: ParseRunContractKind
+   Return: RunContractKind
+   Param: int run_contract
+   Param: const int & context
+FUNCTION_DECL: ParseMirContractKind
+   Return: MirContractKind
+   Param: int mir_contract
+   Param: const int & context
+FUNCTION_DECL: ParseArtifactAuditKind
+   Return: ArtifactAuditKind
+   Param: int kind
+   Param: const int & context
+FUNCTION_DECL: CollectPhaseDirectories
+   Return: int
+   Param: const int & runtime_root
+FUNCTION_DECL: ParseRuntimePhaseDescriptor
+   Return: int
+   Param: const int & phase_dir
+   Param: const int & phase_toml_path
+ENUM_DECL: ArrayMode
+FUNCTION_DECL: LoadRuntimePhaseDescriptorsImpl
+   Return: int
+   Param: const int & source_root
+   Param: int requested_shard
+FUNCTION_DECL: BuildProjectCommandArgs
+   Return: int
+   Param: const int & mc_path
+   Param: int subcommand
+   Param: const int & project_path
+   Param: const int & build_dir
+   Param: int target_name
+   Param: int sample_path
+FUNCTION_DECL: RunProjectCommandAndCheck
+   Return: int
+   Param: const int & output_path
+   Param: const int & args
+   Param: const int & context
+   Param: ProjectCommandExpectation expectation
+   Param: ProjectCommandOutputMode output_mode
+FUNCTION_DECL: ValidateFreestandingKernelRuntimePhaseDescriptor
+   Return: void
+   Param: const int & phase_check
+   Param: const int & phase_toml_path
+   Param: int shard
+FUNCTION_DECL: ExpectFreestandingKernelRunContract
+   Return: void
+   Param: int run_output
+   Param: const int & phase_check
+   Param: const int & source_root
+   Param: const int & context
+FUNCTION_DECL: ExpectFreestandingKernelMirContract
+   Return: void
+   Param: int mir_text
+   Param: const int & phase_check
+   Param: const int & expected_contract_path
+   Param: const int & context
+FUNCTION_DECL: ValidateFreestandingKernelTextAuditDescriptor
+   Return: void
+   Param: const int & descriptor
+   Param: const int & descriptor_path
+FUNCTION_DECL: ValidateFreestandingKernelArtifactAuditDescriptor
+   Return: void
+   Param: const int & descriptor
+   Param: const int & descriptor_path
+FUNCTION_DECL: CollectDescriptorDirectories
+   Return: int
+   Param: const int & root
+FUNCTION_DECL: MakeFreestandingKernelCommonPaths
+   Return: int
+   Param: const int & source_root
+FUNCTION_DECL: ResolveFreestandingKernelGoldenPath
+   Return: int
+   Param: const int & source_root
+   Param: int file_name
+FUNCTION_DECL: LoadFreestandingKernelRuntimePhaseDescriptors
+   Return: int
+   Param: const int & source_root
+   Param: int shard
+FUNCTION_DECL: LoadAllFreestandingKernelRuntimePhaseDescriptors
+   Return: int
+   Param: const int & source_root
+FUNCTION_DECL: LoadFreestandingKernelTextAuditDescriptors
+   Return: int
+   Param: const int & source_root
+   Param: int relative_root
+   Param: int descriptor_file_name
+ENUM_DECL: ArrayMode
+FUNCTION_DECL: LoadFreestandingKernelArtifactAuditDescriptors
+   Return: int
+   Param: const int & source_root
+FUNCTION_DECL: FreestandingKernelCaseNameMatchesExpectedRunFile
+   Return: bool
+   Param: int expected_run_lines_file
+   Param: int case_name
+FUNCTION_DECL: RequireFreestandingKernelRuntimePhaseDescriptor
+   Return: const int &
+   Param: const int & phase_checks
+   Param: int expected_run_lines_file
+   Param: int context_label
+FUNCTION_DECL: RunFreestandingKernelRuntimePhaseCase
+   Return: void
+   Param: const int & source_root
+   Param: const int & binary_root
+   Param: const int & mc_path
+   Param: int shard
+   Param: int case_name
+   Param: int context_label
+FUNCTION_DECL: RunFreestandingKernelRuntimePhaseCase
+   Return: void
+   Param: const int & source_root
+   Param: const int & binary_root
+   Param: const int & mc_path
+   Param: int case_name
+   Param: int context_label
+FUNCTION_DECL: ResolveCanopusRoadmapPath
+   Return: int
+   Param: const int & source_root
+   Param: int phase_number
+FUNCTION_DECL: MaybeCleanBuildDir
+   Return: void
+   Param: const int & build_dir
+FUNCTION_DECL: BuildAndRunFreestandingKernelTarget
+   Return: int
+   Param: const int & mc_path
+   Param: const int & project_path
+   Param: const int & main_source_path
+   Param: const int & build_dir
+   Param: int output_stem
+   Param: const int & build_context
+   Param: const int & run_context
+FUNCTION_DECL: CompileBootstrapCObjectAndExpectSuccess
+   Return: void
+   Param: const int & source_path
+   Param: const int & object_path
+   Param: const int & output_path
+   Param: const int & context
+FUNCTION_DECL: LinkBootstrapObjectsAndExpectSuccess
+   Return: void
+   Param: const int & object_paths
+   Param: const int & executable_path
+   Param: const int & output_path
+   Param: const int & context
+FUNCTION_DECL: CollectBootstrapObjectFiles
+   Return: int
+   Param: const int & object_dir
+FUNCTION_DECL: LinkBootstrapObjectsAndRunExpectExitCode
+   Return: int
+   Param: const int & object_paths
+   Param: const int & executable_path
+   Param: const int & link_output_path
+   Param: const int & run_output_path
+   Param: int expected_exit_code
+   Param: const int & link_context
+   Param: const int & run_context
+FUNCTION_DECL: ResolvePlanDocPath
+   Return: int
+   Param: const int & source_root
+   Param: int file_name
+FUNCTION_DECL: WriteBasicProject
+   Return: int
+   Param: const int & root
+   Param: int helper_source
+   Param: int main_source
+FUNCTION_DECL: WriteTestProject
+   Return: int
+   Param: const int & root
+   Param: int main_source
+FUNCTION_DECL: RunProjectTestAndExpectSuccess
+   Return: int
+   Param: const int & mc_path
+   Param: const int & project_path
+   Param: const int & build_dir
+   Param: int output_name
+   Param: const int & context
+FUNCTION_DECL: BuildProjectTargetAndExpectSuccess
+   Return: void
+   Param: const int & mc_path
+   Param: const int & project_path
+   Param: const int & build_dir
+   Param: int target_name
+   Param: int output_name
+   Param: const int & context
+FUNCTION_DECL: BuildProjectTargetAndCapture
+   Return: int
+   Param: const int & mc_path
+   Param: const int & project_path
+   Param: const int & build_dir
+   Param: int target_name
+   Param: int output_name
+   Param: const int & context
+FUNCTION_DECL: ParseBuiltProjectExecutablePath
+   Return: int
+   Param: int build_output
+   Param: int context
+FUNCTION_DECL: BuildProjectTargetAndExpectFailure
+   Return: int
+   Param: const int & mc_path
+   Param: const int & project_path
+   Param: const int & build_dir
+   Param: int target_name
+   Param: int output_name
+   Param: const int & context
+FUNCTION_DECL: CheckProjectTargetAndExpectFailure
+   Return: int
+   Param: const int & mc_path
+   Param: const int & project_path
+   Param: const int & build_dir
+   Param: int target_name
+   Param: int output_name
+   Param: const int & context
+FUNCTION_DECL: ExpectExitCodeAtLeast
+   Return: void
+   Param: const int & outcome
+   Param: int minimum_exit_code
+   Param: int output
+   Param: const int & context
+FUNCTION_DECL: CheckProjectTargetAndExpectSuccess
+   Return: int
+   Param: const int & mc_path
+   Param: const int & project_path
+   Param: const int & build_dir
+   Param: int target_name
+   Param: int output_name
+   Param: const int & context
+FUNCTION_DECL: RunProjectTargetAndExpectSuccess
+   Return: int
+   Param: const int & mc_path
+   Param: const int & project_path
+   Param: const int & build_dir
+   Param: int target_name
+   Param: const int & sample_path
+   Param: int output_name
+   Param: const int & context
+FUNCTION_DECL: RunProjectTargetAndExpectFailure
+   Return: int
+   Param: const int & mc_path
+   Param: const int & project_path
+   Param: const int & build_dir
+   Param: int target_name
+   Param: int output_name
+   Param: const int & context
+FUNCTION_DECL: RunProjectTestTargetAndExpectSuccess
+   Return: int
+   Param: const int & mc_path
+   Param: const int & project_path
+   Param: const int & build_dir
+   Param: int target_name
+   Param: int output_name
+   Param: const int & context
+FUNCTION_DECL: ExpectTextContainsLines
+   Return: void
+   Param: int actual_text
+   Param: int expected_lines
+   Param: const int & context
+FUNCTION_DECL: ExpectTextContainsLinesFile
+   Return: void
+   Param: int actual_text
+   Param: const int & expected_lines_path
+   Param: const int & context
+FUNCTION_DECL: ExpectFreestandingKernelPhaseFromArtifacts
+   Return: void
+   Param: const int & source_root
+   Param: const int & object_dir
+   Param: int run_output
+   Param: int mir_text
+   Param: const int & phase_check
+
+==== tests/tool/tool_suite_common.h ====
+
+==== tests/tool/tool_test_command_suite.cpp ====
+NAMESPACE: 
+FUNCTION_DECL: RunProjectTestCommand
+   Return: int
+   Param: const int & mc_path
+   Param: const int & project_path
+   Param: const int & build_dir
+   Param: const int & output_path
+   Param: const int & context
+   Param: int target_name
+FUNCTION_DECL: TestProjectTestCommandSucceeds
+   Return: void
+   Param: const int & binary_root
+   Param: const int & mc_path
+FUNCTION_DECL: TestProjectTestCommandFailsOnOrdinaryFailure
+   Return: void
+   Param: const int & binary_root
+   Param: const int & mc_path
+FUNCTION_DECL: TestCompilerManifestUnknownKindListsAcceptedKinds
+   Return: void
+   Param: const int & binary_root
+   Param: const int & mc_path
+FUNCTION_DECL: TestDisabledTestTargetListsEnabledTargets
+   Return: void
+   Param: const int & binary_root
+   Param: const int & mc_path
+FUNCTION_DECL: TestProjectTestTimeoutFailsDeterministically
+   Return: void
+   Param: const int & binary_root
+   Param: const int & mc_path
+FUNCTION_DECL: TestDuplicateOrdinaryTestModuleNamesExplainBootstrapRule
+   Return: void
+   Param: const int & binary_root
+   Param: const int & mc_path
+FUNCTION_DECL: TestGeneratedOrdinaryRunnerRequiresRepositoryStdlibRoot
+   Return: void
+   Param: const int & binary_root
+   Param: const int & mc_path
+NAMESPACE: mc
+NAMESPACE: tool_tests
+FUNCTION_DECL: RunWorkflowTestCommandSuite
+   Return: void
+   Param: const int & binary_root
+   Param: const int & mc_path
+
+==== tests/tool/tool_workflow_orchestrator.cpp ====
+NAMESPACE: mc
+NAMESPACE: tool_tests
+NAMESPACE: 
+FUNCTION_DECL: RunWorkflowHelpCase
+   Return: void
+   Param: const int & 
+   Param: const int & binary_root
+   Param: const int & mc_path
+FUNCTION_DECL: RunWorkflowTestCommandCase
+   Return: void
+   Param: const int & 
+   Param: const int & binary_root
+   Param: const int & mc_path
+FUNCTION_DECL: RunWorkflowProjectValidationCase
+   Return: void
+   Param: const int & source_root
+   Param: const int & binary_root
+   Param: const int & mc_path
+FUNCTION_DECL: RunWorkflowMultifileModuleCase
+   Return: void
+   Param: const int & 
+   Param: const int & binary_root
+   Param: const int & mc_path
+FUNCTION_DECL: RunWorkflowKernelResetLaneCase
+   Return: void
+   Param: const int & source_root
+   Param: const int & binary_root
+   Param: const int & mc_path
+FUNCTION_DECL: RunWorkflowKernelResetLaneFullCase
+   Return: void
+   Param: const int & source_root
+   Param: const int & binary_root
+   Param: const int & mc_path
+STRUCT_DECL: WorkflowTestCase
+FUNCTION_DECL: FindWorkflowTestCase
+   Return: const WorkflowTestCase *
+   Param: int case_name
+FUNCTION_DECL: RunWorkflowToolSuite
+   Return: void
+   Param: const int & source_root
+   Param: const int & binary_root
+   Param: const int & mc_path
+FUNCTION_DECL: RunWorkflowToolSuiteCase
+   Return: void
+   Param: const int & source_root
+   Param: const int & binary_root
+   Param: const int & mc_path
+   Param: int case_name
+
+==== tests/tool/tool_workflow_suite_internal.h ====
+
+==== tests/tool/tool_workflow_tests.cpp ====
+FUNCTION_DECL: main
+   Return: int
+   Param: int argc
+   Param: char ** argv
+

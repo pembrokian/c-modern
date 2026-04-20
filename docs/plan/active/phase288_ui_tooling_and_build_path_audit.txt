@@ -115,14 +115,25 @@ Main files and navigations
 - Primary workflow surfaces: `tests/tool/real_projects/issue-rollup/test.cpp`,
   `tests/tool/real_projects/review-board/test.cpp`, and
   `tests/tool/tool_kernel_reset_lane_suite.cpp`.
+- Open the workflow surface that currently disagrees with documented behavior
+  first, then the one adjacent documentation owner second.
 - Candidate documentation surfaces: `README.md`, `tests/README.md`,
   `tools/README.md`, and any UI-facing phase plan docs that need cross-links.
 - Project manifests to keep in view: `examples/real/issue_rollup/build.toml`
   and `examples/real/review_board/build.toml`.
 - Nearby accelerator docs: `docs/agent/prompts/test_overview.txt` and
-  `docs/plan/active/phase281_first_ui_slice_audit.txt`.
+  `docs/plan/active/phase281_first_ui_slice_audit.txt`,
+  `docs/agent/prompts/change_touch_sets.txt`, and
+  `docs/agent/prompts/error_triage.txt`.
 - Expected first validation target when audit changes land: only the narrow
   affected real-project or reset-lane surfaces.
+- Copy or mirror example command surfaces from the existing real-project tests
+  before inventing new workflow prose.
+- Exact first command when the audit changes a reset-lane-owned path:
+  `ctest --test-dir build/debug -R mc_tool_workflow_kernel_reset_lane_unit --output-on-failure`.
+- If the first mismatching workflow owner and first narrow validation target
+  are already clear, stop broad exploration and fix that owner before reading
+  more docs.
 
 Relevant cookbook patterns
 ~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -138,6 +149,8 @@ Relevant file-local invariants
   for reset-lane UI and workflow validation.
 - `build.toml` project manifests remain the user-facing build entrypoints; no
   alternate app manifest family should be introduced.
+- After the audit passes its narrow validation, do not widen into repo-map,
+  backlog, or architecture edits unless the audit exposed a new durable fact.
 
 Dependency-ordered touch sequence
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -155,6 +168,12 @@ Common breakage map
   descriptor, manifest expectations.
 - Changed project-manifest examples -> real-project tests and local command
   examples that assume the old entrypoint.
+- Added or changed reset-lane case coverage -> scenario registration row,
+  fixed-size scenario table or count, coverage helper expectations, fixture
+  naming, and the owning reset-lane CTest target before reopening broader
+  workflow code.
+- Post-green sidecar drift -> extra roadmap, repo-map, or architecture edits
+  appear even though the audit only changed workflow-local truth.
 
 Relevant test surfaces
 ~~~~~~~~~~~~~~~~~~~~~~

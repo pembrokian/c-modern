@@ -10,6 +10,9 @@ Before making changes:
    - repo_map.txt
    - kernel_style_guide
    - any module contracts relevant to the affected files
+   - `docs/agent/prompts/change_touch_sets.txt`
+   - `docs/agent/prompts/error_triage.txt` if the phase is likely to add a new
+     fixture, grouped-case row, or multi-file follow-through change
 
 2. Identify:
    - which files should change
@@ -18,47 +21,58 @@ Before making changes:
    - any invariants or forbidden changes from the phase spec
    - the dependency-ordered touch sequence for the likely owner and its direct consumers
    - the narrowest first validation target after the owner lands
+   - whether the phase document already identifies enough to start editing
+
+Exploration stop rule:
+
+3. Once you can name the controlling owner, the small adjacent touch set, the
+   dependency-ordered touch sequence, and the narrowest first validation target,
+   stop broad exploration and start the first owner-local edit batch.
+4. Do not keep rereading neighboring files only to reconfirm a shape the phase
+   document already states clearly.
 
 Implementation requirements:
 
-3. Implement the phase fully, not just tests, validation, or scaffolding.
-4. Prefer small, direct, Ken Thompson style programs and data structures.
-5. Do not introduce large frameworks, generic infrastructure, registries, or speculative abstractions unless the phase explicitly requires them.
-6. Respect existing ownership boundaries and module contracts.
-7. Keep dispatch, boot, topology, parser, checker, and codegen responsibilities narrow.
-8. Avoid turning central files into new centers of gravity.
-9. Prefer sequential, dependency-ordered edits over broad synchronized patches.
-10. Stabilize the controlling owner first, then direct consumers, then secondary consumers, then tests.
-11. After each owner-level batch, run the narrowest relevant build or test surface before widening changes.
-12. When compile or type errors appear, fix the earliest root-cause error and its direct fallout before resuming feature work.
-13. Do not preemptively edit all predicted consumers before the controlling owner has landed cleanly.
-14. "Implement the phase fully" does not mean editing every expected file in one pass.
-15. Large synchronized patches tend to fail in this repository. Prefer landing the root owner cleanly before editing transitive consumers.
-16. Use the phase document's `Dependency-ordered touch sequence` and `Common breakage map` to guide repair before reopening repo exploration.
+5. Implement the phase fully, not just tests, validation, or scaffolding.
+6. Prefer small, direct, Ken Thompson style programs and data structures.
+7. Do not introduce large frameworks, generic infrastructure, registries, or speculative abstractions unless the phase explicitly requires them.
+8. Respect existing ownership boundaries and module contracts.
+9. Keep dispatch, boot, topology, parser, checker, and codegen responsibilities narrow.
+10. Avoid turning central files into new centers of gravity.
+11. Prefer sequential, dependency-ordered edits over broad synchronized patches.
+12. Stabilize the controlling owner first, then direct consumers, then secondary consumers, then tests.
+13. After each owner-level batch, run the narrowest relevant build or test surface before widening changes.
+14. When compile or type errors appear, fix the earliest root-cause error and its direct fallout before resuming feature work.
+15. Do not preemptively edit all predicted consumers before the controlling owner has landed cleanly.
+16. "Implement the phase fully" does not mean editing every expected file in one pass.
+17. Large synchronized patches tend to fail in this repository. Prefer landing the root owner cleanly before editing transitive consumers.
+18. Use the phase document's `Dependency-ordered touch sequence` and `Common breakage map` to guide repair before reopening repo exploration.
+19. If the first batch lands and the first narrow validation fails, prefer `docs/agent/prompts/error_triage.txt` plus the phase-local breakage map over new broad repo searches.
 
 After implementation:
 
-17. Update only docs whose truth actually changed.
-18. Prefer phase-doc appendices or phase-local notes first.
-19. Touch `backlog`, `decision_log`, `repo_map`, or architecture docs only when the implementation revealed a new durable fact, boundary, or deferred pressure.
-20. Update any affected docs, such as:
+20. Update only docs whose truth actually changed.
+21. Prefer phase-doc appendices or phase-local notes first.
+22. Touch `backlog`, `decision_log`, `repo_map`, or architecture docs only when the implementation revealed a new durable fact, boundary, or deferred pressure.
+23. Skip repo memory or sidecar summary writes unless the user explicitly asked for them or the local workflow requires them.
+24. Update any affected docs, such as:
    - roadmap
    - backlog
    - decision_log
    - repo_map.txt
    - architecture docs
 
-21. Record:
+25. Record only the durable facts that actually emerged:
    - major implementation decisions (docs/plan/decision_log.txt)
    - important non-decisions
    - places where the compiler or language was intentionally kept simple
    - deferred work
    - newly discovered language limitations
 
-22. If implementation reveals missing language features, add them to backlog under:
+26. If implementation reveals missing language features, add them to backlog under:
    - Potential Language Features
 
-23. End by reviewing the implementation against the phase spec:
+27. End by reviewing the implementation against the phase spec:
    - what invariants were preserved
    - whether any ownership boundaries weakened
    - whether any accidental abstractions or centers of gravity emerged

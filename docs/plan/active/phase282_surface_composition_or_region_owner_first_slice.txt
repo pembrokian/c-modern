@@ -3,7 +3,7 @@ Phase 282 -- Surface Composition Or Region Owner First Slice
 
 Status
 ------
-PROPOSED
+COMPLETED
 
 Purpose
 -------
@@ -192,6 +192,65 @@ Acceptance criteria
 - `display_surface.mc`, `launcher_service.mc`, and app-local render owners all
   keep their existing boundaries
 - the landing does not imply a window system, compositor, or toolkit
+
+Implementation outcome
+----------------------
+- The narrowest honest owner is one tiny adjacent composition module,
+  `kernel/src/services/surface_composition.mc`, not a new service family.
+- The landed region model is fixed and static: one two-cell body region plus
+  one two-cell status region mapped onto the existing four-cell display
+  surface.
+- `display_surface.mc` remains unchanged as the four-cell surface owner; the
+  new composition owner only translates the fixed two-region record into the
+  existing `display_present(...)` contract.
+- `issue_rollup_app.mc` remains the app-local present owner and spends the new
+  composition owner only on one bounded consumer: the custom-manifest path.
+- The launch-only `FRSH` or `RSUM` or `INVD` overlay remains app-local and
+  keeps the earlier flat path; the ordinary default-manifest path also keeps
+  the existing flat `EMTY` or `STDY` or `BUSY` or `ATTN` rendering.
+- The first composed visible result is now one custom-profile status strip for
+  `issue_rollup`: the body region keeps the app-local summary classification
+  prefix (`EM`, `ST`, `BU`, `AT`) and the status region shows the admitted
+  custom-profile marker `CF`, yielding deterministic composed cells such as
+  `STCF`, `BUCF`, `ATCF`, and `EMCF`.
+- One focused reset-lane fixture,
+  `tests/system/kernel_reset_lane_phase282_surface_composition/`, proves that
+  composed result on the maintained hosted reset-lane workflow surface.
+
+Validation
+----------
+- `Build debug`
+- `mc_tool_workflow_kernel_reset_lane_unit`
+- `mc_tool_workflow_kernel_reset_lane_full_unit`
+
+Phase review against the spec
+-----------------------------
+- Preserved invariants:
+  - `display_surface.mc` still owns only fixed-surface update and query
+    semantics
+  - `launcher_service.mc` still owns single-foreground truth and launch
+    classification only
+  - the first composition slice stays bounded to two fixed two-cell regions
+    and one foreground app path
+  - app-local render policy stays app-local because `issue_rollup_app.mc`
+    still chooses the body and status tokens before calling the composition
+    owner
+  - the visible result remains deterministic on both the old flat path and the
+    new composed custom-manifest path
+- Ownership boundaries did not weaken:
+  - no composition truth moved into `display_surface.mc`, `launcher_service.mc`,
+    or `kernel_dispatch.mc`
+  - no new boot-wired service, registry, layout engine, or window-system owner
+    was introduced
+  - default-manifest rendering and launch overlay behavior remain local to the
+    existing app seam instead of being generalized prematurely
+- Intentional non-decisions and deferred work:
+  - no overlapping regions, z-order, retained scene state, or arbitrary region
+    graphs
+  - no shared focus, selection, or control vocabulary owner yet
+  - no second composed consumer beyond the custom-manifest `issue_rollup` path
+  - no hosted-app rendering change, because the phase only needed one bounded
+    kernel-visible composition consumer
 
 Future follow-up
 ----------------

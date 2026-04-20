@@ -112,13 +112,23 @@ Main files and navigations
 ~~~~~~~~~~~~~~~~~~~~~~~~~~
 - Primary controlling owners: `kernel/src/input_event.mc` and
   `kernel/src/foreground_input_route.mc`.
+- Open `kernel/src/input_event.mc` first, then
+  `kernel/src/foreground_input_route.mc` second.
 - First-hop adjacent files: `kernel/src/issue_rollup_app.mc`,
   `kernel/src/kernel_dispatch.mc`, and the current input-facing scenarios.
+- Copy or mirror example surface if the phase lands a new reset-lane proof:
+  the existing input-facing row or fixture in
+  `tests/tool/tool_kernel_reset_lane_suite.cpp`.
 - Nearby accelerator docs: `docs/agent/prompts/kernel_file_invariants.txt`,
+  `docs/agent/prompts/change_touch_sets.txt`,
+  `docs/agent/prompts/error_triage.txt`,
   `docs/plan/active/phase274_input_event_owner_first_slice.txt`, and
   `docs/plan/active/phase281_first_ui_slice_audit.txt`.
 - Expected first validation target when the owner changes: `Build debug`, then
   one focused alternate-input reset-lane fixture.
+- Exact first command if the starter pack is enough: `cmake --build build/debug -j4`.
+- If the owner, adjacent touch set, and first validation target are clear from
+  this starter pack, stop broad rereads and begin the first owner-local batch.
 
 Relevant cookbook patterns
 ~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -152,6 +162,10 @@ Common breakage map
   route callers, fixture bytes.
 - Changed alternate-input outcome names -> dumps, diagnostics, and reset-lane
   expected observations.
+- Added or changed reset-lane fixture row -> scenario registration row,
+  fixed-size scenario table or count, coverage helper expectations, fixture
+  naming, and the owning reset-lane CTest target before reopening broader
+  workflow code.
 
 Relevant test surfaces
 ~~~~~~~~~~~~~~~~~~~~~~
@@ -161,6 +175,8 @@ Relevant test surfaces
   `mc_tool_workflow_kernel_reset_lane_unit`.
 - Supporting validation: one narrow hosted app proof only if the chosen
   consumer's real-project code changes.
+- Exact first command when the phase lands a new reset-lane proof:
+  `ctest --test-dir build/debug -R mc_tool_workflow_kernel_reset_lane_unit --output-on-failure`.
 
 Test obligations
 ----------------

@@ -528,7 +528,7 @@ void RunKernelRepoLiveReceiveScenario(const std::filesystem::path& source_root,
     }
 }
 
-constexpr std::array<ResetLaneScenario, 76> kResetLaneScenarios = {{
+constexpr std::array<ResetLaneScenario, 77> kResetLaneScenarios = {{
     {.label = "repo project", .scenario_key = "repo", .target_name = "kernel", .include_in_fast = true, .build_warn_ms = 2000},
     {.label = "smoke", .fixture_relative_path = "tests/smoke/kernel_reset_lane_serial_round_trip", .scenario_key = "smoke", .target_name = "app", .include_in_fast = true},
     {.label = "retained state", .fixture_relative_path = "tests/system/kernel_reset_lane_retained_log", .scenario_key = "retained_state", .context_label = "retained-state", .target_name = "app", .include_in_fast = true},
@@ -597,6 +597,7 @@ constexpr std::array<ResetLaneScenario, 76> kResetLaneScenarios = {{
     {.label = "fixed cell rendering", .fixture_relative_path = "tests/system/kernel_reset_lane_phase278_fixed_cell_rendering", .scenario_key = "phase278_fixed_cell_rendering", .context_label = "phase 278 fixed cell rendering", .target_name = "app", .include_in_fast = true, .build_warn_ms = 1000},
     {.label = "human-facing app proof", .fixture_relative_path = "tests/system/kernel_reset_lane_phase279_first_human_facing_app_proof", .scenario_key = "phase279_first_human_facing_app_proof", .context_label = "phase 279 human-facing app proof", .target_name = "app", .include_in_fast = true, .build_warn_ms = 1000},
     {.label = "ui app restart and update follow-through", .fixture_relative_path = "tests/system/kernel_reset_lane_phase280_ui_app_restart_and_update_follow_through", .scenario_key = "phase280_ui_app_restart_and_update_follow_through", .context_label = "phase 280 ui app restart and update follow-through", .target_name = "app", .include_in_fast = true, .build_warn_ms = 1000},
+    {.label = "surface composition", .fixture_relative_path = "tests/system/kernel_reset_lane_phase282_surface_composition", .scenario_key = "phase282_surface_composition", .context_label = "phase 282 surface composition", .target_name = "app", .include_in_fast = true, .build_warn_ms = 1000},
     {.label = "connection backed workflow", .fixture_relative_path = "tests/system/kernel_reset_lane_phase239_connection_backed_workflow", .scenario_key = "phase239_connection_backed_workflow", .context_label = "phase 239 connection backed workflow", .target_name = "app", .include_in_fast = true, .build_warn_ms = 1000},
     {.label = "external ingress completion pressure", .fixture_relative_path = "tests/system/kernel_reset_lane_phase240_external_ingress_completion_pressure", .scenario_key = "phase240_external_ingress_completion_pressure", .context_label = "phase 240 external ingress completion pressure", .target_name = "app", .include_in_fast = true, .build_warn_ms = 1000},
     {.label = "delegated external request handling", .fixture_relative_path = "tests/system/kernel_reset_lane_phase241_delegated_external_request_handling", .scenario_key = "phase241_delegated_external_request_handling", .context_label = "phase 241 delegated external request handling", .target_name = "app", .include_in_fast = true, .build_warn_ms = 1000},

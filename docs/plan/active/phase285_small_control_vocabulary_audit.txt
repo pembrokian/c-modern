@@ -109,15 +109,25 @@ Main files and navigations
 - Primary controlling owners: the Phase 282 through Phase 284 owners and the
   current app-local UI logic under `kernel/src/issue_rollup_app.mc` and the
   relevant hosted app trees.
+- Open the strongest landed Phase 282 through Phase 284 owner first, then the
+  corresponding app-local consumer second.
 - First-hop adjacent files: `docs/plan/backlog.txt`,
   `docs/plan/decision_log.txt`, `kernel/src/display_surface.mc`, and the
   current Band E fixtures.
+- Copy or mirror example surface only if a tiny shared control family actually
+  lands: the nearest focused UI fixture that spends one repeated interaction
+  shape.
 - Nearby accelerator docs: `docs/agent/prompts/test_overview.txt`,
+  `docs/agent/prompts/change_touch_sets.txt`,
   `docs/plan/active/phase281_first_ui_slice_audit.txt`, and the Band E plan
   docs that precede this audit.
 - Expected first validation target when the owner changes: none new beyond the
   focused evidence already required by the preceding Band E phases unless one
   tiny shared control family actually lands.
+- Exact first command only if a shared control family lands:
+  `cmake --build build/debug -j4`.
+- If the starter pack already shows that the honest result is still app-local,
+  stop file hunting and write the bounded audit outcome directly.
 
 Relevant cookbook patterns
 ~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -131,6 +141,8 @@ Relevant file-local invariants
   control semantics.
 - `docs/plan/backlog.txt` and `docs/plan/decision_log.txt` should capture only
   bounded still-open control pressure if the audit keeps controls deferred.
+- After the audit result is green, do not widen into roadmap or repo-map edits
+  unless the phase uncovered a genuinely new durable boundary fact.
 
 Dependency-ordered touch sequence
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -150,6 +162,8 @@ Common breakage map
   focused fixtures.
 - Documentation-only audit drift -> backlog or decision-log entries widen into
   framework promises instead of bounded pressure notes.
+- Post-green sidecar drift -> extra roadmap, repo-map, or architecture edits
+  appear even though the audit only changed phase-local truth.
 
 Relevant test surfaces
 ~~~~~~~~~~~~~~~~~~~~~~

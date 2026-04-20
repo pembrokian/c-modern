@@ -109,13 +109,23 @@ Main files and navigations
 ~~~~~~~~~~~~~~~~~~~~~~~~~~
 - Primary controlling owners: the landed or planned Phase 282 and Phase 283
   owners plus `kernel/src/issue_rollup_app.mc`.
+- Open the landed controlling owner from Phase 282 or Phase 283 first, then
+  `kernel/src/issue_rollup_app.mc` second.
 - First-hop adjacent files: `kernel/src/foreground_input_route.mc`,
   `kernel/src/display_surface.mc`, and the relevant UI scenarios.
+- Copy or mirror example surface if the phase needs a new proof row:
+  the nearest UI-facing scenario or case in
+  `tests/tool/tool_kernel_reset_lane_suite.cpp`.
 - Nearby accelerator docs: `docs/agent/prompts/kernel_file_invariants.txt`,
+  `docs/agent/prompts/change_touch_sets.txt`,
+  `docs/agent/prompts/error_triage.txt`,
   `docs/plan/active/phase281_first_ui_slice_audit.txt`, and the Phase 282 or
   Phase 283 plan docs that actually landed.
 - Expected first validation target when the owner changes: `Build debug`, then
   one focused focus-or-selection fixture.
+- Exact first command if the starter pack is enough: `cmake --build build/debug -j4`.
+- If the controlling owner, one adjacent touch set, and one focused fixture are
+  already clear, stop broad exploration and start the owner batch.
 
 Relevant cookbook patterns
 ~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -149,6 +159,10 @@ Common breakage map
 - Moved active truth across owners by accident -> launcher or route files start
   accumulating semantic selection logic that should move back to the chosen
   focus owner.
+- Added or changed reset-lane fixture row -> scenario registration row,
+  fixed-size scenario table or count, coverage helper expectations, fixture
+  naming, and the owning reset-lane CTest target before widening workflow
+  search.
 
 Relevant test surfaces
 ~~~~~~~~~~~~~~~~~~~~~~
@@ -158,6 +172,8 @@ Relevant test surfaces
   `mc_tool_workflow_kernel_reset_lane_unit`.
 - Supporting validation: one narrow app-facing real-project proof only if the
   chosen consumer's hosted app logic changes.
+- Exact first command when the phase lands on the maintained reset-lane path:
+  `ctest --test-dir build/debug -R mc_tool_workflow_kernel_reset_lane_unit --output-on-failure`.
 
 Test obligations
 ----------------

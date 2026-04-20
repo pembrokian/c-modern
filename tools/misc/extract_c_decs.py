@@ -3,7 +3,8 @@ import sys
 from clang.cindex import Config, CursorKind, Index
 
 SOURCE_EXTS = ['.c']
-SOURCE_DIRS = ['runtime']
+# SOURCE_DIRS = ['runtime']
+SOURCE_DIRS = ['tests/tool']
 LIBCLANG_CANDIDATES = [
     os.environ.get('LIBCLANG_FILE'),
     '/opt/homebrew/Cellar/llvm@21/21.1.8/lib/libclang.dylib',
