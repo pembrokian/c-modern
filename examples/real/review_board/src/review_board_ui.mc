@@ -1,11 +1,8 @@
+import active_region
+
 enum ReviewBoardMode {
     Audit,
     Focus,
-}
-
-enum ReviewBoardFocus {
-    Body,
-    Status,
 }
 
 enum ReviewBoardDetail {
@@ -29,7 +26,7 @@ struct ReviewBoardUiState {
     closed: u8
     urgent: u8
     mode: ReviewBoardMode
-    focus: ReviewBoardFocus
+    focus: active_region.ActiveRegion
     detail: ReviewBoardDetail
 }
 
@@ -44,29 +41,20 @@ func review_board_ui_init() ReviewBoardUiState {
         closed: 0,
         urgent: 0,
         mode: ReviewBoardMode.Audit,
-        focus: ReviewBoardFocus.Body,
+        focus: active_region.ActiveRegion.Body,
         detail: ReviewBoardDetail.Summary }
 }
 
-func review_board_uiwith(open: u8, closed: u8, urgent: u8, mode: ReviewBoardMode, focus: ReviewBoardFocus) ReviewBoardUiState {
+func review_board_uiwith(open: u8, closed: u8, urgent: u8, mode: ReviewBoardMode, focus: active_region.ActiveRegion) ReviewBoardUiState {
     return review_board_uiwith_detail(open, closed, urgent, mode, focus, ReviewBoardDetail.Summary)
 }
 
-func review_board_uiwith_detail(open: u8, closed: u8, urgent: u8, mode: ReviewBoardMode, focus: ReviewBoardFocus, detail: ReviewBoardDetail) ReviewBoardUiState {
+func review_board_uiwith_detail(open: u8, closed: u8, urgent: u8, mode: ReviewBoardMode, focus: active_region.ActiveRegion, detail: ReviewBoardDetail) ReviewBoardUiState {
     return ReviewBoardUiState{ open: open, closed: closed, urgent: urgent, mode: mode, focus: focus, detail: detail }
 }
 
 func review_board_ui_result(state: ReviewBoardUiState, changed: bool) ReviewBoardUiResult {
     return ReviewBoardUiResult{ state: state, changed: changed }
-}
-
-func review_board_ui_toggle_focus(focus: ReviewBoardFocus) ReviewBoardFocus {
-    switch focus {
-    case ReviewBoardFocus.Status:
-        return ReviewBoardFocus.Body
-    default:
-        return ReviewBoardFocus.Status
-    }
 }
 
 func review_board_ui_next_detail(detail: ReviewBoardDetail) ReviewBoardDetail {
@@ -158,7 +146,7 @@ func review_board_ui_status_cells(state: ReviewBoardUiState) [2]u8 {
     }
 
     focus_cell: u8 = 66
-    if state.focus == ReviewBoardFocus.Status {
+    if state.focus == active_region.ActiveRegion.Status {
         focus_cell = 83
     }
     return [2]u8{ mode_cell, focus_cell }
@@ -214,12 +202,12 @@ func review_board_ui_handle_key(state: ReviewBoardUiState, key: u8) ReviewBoardU
 
     if key == REVIEW_BOARD_KEY_TOGGLE_REGION {
         return review_board_ui_result(
-            review_board_uiwith_detail(state.open, state.closed, state.urgent, state.mode, review_board_ui_toggle_focus(state.focus), state.detail),
+            review_board_uiwith_detail(state.open, state.closed, state.urgent, state.mode, active_region.active_region_toggle(state.focus), state.detail),
             true)
     }
 
     switch state.focus {
-    case ReviewBoardFocus.Status:
+    case active_region.ActiveRegion.Status:
         return review_board_ui_status_key(state, key)
     default:
         return review_board_ui_body_key(state, key)

@@ -3,7 +3,7 @@ Phase 297 -- Cross-App Small Control Vocabulary Audit
 
 Status
 ------
-PROPOSED
+COMPLETED
 
 Purpose
 -------
@@ -23,11 +23,11 @@ Repository status note
 - `examples/real/review_board/src/review_board_ui.mc` already names concrete
   key meanings for mode, focus, reset, and count changes, while `issue_rollup`
   already uses a bounded focus-toggle key on a custom-manifest path.
-- Phase 295 and Phase 296 are expected to put both apps on a clearer common
-  interaction footing.
-- The repository still lacks one explicit decision about whether any repeated
-  control family is now real enough to extract or whether app-local ownership
-  remains the honest answer.
+- Phase 295 and Phase 296 put both apps on a clearer common interaction
+  footing.
+- This phase lands one tiny shared control family, `active_region`, for the
+  repeated `Body` or `Status` active-region truth while keeping key meaning,
+  mode changes, launch overlays, and routing app-local.
 
 Problem being solved
 --------------------
@@ -144,6 +144,9 @@ Relevant file-local invariants
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 - `kernel/src/issue_rollup_app.mc` and `kernel/src/review_board_app.mc` are
   the current owners of app-local interaction meaning.
+- `stdlib/active_region.mc` may name the repeated `Body` or `Status` active-
+  region family, but it must remain a tiny enum-plus-toggle helper rather than
+  a controller or policy owner.
 - `kernel/src/input_event.mc` names the admitted event family and should not be
   overloaded with app-control semantics.
 - `tests/tool/README.md` identifies the real-project UI targets and reset-lane
@@ -201,6 +204,28 @@ Acceptance criteria
 - any negative result is recorded explicitly enough to prevent immediate
   relitigation
 - the chosen outcome keeps hosted and reset-lane UI behavior intelligible
+
+Validation completed
+--------------------
+- `Build debug`
+- `mc_tool_real_project_issue_rollup_unit`
+- `mc_tool_real_project_review_board_unit`
+- `mc_tool_workflow_kernel_reset_lane_unit`
+
+Implementation notes
+--------------------
+- The audit result is positive but narrow: both apps repeated the same
+  `Body` or `Status` active-region truth strongly enough to extract one shared
+  enum-plus-toggle helper.
+- The landed shared surface is `stdlib/active_region.mc` so the kernel build
+  and the hosted `review_board` project can both import the same tiny owner.
+- `kernel/src/issue_rollup_app.mc` and
+  `examples/real/review_board/src/review_board_ui.mc` now consume that shared
+  helper, while `kernel/src/review_board_app.mc` keeps its journal reload and
+  persistence mapping aligned with the same shared enum.
+- Key bytes remain app-local: `issue_rollup` still uses its custom-manifest
+  focus-toggle key, and `review_board` still keeps separate region-toggle,
+  mode, detail, and reset controls.
 
 Future follow-up
 ----------------

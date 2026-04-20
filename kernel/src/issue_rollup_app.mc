@@ -1,3 +1,4 @@
+import active_region
 import display_surface
 import issue_rollup_interactive
 import program_catalog
@@ -11,17 +12,12 @@ enum IssueRollupPresentKind {
     Presented,
 }
 
-enum IssueRollupFocus {
-    Body,
-    Status,
-}
-
 const ISSUE_ROLLUP_LAUNCH_STATUS_NONE: u8 = 0
 const ISSUE_ROLLUP_KEY_FOCUS: u8 = 70
 
 struct IssueRollupAppState {
     interactive: issue_rollup_interactive.IssueRollupInteractiveState
-    focus: IssueRollupFocus
+    focus: active_region.ActiveRegion
     launch_status: u8
 }
 
@@ -34,11 +30,11 @@ struct IssueRollupPresentResult {
 func issue_rollup_app_init(launch_status: u8) IssueRollupAppState {
     return IssueRollupAppState{
         interactive: issue_rollup_interactive.issue_rollup_interactive_init(),
-        focus: IssueRollupFocus.Body,
+        focus: active_region.ActiveRegion.Body,
         launch_status: launch_status }
 }
 
-func issue_rollupwith(interactive: issue_rollup_interactive.IssueRollupInteractiveState, focus: IssueRollupFocus, launch_status: u8) IssueRollupAppState {
+func issue_rollupwith(interactive: issue_rollup_interactive.IssueRollupInteractiveState, focus: active_region.ActiveRegion, launch_status: u8) IssueRollupAppState {
     return IssueRollupAppState{ interactive: interactive, focus: focus, launch_status: launch_status }
 }
 
@@ -68,22 +64,13 @@ func issue_rollup_manifest_strip(manifest: rollup_manifest.RollupManifest) [surf
     return [surface_composition.SURFACE_REGION_CELL_COUNT]u8{ 68, 70 }
 }
 
-func issue_rollup_focus_next(focus: IssueRollupFocus) IssueRollupFocus {
-    switch focus {
-    case IssueRollupFocus.Status:
-        return IssueRollupFocus.Body
-    default:
-        return IssueRollupFocus.Status
-    }
-}
-
-func issue_rollup_focus_strip(manifest: rollup_manifest.RollupManifest, focus: IssueRollupFocus) [surface_composition.SURFACE_REGION_CELL_COUNT]u8 {
+func issue_rollup_focus_strip(manifest: rollup_manifest.RollupManifest, focus: active_region.ActiveRegion) [surface_composition.SURFACE_REGION_CELL_COUNT]u8 {
     if !issue_rollup_manifest_is_custom(manifest) {
         return issue_rollup_manifest_strip(manifest)
     }
 
     switch focus {
-    case IssueRollupFocus.Status:
+    case active_region.ActiveRegion.Status:
         return [surface_composition.SURFACE_REGION_CELL_COUNT]u8{ 67, 83 }
     default:
         return [surface_composition.SURFACE_REGION_CELL_COUNT]u8{ 67, 70 }
@@ -95,10 +82,10 @@ func issue_rollup_composed_present(display: display_surface.DisplaySurfaceState,
         display,
         surface_composition.surface_composition(
             issue_rollup_region_head(cells),
-            issue_rollup_focus_strip(manifest, IssueRollupFocus.Body)))
+            issue_rollup_focus_strip(manifest, active_region.ActiveRegion.Body)))
 }
 
-func issue_rollup_focus_present(display: display_surface.DisplaySurfaceState, cells: [display_surface.DISPLAY_CELL_COUNT]u8, manifest: rollup_manifest.RollupManifest, focus: IssueRollupFocus) display_surface.DisplayResult {
+func issue_rollup_focus_present(display: display_surface.DisplaySurfaceState, cells: [display_surface.DISPLAY_CELL_COUNT]u8, manifest: rollup_manifest.RollupManifest, focus: active_region.ActiveRegion) display_surface.DisplayResult {
     return surface_composition.compose_present(
         display,
         surface_composition.surface_composition(
@@ -145,12 +132,12 @@ func issue_rollup_input(app: IssueRollupAppState, update_store: update_store_ser
     manifest := issue_rollup_manifest(update_store)
     if key == ISSUE_ROLLUP_KEY_FOCUS && issue_rollup_manifest_is_custom(manifest) {
         return issue_rollup_present(
-            issue_rollupwith(app.interactive, issue_rollup_focus_next(app.focus), ISSUE_ROLLUP_LAUNCH_STATUS_NONE),
+            issue_rollupwith(app.interactive, active_region.active_region_toggle(app.focus), ISSUE_ROLLUP_LAUNCH_STATUS_NONE),
             update_store,
             display)
     }
 
-    if app.focus == IssueRollupFocus.Status {
+    if app.focus == active_region.ActiveRegion.Status {
         return issue_rollup_result(app, display, IssueRollupPresentKind.NoChange)
     }
 

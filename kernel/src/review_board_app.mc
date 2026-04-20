@@ -1,3 +1,4 @@
+import active_region
 import display_surface
 import journal_service
 import review_board_ui
@@ -40,12 +41,12 @@ func review_board_result(app: ReviewBoardAppState, display: display_surface.Disp
 
 func review_board_journal_tag(app: ReviewBoardAppState) u8 {
     if app.ui.mode == review_board_ui.ReviewBoardMode.Focus {
-        if app.ui.focus == review_board_ui.ReviewBoardFocus.Status {
+        if app.ui.focus == active_region.ActiveRegion.Status {
             return REVIEW_BOARD_JOURNAL_TAG_FOCUS_STATUS
         }
         return REVIEW_BOARD_JOURNAL_TAG_FOCUS_BODY
     }
-    if app.ui.focus == review_board_ui.ReviewBoardFocus.Status {
+    if app.ui.focus == active_region.ActiveRegion.Status {
         return REVIEW_BOARD_JOURNAL_TAG_AUDIT_STATUS
     }
     return REVIEW_BOARD_JOURNAL_TAG_AUDIT_BODY
@@ -67,11 +68,11 @@ func review_board_journal_mode_from_state(tag: u8) review_board_ui.ReviewBoardMo
     return review_board_ui.ReviewBoardMode.Audit
 }
 
-func review_board_journal_focus_from_state(tag: u8) review_board_ui.ReviewBoardFocus {
+func review_board_journal_focus_from_state(tag: u8) active_region.ActiveRegion {
     if tag == REVIEW_BOARD_JOURNAL_TAG_AUDIT_STATUS || tag == REVIEW_BOARD_JOURNAL_TAG_FOCUS_STATUS {
-        return review_board_ui.ReviewBoardFocus.Status
+        return active_region.ActiveRegion.Status
     }
-    return review_board_ui.ReviewBoardFocus.Body
+    return active_region.ActiveRegion.Body
 }
 
 func review_board_journal_tag_valid(tag: u8) bool {
