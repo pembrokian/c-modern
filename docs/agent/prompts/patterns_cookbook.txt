@@ -270,9 +270,10 @@ Beware:
   `kernel_dispatch.mc`, or boot just to simplify the first consumer
 - do not add a generic compositor, layout engine, focus stack, or retained
   widget framework unless the phase explicitly requires it
-- if the fixture is added to the reset-lane grouped suite, check the scenario
-  registration row, fixed-size table or scenario-count owner, and coverage
-  helper before reopening broader workflow code
+- watch for reset-lane registration fallout: if the fixture is added to the
+  reset-lane grouped suite, check the scenario registration row, fixed-size
+  table or scenario-count owner, and coverage helper before reopening broader
+  workflow code
 
 Recent shape:
 - Phase 282: bounded `surface_composition.mc` plus one custom-manifest

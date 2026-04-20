@@ -48,31 +48,34 @@ Implementation requirements:
 17. Large synchronized patches tend to fail in this repository. Prefer landing the root owner cleanly before editing transitive consumers.
 18. Use the phase document's `Dependency-ordered touch sequence` and `Common breakage map` to guide repair before reopening repo exploration.
 19. If the first batch lands and the first narrow validation fails, prefer `docs/agent/prompts/error_triage.txt` plus the phase-local breakage map over new broad repo searches.
+20. When adding grouped workflow or reset-lane cases, check registration
+    bookkeeping owners such as fixed-size tables or scenario-count constants
+    before reopening broader search.
 
 After implementation:
 
-20. Update only docs whose truth actually changed.
-21. Prefer phase-doc appendices or phase-local notes first.
-22. Touch `backlog`, `decision_log`, `repo_map`, or architecture docs only when the implementation revealed a new durable fact, boundary, or deferred pressure.
-23. Skip repo memory or sidecar summary writes unless the user explicitly asked for them or the local workflow requires them.
-24. Update any affected docs, such as:
+21. Update only docs whose truth actually changed.
+22. Prefer phase-doc appendices or phase-local notes first.
+23. Touch `backlog`, `decision_log`, `repo_map`, or architecture docs only when the implementation revealed a new durable fact, boundary, or deferred pressure.
+24. Skip repo memory or sidecar summary writes unless the user explicitly asked for them or the local workflow requires them.
+25. Update any affected docs, such as:
    - roadmap
    - backlog
    - decision_log
    - repo_map.txt
    - architecture docs
 
-25. Record only the durable facts that actually emerged:
+26. Record only the durable facts that actually emerged:
    - major implementation decisions (docs/plan/decision_log.txt)
    - important non-decisions
    - places where the compiler or language was intentionally kept simple
    - deferred work
    - newly discovered language limitations
 
-26. If implementation reveals missing language features, add them to backlog under:
+27. If implementation reveals missing language features, add them to backlog under:
    - Potential Language Features
 
-27. End by reviewing the implementation against the phase spec:
+28. End by reviewing the implementation against the phase spec:
    - what invariants were preserved
    - whether any ownership boundaries weakened
    - whether any accidental abstractions or centers of gravity emerged

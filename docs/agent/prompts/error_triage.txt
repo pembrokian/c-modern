@@ -44,6 +44,11 @@ Common first-break checks
   check the owning grouped suite and its checked-in case or scenario first;
   do not start by widening CMake registration or sharding unless ownership
   actually changed
+- Reset-lane registration fallout:
+  after adding a scenario, fixture, or grouped-case row, check the
+  registration row first, then any fixed-size `std::array` or scenario-count
+  owner, then coverage-validation helpers, fixture naming, and the owning
+  reset-lane CTest target before reopening broader workflow code
 - Broader grouped validation failure after a narrow owner fix:
   step to the first failing owner-local case first; treat stale reuse
   expectations and owner-local helper contracts as likely causes before

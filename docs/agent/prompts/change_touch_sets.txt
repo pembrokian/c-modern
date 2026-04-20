@@ -69,6 +69,9 @@ Grouped test touch sets
 - Reset-lane change:
   narrow scenario or fixture first, then `tests/tool/tool_kernel_reset_lane_suite.cpp`,
   then the maintained full grouped case only after the narrow owner passes
-  - first local checks:
-    scenario registration row, fixed-size table or scenario-count constant,
-    coverage helper expectations, fixture directory naming, owning CTest target
+  - reset-lane registration fallout:
+    if a new scenario, fixture, or grouped-case row builds incorrectly, check
+    the scenario registration row first, then any fixed-size table or
+    scenario-count constant, then coverage helper expectations, fixture
+    directory naming, and the owning CTest target before reopening broader
+    workflow code

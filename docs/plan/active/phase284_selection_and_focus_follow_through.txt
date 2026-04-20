@@ -3,7 +3,7 @@ Phase 284 -- Selection And Focus Follow-Through
 
 Status
 ------
-PROPOSED
+COMPLETED
 
 Purpose
 -------
@@ -207,3 +207,75 @@ Future follow-up
   classify whether one tiny shared control vocabulary is justified.
 - If the chosen consumer still works honestly with app-local active-state
   truth, record that and keep shared focus deferred.
+
+Implementation outcome
+----------------------
+- The strongest current pressure stayed app-local rather than justifying a new
+  shared focus owner.
+- `kernel/src/issue_rollup_app.mc` now owns one explicit bounded focus model
+  for the admitted two-region custom-manifest path: `Body` or `Status`.
+- The first bounded model is active region only, not active item selection.
+- The existing key-input lane remains sufficient: `F` toggles the active
+  region only on the custom-manifest path, and no new input family lands.
+- Body-focused custom-manifest rendering preserves the existing Phase 282
+  visible contract (`STCF`, `BUCF`, `ATCF`, `EMCF`) so earlier composed-path
+  truth does not regress.
+- Status-focused custom-manifest rendering now makes the active region visible
+  through the status strip marker `CS`, yielding deterministic cells such as
+  `STCS`.
+- Status focus also gates body-edit actions: ordinary issue-entry keys remain
+  delivered on the existing foreground-input path, but they do not mutate the
+  interactive issue list until focus returns to the body region.
+- `foreground_input_route.mc`, `input_event.mc`, `display_surface.mc`, and
+  `launcher_service.mc` remain unchanged as focus-policy owners; they continue
+  to own input parsing, foreground handoff, visible-surface updates, and
+  foreground-app truth only.
+- One focused reset-lane fixture,
+  `tests/system/kernel_reset_lane_phase284_selection_and_focus_follow_through/`,
+  proves the landed active-region behavior on the maintained kernel UI path.
+
+Implemented decisions
+---------------------
+1. The honest owner is still app-local because the only maintained consumer is
+   the `issue_rollup` custom-manifest two-region path.
+2. The first explicit model is active region only (`Body` or `Status`), not a
+   shared focus stack or active-item system.
+3. The current admitted key-input lane is sufficient, so no second input
+   vocabulary lands.
+4. Shared focus, shared control vocabulary, and broader selection semantics
+   remain deferred until a second real consumer or repeated app-local friction
+   proves them stronger.
+
+Important non-decisions
+-----------------------
+- No new shared focus or selection module was introduced.
+- No launcher-owned, route-owned, or display-owned focus policy was added.
+- No active-item list selection, control hierarchy, pointer input, shortcut
+  system, accessibility metadata, or retained UI tree lands here.
+
+Validation
+----------
+- `Build debug`
+- `ctest --test-dir build/debug -R mc_tool_workflow_kernel_reset_lane_unit --output-on-failure`
+
+Phase review against the spec
+-----------------------------
+- Preserved invariants:
+  - launcher remains the owner of foreground-app choice only
+  - focus truth stays bounded to one admitted UI app family
+  - the first model distinguishes only the active region truth current
+    consumers need
+  - no retained interaction framework or accessibility layer was introduced
+- Ownership boundaries did not weaken:
+  - `issue_rollup_app.mc` owns the new active-region state and uses it only on
+    the existing custom-manifest composed path
+  - `foreground_input_route.mc` still routes parsed input but does not decide
+    focus semantics
+  - `display_surface.mc` still owns only visible-surface state updates
+  - `launcher_service.mc` still owns only foreground-app and launch-status
+    truth
+- Accidental centers of gravity were avoided:
+  - no new service, registry, focus stack, control framework, or toolkit layer
+    was introduced
+  - the new behavior is one enum, one toggle key, one visible status-strip
+    marker, and one focused reset-lane proof
