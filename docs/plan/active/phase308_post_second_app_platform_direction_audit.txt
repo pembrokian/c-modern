@@ -1,0 +1,214 @@
+Phase 308 -- Post-Second-App Platform Direction Audit
+=====================================================
+
+Status
+------
+PROPOSED
+
+Purpose
+-------
+Record whether the next strongest pressure after the richer UI wave and any
+second-install slice is broader packaging, networking, durable file-like
+growth, or some other deferred branch, instead of assuming more packaging work
+follows automatically.
+
+This phase exists now because Band I should end with one explicit decision
+about what the two-app installed story actually changed. The repository needs a
+new plateau note rather than momentum-driven continuation of packaging work.
+
+Repository status note
+----------------------
+- Phase 305 is expected to justify reopening packaging by showing that the
+  current supported slice is honestly blocked on second installed-program
+  pressure.
+- Phase 306 and Phase 307 are expected to land the smallest honest second
+  installed-program slice and stabilize its app-facing status and restart
+  truth.
+- Earlier roadmap notes and the backlog still keep broader packaging,
+  networking, durable file-like growth, and other platform branches explicit as
+  deferred losers.
+- The repository still needs one explicit post-Band-I audit that says whether
+  the admitted two-app installed story is now enough, or whether another branch
+  has become stronger.
+
+Problem being solved
+--------------------
+- Without a post-second-app audit, the repository can drift from one honest
+  two-app install slice into a larger packaging wave without re-checking the
+  evidence.
+- Conversely, a genuinely stronger branch such as networking or durable file-
+  like growth could remain hidden if the repository assumes packaging must keep
+  going once reopened.
+- The current-repo problem is therefore one missing post-Band-I direction note,
+  not another implementation feature.
+
+Non-goals
+---------
+- no new platform implementation by default
+- no automatic promotion of a broader packaging wave
+- no roadmap rewrite beyond the narrow surfaces that must reflect the new
+  direction
+- no package-manager, filesystem, or networking feature landing inside the
+  audit itself
+- no reopening of compiler work unless a new maintained consumer proves it
+
+Invariants
+----------
+- The audit must be driven by maintained repository-owned consumers and landed
+  Band I outcomes.
+- It must be allowed to conclude that packaging pressure is now honestly spent
+  for the admitted two-app slice.
+- If another branch becomes strongest, it must be named explicitly with repo-
+  local evidence.
+- The current launcher, update-store, and program-catalog owner boundaries must
+  stay explicit in the audit result.
+- Planning-surface churn must remain narrow and proportional to the decision.
+
+Required surface changes
+------------------------
+1. Compare the post-Phase-307 platform state against the earlier deferred
+   branch set.
+2. Record whether the admitted two-app install story fully spends current
+   packaging pressure or leaves another stronger packaging follow-through.
+3. Record whether some other branch now outranks further packaging.
+4. Update only the narrow planning or backlog surfaces that must reflect the
+   reclassification.
+
+Forbidden changes
+-----------------
+- do not land another packaging, networking, or storage feature inside the
+  audit by default
+- do not promote a broader platform branch without maintained consumer evidence
+- do not confuse local test-harness friction with real platform pressure
+- do not widen the audit into a general strategic essay
+- do not ignore a legitimate “current packaging pressure is spent” result
+
+Phase role in the larger sequence
+---------------------------------
+- This phase closes Band I by stating what the second installed-program wave
+  actually accomplished.
+- It gives the repository one durable handoff into the next bounded branch.
+- It prevents continued packaging growth from becoming automatic once the first
+  two-app install story exists.
+
+Relevant backlog items this phase intentionally brings under pressure
+--------------------------------------------------------------------
+- re-evaluate the active backlog constraints that kept packaging bounded until
+  a second installed-program consumer appeared
+- compare the post-Band-I repository state against deferred networking,
+  durable file-like growth, and any remaining packaging follow-through
+- keep next-wave selection evidence-backed instead of convenience-driven
+
+Questions this phase must answer
+--------------------------------
+1. Did Phase 306 plus Phase 307 fully spend the current second installed-
+   program pressure?
+2. If not, what exact bounded packaging pressure remains?
+3. If packaging is now honestly spent, which deferred branch is strongest next?
+4. Which planning surfaces must reflect the result so the next branch starts
+   from durable evidence?
+
+Preferred implementation shape
+------------------------------
+- Start from the landed Band I outcomes and the earlier packaging deferral
+  triggers in the backlog.
+- Prefer a short ranked audit with one winning next branch and a short loser
+  matrix.
+- If packaging pressure is spent, say that explicitly and hand off cleanly to
+  the stronger non-packaging branch.
+- Update only the planning surfaces that future work will actually consult.
+
+Implementation accelerators
+---------------------------
+Main files and navigations
+~~~~~~~~~~~~~~~~~~~~~~~~~~
+- Primary audit inputs: the landed Phase 305 through Phase 307 notes, the
+  active backlog entries for launcher and installed-program storage, and the
+  current roadmap comparison in `docs/plan/admin/speculative_roadmap_post_phase294.txt`.
+- Primary owner surfaces to compare second: `kernel/src/services/launcher_service.mc`,
+  `kernel/src/services/update_store_service.mc`, and
+  `kernel/src/identity/program_catalog.mc`.
+- Primary consumer and proof surfaces: `examples/real/issue_rollup/`,
+  `examples/real/review_board/`, and `tests/tool/README.md`.
+- Expected first validation target: editor diagnostics on the touched planning
+  docs unless the audit uncovers a missing evidence repair.
+
+Relevant cookbook patterns
+~~~~~~~~~~~~~~~~~~~~~~~~~~
+- No exact cookbook pattern applies because this is a bounded direction audit
+  rather than a direct implementation feature.
+- Pattern 6 -- Add A Compiler Phase is relevant only as a reminder that any
+  future compiler return still needs a separate bounded plan.
+
+Relevant file-local invariants
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+- `docs/plan/backlog.txt` keeps the current deferred-branch triggers visible and
+  should be the main comparison surface for deciding whether packaging pressure
+  is now spent.
+- `kernel/src/services/launcher_service.mc` and
+  `kernel/src/services/update_store_service.mc` remain evidence surfaces for how
+  far the current packaging slice actually reached.
+- `tests/tool/README.md` remains the workflow-routing anchor for the supported
+  two-app proof surfaces.
+- `docs/plan/admin/speculative_roadmap_post_phase294.txt` is the right narrow
+  admin surface to sync if the platform direction changes after Band I.
+
+Dependency-ordered touch sequence
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+- Compare the post-Phase-307 repository state against the deferred branch set
+  first.
+- Land the post-second-app platform direction audit second.
+- Sync only the narrow roadmap or backlog surface that must reflect the result
+  third.
+- Draft the next branch-specific phase plan last and only after this audit is
+  stable.
+
+Common breakage map
+~~~~~~~~~~~~~~~~~~~
+- Audit assumes more packaging work is needed without checking whether the
+  current two-app story is already honest -> the next branch is convenience-
+  driven.
+- Remaining pressure is misclassified as packaging when it is really app-local,
+  workflow-local, or another deferred branch -> later implementation starts in
+  the wrong owner.
+- A new winning branch has no stronger maintained consumer evidence -> the
+  audit regresses into wishlist planning.
+- Roadmap or backlog sync widens too far -> planning churn exceeds the bounded
+  direction decision.
+
+Relevant test surfaces
+~~~~~~~~~~~~~~~~~~~~~~
+- Primary owning validation surface: editor diagnostics on the audit note and
+  any narrowly synced planning docs.
+- Narrowest expected executable validation target only if a missing evidence
+  gap must be repaired: the owning hosted or reset-lane target implicated by
+  that gap.
+- Use `docs/agent/prompts/test_overview.txt` to route any necessary repair
+  before broadening validation.
+
+Test obligations
+----------------
+- require editor diagnostics on the audit note and any narrowly synced planning
+  docs
+- run executable validation only if the audit uncovers a missing evidence gap
+  that must be repaired in code
+- if executable validation is required, run only the narrowest owning target
+  for that gap first
+
+Acceptance criteria
+-------------------
+- the repository has one explicit post-Band-I account of whether the current
+  packaging pressure is now honestly spent
+- any remaining or newly stronger platform pressure is tied to maintained
+  consumers and existing owner boundaries
+- the audit permits a clean “move on from packaging” result if the two-app
+  install slice is enough
+- later planning can choose the next band without guessing or relying on
+  momentum
+
+Future follow-up
+----------------
+- If packaging pressure is spent, use this audit to hand off to the next
+  strongest deferred branch rather than extending Band I by convenience.
+- If another bounded packaging front still wins, use this note as the contract
+  source for the next packaging phase plan.

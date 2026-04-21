@@ -1,0 +1,216 @@
+Phase 307 -- Two-App Installed Status And Resume Follow-Through
+================================================================
+
+Status
+------
+PROPOSED
+
+Purpose
+-------
+Make launcher and update-store surfaces report honest installed, foreground,
+and restart-visible truth for the admitted two-app installed set without
+becoming a registry, dashboard, session framework, or storage owner.
+
+This phase exists now because once a second installed program exists, the
+current compact install and restart-visible status surfaces must prove that they
+still scale honestly to the admitted two-app set. Otherwise the second-install
+slice stays incomplete and misleading.
+
+Repository status note
+----------------------
+- The earlier Band C work already admitted compact identify, query, launch, and
+  restart-visible classification surfaces on `launcher_service`, plus durable
+  launch-record truth on `update_store_service`.
+- Phase 306 is expected to add `review_board` as a second installed consumer on
+  that same owner split.
+- `launcher_service` currently reports compact app-facing status and stores
+  only volatile launch classification, while `update_store_service` owns the
+  durable comparison record.
+- The repository still needs one explicit follow-through that proves those
+  status and resume surfaces remain honest for the admitted two-app installed
+  set.
+
+Problem being solved
+--------------------
+- A second installed consumer is not complete if launcher-visible status and
+  restart-visible launch classification still behave like a one-app-only
+  contract.
+- At the same time, widening the status surfaces too far would turn launcher or
+  update-store into a registry, dashboard, or session framework.
+- The current-repo problem is therefore one missing two-app follow-through on
+  compact installed and restart truth, not missing a broader app platform.
+
+Non-goals
+---------
+- no dashboard, shell registry, or session model
+- no launcher-owned durable state
+- no richer invalidation taxonomy unless the admitted two-app set proves it is
+  strictly required
+- no filesystem or package metadata expansion
+- no third app or discovery wave
+
+Invariants
+----------
+- `launcher_service` remains the owner of app-facing selection, foreground, and
+  launch classification policy.
+- `update_store_service` remains the owner of durable installed and launch-
+  record truth.
+- Restart-visible truth must stay explicit and bounded, not become a session or
+  process-resume framework.
+- Status payloads must remain compact enough to match the admitted shell and
+  launcher boundary unless a stronger two-app pressure proves otherwise.
+- The phase must stabilize the admitted two-app installed set, not generalize
+  to arbitrary app counts.
+
+Required surface changes
+------------------------
+1. Update compact launcher-visible identify or query or launch consequences so
+   they remain honest for the admitted two-app installed set.
+2. Extend durable launch-record comparison truth only as needed to keep restart-
+   visible status honest for that set.
+3. Keep the app-facing status contract bounded and explicit.
+4. Add or update one narrow hosted proof and one narrow reset-lane proof that
+   exercise the admitted two-app installed and restart-visible path.
+
+Forbidden changes
+-----------------
+- do not widen launcher into a package registry, dashboard, or durable storage
+- do not widen update-store into a session or process state owner
+- do not solve the phase by adding shell-visible discovery or richer metadata
+  that no current caller needs
+- do not generalize to arbitrary installed-app counts
+- do not introduce a second execution or resume framework
+
+Phase role in the larger sequence
+---------------------------------
+- This phase stabilizes the two-app installed story after Phase 306 lands the
+  second installed consumer.
+- It gives Phase 308 the evidence needed to decide whether the next strongest
+  pressure is more packaging, networking, durable file-like growth, or another
+  deferred branch.
+- It also closes the most obvious follow-through risk in Band I: that the
+  installed path grows while its status contract remains single-app-shaped.
+
+Relevant backlog items this phase intentionally brings under pressure
+--------------------------------------------------------------------
+- the active backlog constraint that launcher execution remain bounded to
+  catalog, install consumption, compact status, and restart classification
+- the active backlog constraint that restart-visible app truth remain launcher
+  classification over update-store-owned durable comparison records
+- keep broader session, dashboard, and execution semantics deferred while the
+  admitted two-app installed set stabilizes
+
+Questions this phase must answer
+--------------------------------
+1. Which existing compact launcher status surfaces become misleading once the
+   admitted two-app installed set exists?
+2. What is the smallest honest extension to durable launch-record truth for the
+   new installed pair?
+3. Can restart-visible classification remain compact and bounded, or does the
+   two-app set expose a truly stronger status need?
+4. Which maintained proofs best show installed, foreground, and restart truth
+   without inventing a new runner or dashboard?
+
+Preferred implementation shape
+------------------------------
+- Keep durable comparison logic in `update_store_service` and app-facing status
+  policy in `launcher_service`.
+- Prefer extending current compact identify, query, and launch reply contracts
+  over inventing a new status family.
+- Let the admitted two-app set drive exactly one more bounded status or resume
+  extension if needed, and stop there.
+- Prove the slice on the existing hosted real-project and grouped reset-lane
+  workflow surfaces.
+
+Implementation accelerators
+---------------------------
+Main files and navigations
+~~~~~~~~~~~~~~~~~~~~~~~~~~
+- Primary app-facing owner to open first: `kernel/src/services/launcher_service.mc`.
+- Adjacent durable owner to inspect second: `kernel/src/services/update_store_service.mc`.
+- Fixed identity table to keep nearby: `kernel/src/identity/program_catalog.mc`.
+- Proof routing surfaces: `tests/tool/tool_kernel_reset_lane_suite.cpp`,
+  `tests/tool/README.md`, and the hosted `tests/tool/real_projects/issue-rollup/test.cpp`
+  plus `tests/tool/real_projects/review-board/test.cpp` owners.
+- Expected first validation target after the owner change:
+  `mc_tool_workflow_kernel_reset_lane_unit`.
+
+Relevant cookbook patterns
+~~~~~~~~~~~~~~~~~~~~~~~~~~
+- Pattern 3 -- Add A Service State Field fits because this phase is likely to
+  add or refine one explicit status or launch-record field and its follow-
+  through.
+- Pattern 11 -- Add A Narrow UI Slice Owner remains relevant as the consumer
+  reminder: the admitted two-app set is still the only honest scope.
+
+Relevant file-local invariants
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+- `kernel/src/services/launcher_service.mc` already owns identify, query,
+  select, launch, and one bounded visible-status surface; this phase should
+  deepen that owner, not add a competing one.
+- `kernel/src/services/update_store_service.mc` already owns the persisted
+  launched-artifact comparison record used for fresh versus resumed versus
+  invalidated truth.
+- `tests/tool/README.md` keeps the reset-lane and hosted real-project targets
+  as the canonical proof surfaces for the supported user-facing slice.
+- The current admitted program set stays fixed in `program_catalog.mc`; the
+  phase should not invent dynamic discovery to explain status for two apps.
+
+Dependency-ordered touch sequence
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+- Land the launcher-visible status owner change first.
+- Update durable launch-record or installed-truth follow-through second if
+  needed.
+- Update direct proof expectations third.
+- Update the grouped reset-lane and hosted validation surfaces last.
+
+Common breakage map
+~~~~~~~~~~~~~~~~~~~
+- Compact status becomes ambiguous after two-app install changes -> check
+  `launcher_service` query or identify contracts before widening storage.
+- Restart-visible truth regresses -> inspect `update_store_service` launch-
+  record comparison before editing launcher policy further.
+- Proofs disagree on installed or foreground truth -> compare hosted app owner,
+  launcher reply, and reset-lane scenario expectation before widening workflow
+  code.
+- Added status metadata starts resembling a registry -> tighten the payload and
+  keep only the admitted two-app facts.
+
+Relevant test surfaces
+~~~~~~~~~~~~~~~~~~~~~~
+- Primary owning test family: grouped reset-lane workflow coverage plus the two
+  hosted UI real-project targets.
+- Narrowest expected first executable validation target:
+  `mc_tool_workflow_kernel_reset_lane_unit`.
+- Adjacent hosted validation targets: `mc_tool_real_project_issue_rollup_unit`
+  and `mc_tool_real_project_review_board_unit`.
+- If shared reset-lane workflow cost or reuse changes, widen afterward to
+  `mc_tool_workflow_kernel_reset_lane_full_unit` and rerun it once when
+  practical.
+
+Test obligations
+----------------
+- run `Build debug`
+- run `mc_tool_workflow_kernel_reset_lane_unit`
+- run the hosted real-project target or targets touched by the status and
+  resume follow-through
+- if shared reset-lane workflow or reuse changes, run
+  `mc_tool_workflow_kernel_reset_lane_full_unit` and rerun it once to check the
+  warm path
+
+Acceptance criteria
+-------------------
+- installed, foreground, and restart-visible truth remain honest for the
+  admitted two-app installed set
+- launcher and update-store keep their existing owner split
+- the phase does not become a registry, session model, or dashboard
+- maintained hosted and reset-lane proofs cover the admitted two-app status
+  contract clearly
+
+Future follow-up
+----------------
+- Phase 308 should use the stabilized two-app installed story to re-rank the
+  next strongest deferred branch.
+- If the admitted two-app set still exposes packaging pressure after this
+  follow-through, record the next narrow blocker explicitly rather than
+  widening this phase retroactively.

@@ -1,0 +1,221 @@
+Phase 305 -- Second Installed Program Pressure Audit
+====================================================
+
+Status
+------
+PROPOSED
+
+Purpose
+-------
+Decide whether the current `issue_rollup`-only installed path is now the
+strongest blocker on the richer UI slice, or whether broader packaging should
+remain deferred even after Band G and Band H land cleanly.
+
+This phase exists now because Phase 304 concludes that the byte-literal
+compiler pressure is spent. The next honest question is whether the repository
+now has enough real two-app pressure to reopen packaging, rather than forcing a
+second-install wave just because compiler work stopped.
+
+Repository status note
+----------------------
+- Phase 269 through Phase 272 admitted one fixed installed-program slot,
+  launcher-visible identify and query surfaces, one `issue_rollup`-only
+  manifest family, and one installed workflow demo on the current
+  `update_store_service` plus `launcher_service` split.
+- Phase 273 and the current backlog kept broader packaging deferred because the
+  repository still had one installed app plus no second installed consumer.
+- Band G then made `review_board` a stronger maintained UI consumer without
+  turning it into an installed-program path.
+- Phase 304 now records that compiler pressure is spent and that broader
+  packaging is the strongest next deferred branch to compare explicitly.
+
+Problem being solved
+--------------------
+- The repository now has two maintained UI-facing programs, but only one of
+  them participates in installed-program truth. That creates a real question
+  about whether the current one-installed-app plateau is now the strongest
+  blocker on the supported slice.
+- Without an explicit audit, later work can drift into packaging by
+  convenience, or keep deferring packaging long after a second consumer exists.
+- The current-repo problem is therefore one missing evidence-backed comparison
+  between the existing installed path and the richer direct-launch second app,
+  not yet the absence of a package platform by itself.
+
+Non-goals
+---------
+- no new packaging or install implementation by default
+- no package manager, discovery system, or filesystem wave
+- no launcher, workflow, or storage framework redesign
+- no attempt to solve multi-user, desktop, or process-management concerns
+- no assumption that packaging must reopen just because Band H completed
+
+Invariants
+----------
+- Packaging pressure must still be justified by maintained repository-owned
+  consumers.
+- `kernel/src/services/update_store_service.mc` remains the durable install
+  truth owner, while `kernel/src/services/launcher_service.mc` remains the
+  app-facing policy owner.
+- `kernel/src/identity/program_catalog.mc` remains the owner of fixed admitted
+  program identity.
+- The audit must be allowed to conclude that packaging should remain deferred
+  if the second installed-program pressure is still not strong enough.
+- Planning surfaces must remain narrow; this is a branch-decision audit, not a
+  feature landing.
+
+Required surface changes
+------------------------
+1. Compare the current installed `issue_rollup` path against the richer
+   `review_board` direct-launch path after Band G and Band H.
+2. Record whether a second installed-program slice is now the strongest honest
+   blocker.
+3. If packaging remains deferred, record that explicitly with concrete reasons.
+4. Update only the narrow planning or backlog surfaces that must reflect the
+   audit result.
+
+Forbidden changes
+-----------------
+- do not land a second installed-program implementation inside the audit by
+  default
+- do not confuse richer UI interaction with install-path pressure unless the
+  current supported slice is materially blocked on install truth
+- do not widen the audit into a package-manager, asset-platform, or filesystem
+  proposal
+- do not move install truth into launcher or UI code to simplify the
+  comparison
+- do not ignore a legitimate “packaging still deferred” outcome just because
+  Band I exists in the roadmap
+
+Phase role in the larger sequence
+---------------------------------
+- This phase opens Band I by deciding whether the current supported slice now
+  needs a second installed-program consumer.
+- It gives Phase 306 permission to land only if the comparison shows that a
+  bounded second-install slice is now stronger than continued deferral.
+- It also preserves the earlier Band C boundaries so any packaging reopening is
+  deliberate rather than convenience-driven.
+
+Relevant backlog items this phase intentionally brings under pressure
+--------------------------------------------------------------------
+- the active backlog constraints that keep launcher execution bounded to single-
+  foreground selection, install consumption, and compact status surfaces until
+  a second installed consumer appears
+- the active backlog constraints that keep installed-program storage bounded to
+  one update-store-owned slot until a second installed consumer appears
+- keep broader packaging, metadata, and execution semantics deferred unless the
+  real two-app plateau now proves otherwise
+
+Questions this phase must answer
+--------------------------------
+1. Does the current one-installed-app plus one direct-launch-app plateau now
+   materially limit the supported user-facing slice?
+2. Which owner is actually blocked first: `update_store_service`,
+   `launcher_service`, `program_catalog`, or a higher-level workflow proof?
+3. What is the smallest honest second installed-program slice if packaging now
+   wins?
+4. Which planning surfaces must reflect the answer so later phases do not
+   re-litigate it immediately?
+
+Preferred implementation shape
+------------------------------
+- Start from the landed Band G and Band H support story plus the older Band C
+  installed-path boundaries.
+- Prefer a short winner-versus-loser audit over a broad packaging wishlist.
+- If packaging now wins, define the smallest honest next slice as one second
+  repository-owned installed consumer on the existing launcher/update-store
+  split.
+- If packaging still loses, say so explicitly and keep the current boundaries
+  frozen.
+
+Implementation accelerators
+---------------------------
+Main files and navigations
+~~~~~~~~~~~~~~~~~~~~~~~~~~
+- Primary audit inputs: `docs/plan/active/phase304_post_richer_ui_compiler_pressure_audit.txt`,
+  `docs/plan/active/phase301_richer_ui_slice_freeze_and_audit.txt`, and the
+  active backlog entries for launcher and installed-program storage.
+- Primary owner surfaces to compare second: `kernel/src/services/launcher_service.mc`,
+  `kernel/src/services/update_store_service.mc`, and
+  `kernel/src/identity/program_catalog.mc`.
+- Primary consumer evidence surfaces: `examples/real/issue_rollup/`,
+  `examples/real/review_board/`, and the maintained tool workflow routing in
+  `tests/tool/README.md`.
+- Expected first validation target: editor diagnostics on the touched planning
+  docs unless the audit uncovers a missing evidence repair.
+
+Relevant cookbook patterns
+~~~~~~~~~~~~~~~~~~~~~~~~~~
+- No exact cookbook pattern applies because this is a bounded branch audit
+  rather than a direct code feature.
+- Pattern 11 -- Add A Narrow UI Slice Owner is relevant only as a reminder that
+  the triggering pressure comes from maintained app consumers, not abstract
+  platform ambition.
+
+Relevant file-local invariants
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+- `kernel/src/services/update_store_service.mc` currently owns durable install
+  bytes and one persisted launch record; it should not be preemptively widened
+  into a package database by the audit.
+- `kernel/src/services/launcher_service.mc` currently owns select, identify,
+  query, launch classification, and one `issue_rollup`-specific manifest query,
+  and the audit should treat that as the current honest app-facing boundary.
+- `kernel/src/identity/program_catalog.mc` already names two admitted programs,
+  but only one currently participates in installed truth.
+- `tests/tool/README.md` keeps the canonical public evidence route on the two
+  hosted real-project targets plus `mc_tool_workflow_kernel_reset_lane_unit`.
+
+Dependency-ordered touch sequence
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+- Compare the current installed-path owners and the maintained two-app
+  consumers first.
+- Land the second-installed-program pressure audit second.
+- Sync only the narrow roadmap or backlog surfaces that must reflect the
+  result third.
+- Draft or land the second-installed-program implementation plan last and only
+  if the audit says packaging now wins.
+
+Common breakage map
+~~~~~~~~~~~~~~~~~~~
+- Audit assumes second-install pressure without comparing the actual maintained
+  consumer paths -> the note becomes roadmap momentum rather than repo truth.
+- Pressure is assigned to launcher when durable truth still belongs to
+  `update_store_service` -> implementation would start in the wrong owner.
+- Audit widens into metadata or filesystem work -> the bounded Band I entry
+  point is lost.
+- “Packaging still deferred” is not recorded explicitly -> later planning will
+  reopen the same comparison without the current evidence.
+
+Relevant test surfaces
+~~~~~~~~~~~~~~~~~~~~~~
+- Primary owning validation surface: editor diagnostics on the audit note and
+  any narrowly synced planning docs.
+- Narrowest expected executable validation target only if a missing evidence
+  gap must be repaired: `mc_tool_workflow_kernel_reset_lane_unit` or the owning
+  hosted real-project target implicated by that gap.
+- Use `docs/agent/prompts/test_overview.txt` to route any necessary repair
+  before broadening validation.
+
+Test obligations
+----------------
+- require editor diagnostics on the audit note and any narrowly synced planning
+  docs
+- run executable validation only if the audit uncovers a missing evidence gap
+  that must be repaired in code
+- if executable validation is required, run only the narrowest owning target
+  for that gap first
+
+Acceptance criteria
+-------------------
+- the repository has one explicit answer about whether second installed-program
+  pressure is now the strongest next blocker
+- any winning packaging slice is defined narrowly enough to fit the current
+  launcher/update-store/program-catalog split
+- a losing packaging result stays explicit rather than implied
+- later planning can use this note to enter or skip Band I without guessing
+
+Future follow-up
+----------------
+- If this audit says packaging now wins, use it as the contract source for
+  Phase 306.
+- If it says packaging still loses, keep the current installed-path boundaries
+  explicit and reopen the next strongest non-packaging branch instead.

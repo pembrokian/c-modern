@@ -1,0 +1,215 @@
+Phase 306 -- Second Installed Program First Slice
+=================================================
+
+Status
+------
+PROPOSED
+
+Purpose
+-------
+Admit one second repository-owned UI app as an installed-program consumer
+through the existing `update_store_service` plus `launcher_service` split,
+without widening into multi-package policy, manifest frameworks, launcher-owned
+storage, or a general app platform.
+
+This phase exists now because Phase 305 is expected to decide that the current
+one-installed-app plateau is now the strongest blocker on the supported slice.
+The next honest step is therefore one bounded second-install slice, not a
+broader packaging framework.
+
+Repository status note
+----------------------
+- `kernel/src/identity/program_catalog.mc` already names two admitted programs:
+  `issue_rollup` and `review_board`.
+- `kernel/src/services/update_store_service.mc` still owns only one installed
+  slot and currently reports that slot as `issue_rollup`-only installed truth.
+- `kernel/src/services/launcher_service.mc` consumes installed truth, launch
+  classification, and compact app-facing status, but currently special-cases
+  `review_board` as direct-launch-only.
+- Phase 305 is expected to conclude that the supported slice is now honestly
+  blocked on bringing `review_board` onto the installed-program path.
+
+Problem being solved
+--------------------
+- The repository now supports two meaningful UI-facing apps, but only one can
+  participate in installed identity, install-gated launch, and restart-visible
+  install continuity.
+- That leaves `review_board` on a weaker direct-launch path even though the
+  current app pair is otherwise the supported user-facing slice.
+- The current-repo problem is therefore one missing second installed-program
+  consumer on the existing owner split, not missing a package manager.
+
+Non-goals
+---------
+- no package manager, install queue, or discovery service
+- no arbitrary multi-slot packaging policy beyond the smallest honest second
+  installed consumer
+- no launcher-owned durable storage
+- no general manifest or asset framework for all programs
+- no session, process, or desktop platform wave
+
+Invariants
+----------
+- `update_store_service` remains the owner of durable install bytes and
+  persisted launch-record truth.
+- `launcher_service` remains the owner of selection, launch, and app-facing
+  install status policy.
+- `program_catalog` remains the owner of admitted program identity.
+- The second installed-program slice must stay fixed and explicit rather than
+  opening unbounded package identity or storage policy.
+- Hosted and reset-lane proofs must stay on the existing real-project and
+  grouped reset-lane workflow surfaces.
+
+Required surface changes
+------------------------
+1. Extend the current install-path truth so one second admitted program can be
+   staged and recognized as installed.
+2. Update launcher consumption of that truth so the second installed program is
+   selectable, identifiable, and launchable through the existing app-facing
+   policy owner.
+3. Keep the implementation bounded to the admitted app pair and current owner
+   split.
+4. Add or update one hosted proof and one reset-lane installed-workflow proof
+   that exercise the second installed path.
+
+Forbidden changes
+-----------------
+- do not widen `update_store_service` into a general package database or
+  filesystem owner
+- do not move durable install truth into `launcher_service`
+- do not add dynamic package identity, discovery, or arbitrary manifest
+  families
+- do not introduce a separate packaging runner or test family
+- do not solve the phase by making `review_board` installed-only if the current
+  supported direct-launch behavior still matters
+
+Phase role in the larger sequence
+---------------------------------
+- This phase is the first concrete implementation spend of Band I.
+- It extends the current app platform just enough to turn the supported app
+  pair into an honest installed-program comparison.
+- It prepares Phase 307, which will stabilize launcher-visible installed,
+  foreground, and restart truth for that admitted pair.
+
+Relevant backlog items this phase intentionally brings under pressure
+--------------------------------------------------------------------
+- the active backlog constraints that keep installed-program storage bounded to
+  one update-store-owned slot until a second installed consumer appears
+- the active backlog constraints that keep launcher execution bounded to the
+  current app-facing install and status seam until a second installed consumer
+  appears
+- keep broader package metadata, manifest frameworks, and execution semantics
+  deferred while the admitted two-app install slice lands
+
+Questions this phase must answer
+--------------------------------
+1. What is the smallest honest durable shape for admitting `review_board` as a
+   second installed consumer?
+2. Which owner must change first: `update_store_service`, `launcher_service`,
+   or `program_catalog`?
+3. How should the second installed path stay explicit without becoming an open-
+   ended multi-package abstraction?
+4. Which hosted and reset-lane proofs best demonstrate the new installed slice?
+
+Preferred implementation shape
+------------------------------
+- Start from `update_store_service` as the controlling durable owner and add
+  only the minimal install truth required for the admitted two-program set.
+- Let `launcher_service` consume that truth and expose app-facing consequences,
+  but keep it out of durable storage.
+- Keep `program_catalog` as the tiny fixed identity table for the two admitted
+  programs.
+- Prefer one bounded second installed slot or equivalently explicit two-program
+  installed record family over any generalized package container.
+
+Implementation accelerators
+---------------------------
+Main files and navigations
+~~~~~~~~~~~~~~~~~~~~~~~~~~
+- Controlling owner to open first: `kernel/src/services/update_store_service.mc`.
+- Direct consumer to open second: `kernel/src/services/launcher_service.mc`.
+- Identity owner to inspect early: `kernel/src/identity/program_catalog.mc`.
+- Proof and workflow routing surfaces: `tests/tool/tool_kernel_reset_lane_suite.cpp`,
+  `tests/tool/README.md`, and the hosted `tests/tool/real_projects/review-board/test.cpp`
+  plus `tests/tool/real_projects/issue-rollup/test.cpp` owners.
+- Expected first validation target after the owner change:
+  `mc_tool_workflow_kernel_reset_lane_unit`.
+
+Relevant cookbook patterns
+~~~~~~~~~~~~~~~~~~~~~~~~~~
+- Pattern 3 -- Add A Service State Field fits because this phase is likely to
+  extend durable service state and its reload or launch follow-through.
+- Pattern 11 -- Add A Narrow UI Slice Owner is relevant only as a reminder that
+  the motivating consumer is still the admitted UI app pair, not a general app
+  platform.
+
+Relevant file-local invariants
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+- `kernel/src/services/update_store_service.mc` already owns the durable
+  installed slot and launch-record truth; any new installed-program shape must
+  start there.
+- `kernel/src/services/launcher_service.mc` currently special-cases
+  `review_board` as direct-launch-only through `launcher_requires_installed_program(...)`;
+  a second installed-program slice must repair that boundary deliberately.
+- `kernel/src/identity/program_catalog.mc` already names the admitted two-app
+  set and should remain the fixed source of program identity.
+- `tests/tool/README.md` keeps the public evidence route on
+  `mc_tool_real_project_issue_rollup_unit`, `mc_tool_real_project_review_board_unit`,
+  and `mc_tool_workflow_kernel_reset_lane_unit`.
+
+Dependency-ordered touch sequence
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+- Land the durable installed-truth owner change in `update_store_service` first.
+- Update `launcher_service` consumption and launch policy second.
+- Update any direct consumer or proof wiring third.
+- Update the narrow reset-lane and hosted proofs last.
+
+Common breakage map
+~~~~~~~~~~~~~~~~~~~
+- Changed durable installed shape -> check init, equality, reload, identify,
+  and launch-record follow-through before editing launcher policy more broadly.
+- Launcher still treats `review_board` as direct-launch-only -> inspect
+  `launcher_requires_installed_program(...)`, identify, query, and launch
+  gating before touching tests.
+- Added second install proof breaks workflow wiring -> check the narrow reset-
+  lane scenario or grouped-suite row before widening to shared workflow code.
+- Installed metadata pressure starts expanding beyond two admitted apps -> stop
+  and tighten the shape instead of generalizing.
+
+Relevant test surfaces
+~~~~~~~~~~~~~~~~~~~~~~
+- Primary owning test family: grouped reset-lane workflow coverage for the
+  install path plus the hosted real-project UI targets.
+- Narrowest expected first executable validation target:
+  `mc_tool_workflow_kernel_reset_lane_unit`.
+- Adjacent hosted validation targets: `mc_tool_real_project_issue_rollup_unit`
+  and `mc_tool_real_project_review_board_unit`.
+- If shared reset-lane workflow cost or reuse changes, widen afterward to
+  `mc_tool_workflow_kernel_reset_lane_full_unit`.
+
+Test obligations
+----------------
+- run `Build debug`
+- run `mc_tool_workflow_kernel_reset_lane_unit`
+- run the hosted real-project target or targets touched by the installed-path
+  change
+- if shared reset-lane workflow or reuse changes, run
+  `mc_tool_workflow_kernel_reset_lane_full_unit`
+
+Acceptance criteria
+-------------------
+- one second repository-owned UI app participates honestly in installed-program
+  truth through the existing launcher/update-store split
+- durable install truth stays in `update_store_service`, while app-facing
+  policy stays in `launcher_service`
+- the phase remains bounded to the admitted two-app set and does not become a
+  package platform
+- maintained hosted and reset-lane proofs demonstrate the second installed
+  path clearly
+
+Future follow-up
+----------------
+- Phase 307 should stabilize installed, foreground, and restart-visible status
+  truth for the admitted two-app installed set.
+- If this phase exposes pressure for richer metadata than the admitted two-app
+  slice can carry honestly, record that narrowly instead of generalizing here.
