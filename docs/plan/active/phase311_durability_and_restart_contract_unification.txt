@@ -1,0 +1,201 @@
+Phase 311 -- Durability And Restart Contract Unification
+========================================================
+
+Status
+------
+PROPOSED
+
+Purpose
+-------
+Commit the repository to one small durability taxonomy and one shared
+restart-visible contract for resource-like and retained-state owners so later
+durable work does not keep inventing service-local persistence stories that are
+similar but not the same.
+
+This phase exists now because once Phase 310 clarifies identity and names, the
+next strongest ambiguity is what survives restart, what reloads, what goes
+stale, and which owners are first-class durable resources versus retained-only
+service state.
+
+Repository status note
+----------------------
+- `docs/arch/veya/sys/veya_sys_resource_model_v0.txt` already proposes four
+  durability classes: volatile, retained service state, durable resource, and
+  specialized durable resource.
+- `docs/arch/veya/services/veya_restartable_service_identity_taxonomy_v0.txt`
+  already publishes the admitted running-system identity classes for stable
+  public identity, restart generation, coordinated lane identity, continuity
+  outcome, and derived inspection identity.
+- Current owners still expose different restart-visible shapes: owner-local
+  retained reload, product-specific durable launch records, durable object
+  state, durable journaled state, and app-facing persisted view-state.
+- The repository still lacks one explicit commitment about how those shapes map
+  onto one shared durability and restart contract.
+
+Problem being solved
+--------------------
+- Without one shared durability and restart contract, later durable phases can
+  keep adding service-local “kinds of persistence” that are locally reasonable
+  but globally inconsistent.
+- That would make it harder for callers to predict whether a thing is a
+  retained owner-local state, a first-class durable resource, or a
+  product-specific specialized durable object.
+- The current-repo problem is therefore one missing cross-owner durability and
+  restart vocabulary commitment, not the lack of more persistence features.
+
+Non-goals
+---------
+- no new persistence engine
+- no restart framework rewrite
+- no session or UI-state framework
+- no durable discovery or registry framework
+- no consumer-facing durable feature landing by default
+
+Invariants
+----------
+- The durability taxonomy remains small and explicit.
+- Restart-visible truth remains explicit and owner-local even when the public
+  contract becomes shared.
+- Stable identity, live-instance generation, and continuity outcome remain
+  distinct concepts.
+- Product-specific durable owners remain specializations, not fresh generic
+  durability classes.
+- The phase must not hide restart semantics behind implicit magic.
+
+Required surface changes
+------------------------
+1. Commit the repository to one small durability taxonomy.
+2. Define one shared restart-visible contract for resource-like and retained
+   owners.
+3. Classify current persistence-bearing owners against that shared taxonomy.
+4. Update only the narrow architecture surfaces needed to make the contract
+   normative.
+
+Forbidden changes
+-----------------
+- do not add a new durability class merely because one owner is awkward
+- do not treat retained owner-local state as first-class durable resource by
+  convenience
+- do not collapse restart generation and stable identity into one concept
+- do not widen this phase into a persistence engine or session-model design
+- do not invent implicit reload semantics to avoid classifying an owner
+
+Phase role in the larger sequence
+---------------------------------
+- This phase turns the identity-and-name model from Phase 310 into a shared
+  durability and restart contract.
+- It prepares Phase 312 by giving the current-owner mapping one explicit
+  taxonomy to use.
+- It prepares Phase 317 by ensuring the first durable consumer later lands on
+  one predictable restart-visible contract.
+
+Relevant backlog items this phase intentionally brings under pressure
+--------------------------------------------------------------------
+- the backlog themes around retained versus durable state boundaries
+- the pressure to keep one dominant restart story across storage-like owners
+- the need to distinguish durable-resource owners from retained owner-local
+  service state before another app-facing data slice lands
+
+Questions this phase must answer
+--------------------------------
+1. What are the minimum admitted durability classes for the current repo?
+2. What restart-visible truth must every relevant owner answer publicly?
+3. Which present owners are retained-only, generic durable, or specialized
+   durable?
+4. How should callers detect stale or invalidated restart-visible views?
+
+Preferred implementation shape
+------------------------------
+- Start from `docs/arch/veya/sys/veya_sys_resource_model_v0.txt` for the
+  taxonomy and from `docs/arch/veya/services/veya_restartable_service_identity_taxonomy_v0.txt`
+  for live-instance and continuity vocabulary.
+- Prefer one compact taxonomy table and one restart-visible rule set over a
+  broad persistence essay.
+- Keep product-specific durable owners explicit specializations instead of
+  forcing premature uniformity.
+
+Implementation accelerators
+---------------------------
+Main files and navigations
+~~~~~~~~~~~~~~~~~~~~~~~~~~
+- Controlling owner to open first:
+  `docs/arch/veya/sys/veya_sys_resource_model_v0.txt`.
+- Adjacent supporting notes to open second:
+  `docs/arch/veya/services/veya_restartable_service_identity_taxonomy_v0.txt`,
+  `docs/arch/veya/sys/veya_sys_common_service_contract_v0.txt`, and
+  `docs/arch/veya/sys/veya_authority_vocabulary_and_ownership_table_v0.txt`.
+- First code-evidence owners if needed:
+  `kernel/src/boot/boot_identity.mc`, `kernel/src/boot/init.mc`,
+  `kernel/src/services/object_store_service.mc`,
+  `kernel/src/services/update_store_service.mc`, and retained-state owners.
+- Expected first validation target: editor diagnostics on the touched docs.
+
+Relevant cookbook patterns
+~~~~~~~~~~~~~~~~~~~~~~~~~~
+- No exact cookbook pattern applies. This phase is an architecture-contract
+  phase rather than a direct implementation slice.
+
+Relevant file-local invariants
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+- `docs/arch/veya/sys/veya_sys_resource_model_v0.txt` is the single owner of
+  the proposed durability taxonomy.
+- `docs/arch/veya/services/veya_restartable_service_identity_taxonomy_v0.txt`
+  already owns the restart-visible identity split and should not be silently
+  contradicted.
+- `kernel/src/boot/init.mc` enacts restart policy but is not the right place to
+  hide a generic public restart framework.
+- `kernel/src/boot/boot_identity.mc` projects restart-visible payload truth and
+  remains a projection layer, not a policy owner.
+
+Dependency-ordered touch sequence
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+- Land the durability taxonomy and restart-visible contract in the sys resource
+  model first.
+- Sync the restartable-service identity taxonomy second.
+- Update any adjacent common-service or planning surfaces third.
+- Route unresolved taxonomy mismatches to open-decisions surfaces last.
+
+Common breakage map
+~~~~~~~~~~~~~~~~~~~
+- Taxonomy treats specialized durable owners as new generic classes -> later
+  phases multiply persistence concepts.
+- Phase blurs retained state and durable resource -> later callers cannot tell
+  which owners support resource-shaped contracts.
+- Restart-visible contract ignores stale or invalidated views -> later durable
+  consumers keep inventing owner-local invalidation language.
+- Phase widens into implementation detail instead of public contract -> the
+  architecture remains uncommitted.
+
+Relevant test surfaces
+~~~~~~~~~~~~~~~~~~~~~~
+- Primary owning validation surface: editor diagnostics on the touched
+  architecture and planning docs.
+- Narrowest expected first executable validation target only if the phase needs
+  to verify a concrete restart-visible behavior or lifecycle query already in
+  code: the owning reset-lane workflow or lifecycle fixture for that owner.
+- Use `docs/agent/prompts/test_overview.txt` only if an evidence gap must be
+  repaired.
+
+Test obligations
+----------------
+- require editor diagnostics on the touched docs
+- run executable validation only if the phase uncovers a concrete restart or
+  lifecycle evidence gap
+- if executable validation is required, start with the narrowest owner-local
+  restart or retained-state surface first
+
+Acceptance criteria
+-------------------
+- the repository has one explicit durability taxonomy and one shared
+  restart-visible public contract
+- current persistence-bearing owners can be classified against that taxonomy
+- retained owner-local state and first-class durable resources remain distinct
+- no new persistence engine, registry, or session framework lands by
+  convenience
+
+Future follow-up
+----------------
+- Phase 312 should map present owners onto the committed taxonomy and contract.
+- Any owner that still cannot be classified honestly after this phase should be
+  treated as an explicit architectural contradiction before the first
+  app-facing durable slice proceeds.

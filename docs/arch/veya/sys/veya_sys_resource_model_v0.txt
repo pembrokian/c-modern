@@ -1,0 +1,250 @@
+Veya sys v0 -- Resource Model
+=============================
+
+Status
+------
+PROPOSED
+
+Purpose
+-------
+Define the intended public resource model for Veya system semantics: resource
+identity, names, durability classes, restart-visible truth, and capability
+exposure.
+
+This note is normative about the public model.
+It does not require one universal implementation owner underneath.
+
+Relationship to companion notes
+-------------------------------
+This note is meant to stay aligned with:
+
+- `docs/arch/veya/sys/veya_sys_semantics_contract_v0.txt`
+- `docs/arch/veya/sys/veya_authority_vocabulary_and_ownership_table_v0.txt`
+- `docs/arch/veya/services/veya_restartable_service_identity_taxonomy_v0.txt`
+- `docs/plan/active/phase308_post_second_app_platform_direction_audit.txt`
+
+1. Resource identity
+--------------------
+
+1.1 Rule
+
+Resource identity should be primary.
+Names should be layered on top of resource identity rather than acting as the
+only identity source.
+
+1.2 Required distinction
+
+Keep these identities distinct:
+
+- service identity: the owner of behavior
+- resource identity: the owned thing
+- name identity: a lookup label or selector for the owned thing
+- live instance identity: the current restart-visible incarnation of an owner
+
+1.3 Normative shape
+
+The public semantic model should treat every durable or resource-like object as
+having:
+
+- an owning service or owner family
+- an owner-local stable id
+- zero or more names that may resolve to that id
+
+The repository does not need one final concrete wire encoding for that id yet.
+It does need this identity-first mental model.
+
+1.4 Consequence
+
+Callers should be able to distinguish these questions:
+
+- is this the same resource as before
+- is this the same name as before
+- is this the same live service instance as before
+
+Those questions must not collapse into one overloaded concept.
+
+2. Naming model
+---------------
+
+2.1 Rule
+
+Names are layered, not foundational.
+
+2.2 Meaning
+
+A name is a lookup path to an owned resource or service.
+A name is not authority.
+A name is not required for every operation after lookup.
+
+2.3 Required distinction
+
+Keep these operations distinct:
+
+- resolve: map name to a resource or service reference
+- describe: return stable metadata about the resolved object
+- use: read, write, append, invoke, or otherwise act on the object
+
+2.4 Consequence
+
+Storage-like owners may keep different internal naming implementations.
+Their public model should still follow one layered story:
+
+- names are optional selectors
+- identity remains primary
+- authority is explicit and separate
+
+3. Durability classes
+---------------------
+
+3.1 Rule
+
+Every relevant system-facing state or object should map onto one small shared
+durability taxonomy.
+
+3.2 Admitted classes
+
+Volatile
+  Lost on restart.
+  No reload obligation exists.
+
+Retained service state
+  Service-owned state that may survive explicit restart only through an
+  owner-local reload path.
+  It is not independently addressable as a first-class durable resource.
+
+Durable resource
+  Independently addressable state with explicit resource identity and explicit
+  reload semantics.
+  Names may resolve to it, and service contracts may expose it directly.
+
+Specialized durable resource
+  A durable resource with extra product-specific semantics, such as install
+  artifacts or launch records, but still part of the durable-resource family
+  rather than a new generic durability class.
+
+3.3 Consequence
+
+New owners should not invent new durability classes casually.
+If an object does not fit one of these classes, that mismatch should be called
+out explicitly as an architectural change.
+
+4. Restart model
+----------------
+
+4.1 Rule
+
+Restart-visible truth should use one shared vocabulary across owners.
+
+4.2 Questions every owner should answer
+
+For any resource-like or storage-like surface:
+
+- what survives restart
+- what reloads on restart
+- what identity remains stable
+- what instance marker changes
+- what handles or capabilities become stale
+- what outcome the caller should observe when restart invalidates a prior view
+
+4.3 Stable versus replaced truth
+
+Keep these distinct:
+
+- stable public name or stable resource identity
+- live service-instance generation
+- continuity outcome classification
+
+4.4 Consequence
+
+Different services may keep owner-local reload logic.
+They should not expose subtly different restart semantics without mapping those
+differences onto the same shared restart vocabulary.
+
+5. Capability model
+-------------------
+
+5.1 Rule
+
+Authority should be explicit, resource-aware, and separate from naming.
+
+5.2 Required properties
+
+- no ambient authority
+- lookup and use remain distinct
+- names do not themselves grant permission
+- handles or capabilities are explicit authority carriers
+- transfer remains explicit rather than hidden in byte payloads or names
+
+5.3 Target of authority
+
+Capabilities may target:
+
+- services
+- resources
+- specialized product-owned objects
+
+They should not depend on human-readable names as the authority source.
+
+6. Current-owner classification target
+--------------------------------------
+
+The intended classification target for present owners is:
+
+`journal_service`
+  Internal durability substrate or specialized append-log owner, not the sole
+  generic public resource model.
+
+`object_store_service`
+  Strongest candidate for a generic durable-resource owner or for the semantic
+  model that generic durable resources should map onto.
+
+`file_service`
+  User-facing or named-resource projection that should align with the generic
+  durable-resource model rather than invent a separate one.
+
+`update_store_service`
+  Specialized durable-resource owner for install and launch-product truth, not
+  the general public storage model.
+
+retained service owners such as `kv_service` or queue-like owners
+  Retained service state, not the dominant general durable-resource model.
+
+7. Useful derived rule
+----------------------
+
+The system should be able to say, for any given object:
+
+- what service owns it
+- what resource identity names it
+- what names resolve to it
+- what durability class it lives in
+- what restart does to it
+- what capability is needed to act on it
+
+If that description is not possible, the owner is not yet aligned with the
+intended public resource model.
+
+8. Deliberate non-goals
+-----------------------
+
+- no forced single storage engine
+- no mandatory filesystem namespace
+- no dynamic discovery framework by default
+- no resource identity derived only from names
+- no restart semantics that vary silently per owner
+
+Interpretation rule
+-------------------
+When later architecture work touches a storage-like or restart-visible owner,
+classify it in this order:
+
+1. owner
+2. resource identity
+3. names
+4. durability class
+5. restart-visible truth
+6. capability target
+
+If two owners answer those questions with different public semantics for what
+is obviously the same class of thing, the architecture should treat that as a
+problem to remove rather than a harmless local variation.

@@ -76,14 +76,14 @@ func launch_issue_rollup(state: *boot.KernelBootState, fail_select: i32, fail_la
     return 0
 }
 
-func launch_review_board(state: *boot.KernelBootState, foreground: u8, fail_select: i32, fail_launch: i32) i32 {
+func launch_review_board(state: *boot.KernelBootState, foreground: u8, classification: u8, fail_select: i32, fail_launch: i32) i32 {
     effect := kernel_dispatch.kernel_dispatch_step(state, scenario_transport.cmd_launcher_select(program_catalog.PROGRAM_ID_REVIEW_BOARD))
     if !scenario_assert.expect_reply(effect, syscall.SyscallStatus.Ok, 2, program_catalog.PROGRAM_ID_REVIEW_BOARD, foreground, 0, 0) {
         return fail_select
     }
 
     effect = kernel_dispatch.kernel_dispatch_step(state, scenario_transport.cmd_launcher_launch())
-    if !expect_launch_reply(effect, program_catalog.PROGRAM_ID_REVIEW_BOARD, launcher_service.LAUNCHER_RESUME_FRESH) {
+    if !expect_launch_reply(effect, program_catalog.PROGRAM_ID_REVIEW_BOARD, classification) {
         return fail_launch
     }
     return 0
@@ -130,7 +130,8 @@ func drive_review_board_state(state: *boot.KernelBootState) i32 {
 }
 
 func run_integrated_small_system_demo_probe() i32 {
-    if !update_store_service.update_store_persist(update_store_service.update_store_init(service_topology.UPDATE_STORE_SLOT.pid, 1)) {
+    review_board_data: [4]u8 = [4]u8{ 94, 95, 96, 0 }
+    if !update_store_service.update_store_persist(update_store_service.update_review_board_install(update_store_service.update_store_init(service_topology.UPDATE_STORE_SLOT.pid, 1), 9, 3, review_board_data)) {
         return FAIL_SMALL_SYSTEM_SETUP
     }
     if !journal_service.journal_persist(journal_service.journal_init(service_topology.JOURNAL_SLOT.pid, 1)) {
@@ -147,6 +148,11 @@ func run_integrated_small_system_demo_probe() i32 {
     result := scenario_helpers.scenario_apply_issue_rollup_update(&state, 7, 11, 22, 33, FAIL_SMALL_SYSTEM_APPLY_UPDATE)
     if result != 0 {
         return result
+    }
+
+    effect = kernel_dispatch.kernel_dispatch_step(&state, scenario_transport.cmd_launcher_select(program_catalog.PROGRAM_ID_ISSUE_ROLLUP))
+    if !scenario_assert.expect_reply(effect, syscall.SyscallStatus.Ok, 2, program_catalog.PROGRAM_ID_ISSUE_ROLLUP, 0, 0, 0) {
+        return FAIL_SMALL_SYSTEM_SELECT_ISSUE_ROLLUP
     }
 
     effect = kernel_dispatch.kernel_dispatch_step(&state, scenario_transport.cmd_launcher_status())
@@ -172,7 +178,7 @@ func run_integrated_small_system_demo_probe() i32 {
         return FAIL_SMALL_SYSTEM_DISPLAY_ISSUE_ROLLUP_STEADY
     }
 
-    result = launch_review_board(&state, program_catalog.PROGRAM_ID_ISSUE_ROLLUP, FAIL_SMALL_SYSTEM_SELECT_REVIEW_BOARD, FAIL_SMALL_SYSTEM_LAUNCH_REVIEW_BOARD)
+    result = launch_review_board(&state, program_catalog.PROGRAM_ID_ISSUE_ROLLUP, launcher_service.LAUNCHER_RESUME_FRESH, FAIL_SMALL_SYSTEM_SELECT_REVIEW_BOARD, FAIL_SMALL_SYSTEM_LAUNCH_REVIEW_BOARD)
     if result != 0 {
         return result
     }
@@ -194,12 +200,17 @@ func run_integrated_small_system_demo_probe() i32 {
 
     restarted := boot.kernel_init()
 
+    effect = kernel_dispatch.kernel_dispatch_step(&restarted, scenario_transport.cmd_launcher_select(program_catalog.PROGRAM_ID_ISSUE_ROLLUP))
+    if !scenario_assert.expect_reply(effect, syscall.SyscallStatus.Ok, 2, program_catalog.PROGRAM_ID_ISSUE_ROLLUP, 0, 0, 0) {
+        return FAIL_SMALL_SYSTEM_SELECT_ISSUE_ROLLUP
+    }
+
     effect = kernel_dispatch.kernel_dispatch_step(&restarted, scenario_transport.cmd_launcher_status())
     if !scenario_assert.expect_reply(effect, syscall.SyscallStatus.Ok, 4, program_catalog.PROGRAM_ID_ISSUE_ROLLUP, 7, 0, launcher_service.LAUNCHER_STATUS_ACTIVATED) {
         return FAIL_SMALL_SYSTEM_STATUS_AFTER_REBOOT
     }
 
-    result = launch_review_board(&restarted, program_catalog.PROGRAM_ID_NONE, FAIL_SMALL_SYSTEM_SELECT_REVIEW_BOARD_RELOADED, FAIL_SMALL_SYSTEM_LAUNCH_REVIEW_BOARD_RELOADED)
+    result = launch_review_board(&restarted, program_catalog.PROGRAM_ID_NONE, launcher_service.LAUNCHER_RESUME_FRESH, FAIL_SMALL_SYSTEM_SELECT_REVIEW_BOARD_RELOADED, FAIL_SMALL_SYSTEM_LAUNCH_REVIEW_BOARD_RELOADED)
     if result != 0 {
         return result
     }

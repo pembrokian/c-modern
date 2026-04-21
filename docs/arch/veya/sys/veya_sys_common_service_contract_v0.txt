@@ -1,0 +1,201 @@
+Veya sys v0 -- Common Service Contract
+======================================
+
+Status
+------
+PROPOSED
+
+Purpose
+-------
+Define one intended common public contract shape for Veya services that expose
+resource-like or stateful behavior.
+
+This note is normative about public operation families and outcome semantics.
+It does not require every service to expose every operation.
+
+Relationship to companion notes
+-------------------------------
+This note is meant to stay aligned with:
+
+- `docs/arch/veya/sys/veya_sys_semantics_contract_v0.txt`
+- `docs/arch/veya/sys/veya_sys_resource_model_v0.txt`
+- `docs/arch/veya/sys/veya_authority_vocabulary_and_ownership_table_v0.txt`
+- `docs/arch/veya/services/veya_service_shape_phase146_v0.txt`
+
+1. Contract rule
+----------------
+
+Different services may keep different implementations.
+Their public contract should still map onto one shared family of operations
+and outcomes so callers do not need to relearn the system per owner.
+
+2. Operation families
+---------------------
+
+2.1 Required conceptual split
+
+When a service is resource-like, its public behavior should be describable in
+terms of these operation families:
+
+Resolve
+  Map a name or selector to a resource or service reference.
+
+Describe
+  Return stable metadata or current classification for the target.
+
+Read or query
+  Return current content or current state without mutation.
+
+Write or replace
+  Replace or set current authoritative content.
+
+Append
+  Extend current content while preserving prior content when that semantic is
+  truly owner-local and useful.
+
+List or enumerate
+  Return bounded collection membership only if the owner truly owns a
+  collection view.
+
+Control or invoke
+  Perform non-storage behavior on a service or resource when the operation is
+  not just read, replace, append, or list.
+
+2.2 Optionality rule
+
+Not every service needs every family.
+If a family is absent, that absence should be explicit and unsurprising.
+
+3. Common metadata expectations
+-------------------------------
+
+When a service exposes `describe`, the returned truth should be expressible in
+the shared resource vocabulary:
+
+- owner
+- resource identity or fixed target identity
+- durability class
+- current restart-visible classification if relevant
+- size or bounded extent if relevant
+- mutability or appendability if relevant
+
+4. Outcome semantics
+--------------------
+
+4.1 Rule
+
+Services should reuse one small shared family of outcome meanings even if the
+exact wire encoding differs per protocol.
+
+4.2 Admitted outcome meanings
+
+Ok
+  The requested operation succeeded.
+
+Invalid
+  The request shape, selector, or supplied storage was malformed.
+
+PermissionDenied
+  The caller lacks explicit authority.
+
+NotFound
+  The named or identified target does not exist.
+
+Exhausted
+  The owner has no capacity for the requested operation.
+
+TooLarge
+  The supplied or requested payload exceeds the owner's admitted limit.
+
+WouldBlock
+  The requested operation cannot complete immediately under the current
+  readiness or queue state.
+
+Conflict
+  The request is well-formed but loses against current authoritative state,
+  version, or generation truth.
+
+Stale
+  The caller's restart-visible or generation-sensitive view is no longer
+  current.
+
+Unsupported
+  The requested operation family is intentionally not admitted by this owner.
+
+4.3 Consequence
+
+Owner-local protocols may still use bounded specialized reply shapes.
+Those shapes should map cleanly onto these shared outcome meanings.
+
+5. Restart and capability semantics at the boundary
+---------------------------------------------------
+
+5.1 Restart rule
+
+If a service exposes restart-visible truth, its public contract should make
+clear:
+
+- whether the target's identity stays stable
+- whether the live instance changed
+- whether cached handles or references go stale
+- whether reload preserved content or only the public name
+
+5.2 Capability rule
+
+If a service exposes resource-like operations, authority should be explicit.
+At minimum the contract should make clear:
+
+- whether lookup is public or capability-gated
+- whether use is capability-gated
+- whether mutation and observation differ in authority requirements
+- whether transfer is admitted
+
+6. Conformance target for current owners
+----------------------------------------
+
+The intended conformance target is:
+
+- storage-like owners should look like specializations of one common resource
+  contract rather than unrelated subsystems
+- retained-state owners should clearly signal when they are not first-class
+  durable-resource owners
+- product-specific durable owners should describe themselves as specializations
+  of the shared durable-resource model, not as fresh generic frameworks
+
+7. Useful additional rule
+-------------------------
+
+If two services expose the same conceptual operation, they should try to agree
+on:
+
+- the name of the operation family
+- the preconditions for success
+- the meaning of capacity failure
+- the meaning of restart-visible invalidation
+- the distinction between lookup, read, mutation, and control
+
+That is the minimal boundary unification target.
+
+8. Deliberate non-goals
+-----------------------
+
+- no requirement that every service become CRUD-shaped
+- no universal message schema
+- no object-oriented interface hierarchy
+- no service registry or dynamic discovery framework by default
+- no requirement to erase owner-local protocol detail where it still matters
+
+Interpretation rule
+-------------------
+When a later proposal adds a new service or extends an existing one, answer
+these questions first:
+
+1. which operation families it exposes
+2. which shared outcome meanings it uses
+3. what authority is required for each family
+4. what restart does to its public targets
+5. whether it matches an existing service family already in the system
+
+If a new service cannot be described in those terms, the proposal either needs
+to justify a real new service family or it is duplicating an existing one with
+slightly different contracts.

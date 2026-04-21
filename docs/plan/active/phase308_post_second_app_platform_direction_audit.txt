@@ -3,7 +3,7 @@ Phase 308 -- Post-Second-App Platform Direction Audit
 
 Status
 ------
-PROPOSED
+COMPLETED
 
 Purpose
 -------
@@ -18,12 +18,14 @@ new plateau note rather than momentum-driven continuation of packaging work.
 
 Repository status note
 ----------------------
-- Phase 305 is expected to justify reopening packaging by showing that the
-  current supported slice is honestly blocked on second installed-program
-  pressure.
-- Phase 306 and Phase 307 are expected to land the smallest honest second
-  installed-program slice and stabilize its app-facing status and restart
-  truth.
+- Phase 305 recorded that the earlier one-installed-app plateau still did not
+  justify broader packaging by itself.
+- Phase 306 then landed the smallest honest second installed-program slice for
+  the admitted app pair on the existing `update_store_service` plus
+  `launcher_service` split.
+- Phase 307 stabilized compact installed, foreground, and restart-visible
+  truth for that admitted two-app installed set without widening launcher or
+  update-store into a registry or session owner.
 - Earlier roadmap notes and the backlog still keep broader packaging,
   networking, durable file-like growth, and other platform branches explicit as
   deferred losers.
@@ -212,3 +214,48 @@ Future follow-up
   strongest deferred branch rather than extending Band I by convenience.
 - If another bounded packaging front still wins, use this note as the contract
   source for the next packaging phase plan.
+
+Implementation outcome
+----------------------
+- Phase 306 plus Phase 307 fully spend the current packaging pressure for the
+  admitted two-app slice. The repository now has one honest two-app installed
+  story on the existing owner split: `program_catalog` still owns the fixed
+  admitted program pair, `update_store_service` owns the bounded durable
+  installed and launch-record truth, and `launcher_service` owns compact
+  selection, foreground, install consumption, and restart-visible policy.
+- No stronger bounded packaging follow-through remains on the current
+  maintained slice. The admitted app pair does not currently justify a third
+  installed consumer, discovery, broader manifest families, launcher-owned
+  durable state, or a package registry. Those would be convenience growth, not
+  a repair to a current consumer-visible blocker.
+- Durable file-like growth is now the strongest deferred branch. The supported
+  user-facing slice already proves bounded install/update truth and one compact
+  persisted `review_board` view-state lane, but it still lacks an honest app-
+  facing durable data owner broader than the current journal, object-store,
+  and update-store slices. That pressure is now closer to the maintained app
+  pair than another packaging step.
+- Networking remains a loser because no maintained user-facing app, launcher
+  path, or reset-lane proof is currently blocked on a broader network owner;
+  the landed `connection_service` pressure is still shell/workflow-local.
+  Broader compiler reopening also loses because the byte-literal readability
+  branch was already spent before Band I and the two-app install follow-through
+  did not expose a new compiler blocker.
+
+Validation
+----------
+- Checked editor diagnostics on the touched planning docs only. No executable
+  validation was required because this phase is a planning audit and did not
+  uncover a missing code-evidence repair.
+
+Phase review against spec
+-------------------------
+- Preserved invariants: the audit stayed tied to maintained repository-owned
+  consumers, allowed the honest result that current packaging pressure is
+  spent, kept launcher/update-store/program-catalog ownership explicit, and
+  limited planning churn to the narrow synced docs.
+- Ownership boundaries did not weaken: the note did not move durable install
+  truth into `launcher_service`, did not widen `update_store_service` into a
+  package database, and did not promote networking or storage work without a
+  stronger maintained consumer.
+- Accidental centers of gravity were avoided: no package manager, filesystem,
+  registry, session framework, or roadmap-wide strategic rewrite was added.

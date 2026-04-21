@@ -1,0 +1,174 @@
+Veya sys v0 -- System Semantics Contract
+========================================
+
+Status
+------
+PROPOSED
+
+Purpose
+-------
+Define the intended normative system semantics for the next Veya OS-facing
+architecture pass so later service, storage, and app work shares one explicit
+resource model instead of accumulating multiple almost-equivalent contracts.
+
+This note is intentionally architectural.
+It does not prescribe one implementation strategy for every service.
+It does define the public semantic model that specialized owners should map
+onto.
+
+Relationship to companion notes
+-------------------------------
+This note is meant to stay aligned with:
+
+- `docs/arch/veya/sys/veya_sys_interface_v0.txt`
+- `docs/arch/veya/sys/veya_syscall_mapping_v0.txt`
+- `docs/arch/veya/sys/veya_std_sys_wrapper_v0.txt`
+- `docs/arch/veya/sys/veya_authority_vocabulary_and_ownership_table_v0.txt`
+- `docs/arch/veya/services/veya_restartable_service_identity_taxonomy_v0.txt`
+- `docs/arch/key_decisions.txt`
+- `docs/plan/active/phase308_post_second_app_platform_direction_audit.txt`
+
+Problem this note solves
+------------------------
+The current repository still has a clean local spine:
+
+- services own state
+- messages come in
+- pure transition logic runs
+- effects come out
+- restart boundaries are explicit
+- ownership is usually clear
+
+The current drift is global rather than local. Multiple storage-like owners,
+multiple naming stories, multiple restart-visible data shapes, and multiple
+resource exposure patterns are accumulating without one explicit shared system
+model.
+
+This contract exists to stop that drift before the repository admits another
+durable feature wave.
+
+Normative outcome
+-----------------
+The intended Veya system model should converge on six dominant public stories:
+
+1. one dominant resource identity model
+2. one dominant naming model
+3. one dominant durability model
+4. one dominant restart model
+5. one dominant capability model
+6. one dominant common service contract
+
+Different service implementations may remain specialized internally.
+The public semantic model should not force callers to care most of the time.
+
+Core rules
+----------
+- Public semantic unification matters more than internal implementation
+  unification.
+- Public names are not authority.
+- Resource identity is not the same thing as service identity.
+- Lookup and use are distinct operations.
+- Restart-visible truth must use one shared vocabulary even when reload logic
+  remains owner-local.
+- Storage-like owners may specialize internally, but they should not invent
+  unrelated public semantics for identity, durability, or mutation.
+- If a service cannot describe its external contract in the shared system
+  vocabulary, it is either a special-case owner that must say so explicitly or
+  evidence that the shared vocabulary is still incomplete.
+
+What counts as normative here
+-----------------------------
+This note is normative about:
+
+- semantic vocabulary
+- public boundary concepts
+- compatibility expectations between storage-like and restart-visible owners
+- the interpretation of names, resources, handles, restart, and durability
+
+This note is not yet normative about:
+
+- exact message wire formats for every service
+- which one current service becomes the generic durable-resource owner
+- whether every present owner survives unchanged internally
+- full user-space library APIs above `sys`
+
+Companion structure
+-------------------
+The detailed normative content is split into two focused companion notes:
+
+- `veya_sys_resource_model_v0.txt`
+- `veya_sys_common_service_contract_v0.txt`
+
+Use this file as the umbrella contract and entry point.
+
+Binding vocabulary summary
+--------------------------
+Use these terms consistently in later Veya architecture work.
+
+Service
+  The owner of behavior, protocol, and authoritative live state transitions.
+
+Resource
+  An owned object or durable datum that can be named, described, read,
+  replaced, appended, listed, or otherwise acted on through an admitted
+  contract.
+
+Resource identity
+  The stable semantic identity of an owned object, independent from any one
+  human-readable name.
+
+Name
+  A lookup key layered on top of identity. A name helps resolve a resource; it
+  is not itself the resource and does not itself carry authority.
+
+Handle or capability
+  An explicit authority-bearing token or process-local reference used to act on
+  a service or resource after lookup or transfer.
+
+Durability class
+  The shared classification that answers whether and how state survives
+  restart.
+
+Restart-visible truth
+  The shared vocabulary for what survives, what reloads, what goes stale, and
+  which identity markers remain stable across explicit restart.
+
+Common service contract
+  The shared family of externally visible operations and outcomes that
+  storage-like and other resource-owning services should map onto.
+
+Expected architectural result
+-----------------------------
+If later work follows this contract, the repo should move toward:
+
+- one obvious story for how durable things are identified
+- one obvious story for how names resolve to owned things
+- one obvious story for what survives restart and what does not
+- one obvious story for how authority is acquired and exercised
+- one obvious story for how services expose resource-shaped behavior
+
+That is the intended simplicity target.
+
+Deliberate non-goals
+--------------------
+- no giant generic storage framework with many modes and flags
+- no forced identical internal implementation across all services
+- no ambient authority or hidden namespace lookup
+- no implicit restart semantics that vary silently per owner
+- no requirement that every service expose every operation family
+
+Interpretation rule
+-------------------
+When a future proposal touches storage-like, restart-visible, or resource-like
+behavior, answer these questions first:
+
+1. what is the resource identity
+2. what names, if any, resolve to it
+3. which durability class it belongs to
+4. what restart does to it
+5. what authority is required to act on it
+6. which common service operations it admits
+
+If the proposal cannot answer those six questions clearly, it is either not
+yet aligned with the intended Veya system model or it is changing that model
+and must say so explicitly.

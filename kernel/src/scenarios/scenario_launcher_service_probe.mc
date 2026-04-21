@@ -48,6 +48,11 @@ const FAIL_LAUNCHER_STORE_RESTART: i32 = 26933
 const FAIL_LAUNCHER_IDENTIFY_AFTER_STORE_RESTART: i32 = 26934
 const FAIL_LAUNCHER_CLEAR_UPDATE: i32 = 26935
 const FAIL_LAUNCHER_IDENTIFY_ISSUE_ROLLUP: i32 = 26936
+const FAIL_LAUNCHER_STATUS_REVIEW_BOARD: i32 = 26937
+const FAIL_LAUNCHER_STATUS_ISSUE_ROLLUP_SELECTED: i32 = 26938
+const FAIL_LAUNCHER_STATUS_ISSUE_ROLLUP_LAUNCHED: i32 = 26939
+const FAIL_LAUNCHER_STATUS_RESUMED: i32 = 26940
+const FAIL_LAUNCHER_STATUS_REACTIVATED: i32 = 26941
 
 func run_launcher_service_probe() i32 {
     review_board_data: [4]u8 = [4]u8{ 91, 92, 93, 0 }
@@ -76,6 +81,11 @@ func run_launcher_service_probe() i32 {
         return FAIL_LAUNCHER_IDENTIFY_REVIEW_BOARD
     }
 
+    effect = kernel_dispatch.kernel_dispatch_step(&state, scenario_transport.cmd_launcher_status())
+    if !scenario_assert.expect_reply(effect, syscall.SyscallStatus.Ok, 4, program_catalog.PROGRAM_ID_REVIEW_BOARD, 9, 0, launcher_service.LAUNCHER_STATUS_ACTIVATED) {
+        return FAIL_LAUNCHER_STATUS_REVIEW_BOARD
+    }
+
     effect = kernel_dispatch.kernel_dispatch_step(&state, scenario_transport.cmd_launcher_launch())
     if !scenario_assert.expect_reply(effect, syscall.SyscallStatus.Ok, 4, program_catalog.PROGRAM_ID_REVIEW_BOARD, program_catalog.PROGRAM_KIND_CODE_HOSTED_EXE, 1, launcher_service.LAUNCHER_RESUME_FRESH) {
         return FAIL_LAUNCHER_UNINSTALLED_LAUNCH
@@ -99,6 +109,11 @@ func run_launcher_service_probe() i32 {
         return FAIL_LAUNCHER_IDENTIFY_ISSUE_ROLLUP
     }
 
+    effect = kernel_dispatch.kernel_dispatch_step(&state, scenario_transport.cmd_launcher_status())
+    if !scenario_assert.expect_reply(effect, syscall.SyscallStatus.Ok, 4, program_catalog.PROGRAM_ID_ISSUE_ROLLUP, 7, program_catalog.PROGRAM_ID_REVIEW_BOARD, launcher_service.LAUNCHER_STATUS_ACTIVATED) {
+        return FAIL_LAUNCHER_STATUS_ISSUE_ROLLUP_SELECTED
+    }
+
     effect = kernel_dispatch.kernel_dispatch_step(&state, scenario_transport.cmd_launcher_launch())
     if !scenario_assert.expect_reply(effect, syscall.SyscallStatus.Ok, 4, program_catalog.PROGRAM_ID_ISSUE_ROLLUP, program_catalog.PROGRAM_KIND_CODE_HOSTED_EXE, 2, launcher_service.LAUNCHER_RESUME_FRESH) {
         return FAIL_LAUNCHER_INSTALLED_LAUNCH
@@ -107,6 +122,11 @@ func run_launcher_service_probe() i32 {
     effect = kernel_dispatch.kernel_dispatch_step(&state, scenario_transport.cmd_launcher_identify())
     if !scenario_assert.expect_reply(effect, syscall.SyscallStatus.Ok, 4, program_catalog.PROGRAM_ID_ISSUE_ROLLUP, 7, 3, program_catalog.PROGRAM_ID_ISSUE_ROLLUP) {
         return FAIL_LAUNCHER_IDENTIFY_ISSUE_ROLLUP
+    }
+
+    effect = kernel_dispatch.kernel_dispatch_step(&state, scenario_transport.cmd_launcher_status())
+    if !scenario_assert.expect_reply(effect, syscall.SyscallStatus.Ok, 4, program_catalog.PROGRAM_ID_ISSUE_ROLLUP, 7, program_catalog.PROGRAM_ID_ISSUE_ROLLUP, launcher_service.LAUNCHER_RESUME_FRESH) {
+        return FAIL_LAUNCHER_STATUS_ISSUE_ROLLUP_LAUNCHED
     }
 
     effect = kernel_dispatch.kernel_dispatch_step(&state, scenario_transport.cmd_launcher_launch())
@@ -148,6 +168,11 @@ func run_launcher_service_probe() i32 {
         return FAIL_LAUNCHER_RESUMED_LAUNCH
     }
 
+    effect = kernel_dispatch.kernel_dispatch_step(&state, scenario_transport.cmd_launcher_status())
+    if !scenario_assert.expect_reply(effect, syscall.SyscallStatus.Ok, 4, program_catalog.PROGRAM_ID_ISSUE_ROLLUP, 7, program_catalog.PROGRAM_ID_ISSUE_ROLLUP, launcher_service.LAUNCHER_RESUME_RESUMED) {
+        return FAIL_LAUNCHER_STATUS_RESUMED
+    }
+
     effect = kernel_dispatch.kernel_dispatch_step(&state, scenario_transport.cmd_update_clear())
     if service_effect.effect_reply_status(effect) != syscall.SyscallStatus.Ok {
         return FAIL_LAUNCHER_CLEAR_UPDATE
@@ -166,6 +191,11 @@ func run_launcher_service_probe() i32 {
     effect = kernel_dispatch.kernel_dispatch_step(&state, scenario_transport.cmd_launcher_select(program_catalog.PROGRAM_ID_ISSUE_ROLLUP))
     if !scenario_assert.expect_reply(effect, syscall.SyscallStatus.Ok, 2, program_catalog.PROGRAM_ID_ISSUE_ROLLUP, 0, 0, 0) {
         return FAIL_LAUNCHER_SELECT_AFTER_INVALIDATION
+    }
+
+    effect = kernel_dispatch.kernel_dispatch_step(&state, scenario_transport.cmd_launcher_status())
+    if !scenario_assert.expect_reply(effect, syscall.SyscallStatus.Ok, 4, program_catalog.PROGRAM_ID_ISSUE_ROLLUP, 8, 0, launcher_service.LAUNCHER_STATUS_ACTIVATED) {
+        return FAIL_LAUNCHER_STATUS_REACTIVATED
     }
 
     effect = kernel_dispatch.kernel_dispatch_step(&state, scenario_transport.cmd_launcher_launch())

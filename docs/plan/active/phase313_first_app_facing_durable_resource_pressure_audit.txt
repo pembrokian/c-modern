@@ -1,0 +1,202 @@
+Phase 313 -- First App-Facing Durable Resource Pressure Audit
+=============================================================
+
+Status
+------
+PROPOSED
+
+Purpose
+-------
+Choose one maintained consumer and one narrow durable owner boundary for the
+first app-facing durable resource slice on top of the new universal interface,
+instead of letting every plausible storage-like owner compete equally.
+
+This phase exists now because after the universal-interface wave, the
+repository should know how durable resources are supposed to look publicly but
+still needs one real consumer and one real owner boundary to spend that model
+honestly.
+
+Repository status note
+----------------------
+- Phase 308 chose durable file-like growth as the next deferred branch winner.
+- Phases 309 through 312 are expected to define the universal interface,
+  commit the identity and durability model, and map present owners onto it.
+- The current supported slice still has two directly usable apps and only one
+  tiny persisted `review_board` view-state lane rather than an honest app-
+  facing durable resource story.
+- The roadmap expects the next implementation band to land one first durable
+  consumer only after the architecture and owner mapping are explicit.
+
+Problem being solved
+--------------------
+- Without one pressure audit naming the first consumer and owner boundary, the
+  repository can still drift into “file-like growth” by whichever nearby owner
+  feels easiest to extend.
+- That would weaken the whole point of the universal-interface phases by
+  turning them into architectural commentary rather than implementation
+  routing truth.
+- The current-repo problem is therefore one missing consumer-and-owner choice
+  for the first durable slice, not the lack of additional storage semantics in
+  general.
+
+Non-goals
+---------
+- no durable consumer implementation by default
+- no second consumer in the same phase
+- no storage-engine rewrite
+- no filesystem namespace or directory story
+- no language feature landing by default
+
+Invariants
+----------
+- The chosen consumer must be maintained and repository-owned.
+- The chosen owner boundary must align with the shared sys semantics model and
+  the current-owner mapping audit.
+- The phase must preserve the distinction between generic durable-resource
+  owner and specialized durable-resource owner.
+- The first durable slice must remain smaller than a filesystem, document
+  platform, or app-state framework.
+
+Required surface changes
+------------------------
+1. Compare the plausible first consumers against the current supported slice.
+2. Name one chosen consumer and one chosen durable owner boundary.
+3. Record why nearby alternative consumers or owners lose.
+4. Update only the narrow planning or architecture surfaces needed to make the
+   decision durable.
+
+Forbidden changes
+-----------------
+- do not land the consumer implementation inside the audit by default
+- do not choose an owner solely because it already stores bytes
+- do not choose a consumer that is not already maintained in the repo
+- do not widen into multi-consumer durable policy
+- do not reopen packaging or networking to avoid choosing a consumer
+
+Phase role in the larger sequence
+---------------------------------
+- This phase closes the architecture-selection part of Band J.
+- It prepares Phase 315 by giving the first durable implementation slice one
+  honest consumer and one honest owner to start from.
+- It prevents the implementation wave from diffusing across multiple candidate
+  owners or apps.
+
+Relevant backlog items this phase intentionally brings under pressure
+--------------------------------------------------------------------
+- the active pressure for one app-facing durable data lane broader than the
+  bounded `review_board` view-state path
+- the need to choose one generic durable owner boundary rather than extending a
+  product-specific or substrate-only owner by convenience
+- the need to keep the first durable slice smaller than a filesystem or app
+  platform
+
+Questions this phase must answer
+--------------------------------
+1. Which maintained app or app-adjacent consumer is the strongest first durable
+   resource pressure right now?
+2. Which current owner should carry that first slice honestly?
+3. Which nearby owner or consumer candidates lose, and why?
+4. What exact implementation slice should the next phase admit and what should
+   it still defer?
+
+Preferred implementation shape
+------------------------------
+- Start from the current-owner mapping audit rather than from whatever owner is
+  easiest to edit.
+- Compare real maintained consumers such as `review_board` and adjacent
+  app-local durable needs before considering broader or more speculative
+  consumers.
+- Prefer one narrow product-shaped durable slice over a generic resource
+  showcase.
+- Keep the outcome in planning or architecture surfaces only unless a concrete
+  evidence gap must be repaired.
+
+Implementation accelerators
+---------------------------
+Main files and navigations
+~~~~~~~~~~~~~~~~~~~~~~~~~~
+- Primary planning owners to open first:
+  `docs/plan/admin/speculative_roadmap_post_phase308.txt`,
+  `docs/arch/veya/sys/veya_sys_semantics_contract_v0.txt`, and the current-
+  owner mapping result from Phase 312.
+- Primary maintained-consumer proof surfaces to open second:
+  `examples/real/review_board/`, `examples/real/issue_rollup/`, and
+  `tests/tool/README.md`.
+- Primary owner candidates to inspect third:
+  `kernel/src/services/object_store_service.mc`,
+  `kernel/src/services/file_service.mc`, and product-specific durable owners as
+  comparison losers.
+- Expected first validation target: editor diagnostics on the touched docs.
+
+Relevant cookbook patterns
+~~~~~~~~~~~~~~~~~~~~~~~~~~
+- No exact cookbook pattern applies because this is a bounded consumer and
+  owner pressure audit rather than the durable implementation landing itself.
+- Pattern 11 -- Add A Narrow UI Slice Owner is relevant only as a reminder
+  that the first durable consumer should still be one bounded repository-owned
+  consumer rather than a framework step.
+
+Relevant file-local invariants
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+- `tests/tool/README.md` remains the canonical proof-routing note for the
+  current supported user-facing slice.
+- `examples/real/review_board/` is the strongest current maintained candidate
+  for a user-facing durable lane beyond one-byte view-state, but the phase must
+  still prove that against alternatives rather than assume it.
+- `kernel/src/services/update_store_service.mc` remains product-specific and
+  should lose unless the audit finds a genuine generic durable-resource need
+  there.
+- `kernel/src/services/object_store_service.mc` is the strongest generic owner
+  candidate but should still lose if the chosen first consumer cannot honestly
+  stay on that owner boundary.
+
+Dependency-ordered touch sequence
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+- Compare maintained consumer candidates first.
+- Compare candidate owners against the chosen consumer second.
+- Land the chosen consumer-and-owner audit result third.
+- Sync only narrow roadmap or architecture follow-through last.
+
+Common breakage map
+~~~~~~~~~~~~~~~~~~~
+- Audit picks the consumer first but not the owner -> the next implementation
+  phase still starts diffusely.
+- Audit picks the owner first but not the consumer -> later phases build a
+  generic durable demo instead of a real supported slice.
+- Product-specific or substrate owners win by convenience -> the generic
+  resource model stops paying rent.
+- Audit widens into implementation detail instead of one bounded decision ->
+  Band K loses focus before it starts.
+
+Relevant test surfaces
+~~~~~~~~~~~~~~~~~~~~~~
+- Primary owning validation surface: editor diagnostics on the touched docs.
+- Narrowest expected first executable validation target only if the phase needs
+  to verify a candidate consumer or owner behavior in code: the nearest hosted
+  real-project or reset-lane proof for that candidate.
+- Use `docs/agent/prompts/test_overview.txt` only if a code-evidence gap must
+  be repaired.
+
+Test obligations
+----------------
+- require editor diagnostics on the touched planning and architecture docs
+- run executable validation only if a concrete consumer or owner behavior must
+  be verified or repaired
+- if executable validation is required, start with the narrowest hosted or
+  reset-lane proof first
+
+Acceptance criteria
+-------------------
+- the repository names one strongest maintained consumer for the first durable
+  resource slice
+- the repository names one honest durable owner boundary for that slice
+- losing consumer and owner candidates are rejected explicitly with repo-local
+  reasons
+- no implementation or multi-consumer framework lands by convenience
+
+Future follow-up
+----------------
+- Phase 314 should freeze the universal resource model and this first-consumer
+  decision into one stable checkpoint before implementation begins.
+- Phase 315 should then land the first app-facing durable resource identity
+  slice on top of that checkpoint.

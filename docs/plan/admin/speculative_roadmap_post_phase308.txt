@@ -1,0 +1,411 @@
+Phase 309 Through Phase 323 -- Speculative Post-Phase-308 Roadmap
+=================================================================
+
+Status
+------
+SPECULATIVE
+
+Purpose
+-------
+Sketch one plausible continuation after the completed Phase 308 direction
+audit so the repository can first formalize one universal OS-facing resource
+model, then spend the newly chosen durable file-like branch on top of that
+shared contract, and only then reopen narrowly earned language work without
+drifting into a filesystem, package platform, or broad compiler-fashion wave.
+
+This document is intentionally forward-looking and tentative.
+It does not replace `docs/plan/plan.txt`.
+It does not replace the concrete Phase 305 through Phase 308 notes.
+It gives one plausible ordering for the next repository wave if the repo keeps
+following the same evidence-first rules used so far:
+
+- one bounded owner pressure at a time
+- one real repository-owned consumer at a time
+- one explicit exit criterion per phase
+- no filesystem, toolkit, package-manager, or speculative language-sugar wave
+  before one smaller owner-local outcome is already honest
+
+Relationship to companion notes
+-------------------------------
+This roadmap is meant to stay aligned with:
+
+- `docs/plan/admin/speculative_roadmap_post_phase294.txt`
+- `docs/plan/active/phase305_second_installed_program_pressure_audit.txt`
+- `docs/plan/active/phase306_second_installed_program_first_slice.txt`
+- `docs/plan/active/phase307_two_app_installed_status_and_resume_follow_through.txt`
+- `docs/plan/active/phase308_post_second_app_platform_direction_audit.txt`
+- `docs/plan/backlog.txt`
+- `docs/plan/decision_log.txt`
+- `README.md`
+- `kernel/README.md`
+- `tests/tool/README.md`
+
+If those notes define the admitted two-app installed story, the bounded loser
+matrix around packaging and networking, and the current deferred compiler and
+language fronts, this roadmap suggests one practical continuation after the
+repository proved that broader packaging is no longer the strongest next move.
+
+Repository numbering note
+-------------------------
+- Phase 295 through Phase 301 are occupied by the richer UI wave.
+- Phase 302 through Phase 304 are occupied by the bounded byte-literal spend
+  and its closeout audit.
+- Phase 305 through Phase 308 are occupied by the second-installed-program
+  comparison, implementation, status follow-through, and post-Band-I audit.
+- Phase 308 now records one explicit winner: durable file-like growth is the
+  strongest next deferred branch, while broader packaging and networking both
+  remain losers on current maintained-consumer evidence.
+- The next speculative continuation therefore starts at Phase 309.
+
+Repository status note
+----------------------
+- The repository now has one honest two-app installed story on the existing
+  `program_catalog` plus `update_store_service` plus `launcher_service` split.
+- The current supported user-facing slice still stays intentionally small:
+  two directly usable apps, one fixed four-cell surface, one optional two-
+  region composition seam, one key-only input family, and one bounded
+  persisted `review_board` view-state path.
+- Phase 308 records that the next stronger gap is not more packaging. It is
+  the absence of one honest app-facing durable data owner broader than the
+  current journal, object-store, and update-store slices, but the repository
+  is also close to architectural drift: multiple storage-like owners, multiple
+  naming stories, and multiple restart-visible data shapes are accumulating
+  without one explicit universal interface.
+- The earlier single-byte literal pressure has already been spent in Phases
+  302 and 303. Any future byte-syntax work therefore needs to be about tiny
+  byte-sequence or fixed-array pressure, not another `u8` character-literal
+  phase.
+- Several narrowly scoped language items remain plausible follow-through only
+  if the file-like wave exposes them as real blockers: `sizeof(T)`, slightly
+  better fixed-array literals, guarded switch cases, one very narrow trailing
+  default-argument form, and purely syntactic aggregate shorthand.
+
+What this roadmap is trying to answer
+-------------------------------------
+- How should the repository formalize one universal resource interface before
+  spending the Phase 308 durable file-like winner?
+- What should be foundational versus layered: resource identity, names,
+  capabilities, durability class, and restart-visible truth?
+- Which maintained consumer should force the first app-facing durable slice
+  once that universal interface is explicit: one app-local durable document
+  lane, one bounded issue lane, or one adjacent durable helper owner?
+- Which compiler and language repairs become honestly stronger only after that
+  file-like wave lands?
+- Which of the tempting syntactic-sugar ideas should still lose even if they
+  sound pleasant locally?
+
+Core rule
+---------
+- Keep the current parser, sema, MIR, backend, launcher, update-store,
+  object-store, journal, workflow, and app-wrapper ownership boundaries intact
+  unless one maintained repository-owned consumer proves that a narrower new
+  owner is now the controlling blocker.
+- Spend the next wave first on one shared external resource model and only
+  then on durable file-like behavior above the existing bounded durable-owner
+  split, not on broader packaging, networking, or a speculative language-
+  ergonomics spree.
+- Prefer one dominant interface vocabulary for resource identity, naming,
+  durability, restart, and capability exposure even if specialized services
+  remain internally different.
+- Prefer one admitted consumer and one small durable owner over a reusable
+  namespace, directory, path, or handle framework.
+- Treat language work as follow-through on real maintained-owner pressure, not
+  as a parallel wish list.
+
+Universal-interface rule
+------------------------
+The default assumption for every post-308 architectural phase should be:
+
+- identity first, names layered on top
+- one explicit resource vocabulary across storage-like owners
+- one small durability taxonomy across services
+- one explicit restart-visible contract at the boundary
+- one shared capability and access story before more feature growth
+
+If a proposed phase cannot stay honest under those defaults, the roadmap
+should delay it until a stronger consumer exists rather than widening by
+convenience.
+
+Durable-file-like rule
+----------------------
+Once the universal interface is explicit, the default assumption for every
+post-308 file-like phase should be:
+
+- one real maintained consumer first
+- one bounded owner-local identity scheme first
+- explicit fixed-capacity data shapes first
+- explicit reload and restart behavior first
+- no directory tree, path graph, delete-plus-rename matrix, open-ended handle
+  table, or durable capability framework by default
+
+If a proposed phase cannot stay honest under those defaults, the roadmap
+should delay it until a stronger consumer exists rather than widening by
+convenience.
+
+Language-reopening rule
+-----------------------
+- Reopen `sizeof(T)` only when the file-like wave or an adjacent maintained
+  consumer is materially distorted by raw byte-slot sizing or ad hoc size
+  duplication.
+- Reopen fixed-array literal ergonomics only when explicitly typed fixed-array
+  owners keep carrying repetitive boilerplate that cannot stay honest on the
+  current literal forms.
+- Reopen byte syntax only for tiny fixed-array or byte-sequence pressure; the
+  earlier single-byte literal slice is already spent.
+- Reopen guarded switch cases only when maintained parser, service, or app
+  code repeatedly carries a `switch` plus nested `if` shape that one bounded
+  guard would remove cleanly.
+- Reopen trailing default arguments only if repeated helper-call boilerplate
+  survives the stronger file-like and array-literality repairs.
+- Reopen broader aggregate shorthand only when it remains purely syntactic
+  sugar over already-admitted aggregate construction, with no new inference,
+  precedence, or ownership semantics.
+
+Outcome bias
+------------
+This roadmap intentionally prefers three steps in order:
+
+- first formalize one shared OS-facing resource model
+- then spend the durable file-like winner on one honest app-facing data path
+- then cash any repeated file-like boilerplate into one or two narrow language
+  repairs only if that pressure becomes real
+- only then consider softer syntactic sugar that still survives the stronger
+  owner and compiler repairs
+
+That bias is deliberate. Phase 308 already spent one pause on ranking the next
+branch. The next roadmap should extract concrete value from that ranking before
+reopening a broader compiler wish list.
+
+Roadmap bands
+-------------
+
+Band J - Formalize One Universal Resource Interface
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+Phases 309 through 314 should spend the Phase 308 winner indirectly first: one
+bounded architecture wave that defines a shared external resource model for
+storage-like and restart-visible services before another app-facing durable
+feature lands.
+
+Likely themes:
+- define one dominant resource identity story
+- decide whether naming is foundational or layered
+- define one small durability taxonomy
+- define one shared restart-visible contract at the service boundary
+- map current storage-like owners onto that shared model before choosing the
+  first app-facing durable consumer
+
+Why this band comes first:
+- Phase 308 explicitly re-ranked the branches and picked durable file-like
+  growth over more packaging or networking.
+- The current supported slice already has the install/update story it needed.
+- The strongest remaining user-facing gap is durable data broader than the
+  current journal/view-state lane, but the stronger architectural risk is now
+  accidental variation across storage-like services, names, and restart rules.
+- If that variation is not resolved first, the next file-like wave is likely
+  to deepen local simplicity while weakening global simplicity.
+
+Why this band remains bounded:
+- this is not a filesystem wave
+- this is not a directory or path-language wave
+- this is not a handle-table or vnode framework wave
+- this is not a networking wave in disguise
+- this is not permission to widen app storage into generic persistence policy
+- this is not a giant storage framework rewrite
+
+Possible phases in this band:
+
+Phase 309 -- Universal Resource Interface Audit
+- Exit criterion: the repository names one shared external resource model and
+  identifies exactly where current services diverge in identity, naming,
+  durability, restart truth, and capability exposure, instead of treating
+  “file-like” as an abstract platform ambition.
+
+Phase 310 -- Resource Identity And Naming Model
+- Exit criterion: the repository chooses one explicit identity-first or
+  namespace-first model and one layered naming story for storage-like owners,
+  without admitting directories, open-ended path graphs, or a filesystem
+  namespace as a foundational concept.
+
+Phase 311 -- Durability And Restart Contract Unification
+- Exit criterion: the repository defines one small durability taxonomy and one
+  restart-visible contract that current storage-like and retained-state owners
+  can map onto without becoming a session framework or generic persistence
+  layer.
+
+Phase 312 -- Current Service Mapping Audit
+- Exit criterion: `journal_service`, `object_store_service`, `file_service`,
+  `update_store_service`, and the remaining retained-state owners are all
+  classified against the shared resource model so the repository knows which
+  owner is generic, which owners are specialized, and which interfaces should
+  converge.
+
+Phase 313 -- First App-Facing Durable Resource Pressure Audit
+- Exit criterion: once the shared resource model is explicit, the repository
+  names one maintained consumer and one narrow durable owner boundary that
+  should carry user-facing durable data next, instead of letting every storage-
+  like owner compete equally.
+
+Phase 314 -- Universal Resource Model Freeze
+- Exit criterion: the repository states exactly what the admitted universal
+  resource interface now means, which storage-like variations remain internal
+  implementation details versus public concepts, and which owner should carry
+  the first app-facing durable slice next.
+
+Outcome checkpoint after Band J:
+- the repository should have one explicit universal interface story for
+  resource identity, names, durability, restart truth, and capability
+  exposure, even if storage-like owners remain internally specialized.
+- If that checkpoint cannot be reached honestly without a broader storage
+  framework, the repository should stop early and record that the current
+  architectural winner was smaller than Phase 308 predicted.
+- If Band J lands cleanly, the strongest next blocker should shift from
+  architectural ambiguity to one concrete app-facing durable slice and only
+  then, potentially, to the source-level boilerplate that slice exposes.
+
+Band K - Spend The First Durable Slice On The New Interface
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+Phases 315 through 319 should spend the first app-facing durable slice on top
+of the universal resource model from Band J before reopening language work.
+
+Likely themes:
+- choose one maintained consumer first, probably `review_board` or one nearby
+  bounded app-owned data lane
+- keep identity and naming aligned with the shared resource model
+- keep read or write or replace semantics narrow and product-shaped
+- keep restart and reload behavior explicit on the current durable-owner map
+- prove the slice on the existing hosted and reset-lane workflow surfaces
+
+Why this band comes second:
+- Phase 308 picked durable file-like growth as the winning branch, not a new
+  compiler wave.
+- Once the shared interface is explicit, the repository still needs one real
+  maintained consumer to prove that the architecture actually pays rent.
+- The first durable app-facing slice is the best place to validate whether the
+  new universal interface is genuinely simpler or only more abstract.
+
+Why this band remains bounded:
+- this is not a filesystem wave
+- this is not a directory or path-language wave
+- this is not a handle-table or vnode framework wave
+- this is not a networking wave in disguise
+- this is not permission to widen app storage into generic persistence policy
+
+Possible phases in this band:
+
+Phase 315 -- App-Facing Durable Resource Identity First Slice
+- Exit criterion: one admitted consumer can address one tiny fixed set of
+  durable resources through the shared identity and naming model without
+  admitting directories, open-ended names, or a filesystem graph.
+
+Phase 316 -- Durable Read Or Replace Or Append Follow-Through
+- Exit criterion: that same owner exposes one minimal useful data mutation and
+  retrieval contract for the admitted consumer without widening into seek,
+  truncation, delete, rename, or stream semantics.
+
+Phase 317 -- Restart-Visible Durable Reload And App Follow-Through
+- Exit criterion: the admitted durable slice reloads honestly across restart
+  on the current durable-owner path and reaches the chosen app or app-local
+  helper without creating a UI-state or session framework.
+
+Phase 318 -- Hosted And Reset-Lane Durable Resource Workflow Proof
+- Exit criterion: the new durable slice is exercised on the existing hosted
+  real-project and reset-lane workflow surfaces without inventing a new
+  runner, test family, or artifact layout.
+
+Phase 319 -- Durable Resource Slice Freeze And Audit
+- Exit criterion: the repository states exactly what the admitted app-facing
+  durable slice now means on top of the shared resource model, which tempting
+  storage expansions still remain deferred, and whether the next pressure has
+  shifted to a narrower language blocker.
+
+Outcome checkpoint after Band K:
+- the repository should have one honest app-facing durable data lane broader
+  than installed artifacts and the one-byte `review_board` view-state path,
+  and it should prove that the new universal resource interface makes that
+  slice simpler globally rather than only more regular locally.
+- If Band K lands cleanly, the strongest next blocker may shift from durable
+  ownership to source-level boilerplate around typed sizes, fixed-array
+  construction, small byte-sequence setup, or repetitive switch guards.
+- If Band K cannot land cleanly without broader naming or recovery claims, the
+  repository should stop early instead of forcing a larger file-like wave.
+
+Band L - Cash Durable-Slice Boilerplate Into Narrow Language Repairs Only If Earned
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+Phases 320 through 323 should reopen compiler and language work only if the
+first real durable slice on the new interface exposes a clearer source-level
+bottleneck than another architectural or file-like follow-through phase.
+
+Likely themes:
+- one bounded `sizeof(T)` surface for library and durable-owner code
+- one bounded fixed-array literal ergonomic for explicitly typed arrays
+- one tiny byte-sequence or byte-array sugar for repeated small fixed data
+- one bounded guarded-switch repair for repeated `switch` plus nested `if`
+  ladders
+- optionally, one very narrow trailing-default or aggregate-shorthand spend
+  only if the stronger repairs still leave real residue
+- one closeout audit that says which of those repairs were actually earned
+
+Why this band comes last:
+- the current strongest compiler pressure is no longer the already-spent
+  single-byte literal front.
+- `sizeof(T)`, fixed-array ergonomics, compact byte-sequence setup, and
+  guarded switch cases are only worth reopening if the admitted durable slice
+  actually exposes them.
+- trailing defaults and aggregate shorthand are lower-signal than those
+  stronger file-like-driven repairs and are easiest to overspend into new
+  centers of gravity.
+
+Why this band remains bounded:
+- this is not a broad literal-inference wave
+- this is not a general collection-construction wave
+- this is not a pattern-matching or control-flow redesign
+- this is not a default-parameter or overload framework
+- this is not a broad aggregate-construction redesign
+- this is not permission for convenience syntax without a maintained owner
+  blocker
+
+Possible phases in this band:
+
+Phase 320 -- Compile-Time Size Query First Slice
+- Exit criterion: one bounded `sizeof(T)`-style surface becomes available for
+  admitted library or durable-resource owners that are currently distorted by
+  raw byte-slot sizing, without widening into reflection, ABI policy, or a
+  general metaprogramming system.
+
+Phase 321 -- Fixed-Array And Tiny Byte-Sequence Ergonomics First Slice
+- Exit criterion: one bounded improvement for explicitly typed fixed-array
+  literals or short byte-sequence setup removes repeated boilerplate in
+  maintained durable-resource owners without admitting dynamic length
+  inference, hidden allocation, or broad string or collection sugar.
+
+Phase 322 -- Guarded Switch Case First Slice
+- Exit criterion: one bounded guard form on existing `switch` cases can remove
+  repeated nested-`if` boilerplate in maintained owners without widening into
+  pattern guards, arbitrary match expressions, or a second control family.
+
+Phase 323 -- Post-309 Plateau Note
+- Exit criterion: the repository records what the post-Phase-308 wave actually
+  accomplished, which compiler and language repairs were honestly spent versus
+  still deferred, whether trailing-default or aggregate-shorthand pressure ever
+  became real enough to matter, and whether the next stronger branch is more
+  file-like work, networking, or another bounded compiler front.
+
+Interpretation guide
+--------------------
+- Treat this as a rough map, not a contract.
+- If Band J reveals that one universal resource model is too ambitious for the
+  current maintained slice, prefer the earlier audit and explicit stop over a
+  larger abstraction push.
+- If Band J lands cleanly, prefer Band K's first real durable consumer before
+  reopening compiler work.
+- If Band K lands cleanly and `sizeof(T)` or fixed-array boilerplate becomes
+  the clearest next blocker, prefer Band L before any softer syntax work.
+- If Band L spends the earned compiler pressure cleanly, treat trailing-
+  default and aggregate shorthand as optional residue only, not mandatory next
+  steps.
+- If networking suddenly gains one stronger real maintained consumer than the
+  current file-like or compiler pressures, say so explicitly and treat that as
+  a new direction note rather than quietly mutating this roadmap's ordering.
+- If broader packaging reappears, require a third installed consumer or a
+  materially different package family before reopening it; the current two-app
+  installed story is already spent.

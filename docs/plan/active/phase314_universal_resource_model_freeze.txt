@@ -1,0 +1,194 @@
+Phase 314 -- Universal Resource Model Freeze
+============================================
+
+Status
+------
+PROPOSED
+
+Purpose
+-------
+Freeze the post-308 universal resource model as the current architectural truth
+for the next durable implementation band, stating exactly what is now admitted,
+what current owners must converge toward, and which tempting expansions remain
+deferred.
+
+This phase exists now because Phases 309 through 313 are expected to build the
+full architecture checkpoint for the next durable implementation wave. The
+repository needs one durable plateau note before implementation starts, not a
+half-settled architecture that later phases silently reinterpret.
+
+Repository status note
+----------------------
+- The roadmap now expects an architecture-first Band J before the first real
+  app-facing durable slice.
+- The new sys semantics notes publish the intended umbrella contract, resource
+  model, and common service contract.
+- Phases 309 through 313 are expected to audit divergence, commit identity and
+  durability semantics, map current owners, and choose the first durable
+  consumer and owner boundary.
+- The repository still needs one explicit freeze note that turns those results
+  into stable truth for the next implementation band.
+
+Problem being solved
+--------------------
+- Without a freeze checkpoint, the architecture phases can still be treated as
+  advisory commentary and later implementation work can reopen the same
+  questions opportunistically.
+- That would erase the main value of the architecture wave just before the
+  first real durable slice tries to spend it.
+- The current-repo problem is therefore one missing plateau note for the new
+  universal resource model, not another design exploration phase.
+
+Non-goals
+---------
+- no durable consumer implementation by default
+- no new architecture branch selection beyond what the prior phases already
+  decide
+- no broader storage framework design
+- no language-feature landing
+- no roadmap rewrite beyond the narrow surfaces that must reflect the freeze
+
+Invariants
+----------
+- The freeze must be driven by the actual results of Phases 309 through 313.
+- The shared resource model must remain smaller than a filesystem or generic
+  storage framework.
+- The chosen first durable consumer and owner boundary must stay explicit.
+- Deferred expansions such as discovery, directories, path graphs, multi-
+  consumer policy, and broader syntax work must remain deferred explicitly.
+- Planning churn must remain narrow and proportional to the checkpoint.
+
+Required surface changes
+------------------------
+1. Record the admitted universal resource model as the current architectural
+   truth.
+2. Record the chosen first consumer and chosen durable owner boundary.
+3. Record which expansions remain explicitly deferred.
+4. Sync only the narrow roadmap, backlog, or architecture surfaces that must
+   reflect the frozen result.
+
+Forbidden changes
+-----------------
+- do not reopen identity, naming, durability, or owner-choice questions in the
+  freeze note unless the earlier phases failed to answer them honestly
+- do not land the first durable implementation slice inside the freeze
+- do not widen the freeze into a broader storage or syntax wishlist
+- do not let deferred expansions drift back in through vague language
+- do not hide unresolved contradictions if they still remain
+
+Phase role in the larger sequence
+---------------------------------
+- This phase closes Band J by turning the architecture sequence into one stable
+  implementation checkpoint.
+- It prepares Phase 315 and the rest of Band K by giving the first durable
+  slice one explicit contract source.
+- It also sets the baseline that later language work must justify against real
+  implementation pressure rather than roadmap habit.
+
+Relevant backlog items this phase intentionally brings under pressure
+--------------------------------------------------------------------
+- the active backlog themes around one dominant resource, naming, durability,
+  restart, and capability story
+- the pressure to keep the first durable slice smaller than a filesystem or app
+  framework
+- the pressure to make later language work follow real implementation residue
+  rather than planning momentum
+
+Questions this phase must answer
+--------------------------------
+1. What exact universal resource model is now admitted as current truth?
+2. Which current-owner classifications and deferred expansions are now stable?
+3. Which first durable consumer and owner boundary are now the implementation
+   checkpoint?
+4. Which planning surfaces must reflect the freeze so later phases do not
+   relitigate it immediately?
+
+Preferred implementation shape
+------------------------------
+- Start from the actual landed results of Phases 309 through 313.
+- Prefer one short plateau note with one admitted model, one chosen consumer,
+  one chosen owner boundary, and one loser matrix for deferred expansions.
+- Update only the architecture and planning surfaces that later work will
+  actually consult.
+
+Implementation accelerators
+---------------------------
+Main files and navigations
+~~~~~~~~~~~~~~~~~~~~~~~~~~
+- Primary freeze inputs to open first:
+  the landed results of `phase309_universal_resource_interface_audit.txt`,
+  `phase310_resource_identity_and_naming_model.txt`,
+  `phase311_durability_and_restart_contract_unification.txt`,
+  `phase312_current_service_mapping_audit.txt`, and
+  `phase313_first_app_facing_durable_resource_pressure_audit.txt`.
+- Primary architecture surfaces to sync second:
+  `docs/arch/veya/sys/veya_sys_semantics_contract_v0.txt`,
+  `docs/arch/veya/sys/veya_sys_resource_model_v0.txt`, and
+  `docs/plan/admin/speculative_roadmap_post_phase308.txt`.
+- Expected first validation target: editor diagnostics on the touched docs.
+
+Relevant cookbook patterns
+~~~~~~~~~~~~~~~~~~~~~~~~~~
+- No exact cookbook pattern applies. This is a freeze-and-audit checkpoint, not
+  a direct implementation slice.
+
+Relevant file-local invariants
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+- `docs/arch/veya/sys/veya_sys_semantics_contract_v0.txt` remains the umbrella
+  contract for the universal resource model and should stay the main reference
+  surface after the freeze.
+- `docs/plan/admin/speculative_roadmap_post_phase308.txt` is the narrow admin
+  roadmap surface that should reflect the frozen checkpoint if the sequence
+  stays honest.
+- `docs/arch/key_decisions.txt` should receive only truly settled design
+  choices; unresolved contradictions still belong elsewhere.
+
+Dependency-ordered touch sequence
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+- Gather the landed outcomes of Phases 309 through 313 first.
+- Land the universal-resource freeze note second.
+- Sync only narrow architecture or roadmap follow-through third.
+- Route any remaining unresolved contradiction explicitly last.
+
+Common breakage map
+~~~~~~~~~~~~~~~~~~~
+- Freeze note quietly reopens questions the earlier phases were meant to close
+  -> the implementation checkpoint remains unstable.
+- Freeze note hides still-unresolved contradictions -> later implementation
+  phases discover architectural ambiguity too late.
+- Roadmap or backlog sync widens too far -> planning churn exceeds the bounded
+  checkpoint role.
+- Deferred expansions are not recorded explicitly -> later phases reintroduce
+  them by convenience.
+
+Relevant test surfaces
+~~~~~~~~~~~~~~~~~~~~~~
+- Primary owning validation surface: editor diagnostics on the touched docs.
+- Narrowest expected first executable validation target only if the freeze note
+  uncovers a concrete code-evidence contradiction that must be repaired.
+- Use `docs/agent/prompts/test_overview.txt` only if such a repair becomes
+  necessary.
+
+Test obligations
+----------------
+- require editor diagnostics on the touched docs
+- run executable validation only if the freeze uncovers a concrete evidence gap
+  that must be repaired in code
+- if executable validation is required, run only the narrowest owner-local
+  surface first
+
+Acceptance criteria
+-------------------
+- the repository has one explicit plateau note freezing the universal resource
+  model as current architectural truth
+- the chosen first durable consumer and owner boundary are recorded explicitly
+- deferred expansions remain explicit and bounded
+- later implementation phases can start without relitigating the Band J
+  architecture questions
+
+Future follow-up
+----------------
+- Phase 315 should spend the first app-facing durable resource identity slice
+  on top of this frozen checkpoint.
+- If the freeze still leaves an unresolved contradiction, Phase 315 must stop
+  and repair that contradiction before landing consumer behavior.

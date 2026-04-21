@@ -91,6 +91,13 @@ func launcher_identify(s: LauncherServiceState, ctx: LauncherContext) LauncherRe
             s.selected))
 }
 
+func launcher_selected_installed(s: LauncherServiceState, ctx: LauncherContext) bool {
+    if s.selected == program_catalog.PROGRAM_ID_NONE {
+        return false
+    }
+    return update_store_service.update_installed_program_id_for(ctx.update_store, s.selected) == s.selected
+}
+
 func launcher_select(s: LauncherServiceState, ctx: LauncherContext, id: u8) LauncherResult {
     desc := program_catalog.program_descriptor_for_id(id)
     if !program_catalog.program_descriptor_is_valid(desc) {
@@ -101,10 +108,13 @@ func launcher_select(s: LauncherServiceState, ctx: LauncherContext, id: u8) Laun
 }
 
 func launcher_visible_status(s: LauncherServiceState, ctx: LauncherContext) u8 {
-    if !update_store_service.update_installed_any_present(ctx.update_store) {
+    if !launcher_selected_installed(s, ctx) {
         return LAUNCHER_STATUS_NONE
     }
     if s.foreground == program_catalog.PROGRAM_ID_NONE {
+        return LAUNCHER_STATUS_ACTIVATED
+    }
+    if s.foreground != s.selected {
         return LAUNCHER_STATUS_ACTIVATED
     }
     return s.status
@@ -117,8 +127,8 @@ func launcher_query(s: LauncherServiceState, ctx: LauncherContext) LauncherResul
         launcher_reply(
             syscall.SyscallStatus.Ok,
             4,
-            update_store_service.update_installed_program_id(ctx.update_store),
-            update_store_service.update_installed_version(ctx.update_store),
+            update_store_service.update_installed_program_id_for(ctx.update_store, s.selected),
+            update_store_service.update_installed_version_for(ctx.update_store, s.selected),
             s.foreground,
             launcher_visible_status(s, ctx)))
 }
@@ -137,7 +147,7 @@ func launcher_launch_classification(update_store: update_store_service.UpdateSto
 }
 
 func launcher_requires_installed_program(program: u8) bool {
-    return program != program_catalog.PROGRAM_ID_REVIEW_BOARD
+    return program != program_catalog.PROGRAM_ID_NONE
 }
 
 func launcher_launch(s: LauncherServiceState, ctx: LauncherContext) LauncherResult {
@@ -145,7 +155,7 @@ func launcher_launch(s: LauncherServiceState, ctx: LauncherContext) LauncherResu
     if !program_catalog.program_descriptor_is_valid(desc) {
         return launcher_result(s, ctx.update_store, launcher_reply(syscall.SyscallStatus.InvalidArgument, 0, 0, 0, 0, 0))
     }
-    if launcher_requires_installed_program(s.selected) && update_store_service.update_installed_program_id(ctx.update_store) != s.selected {
+    if launcher_requires_installed_program(s.selected) && update_store_service.update_installed_program_id_for(ctx.update_store, s.selected) != s.selected {
         return launcher_result(s, ctx.update_store, launcher_reply(syscall.SyscallStatus.InvalidArgument, 0, 0, 0, 0, 0))
     }
     next_foreground := s.selected

@@ -1,0 +1,199 @@
+Phase 312 -- Current Service Mapping Audit
+==========================================
+
+Status
+------
+PROPOSED
+
+Purpose
+-------
+Classify the current storage-like and restart-visible owners against the new
+resource, naming, durability, restart, and common-service contracts so the
+repository knows which owners are generic, specialized, retained-only, or
+substrate-only before another app-facing durable feature lands.
+
+This phase exists now because after Phases 309 through 311, the repository
+should have a proposed universal interface vocabulary but still needs one audit
+that maps real owners onto it explicitly.
+
+Repository status note
+----------------------
+- The new Veya sys semantics notes now name the intended shared system model.
+- The repository still carries several concrete owners with overlapping durable
+  or resource-like behavior: `journal_service`, `object_store_service`,
+  `file_service`, `update_store_service`, and retained-state owners.
+- The current roadmap expects later phases to build one app-facing durable
+  slice on top of the new interface, but that cannot be honest until the repo
+  states which existing owner class each of those services belongs to.
+
+Problem being solved
+--------------------
+- Without a current-owner mapping audit, later phases can still pick the wrong
+  owner as the “generic” model merely because it is nearby or convenient.
+- That would turn the universal interface into theory instead of an explicit
+  guide for implementation routing.
+- The current-repo problem is therefore one missing mapping from intended
+  system semantics onto real repository owners, not the lack of another durable
+  feature.
+
+Non-goals
+---------
+- no owner merge or service deletion by default
+- no storage implementation rewrite
+- no new app-facing durable consumer by default
+- no registry or discovery service
+- no capability-system redesign
+
+Invariants
+----------
+- The audit must classify owners against the shared model rather than forcing
+  them into premature implementation unification.
+- The phase must preserve explicit distinctions between generic durable owner,
+  specialized durable owner, retained-only owner, and substrate owner.
+- Product-specific semantics remain specialized until a later phase proves a
+  broader contract is honest.
+- The audit must keep public semantics separate from implementation detail.
+
+Required surface changes
+------------------------
+1. Map each current storage-like and restart-visible owner against the shared
+   resource and common-service contracts.
+2. Record which owner is the strongest current generic durable-resource
+   candidate and which owners are specializations or retained-only.
+3. Record any residual contradiction that would block the first app-facing
+   durable slice.
+4. Update only the narrow architecture or planning surfaces needed to keep that
+   mapping durable.
+
+Forbidden changes
+-----------------
+- do not merge owners merely because the audit finds similarity
+- do not treat product-specific durable owners as automatically generic
+- do not hide unresolved contradictions in vague language
+- do not let implementation detail substitute for public semantic mapping
+- do not widen this phase into the consumer-selection phase by default
+
+Phase role in the larger sequence
+---------------------------------
+- This phase consumes the shared vocabulary from Phases 309 through 311.
+- It prepares Phase 313 by making the first durable consumer choice explicit
+  against a mapped owner set instead of a vague set of options.
+- It is the last architectural comparison phase before the sequence chooses one
+  concrete consumer and owner boundary.
+
+Relevant backlog items this phase intentionally brings under pressure
+--------------------------------------------------------------------
+- the active pressure to stop accumulating multiple almost-generic durable
+  stories
+- the need to identify which current owner is the generic public model and
+  which are specializations or substrates
+- the need to distinguish retained-state owners from durable-resource owners
+
+Questions this phase must answer
+--------------------------------
+1. Which present owner is the strongest generic durable-resource candidate?
+2. Which present owners are clearly specialized durable-resource owners?
+3. Which present owners are retained-state or substrate-only and should not be
+   chosen as the generic public model?
+4. What contradiction, if any, still blocks the first app-facing durable
+   resource slice?
+
+Preferred implementation shape
+------------------------------
+- Start from `docs/arch/veya/sys/veya_sys_resource_model_v0.txt` and
+  `docs/arch/veya/sys/veya_sys_common_service_contract_v0.txt` as the
+  controlling semantic contracts.
+- Compare the real owners one by one against those contracts.
+- Prefer one compact mapping table and one short contradiction list over a
+  broad implementation survey.
+- If one owner clearly wins as the generic model, say so explicitly.
+
+Implementation accelerators
+---------------------------
+Main files and navigations
+~~~~~~~~~~~~~~~~~~~~~~~~~~
+- Controlling semantic owners to open first:
+  `docs/arch/veya/sys/veya_sys_resource_model_v0.txt` and
+  `docs/arch/veya/sys/veya_sys_common_service_contract_v0.txt`.
+- Primary real-owner comparison set to open second:
+  `kernel/src/services/object_store_service.mc`,
+  `kernel/src/services/file_service.mc`,
+  `kernel/src/services/update_store_service.mc`,
+  `kernel/src/services/journal_service.mc`, and representative retained-state
+  owners such as `kernel/src/services/kv_service.mc`.
+- Supporting identity and authority notes:
+  `docs/arch/veya/services/veya_restartable_service_identity_taxonomy_v0.txt`
+  and `docs/arch/veya/sys/veya_authority_vocabulary_and_ownership_table_v0.txt`.
+- Expected first validation target: editor diagnostics on the touched docs.
+
+Relevant cookbook patterns
+~~~~~~~~~~~~~~~~~~~~~~~~~~
+- No exact cookbook pattern applies. This is a bounded owner-mapping audit, not
+  a direct runtime feature landing.
+
+Relevant file-local invariants
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+- `kernel/src/services/object_store_service.mc` is the strongest current
+  candidate for a generic durable-resource owner and should be evaluated first
+  against the public model.
+- `kernel/src/services/update_store_service.mc` is already specialized around
+  install and launch-product truth and should not be treated as generic by
+  default.
+- `kernel/src/services/journal_service.mc` is likely substrate-like or
+  specialized append-log behavior rather than the public generic model.
+- Retained-state owners such as `kv_service` remain owner-local state machines
+  unless the audit finds a real first-class resource contract there.
+
+Dependency-ordered touch sequence
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+- Land the semantic mapping table against the shared sys contracts first.
+- Compare the strongest generic candidate and the obvious specializations
+  second.
+- Record any residual contradiction third.
+- Sync only narrow planning or architecture surfaces last.
+
+Common breakage map
+~~~~~~~~~~~~~~~~~~~
+- Audit picks the wrong generic owner because product-specific owners look more
+  complete locally -> later durable consumer work starts in the wrong place.
+- Audit fails to distinguish substrate, retained-only, and durable-resource
+  owners -> the public model remains too fuzzy for the next phase.
+- Audit widens into implementation rewrite proposals -> the bounded comparison
+  loses focus.
+- Audit leaves contradictions implicit -> Phase 313 cannot choose an honest
+  consumer and owner boundary.
+
+Relevant test surfaces
+~~~~~~~~~~~~~~~~~~~~~~
+- Primary owning validation surface: editor diagnostics on the touched
+  architecture and planning docs.
+- Narrowest expected first executable validation target only if the audit must
+  confirm a concrete owner behavior in code: the nearest owner-local reset-lane
+  or real-project proof for that owner.
+- Use `docs/agent/prompts/test_overview.txt` only if an evidence gap must be
+  repaired to keep the mapping honest.
+
+Test obligations
+----------------
+- require editor diagnostics on the touched docs
+- run executable validation only if a concrete owner behavior must be verified
+  or repaired
+- if executable validation is required, start with the narrowest owner-local
+  proof first
+
+Acceptance criteria
+-------------------
+- the repository has one explicit mapping from the shared sys semantics model
+  onto current real owners
+- one strongest current generic durable-resource candidate is named explicitly
+- obvious specializations, retained-only owners, and substrate owners are
+  distinguished clearly
+- any still-blocking contradiction is explicit and actionable
+
+Future follow-up
+----------------
+- Phase 313 should use this mapping to choose one honest maintained consumer
+  and one honest durable owner boundary for the first app-facing slice.
+- If this audit cannot identify a generic durable-resource candidate honestly,
+  the next phase must stop and record that contradiction before consumer work
+  proceeds.

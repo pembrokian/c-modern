@@ -45,13 +45,13 @@ func expect_delivered(effect: service_effect.Effect, value: u8) bool {
     return scenario_assert.expect_reply(effect, syscall.SyscallStatus.Ok, 4, program_catalog.PROGRAM_ID_REVIEW_BOARD, input_event.INPUT_ROUTE_DELIVERED, input_event.INPUT_EVENT_KEY, value)
 }
 
-func launch_review_board(state: *boot.KernelBootState, fail_select: i32, fail_launch: i32) i32 {
+func launch_review_board(state: *boot.KernelBootState, expected_resume: u8, fail_select: i32, fail_launch: i32) i32 {
     effect := kernel_dispatch.kernel_dispatch_step(state, scenario_transport.cmd_launcher_select(program_catalog.PROGRAM_ID_REVIEW_BOARD))
     if !scenario_assert.expect_reply(effect, syscall.SyscallStatus.Ok, 2, program_catalog.PROGRAM_ID_REVIEW_BOARD, 0, 0, 0) {
         return fail_select
     }
     effect = kernel_dispatch.kernel_dispatch_step(state, scenario_transport.cmd_launcher_launch())
-    if !scenario_assert.expect_reply(effect, syscall.SyscallStatus.Ok, 4, program_catalog.PROGRAM_ID_REVIEW_BOARD, program_catalog.PROGRAM_KIND_CODE_HOSTED_EXE, 1, launcher_service.LAUNCHER_RESUME_FRESH) {
+    if !scenario_assert.expect_reply(effect, syscall.SyscallStatus.Ok, 4, program_catalog.PROGRAM_ID_REVIEW_BOARD, program_catalog.PROGRAM_KIND_CODE_HOSTED_EXE, 1, expected_resume) {
         return fail_launch
     }
     return 0
@@ -66,7 +66,8 @@ func input_key(state: *boot.KernelBootState, key: u8, fail: i32) i32 {
 }
 
 func run_review_board_state_persistence_probe() i32 {
-    if !update_store_service.update_store_persist(update_store_service.update_store_init(service_topology.UPDATE_STORE_SLOT.pid, 1)) {
+    review_board_data: [4]u8 = [4]u8{ 94, 95, 96, 0 }
+    if !update_store_service.update_store_persist(update_store_service.update_review_board_install(update_store_service.update_store_init(service_topology.UPDATE_STORE_SLOT.pid, 1), 9, 3, review_board_data)) {
         return FAIL_REVIEW_BOARD_PERSIST_SETUP
     }
     if !journal_service.journal_persist(journal_service.journal_init(service_topology.JOURNAL_SLOT.pid, 1)) {
@@ -75,7 +76,7 @@ func run_review_board_state_persistence_probe() i32 {
 
     state := boot.kernel_init()
 
-    result := launch_review_board(&state, FAIL_REVIEW_BOARD_PERSIST_SELECT0, FAIL_REVIEW_BOARD_PERSIST_LAUNCH0)
+    result := launch_review_board(&state, launcher_service.LAUNCHER_RESUME_FRESH, FAIL_REVIEW_BOARD_PERSIST_SELECT0, FAIL_REVIEW_BOARD_PERSIST_LAUNCH0)
     if result != 0 {
         return result
     }
@@ -140,7 +141,7 @@ func run_review_board_state_persistence_probe() i32 {
 
     restarted := boot.kernel_init()
 
-    result = launch_review_board(&restarted, FAIL_REVIEW_BOARD_PERSIST_SELECT1, FAIL_REVIEW_BOARD_PERSIST_LAUNCH1)
+    result = launch_review_board(&restarted, launcher_service.LAUNCHER_RESUME_FRESH, FAIL_REVIEW_BOARD_PERSIST_SELECT1, FAIL_REVIEW_BOARD_PERSIST_LAUNCH1)
     if result != 0 {
         return result
     }

@@ -3,7 +3,7 @@ Phase 307 -- Two-App Installed Status And Resume Follow-Through
 
 Status
 ------
-PROPOSED
+COMPLETED
 
 Purpose
 -------
@@ -206,6 +206,21 @@ Acceptance criteria
 - the phase does not become a registry, session model, or dashboard
 - maintained hosted and reset-lane proofs cover the admitted two-app status
   contract clearly
+
+Implementation notes
+--------------------
+- `launcher_service` now treats both admitted apps as installed-program
+  consumers, so the stale `review_board` direct-launch exception is gone.
+- The compact launcher status query stays four bytes but is now selection-
+  aware: it reports the selected app's installed id and version, the current
+  foreground app, and one bounded visible status.
+- `update_store_service` kept its fixed two-slot installed shape plus one
+  durable launch-record comparison path; no registry, dashboard, or second
+  resume framework was added.
+- Reset-lane launcher, installed-workflow, review-board persistence, and
+  integrated demo probes were updated so they install `review_board`
+  explicitly and ask status only with explicit selection when the selected-app
+  contract matters.
 
 Future follow-up
 ----------------

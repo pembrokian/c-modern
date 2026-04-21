@@ -1,0 +1,198 @@
+Phase 310 -- Resource Identity And Naming Model
+===============================================
+
+Status
+------
+PROPOSED
+
+Purpose
+-------
+Commit the repository to one explicit identity-first, layered naming model for
+resource-like owners so later durable work does not continue mixing resource
+identity, public names, and live-instance identity into one overloaded story.
+
+This phase exists now because Phase 309 is expected to show that the current
+architectural drift is not just “storage variety” but semantic ambiguity about
+what the same resource is, what a name is, and what restart changes.
+
+Repository status note
+----------------------
+- `docs/arch/veya/sys/veya_sys_resource_model_v0.txt` already states the
+  intended rule: resource identity is primary and names are layered on top.
+- `docs/arch/veya/services/veya_restartable_service_identity_taxonomy_v0.txt`
+  already distinguishes stable public identity, restart generation identity,
+  coordinated lane identity, and continuity outcome identity for running-system
+  services.
+- Current repository owners still expose several distinct naming surfaces:
+  boot-wired service public names, owner-local object names, file-like names,
+  install-program identities, and direct app-facing labels.
+- The repository still needs one explicit model that says which of those are
+  foundational identity and which are merely lookup labels.
+
+Problem being solved
+--------------------
+- Without a committed identity and naming model, later phases can keep making
+  slightly different choices per owner: some will treat names as identity,
+  some will treat instance generation as identity, and some will conflate
+  service names with durable resource names.
+- That makes restart semantics, capability semantics, and durable-data
+  semantics harder to unify afterward.
+- The current-repo problem is therefore one missing normative identity and
+  naming commitment, not the absence of more lookup features.
+
+Non-goals
+---------
+- no directory tree or path graph
+- no dynamic discovery or registry framework
+- no global filesystem namespace
+- no capability-system redesign
+- no user-visible file-like feature landing by default
+
+Invariants
+----------
+- Resource identity remains distinct from service identity.
+- Public names remain distinct from authority.
+- Live-instance generation remains distinct from stable resource identity.
+- Lookup and use remain distinct operations.
+- The phase must not require one final concrete wire encoding for all resource
+  ids if the public model can be stated without that encoding.
+
+Required surface changes
+------------------------
+1. State one explicit identity-first or namespace-first rule for the repo and
+   justify it against current owners.
+2. Define the layered naming model that storage-like owners should follow.
+3. Classify current public names, owner-local names, and product labels as
+   either identity, lookup labels, or observation-only labels.
+4. Update only the narrow architecture surfaces needed to make that model
+   normative.
+
+Forbidden changes
+-----------------
+- do not solve this phase by introducing a filesystem namespace
+- do not treat boot-wired service public names as general durable-resource ids
+- do not widen naming into capability or authority semantics
+- do not erase the distinction between stable resource identity and live
+  service-instance generation
+- do not add dynamic discovery to justify the naming model
+
+Phase role in the larger sequence
+---------------------------------
+- This phase consumes the architectural ambiguity named in Phase 309.
+- It prepares Phase 311 by making durability and restart contracts attach to
+  one explicit identity model instead of multiple competing ones.
+- It prepares Phase 315 by giving the first durable app-facing slice one clear
+  answer for what counts as “the same resource” across restart and lookup.
+
+Relevant backlog items this phase intentionally brings under pressure
+--------------------------------------------------------------------
+- the active pressure around one dominant naming story for storage-like owners
+- the need to keep resource identity, names, and authority separate
+- the later file-like need for one honest lookup model that does not imply a
+  full filesystem
+
+Questions this phase must answer
+--------------------------------
+1. Is the repository now committed to identity-first, names layered, or not?
+2. Which current public names are true identities and which are only lookup
+   labels?
+3. How should restart-visible instance identity relate to stable resource
+   identity?
+4. What minimum naming model later durable-resource owners must follow?
+
+Preferred implementation shape
+------------------------------
+- Start from `docs/arch/veya/sys/veya_sys_resource_model_v0.txt` as the
+  controlling owner for the intended identity-first rule.
+- Reuse the existing restartable-service identity taxonomy rather than
+  reinventing live-instance language.
+- Prefer one short normative identity-and-name table over a large naming essay.
+- Keep naming layered and capability-neutral.
+
+Implementation accelerators
+---------------------------
+Main files and navigations
+~~~~~~~~~~~~~~~~~~~~~~~~~~
+- Controlling owner to open first:
+  `docs/arch/veya/sys/veya_sys_resource_model_v0.txt`.
+- Adjacent supporting notes to open second:
+  `docs/arch/veya/services/veya_restartable_service_identity_taxonomy_v0.txt`,
+  `docs/arch/veya/sys/veya_sys_semantics_contract_v0.txt`, and
+  `docs/arch/veya/sys/veya_authority_vocabulary_and_ownership_table_v0.txt`.
+- First code-evidence owners if concrete examples are needed:
+  `kernel/src/identity/service_topology.mc`,
+  `kernel/src/identity/program_catalog.mc`,
+  `kernel/src/services/object_store_service.mc`, and
+  `kernel/src/services/file_service.mc`.
+- Expected first validation target: editor diagnostics on the touched docs.
+
+Relevant cookbook patterns
+~~~~~~~~~~~~~~~~~~~~~~~~~~
+- No exact cookbook pattern applies. This is a bounded architecture decision
+  phase rather than a direct service or compiler feature landing.
+
+Relevant file-local invariants
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+- `docs/arch/veya/sys/veya_sys_resource_model_v0.txt` already states the
+  identity-first, layered-name intention and should remain the single owner of
+  that public vocabulary.
+- `docs/arch/veya/services/veya_restartable_service_identity_taxonomy_v0.txt`
+  already owns the distinction between stable public identity and restart
+  generation identity.
+- `kernel/src/identity/service_topology.mc` remains the owner of stable public
+  service names and must not become a general name service by accident.
+- `kernel/src/identity/program_catalog.mc` is product identity, not a general
+  durable-resource naming framework.
+
+Dependency-ordered touch sequence
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+- Land the identity-first versus layered-name decision in the resource-model
+  contract first.
+- Sync the restartable-service identity vocabulary second.
+- Update any adjacent authority or planning surfaces third.
+- Route unresolved naming contradictions to open-decisions surfaces last.
+
+Common breakage map
+~~~~~~~~~~~~~~~~~~~
+- Phase treats service names as generic resource ids -> later durable owners
+  inherit the wrong identity model.
+- Phase collapses product labels and durable-resource names -> app-facing and
+  product-specific semantics blur together.
+- Phase tries to settle authority through naming -> capability model becomes
+  less explicit.
+- Phase widens into path syntax or registry design -> the bounded naming model
+  is lost.
+
+Relevant test surfaces
+~~~~~~~~~~~~~~~~~~~~~~
+- Primary owning validation surface: editor diagnostics on the touched
+  architecture and planning docs.
+- Narrowest expected first executable validation target only if the phase needs
+  to confirm a concrete naming or identity surface in code: the nearest owner-
+  local reset-lane or real-project proof for that owner.
+- Use `docs/agent/prompts/test_overview.txt` only if a concrete evidence gap
+  must be repaired.
+
+Test obligations
+----------------
+- require editor diagnostics on the touched docs
+- run executable validation only if a concrete identity or naming evidence gap
+  must be repaired
+- if executable validation is required, start with the narrowest owner-local
+  surface only
+
+Acceptance criteria
+-------------------
+- the repository has one explicit identity-first and layered naming model
+- stable resource identity, public names, and live-instance identity are kept
+  distinct in the normative docs
+- current public naming surfaces are classified consistently against that model
+- no filesystem namespace, discovery framework, or capability redesign lands by
+  convenience
+
+Future follow-up
+----------------
+- Phase 311 should map the chosen identity model onto one shared durability and
+  restart contract.
+- Any still-unsettled cross-owner naming contradiction should be resolved or
+  explicitly recorded before Phase 312 attempts the full current-owner mapping.

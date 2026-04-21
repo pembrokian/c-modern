@@ -347,12 +347,11 @@ Phase 308 -- Post-Second-App Platform Direction Audit
   networking, durable file-like growth, or another compiler wave.
 
 Outcome checkpoint after Band I:
-- the repository should either have one honest two-app install story or one
-  explicit decision that packaging is still not the strongest next wave.
-- Phase 305 delivered that explicit decision: the current `issue_rollup`-
-  only installed path is still not the strongest blocker, `review_board`
-  remains direct-launch-only, and broader packaging stays deferred until a
-  real second installed consumer appears.
+- the repository now has one honest two-app install story on the existing
+  `update_store_service` plus `launcher_service` split.
+- Phase 308 records that this fully spends the current packaging pressure for
+  the admitted app pair; broader packaging and networking both lose to durable
+  file-like growth as the next stronger deferred branch.
 
 Interpretation guide
 --------------------
@@ -364,9 +363,9 @@ Interpretation guide
   clearest next blocker, Band H should be preferred before any packaging step.
 - If Band H spends the byte-literal surface cleanly, move to Band I packaging
   comparison rather than reopening compiler work.
-- If Band G lands cleanly but no second installed-program pressure appears,
-  Band I should be delayed rather than forced.
-- If networking or durable file-like growth suddenly gains one stronger real
-  maintained consumer than the current UI or packaging pressures, the
-  repository should say so explicitly and treat that as a new direction note
-  rather than quietly mutating this roadmap's assumptions.
+- If Band I lands as one honest two-app installed story, treat broader
+  packaging as spent until a third installed consumer or materially different
+  package family becomes the stronger blocker.
+- After Phase 308, prefer bounded durable file-like growth over more
+  packaging or networking unless a stronger maintained consumer appears and
+  changes that ranking explicitly.

@@ -1,0 +1,223 @@
+Phase 309 -- Universal Resource Interface Audit
+================================================
+
+Status
+------
+PROPOSED
+
+Purpose
+-------
+Define whether the repository can now state one shared external resource model
+for storage-like and restart-visible owners, and name the smallest honest
+boundary where that model should live, instead of letting another durable wave
+ proceed on top of multiple almost-equivalent public stories.
+
+This phase exists now because Phase 308 chose durable file-like growth as the
+next winner, but the repository is already close to architectural drift across
+resource identity, naming, durability, restart truth, and capability exposure.
+The next honest move is therefore an interface audit before another feature
+slice, not a broader storage framework step.
+
+Repository status note
+----------------------
+- Phase 308 records that broader packaging is spent for the admitted two-app
+  installed story and that durable file-like growth is now the strongest next
+  deferred branch.
+- `docs/arch/veya/sys/veya_sys_semantics_contract_v0.txt` now states the
+  intended six-part convergence target: one dominant resource identity, naming,
+  durability, restart, capability, and common service contract story.
+- `docs/arch/veya/sys/veya_sys_resource_model_v0.txt` and
+  `docs/arch/veya/sys/veya_sys_common_service_contract_v0.txt` name the
+  intended model, but the repository does not yet have one explicit audit that
+  compares current owners against that target and identifies the smallest
+  honest unification boundary.
+- Current storage-like and restart-visible owners still include
+  `journal_service`, `object_store_service`, `file_service`,
+  `update_store_service`, and retained-state owners with partly overlapping but
+  not yet explicitly unified public semantics.
+
+Problem being solved
+--------------------
+- The repository now risks local simplicity and global complexity diverging.
+  Each owner remains individually small, but the system-level stories for
+  names, durable data, restart-visible truth, and resource access are no
+  longer obviously one thing.
+- If the next durable phase lands without an audit, the repository can deepen
+  that drift by admitting another consumer-local storage contract without first
+  deciding whether the current owners are specializations of one model or a set
+  of unrelated public subsystems.
+- The current-repo problem is therefore one missing cross-owner semantic audit,
+  not the absence of more file-like behavior by itself.
+
+Non-goals
+---------
+- no filesystem implementation
+- no storage-engine rewrite
+- no requirement that one present owner immediately become the final generic
+  durable-resource owner
+- no capability algebra or ACL system
+- no user-facing feature landing by default
+
+Invariants
+----------
+- The audit must preserve the current service-owner split; it may compare
+  owners, but it must not move owner-local behavior into a framework layer.
+- Public names remain distinct from authority.
+- Resource identity remains distinct from service identity and live-instance
+  generation.
+- Restart-visible truth remains explicit and owner-local even if the audit
+  standardizes vocabulary across owners.
+- Planning-surface churn remains narrow and proportional to the audit result.
+
+Required surface changes
+------------------------
+1. Compare the current storage-like and restart-visible owners against the
+   semantics contract in `docs/arch/veya/sys/veya_sys_semantics_contract_v0.txt`.
+2. Record the current divergence points in resource identity, naming,
+   durability class, restart-visible truth, and capability exposure.
+3. Name the smallest honest shared external model that current owners should
+   converge toward.
+4. Update only the narrow architecture or planning surfaces needed to reflect
+   that audit result.
+
+Forbidden changes
+-----------------
+- do not solve the audit by inventing a giant storage framework
+- do not widen the audit into an implementation phase by default
+- do not collapse internal service differences that still matter locally
+- do not treat names as authority merely to simplify the comparison
+- do not confuse product-specific durable owners with the generic public model
+
+Phase role in the larger sequence
+---------------------------------
+- This phase opens Band J by testing whether the new sys semantics contract can
+  serve as the real unifying public model for the next durable wave.
+- It prepares Phase 310 by identifying what identity-first and layered naming
+  must mean concretely in this repository.
+- It prevents Phase 315-style consumer work from hardening the wrong public
+  contract by convenience.
+
+Relevant backlog items this phase intentionally brings under pressure
+--------------------------------------------------------------------
+- the active backlog themes around file-like growth, durable owner boundaries,
+  and app-facing durable data
+- the architectural pressure to keep one dominant naming, restart, and
+  capability story instead of multiple almost-generic variants
+- the need to classify which current storage-like owners are generic,
+  specialized, retained-only, or substrate-only
+
+Questions this phase must answer
+--------------------------------
+1. Which current owners are presenting resource-like public semantics today?
+2. Where do those owners diverge in identity, naming, durability, restart, and
+   capability language?
+3. Which divergence points are real specializations and which are accidental
+   variation?
+4. What is the smallest honest shared external model the repository can now
+   commit to before more feature growth?
+
+Preferred implementation shape
+------------------------------
+- Start from `docs/arch/veya/sys/veya_sys_semantics_contract_v0.txt` as the
+  controlling architectural contract.
+- Compare each relevant current owner against that contract without assuming
+  that one implementation must absorb all others.
+- Prefer a short owner-classification matrix and one explicit winner for the
+  shared external model over a broad essay.
+- If the audit finds a real unresolved contradiction, route it to
+  `docs/arch/open_decisions.txt`; otherwise keep the result in architecture and
+  phase-planning surfaces only.
+
+Implementation accelerators
+---------------------------
+Main files and navigations
+~~~~~~~~~~~~~~~~~~~~~~~~~~
+- Controlling owner to open first:
+  `docs/arch/veya/sys/veya_sys_semantics_contract_v0.txt`.
+- Adjacent comparison surfaces to open second:
+  `docs/arch/veya/sys/veya_sys_resource_model_v0.txt`,
+  `docs/arch/veya/sys/veya_sys_common_service_contract_v0.txt`,
+  `docs/arch/veya/sys/veya_authority_vocabulary_and_ownership_table_v0.txt`,
+  and `docs/arch/veya/services/veya_restartable_service_identity_taxonomy_v0.txt`.
+- First code-evidence surfaces to inspect if the audit needs concrete examples:
+  `kernel/src/services/object_store_service.mc`,
+  `kernel/src/services/file_service.mc`,
+  `kernel/src/services/update_store_service.mc`, and retained-state owners such
+  as `kernel/src/services/kv_service.mc`.
+- Expected first validation target: editor diagnostics on the touched docs.
+
+Relevant cookbook patterns
+~~~~~~~~~~~~~~~~~~~~~~~~~~
+- No exact cookbook pattern applies. This is a bounded architecture audit, not
+  a direct runtime or compiler feature landing.
+- Pattern 9 -- Add A New Runtime Service is relevant only as a reminder that a
+  future service implementation phase must still keep one owner and one honest
+  consumer, but this audit should not land that service.
+
+Relevant file-local invariants
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+- `docs/arch/veya/sys/veya_sys_semantics_contract_v0.txt` is the single owner
+  of the intended six-part public system model and should remain the umbrella
+  contract.
+- `docs/arch/veya/sys/veya_sys_resource_model_v0.txt` owns the intended
+  identity, naming, durability, restart, and capability vocabulary.
+- `docs/arch/veya/services/veya_restartable_service_identity_taxonomy_v0.txt`
+  already owns the admitted live-instance and restart-generation taxonomy and
+  should not be silently contradicted.
+- `kernel/src/identity/service_topology.mc` remains the owner of stable public
+  service names; this audit must not casually widen it into a general resource
+  registry.
+
+Dependency-ordered touch sequence
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+- Compare the umbrella sys semantics contract against current storage-like and
+  restart-visible owners first.
+- Land the owner-classification and divergence audit second.
+- Sync any narrow architecture or planning follow-through third.
+- Route only unresolved contradictions to open-decisions surfaces last.
+
+Common breakage map
+~~~~~~~~~~~~~~~~~~~
+- Audit treats all durable owners as generic peers -> later phases widen the
+  wrong owner by convenience.
+- Audit collapses service identity, resource identity, and live-instance
+  generation -> restart semantics become less clear rather than more clear.
+- Audit treats names as authority -> capability and access rules become
+  inconsistent with the sys semantics contract.
+- Audit widens into implementation detail comparison instead of public
+  semantics -> the phase loses its bounded architectural purpose.
+
+Relevant test surfaces
+~~~~~~~~~~~~~~~~~~~~~~
+- Primary owning validation surface: editor diagnostics on the touched
+  architecture and phase-planning docs.
+- Narrowest expected first executable validation target only if the audit needs
+  to repair a concrete evidence gap: the nearest owner-local reset-lane or real
+  project proof implicated by that gap.
+- Use `docs/agent/prompts/test_overview.txt` only if the audit uncovers a real
+  code-evidence mismatch that must be repaired before the comparison is honest.
+
+Test obligations
+----------------
+- require editor diagnostics on the touched architecture and planning docs
+- run executable validation only if the audit uncovers a missing code-evidence
+  repair
+- if executable validation is required, run only the narrowest owner-local
+  surface first
+
+Acceptance criteria
+-------------------
+- the repository has one explicit audit comparing current storage-like and
+  restart-visible owners against the sys semantics contract
+- the audit distinguishes real specialization from accidental public-semantic
+  variation
+- the phase names one smallest honest shared external model for later phases
+- no implementation framework or new storage subsystem lands by convenience
+
+Future follow-up
+----------------
+- Phase 310 should turn the audit result into one explicit resource identity
+  and layered naming model.
+- If this phase finds a still-unresolved contradiction that cannot be settled
+  locally, record it in `docs/arch/open_decisions.txt` before Phase 310 tries
+  to freeze identity semantics.
