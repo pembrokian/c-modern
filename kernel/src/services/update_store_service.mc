@@ -5,8 +5,8 @@ import service_effect
 import syscall
 
 const UPDATE_ARTIFACT_CAPACITY: usize = 4
-const UPDATE_STORE_FORMAT_VERSION: u8 = 2
-const UPDATE_STORE_ARTIFACT_SIZE: usize = 16
+const UPDATE_STORE_FORMAT_VERSION: u8 = 3
+const UPDATE_STORE_ARTIFACT_SIZE: usize = 24
 const UPDATE_STORE_LAUNCH_RECORD_SIZE: usize = 8
 const UPDATE_OP_STAGE: u8 = 65
 const UPDATE_OP_CLEAR: u8 = 67
@@ -47,6 +47,7 @@ struct UpdateStoreServiceState {
     data: [UPDATE_ARTIFACT_CAPACITY]u8
     manifest: UpdateManifest
     installed: InstalledProgramSlot
+    review_board_installed: InstalledProgramSlot
     launched: InstalledLaunchRecord
 }
 
@@ -63,16 +64,20 @@ func update_installed_init() InstalledProgramSlot {
     return InstalledProgramSlot{ present: false, version: 0, len: 0, data: primitives.zero_payload() }
 }
 
+func update_review_board_installed_init() InstalledProgramSlot {
+    return InstalledProgramSlot{ present: false, version: 0, len: 0, data: primitives.zero_payload() }
+}
+
 func update_launch_init() InstalledLaunchRecord {
     return InstalledLaunchRecord{ present: false, program: program_catalog.PROGRAM_ID_NONE, version: 0, len: 0, launcher_generation: 0 }
 }
 
 func update_store_init(pid: u32, slot: u32) UpdateStoreServiceState {
-    return UpdateStoreServiceState{ pid: pid, slot: slot, len: 0, data: primitives.zero_payload(), manifest: update_manifest_init(), installed: update_installed_init(), launched: update_launch_init() }
+    return UpdateStoreServiceState{ pid: pid, slot: slot, len: 0, data: primitives.zero_payload(), manifest: update_manifest_init(), installed: update_installed_init(), review_board_installed: update_review_board_installed_init(), launched: update_launch_init() }
 }
 
-func update_storewith(s: UpdateStoreServiceState, len: usize, data: [UPDATE_ARTIFACT_CAPACITY]u8, manifest: UpdateManifest, installed: InstalledProgramSlot, launched: InstalledLaunchRecord) UpdateStoreServiceState {
-    return UpdateStoreServiceState{ pid: s.pid, slot: s.slot, len: len, data: data, manifest: manifest, installed: installed, launched: launched }
+func update_storewith(s: UpdateStoreServiceState, len: usize, data: [UPDATE_ARTIFACT_CAPACITY]u8, manifest: UpdateManifest, installed: InstalledProgramSlot, review_board_installed: InstalledProgramSlot, launched: InstalledLaunchRecord) UpdateStoreServiceState {
+    return UpdateStoreServiceState{ pid: s.pid, slot: s.slot, len: len, data: data, manifest: manifest, installed: installed, review_board_installed: review_board_installed, launched: launched }
 }
 
 func update_manifest_equal(left: UpdateManifest, right: UpdateManifest) bool {
@@ -106,6 +111,10 @@ func update_installed_equal(left: InstalledProgramSlot, right: InstalledProgramS
     return true
 }
 
+func update_review_board_installed_equal(left: InstalledProgramSlot, right: InstalledProgramSlot) bool {
+    return update_installed_equal(left, right)
+}
+
 func update_launch_equal(left: InstalledLaunchRecord, right: InstalledLaunchRecord) bool {
     if left.present != right.present {
         return false
@@ -135,6 +144,9 @@ func update_store_changed(before: UpdateStoreServiceState, after: UpdateStoreSer
     if !update_installed_equal(before.installed, after.installed) {
         return true
     }
+    if !update_review_board_installed_equal(before.review_board_installed, after.review_board_installed) {
+        return true
+    }
     if !update_launch_equal(before.launched, after.launched) {
         return true
     }
@@ -150,6 +162,14 @@ func update_installed_present(s: UpdateStoreServiceState) bool {
     return s.installed.present
 }
 
+func update_review_board_installed_present(s: UpdateStoreServiceState) bool {
+    return s.review_board_installed.present
+}
+
+func update_installed_any_present(s: UpdateStoreServiceState) bool {
+    return update_installed_present(s) || update_review_board_installed_present(s)
+}
+
 func update_installed_program_id(s: UpdateStoreServiceState) u8 {
     if !update_installed_present(s) {
         return program_catalog.PROGRAM_ID_NONE
@@ -157,12 +177,56 @@ func update_installed_program_id(s: UpdateStoreServiceState) u8 {
     return program_catalog.PROGRAM_ID_ISSUE_ROLLUP
 }
 
+func update_installed_program_id_for(s: UpdateStoreServiceState, program: u8) u8 {
+    if program == program_catalog.PROGRAM_ID_ISSUE_ROLLUP {
+        if update_installed_present(s) {
+            return program_catalog.PROGRAM_ID_ISSUE_ROLLUP
+        }
+        return program_catalog.PROGRAM_ID_NONE
+    }
+    if program == program_catalog.PROGRAM_ID_REVIEW_BOARD {
+        if update_review_board_installed_present(s) {
+            return program_catalog.PROGRAM_ID_REVIEW_BOARD
+        }
+        return program_catalog.PROGRAM_ID_NONE
+    }
+    return program_catalog.PROGRAM_ID_NONE
+}
+
 func update_installed_version(s: UpdateStoreServiceState) u8 {
     return s.installed.version
 }
 
+func update_review_board_installed_version(s: UpdateStoreServiceState) u8 {
+    return s.review_board_installed.version
+}
+
+func update_installed_version_for(s: UpdateStoreServiceState, program: u8) u8 {
+    if program == program_catalog.PROGRAM_ID_ISSUE_ROLLUP {
+        return update_installed_version(s)
+    }
+    if program == program_catalog.PROGRAM_ID_REVIEW_BOARD {
+        return update_review_board_installed_version(s)
+    }
+    return 0
+}
+
 func update_installed_len(s: UpdateStoreServiceState) usize {
     return s.installed.len
+}
+
+func update_review_board_installed_len(s: UpdateStoreServiceState) usize {
+    return s.review_board_installed.len
+}
+
+func update_installed_len_for(s: UpdateStoreServiceState, program: u8) usize {
+    if program == program_catalog.PROGRAM_ID_ISSUE_ROLLUP {
+        return update_installed_len(s)
+    }
+    if program == program_catalog.PROGRAM_ID_REVIEW_BOARD {
+        return update_review_board_installed_len(s)
+    }
+    return 0
 }
 
 func update_installed_byte(s: UpdateStoreServiceState, idx: usize) u8 {
@@ -170,6 +234,23 @@ func update_installed_byte(s: UpdateStoreServiceState, idx: usize) u8 {
         return 0
     }
     return s.installed.data[idx]
+}
+
+func update_review_board_installed_byte(s: UpdateStoreServiceState, idx: usize) u8 {
+    if idx >= UPDATE_ARTIFACT_CAPACITY {
+        return 0
+    }
+    return s.review_board_installed.data[idx]
+}
+
+func update_installed_byte_for(s: UpdateStoreServiceState, program: u8, idx: usize) u8 {
+    if program == program_catalog.PROGRAM_ID_ISSUE_ROLLUP {
+        return update_installed_byte(s, idx)
+    }
+    if program == program_catalog.PROGRAM_ID_REVIEW_BOARD {
+        return update_review_board_installed_byte(s, idx)
+    }
+    return 0
 }
 
 func update_applied_present(s: UpdateStoreServiceState) bool {
@@ -204,16 +285,16 @@ func update_launch_matches_installed_program(s: UpdateStoreServiceState, program
     if !s.launched.present {
         return false
     }
-    if update_installed_program_id(s) != program {
+    if update_installed_program_id_for(s, program) != program {
         return false
     }
     if s.launched.program != program {
         return false
     }
-    if s.launched.version != update_installed_version(s) {
+    if s.launched.version != update_installed_version_for(s, program) {
         return false
     }
-    if s.launched.len != update_installed_len(s) {
+    if s.launched.len != update_installed_len_for(s, program) {
         return false
     }
     return true
@@ -223,11 +304,11 @@ func update_record_launch(s: UpdateStoreServiceState, program: u8, launcher_gene
     launched := InstalledLaunchRecord{
         present: true,
         program: program,
-        version: update_installed_version(s),
-        len: update_installed_len(s),
+        version: update_installed_version_for(s, program),
+        len: update_installed_len_for(s, program),
         launcher_generation: launcher_generation
     }
-    return update_storewith(s, s.len, s.data, s.manifest, s.installed, launched)
+    return update_storewith(s, s.len, s.data, s.manifest, s.installed, s.review_board_installed, launched)
 }
 
 func update_manifest_classification(s: UpdateStoreServiceState) u8 {
@@ -274,6 +355,16 @@ func update_store_artifact_bytes(s: UpdateStoreServiceState) [UPDATE_STORE_ARTIF
     for i in 0..UPDATE_ARTIFACT_CAPACITY {
         bytes[12 + i] = s.installed.data[i]
     }
+    if s.review_board_installed.present {
+        bytes[16] = 1
+    } else {
+        bytes[16] = 0
+    }
+    bytes[17] = s.review_board_installed.version
+    bytes[18] = u8(s.review_board_installed.len)
+    for i in 0..UPDATE_ARTIFACT_CAPACITY {
+        bytes[19 + i] = s.review_board_installed.data[i]
+    }
     return bytes
 }
 
@@ -313,7 +404,7 @@ func update_store_load(pid: u32, slot: u32) UpdateStoreServiceState {
     if bytes[0] != UPDATE_STORE_FORMAT_VERSION {
         return state
     }
-    if usize(bytes[1]) > UPDATE_ARTIFACT_CAPACITY || usize(bytes[4]) > UPDATE_ARTIFACT_CAPACITY || usize(bytes[11]) > UPDATE_ARTIFACT_CAPACITY {
+    if usize(bytes[1]) > UPDATE_ARTIFACT_CAPACITY || usize(bytes[4]) > UPDATE_ARTIFACT_CAPACITY || usize(bytes[11]) > UPDATE_ARTIFACT_CAPACITY || usize(bytes[18]) > UPDATE_ARTIFACT_CAPACITY {
         return state
     }
 
@@ -327,6 +418,11 @@ func update_store_load(pid: u32, slot: u32) UpdateStoreServiceState {
         installed_data[i] = bytes[12 + i]
     }
     installed := InstalledProgramSlot{ present: bytes[9] == 1, version: bytes[10], len: usize(bytes[11]), data: installed_data }
+    review_board_data: [UPDATE_ARTIFACT_CAPACITY]u8 = primitives.zero_payload()
+    for i in 0..UPDATE_ARTIFACT_CAPACITY {
+        review_board_data[i] = bytes[19 + i]
+    }
+    review_board_installed := InstalledProgramSlot{ present: bytes[16] == 1, version: bytes[17], len: usize(bytes[18]), data: review_board_data }
     launch_bytes: [UPDATE_STORE_LAUNCH_RECORD_SIZE]u8
     launched := update_launch_init()
     if fs.read_exact("mc_update_store_launch.bin", (Slice<u8>)(launch_bytes)) {
@@ -338,7 +434,7 @@ func update_store_load(pid: u32, slot: u32) UpdateStoreServiceState {
             launcher_generation: (u32(launch_bytes[4]) << 24) + (u32(launch_bytes[5]) << 16) + (u32(launch_bytes[6]) << 8) + u32(launch_bytes[7])
         }
     }
-    return UpdateStoreServiceState{ pid: pid, slot: slot, len: usize(bytes[1]), data: data, manifest: manifest, installed: installed, launched: launched }
+    return UpdateStoreServiceState{ pid: pid, slot: slot, len: usize(bytes[1]), data: data, manifest: manifest, installed: installed, review_board_installed: review_board_installed, launched: launched }
 }
 
 func update_stage(s: UpdateStoreServiceState, value: u8) UpdateStoreResult {
@@ -347,7 +443,7 @@ func update_stage(s: UpdateStoreServiceState, value: u8) UpdateStoreResult {
     }
     data := s.data
     data[s.len] = value
-    return UpdateStoreResult{ state: update_storewith(s, s.len + 1, data, s.manifest, s.installed, s.launched), effect: service_effect.effect_reply(syscall.SyscallStatus.Ok, 0, primitives.zero_payload()) }
+    return UpdateStoreResult{ state: update_storewith(s, s.len + 1, data, s.manifest, s.installed, s.review_board_installed, s.launched), effect: service_effect.effect_reply(syscall.SyscallStatus.Ok, 0, primitives.zero_payload()) }
 }
 
 func update_record_manifest(s: UpdateStoreServiceState, version: u8, expected_len: u8) UpdateStoreResult {
@@ -355,7 +451,7 @@ func update_record_manifest(s: UpdateStoreServiceState, version: u8, expected_le
         return UpdateStoreResult{ state: s, effect: service_effect.effect_reply(syscall.SyscallStatus.InvalidArgument, 0, primitives.zero_payload()) }
     }
     manifest := UpdateManifest{ present: true, version: version, expected_len: usize(expected_len) }
-    return UpdateStoreResult{ state: update_storewith(s, s.len, s.data, manifest, s.installed, s.launched), effect: service_effect.effect_reply(syscall.SyscallStatus.Ok, 0, primitives.zero_payload()) }
+    return UpdateStoreResult{ state: update_storewith(s, s.len, s.data, manifest, s.installed, s.review_board_installed, s.launched), effect: service_effect.effect_reply(syscall.SyscallStatus.Ok, 0, primitives.zero_payload()) }
 }
 
 func update_apply(s: UpdateStoreServiceState) UpdateStoreResult {
@@ -366,7 +462,12 @@ func update_apply(s: UpdateStoreServiceState) UpdateStoreResult {
     if update_installed_equal(s.installed, installed) {
         return UpdateStoreResult{ state: s, effect: service_effect.effect_reply(syscall.SyscallStatus.Ok, 0, primitives.zero_payload()) }
     }
-    return UpdateStoreResult{ state: update_storewith(s, s.len, s.data, s.manifest, installed, s.launched), effect: service_effect.effect_reply(syscall.SyscallStatus.Ok, 0, primitives.zero_payload()) }
+    return UpdateStoreResult{ state: update_storewith(s, s.len, s.data, s.manifest, installed, s.review_board_installed, s.launched), effect: service_effect.effect_reply(syscall.SyscallStatus.Ok, 0, primitives.zero_payload()) }
+}
+
+func update_review_board_install(s: UpdateStoreServiceState, version: u8, len: usize, data: [UPDATE_ARTIFACT_CAPACITY]u8) UpdateStoreServiceState {
+    review_board_installed := InstalledProgramSlot{ present: true, version: version, len: len, data: data }
+    return update_storewith(s, s.len, s.data, s.manifest, s.installed, review_board_installed, s.launched)
 }
 
 func update_query(s: UpdateStoreServiceState) UpdateStoreResult {
@@ -380,7 +481,7 @@ func update_query(s: UpdateStoreServiceState) UpdateStoreResult {
 
 func update_clear(s: UpdateStoreServiceState) UpdateStoreResult {
     cleared := update_store_init(s.pid, s.slot)
-    return UpdateStoreResult{ state: update_storewith(cleared, cleared.len, cleared.data, cleared.manifest, s.installed, s.launched), effect: service_effect.effect_reply(syscall.SyscallStatus.Ok, 0, primitives.zero_payload()) }
+    return UpdateStoreResult{ state: update_storewith(cleared, cleared.len, cleared.data, cleared.manifest, s.installed, s.review_board_installed, s.launched), effect: service_effect.effect_reply(syscall.SyscallStatus.Ok, 0, primitives.zero_payload()) }
 }
 
 func handle(s: UpdateStoreServiceState, m: service_effect.Message) UpdateStoreResult {

@@ -15,6 +15,7 @@ const FAIL_REVIEW_BOARD_SETUP: i32 = 28601
 const FAIL_REVIEW_BOARD_SELECT: i32 = 28602
 const FAIL_REVIEW_BOARD_LAUNCH: i32 = 28603
 const FAIL_REVIEW_BOARD_DISPLAY_INIT: i32 = 28604
+const FAIL_REVIEW_BOARD_IDENTIFY: i32 = 28626
 const FAIL_REVIEW_BOARD_INPUT_OPEN: i32 = 28605
 const FAIL_REVIEW_BOARD_DISPLAY_PAUSE: i32 = 28606
 const FAIL_REVIEW_BOARD_INPUT_STATUS: i32 = 28607
@@ -52,7 +53,8 @@ func expect_delivered(effect: service_effect.Effect, value: u8) bool {
 }
 
 func run_review_board_ui_proof_probe() i32 {
-    if !update_store_service.update_store_persist(update_store_service.update_store_init(service_topology.UPDATE_STORE_SLOT.pid, 1)) {
+    review_board_data: [4]u8 = [4]u8{ 94, 95, 96, 0 }
+    if !update_store_service.update_store_persist(update_store_service.update_review_board_install(update_store_service.update_store_init(service_topology.UPDATE_STORE_SLOT.pid, 1), 9, 3, review_board_data)) {
         return FAIL_REVIEW_BOARD_SETUP
     }
 
@@ -61,6 +63,11 @@ func run_review_board_ui_proof_probe() i32 {
     effect := kernel_dispatch.kernel_dispatch_step(&state, scenario_transport.cmd_launcher_select(program_catalog.PROGRAM_ID_REVIEW_BOARD))
     if !scenario_assert.expect_reply(effect, syscall.SyscallStatus.Ok, 2, program_catalog.PROGRAM_ID_REVIEW_BOARD, 0, 0, 0) {
         return FAIL_REVIEW_BOARD_SELECT
+    }
+
+    effect = kernel_dispatch.kernel_dispatch_step(&state, scenario_transport.cmd_launcher_identify())
+    if !scenario_assert.expect_reply(effect, syscall.SyscallStatus.Ok, 4, program_catalog.PROGRAM_ID_REVIEW_BOARD, 9, 3, program_catalog.PROGRAM_ID_REVIEW_BOARD) {
+        return FAIL_REVIEW_BOARD_IDENTIFY
     }
 
     effect = kernel_dispatch.kernel_dispatch_step(&state, scenario_transport.cmd_launcher_launch())

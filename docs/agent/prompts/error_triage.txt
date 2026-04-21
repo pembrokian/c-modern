@@ -33,6 +33,13 @@ Common first-break checks
   check `compiler/support/dump_paths.*`, any owner-local artifact resolver,
   and the actual emitted `obj/`, `bin/`, `mci/`, or `state/` tree before
   changing compiler or workflow logic
+- Stale build or generated-project reuse:
+  if the same compile error repeats immediately after a direct source fix,
+  check whether the owning workflow or test path builds from a generated
+  project tree or cached build dir; inspect the emitted source and outputs
+  under the owning build tree, confirm whether the touched file was recopied
+  or rebuilt, and invalidate the smallest relevant build dir before widening
+  code search or forcing a full rebuild
 - Incremental rebuild or timestamp assertion failure:
   check whether the assertion is stale before changing reuse logic; reproduce
   the local build twice, inspect object or executable mtimes, and compare the

@@ -85,9 +85,9 @@ func launcher_identify(s: LauncherServiceState, ctx: LauncherContext) LauncherRe
         launcher_reply(
             syscall.SyscallStatus.Ok,
             4,
-            update_store_service.update_installed_program_id(ctx.update_store),
-            update_store_service.update_installed_version(ctx.update_store),
-            u8(update_store_service.update_installed_len(ctx.update_store)),
+            update_store_service.update_installed_program_id_for(ctx.update_store, s.selected),
+            update_store_service.update_installed_version_for(ctx.update_store, s.selected),
+            u8(update_store_service.update_installed_len_for(ctx.update_store, s.selected)),
             s.selected))
 }
 
@@ -101,7 +101,7 @@ func launcher_select(s: LauncherServiceState, ctx: LauncherContext, id: u8) Laun
 }
 
 func launcher_visible_status(s: LauncherServiceState, ctx: LauncherContext) u8 {
-    if !update_store_service.update_installed_present(ctx.update_store) {
+    if !update_store_service.update_installed_any_present(ctx.update_store) {
         return LAUNCHER_STATUS_NONE
     }
     if s.foreground == program_catalog.PROGRAM_ID_NONE {

@@ -1,5 +1,5 @@
 
-TOOLS/MISC EXTRACTORS - README
+TOOLS/DECL_EXTRACTION - README
 
 Overview:
 	Purpose: Small utilities to extract top-level function and struct
@@ -8,35 +8,35 @@ Overview:
 
 Scripts:
 	extract_mc_decs.py
-		location: tools/misc/extract_mc_decs.py
+		location: tools/decl_extraction/extract_mc_decs.py
 		scans: kernel/src
-		outputs: tools/misc/extracted_mc_decs/
+		outputs: tools/decl_extraction/extracted_mc_decs/
 		notes: writes one file per immediate child directory, named
 					 <dir>_extracted_decs.txt (for example: shell_extracted_decs.txt)
 
 	extract_cpp_decs.py
-		location: tools/misc/extract_cpp_decs.py
+		location: tools/decl_extraction/extract_cpp_decs.py
 		scans: compiler/
-		outputs: tools/misc/extracted_decls/compiler_extracted_decs.txt
+		outputs: tools/decl_extraction/extracted_decls/compiler_extracted_decs.txt
 
 	extract_c_decs.py
-		location: tools/misc/extract_c_decs.py
+		location: tools/decl_extraction/extract_c_decs.py
 		scans: runtime/
-		outputs: tools/misc/extracted_c_decs/
+		outputs: tools/decl_extraction/extracted_c_decs/
 		notes: writes one file per immediate child directory, named
 					 <dir>_extracted_decs.txt (for example: freestanding_extracted_decs.txt)
 
 Outputs:
-	Modern C:    tools/misc/extracted_mc_decs/   (per-directory files)
-	Compiler:    tools/misc/extracted_decls/      (single compiler_extracted_decs.txt)
-	Runtime C:   tools/misc/extracted_c_decs/     (per-directory files)
+	Modern C:    tools/decl_extraction/extracted_mc_decs/   (per-directory files)
+	Compiler:    tools/decl_extraction/extracted_decls/      (single compiler_extracted_decs.txt)
+	Runtime C:   tools/decl_extraction/extracted_c_decs/     (per-directory files)
 
 Quick run:
 	Use the project's virtualenv Python interpreter so dependencies match.
 
-	./.venv/bin/python tools/misc/extract_mc_decs.py
-	./.venv/bin/python tools/misc/extract_cpp_decs.py
-	./.venv/bin/python tools/misc/extract_c_decs.py
+	./.venv/bin/python tools/decl_extraction/extract_mc_decs.py
+	./.venv/bin/python tools/decl_extraction/extract_cpp_decs.py
+	./.venv/bin/python tools/decl_extraction/extract_c_decs.py
 
 Notes:
 	- The clang-based extractors (extract_cpp_decs.py, extract_c_decs.py)
@@ -45,7 +45,7 @@ Notes:
 		path of libclang.dylib before running. Example:
 
 		export LIBCLANG_FILE=/path/to/libclang.dylib
-		./.venv/bin/python tools/misc/extract_c_decs.py
+		./.venv/bin/python tools/decl_extraction/extract_c_decs.py
 
 	- To change which directories are scanned, edit the SOURCE_DIRS list
 		near the top of the corresponding script.

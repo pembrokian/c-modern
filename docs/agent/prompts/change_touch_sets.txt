@@ -66,6 +66,10 @@ Grouped test touch sets
 - Real-project workflow change:
   `tests/tool/real_projects/<case>/test.cpp`, that case's descriptor or
   manifest, grouped real-project dispatcher only if shared wiring changed
+  - stale-build checks:
+    checked-in source, generated project source, owner-local build dir, and
+    emitted outputs under the owning build tree; if one is stale, invalidate
+    the narrow build dir before rerunning the target
 - Reset-lane change:
   narrow scenario or fixture first, then `tests/tool/tool_kernel_reset_lane_suite.cpp`,
   then the maintained full grouped case only after the narrow owner passes
@@ -75,3 +79,8 @@ Grouped test touch sets
     scenario-count constant, then coverage helper expectations, fixture
     directory naming, and the owning CTest target before reopening broader
     workflow code
+  - stale-build checks:
+    checked-in scenario source, generated repo-project source, owning build
+    dir, and emitted outputs under the active build tree; if the same compile
+    error repeats after a source fix, invalidate the smallest relevant build
+    dir before forcing a full rebuild

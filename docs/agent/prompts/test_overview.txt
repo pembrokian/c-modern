@@ -203,6 +203,11 @@ Local iteration guidance
 - if build-state or real-project reuse assertions fail, inspect the actual
   emitted artifact names and mtimes before changing shared build logic; stale
   owner-local expectations are common
+- if a workflow or reset-lane target repeats the same compile error
+  immediately after a direct source fix, treat that as possible stale
+  generated-project or cached-build reuse; compare the checked-in source with
+  the emitted project source under the owning build tree, then invalidate the
+  smallest relevant build dir before assuming the source edit failed
 - after changing shared tool helpers or dump-path helpers, widen once to the
   neighboring grouped workflow or real-project owners rather than assuming the
   narrow owner target is sufficient

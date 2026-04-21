@@ -6,7 +6,7 @@ SOURCE_EXTS = ['.mc']
 SOURCE_DIRS = ['kernel/src']
 
 # fixed output dir and file
-OUTPUT_DIR = 'tools/misc/extracted_mc_decs'
+OUTPUT_DIR = 'tools/decl_extraction/extracted_mc_decs'
 DECL_KIND = 'FUNCTION_DECL'
 STRUCT_KIND = 'STRUCT_DECL'
 

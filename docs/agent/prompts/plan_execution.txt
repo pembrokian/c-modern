@@ -55,31 +55,35 @@ Implementation requirements:
     unrelated reasons, record that it is low-signal for the current change and
     step to the next closest owner-local validation surface instead of
     reopening implementation work immediately.
+22. If the same compile error repeats immediately after a direct local fix,
+    consider stale generated-project or cached-build reuse before reopening
+    code exploration; inspect the owning build tree and invalidate the
+    smallest relevant build dir first instead of defaulting to a full rebuild.
 
 After implementation:
 
-22. Update only docs whose truth actually changed.
-23. Prefer phase-doc appendices or phase-local notes first.
-24. Touch `backlog`, `decision_log`, `repo_map`, or architecture docs only when the implementation revealed a new durable fact, boundary, or deferred pressure.
-25. Skip repo memory or sidecar summary writes unless the user explicitly asked for them or the local workflow requires them.
-26. Update any affected docs, such as:
+23. Update only docs whose truth actually changed.
+24. Prefer phase-doc appendices or phase-local notes first.
+25. Touch `backlog`, `decision_log`, `repo_map`, or architecture docs only when the implementation revealed a new durable fact, boundary, or deferred pressure.
+26. Skip repo memory or sidecar summary writes unless the user explicitly asked for them or the local workflow requires them.
+27. Update any affected docs, such as:
    - roadmap
    - backlog
    - decision_log
    - repo_map.txt
    - architecture docs
 
-27. Record only the durable facts that actually emerged:
+28. Record only the durable facts that actually emerged:
    - major implementation decisions (docs/plan/decision_log.txt)
    - important non-decisions
    - places where the compiler or language was intentionally kept simple
    - deferred work
    - newly discovered language limitations
 
-28. If implementation reveals missing language features, add them to backlog under:
+29. If implementation reveals missing language features, add them to backlog under:
    - Potential Language Features
 
-29. End by reviewing the implementation against the phase spec:
+30. End by reviewing the implementation against the phase spec:
    - what invariants were preserved
    - whether any ownership boundaries weakened
    - whether any accidental abstractions or centers of gravity emerged

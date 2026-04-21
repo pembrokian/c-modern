@@ -1,10 +1,9 @@
 import os
-import sys
 from clang.cindex import Config, CursorKind, Index
 
-SOURCE_EXTS = ['.c']
-# SOURCE_DIRS = ['runtime']
-SOURCE_DIRS = ['tests/tool']
+SOURCE_EXTS = ['.c', '.cpp', '.h', '.hpp']
+SOURCE_DIRS = ['compiler']
+# SOURCE_DIRS = ['tests/tool']
 LIBCLANG_CANDIDATES = [
     os.environ.get('LIBCLANG_FILE'),
     '/opt/homebrew/Cellar/llvm@21/21.1.8/lib/libclang.dylib',
@@ -14,7 +13,9 @@ LIBCLANG_CANDIDATES = [
 ]
 
 # fixed output dir and file
-OUTPUT_DIR = 'tools/misc/extracted_c_decs'
+OUTPUT_DIR = 'tools/decl_extraction/extracted_cpp_decls'
+OUTPUT_FILE = 'compiler_extracted_decs.txt'
+# OUTPUT_FILE = 'tests_tools_extracted_decs.txt'
 DECL_KINDS = {
     CursorKind.FUNCTION_DECL,
     CursorKind.NAMESPACE,
@@ -79,21 +80,6 @@ def scan_dir(dir_path):
     return sorted(files)
 
 
-def discover_source_dirs(root_dir):
-    subdirs = []
-    with os.scandir(root_dir) as entries:
-        for entry in entries:
-            if entry.is_dir():
-                subdirs.append(entry.path)
-
-    return sorted(subdirs)
-
-
-def output_file_name(source_dir):
-    dir_name = os.path.basename(os.path.normpath(source_dir))
-    return f"{dir_name}_extracted_decs.txt"
-
-
 def write_output(results, output_file):
     os.makedirs(OUTPUT_DIR, exist_ok=True)
     out_path = os.path.join(OUTPUT_DIR, output_file)
@@ -113,28 +99,20 @@ def write_output(results, output_file):
 
 
 def main():
-    if len(sys.argv) != 1:
-        print('Usage: python extract_c_decs.py')
-        return
-
     configure_libclang()
 
-    outputs = {}
+    results = {}
 
     for source_dir in SOURCE_DIRS:
         if not os.path.isdir(source_dir):
-            print(f'Error: {source_dir} is not a valid directory')
+            print(f"Error: {source_dir} is not a valid directory")
             return
 
-        for child_dir in discover_source_dirs(source_dir):
-            results = {}
-            for file_path in scan_dir(child_dir):
-                results[file_path] = extract_declarations_from_file(file_path)
-            outputs[output_file_name(child_dir)] = results
+        for file_path in scan_dir(source_dir):
+            results[file_path] = extract_declarations_from_file(file_path)
 
-    for output_file, results in outputs.items():
-        write_output(results, output_file)
+    write_output(results, OUTPUT_FILE)
 
 
-if __name__ == '__main__':
+if __name__ == "__main__":
     main()
