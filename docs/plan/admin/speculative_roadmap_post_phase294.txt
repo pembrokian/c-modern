@@ -349,6 +349,10 @@ Phase 308 -- Post-Second-App Platform Direction Audit
 Outcome checkpoint after Band I:
 - the repository should either have one honest two-app install story or one
   explicit decision that packaging is still not the strongest next wave.
+- Phase 305 delivered that explicit decision: the current `issue_rollup`-
+  only installed path is still not the strongest blocker, `review_board`
+  remains direct-launch-only, and broader packaging stays deferred until a
+  real second installed consumer appears.
 
 Interpretation guide
 --------------------
