@@ -84,11 +84,12 @@ std::string AtomicMetadataText(const Instruction& instruction) {
     return {};
 }
 
-bool MatchGenericTypePattern(const Module& module,
-                             const sema::Type& pattern,
-                             const sema::Type& actual,
-                             const std::unordered_map<std::string, bool>& type_param_set,
-                             std::unordered_map<std::string, sema::Type>& bindings) {
+bool MatchGenericTypePattern(
+    const Module& module,
+    const sema::Type& pattern,
+    const sema::Type& actual,
+    const std::unordered_map<std::string, bool>& type_param_set,
+    std::unordered_map<std::string, sema::Type>& bindings) {
     // This performs one-directional matching from an expected generic pattern
     // onto an actual type while accumulating type-parameter bindings.
     const sema::Type canonical_pattern = CanonicalMirType(module, pattern);
@@ -166,9 +167,11 @@ const GlobalDecl* FindMirGlobalDecl(const Module& module, std::string_view name)
     return nullptr;
 }
 
-std::optional<sema::Type> FindMirFieldType(const Module& module,
-                                           const sema::Type& base_type,
-                                           std::string_view field_name) {
+std::optional<sema::Type> FindMirFieldType(
+    const Module& module,
+    const sema::Type& base_type,
+    std::string_view field_name) {
+    
     const auto builtin_fields = sema::BuiltinAggregateFields(base_type);
     for (const auto& field : builtin_fields) {
         if (field.first == field_name) {
@@ -284,11 +287,14 @@ bool TypeContainsTypeParams(const sema::Type& type,
     return false;
 }
 
-bool TypeNeedsExecutableSpecialization(const Module& module,
-                                       const sema::Type& raw_type,
-                                       const std::unordered_map<std::string, bool>& type_param_set) {
+bool TypeNeedsExecutableSpecialization(
+    const Module& module,
+    const sema::Type& raw_type,
+    const std::unordered_map<std::string, bool>& type_param_set) {
+    
     const sema::Type type = sema::CanonicalizeBuiltinType(raw_type);
     switch (type.kind) {
+        // simple types, never specified
         case sema::Type::Kind::kUnknown:
         case sema::Type::Kind::kVoid:
         case sema::Type::Kind::kBool:
@@ -299,10 +305,13 @@ bool TypeNeedsExecutableSpecialization(const Module& module,
         case sema::Type::Kind::kPointer:
         case sema::Type::Kind::kProcedure:
             return false;
+        // single-subtype wrappers
         case sema::Type::Kind::kConst:
         case sema::Type::Kind::kArray:
         case sema::Type::Kind::kRange:
             return !type.subtypes.empty() && TypeNeedsExecutableSpecialization(module, type.subtypes.front(), type_param_set);
+        
+        // multi-subtype wrappers
         case sema::Type::Kind::kTuple:
             for (const auto& subtype : type.subtypes) {
                 if (TypeNeedsExecutableSpecialization(module, subtype, type_param_set)) {
@@ -310,6 +319,7 @@ bool TypeNeedsExecutableSpecialization(const Module& module,
                 }
             }
             return false;
+        // named types
         case sema::Type::Kind::kNamed:
             if (type_param_set.contains(type.name)) {
                 return true;

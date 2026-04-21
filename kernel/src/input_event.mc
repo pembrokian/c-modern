@@ -15,10 +15,10 @@ struct InputParse {
     value: u8
 }
 
-const INPUT_ROUTE_DELIVERED: u8 = 68
-const INPUT_ROUTE_NO_FOREGROUND: u8 = 78
-const INPUT_ROUTE_UNSUPPORTED: u8 = 85
-const INPUT_EVENT_KEY: u8 = 75
+const INPUT_ROUTE_DELIVERED: u8 = 'D'
+const INPUT_ROUTE_NO_FOREGROUND: u8 = 'N'
+const INPUT_ROUTE_UNSUPPORTED: u8 = 'U'
+const INPUT_EVENT_KEY: u8 = 'K'
 
 func input_parse(kind: InputParseKind, event: u8, value: u8) InputParse {
     return InputParse{ kind: kind, event: event, value: value }

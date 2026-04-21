@@ -3,7 +3,7 @@ Phase 304 -- Post-Richer-UI Compiler Pressure Audit
 
 Status
 ------
-PROPOSED
+COMPLETED
 
 Purpose
 -------
@@ -198,9 +198,42 @@ Acceptance criteria
   post-spend repo state supports
 - later planning can use this note to choose the next band without guessing
 
+Implementation outcome
+----------------------
+- Phases 302 and 303 spent the byte-literal slice directly in the maintained
+  UI and input owners, so the obvious UI-facing `u8` source awkwardness is no
+  longer compiler pressure. The repeated raw ASCII spellings are now replaced
+  in the admitted consumer files that originally proved the need.
+- The post-spend audit did not expose a stronger bounded compiler front. The
+  remaining source repetition is app-helper or packaging pressure, not parser,
+  sema, MIR, backend, or driver pressure.
+- The audit therefore concludes that the current byte-literal compiler
+  pressure is honestly spent.
+- The strongest next deferred branch is broader packaging, because the
+  repository still has one installed `issue_rollup` path plus one direct-launch
+  `review_board` path rather than a second installed-program consumer.
+
+Validation
+----------
+- No executable validation was required because this phase is an audit note
+  only.
+
+Phase review against spec
+-------------------------
+- Preserved invariants: the audit stayed tied to maintained repository-owned
+  consumers, compared the post-Phase-303 state against the Phase-291 baseline,
+  and allowed the honest negative result that compiler pressure is spent.
+- Ownership boundaries did not weaken: the remaining follow-through pressure
+  was classified as app-helper or packaging pressure instead of being forced
+  back into compiler layers.
+- Accidental centers of gravity were avoided: the note did not promote a new
+  compiler wave, did not widen into parser or sema design, and did not turn a
+  consumer-local readability result into a broader framework claim.
+
 Future follow-up
 ----------------
 - If the audit says current compiler pressure is spent, reopen the strongest
-  non-compiler deferred branch instead of forcing another compiler phase.
-- If the audit identifies one stronger bounded compiler front, use this note as
-  the contract source for the next concrete compiler phase plan.
+  non-compiler deferred branch instead of forcing another compiler phase;
+  broader packaging is now the next planning branch.
+- If a later audit identifies one stronger bounded compiler front, use this
+  note as the contract source for the next concrete compiler phase plan.

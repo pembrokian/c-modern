@@ -12,19 +12,19 @@ enum ReviewBoardDetail {
     Urgent,
 }
 
-const REVIEW_BOARD_KEY_AUDIT: u8 = 65
-const REVIEW_BOARD_KEY_CLOSED: u8 = 67
-const REVIEW_BOARD_KEY_DETAIL: u8 = 68
-const REVIEW_BOARD_KEY_FOCUS: u8 = 70
-const REVIEW_BOARD_KEY_FILTER: u8 = 81
-const REVIEW_BOARD_KEY_FILTER_CLOSED_TAIL: u8 = 76
-const REVIEW_BOARD_KEY_FILTER_OPEN_TAIL: u8 = 80
-const REVIEW_BOARD_KEY_FILTER_SUMMARY_TAIL: u8 = 76
-const REVIEW_BOARD_KEY_OPEN: u8 = 79
-const REVIEW_BOARD_KEY_RESET: u8 = 82
-const REVIEW_BOARD_KEY_TOGGLE_REGION: u8 = 84
-const REVIEW_BOARD_KEY_URGENT: u8 = 85
-const REVIEW_BOARD_FILTER_FILL: u8 = 45
+const REVIEW_BOARD_KEY_AUDIT: u8 = 'A'
+const REVIEW_BOARD_KEY_CLOSED: u8 = 'C'
+const REVIEW_BOARD_KEY_DETAIL: u8 = 'D'
+const REVIEW_BOARD_KEY_FOCUS: u8 = 'F'
+const REVIEW_BOARD_KEY_FILTER: u8 = 'Q'
+const REVIEW_BOARD_KEY_FILTER_CLOSED_TAIL: u8 = 'L'
+const REVIEW_BOARD_KEY_FILTER_OPEN_TAIL: u8 = 'P'
+const REVIEW_BOARD_KEY_FILTER_SUMMARY_TAIL: u8 = 'L'
+const REVIEW_BOARD_KEY_OPEN: u8 = 'O'
+const REVIEW_BOARD_KEY_RESET: u8 = 'R'
+const REVIEW_BOARD_KEY_TOGGLE_REGION: u8 = 'T'
+const REVIEW_BOARD_KEY_URGENT: u8 = 'U'
+const REVIEW_BOARD_FILTER_FILL: u8 = '-'
 
 struct ReviewBoardUiState {
     open: u8
@@ -152,48 +152,48 @@ func review_board_ui_summary_cells(state: ReviewBoardUiState) [2]u8 {
     switch state.mode {
     case ReviewBoardMode.Focus:
         if review_board_ui_focus_needs_escalation(state) {
-            return [2]u8{ 70, 69 }
+            return [2]u8{ 'F', 'E' }
         }
-        return [2]u8{ 70, 78 }
+        return [2]u8{ 'F', 'N' }
     default:
         if review_board_ui_audit_should_pause(state) {
-            return [2]u8{ 65, 80 }
+            return [2]u8{ 'A', 'P' }
         }
-        return [2]u8{ 65, 83 }
+        return [2]u8{ 'A', 'S' }
     }
 }
 
 func review_board_ui_open_detail_cells(state: ReviewBoardUiState) [2]u8 {
     if state.mode == ReviewBoardMode.Focus {
         if state.open > 0 {
-            return [2]u8{ 79, 72 }
+            return [2]u8{ 'O', 'H' }
         }
-        return [2]u8{ 79, 78 }
+        return [2]u8{ 'O', 'N' }
     }
     if review_board_ui_audit_should_pause(state) {
-        return [2]u8{ 79, 80 }
+        return [2]u8{ 'O', 'P' }
     }
-    return [2]u8{ 79, 83 }
+    return [2]u8{ 'O', 'S' }
 }
 
 func review_board_ui_closed_detail_cells(state: ReviewBoardUiState) [2]u8 {
     if state.closed > 0 {
-        return [2]u8{ 67, 72 }
+        return [2]u8{ 'C', 'H' }
     }
-    return [2]u8{ 67, 78 }
+    return [2]u8{ 'C', 'N' }
 }
 
 func review_board_ui_urgent_detail_cells(state: ReviewBoardUiState) [2]u8 {
     if state.mode == ReviewBoardMode.Focus {
         if review_board_ui_focus_needs_escalation(state) {
-            return [2]u8{ 85, 69 }
+            return [2]u8{ 'U', 'E' }
         }
-        return [2]u8{ 85, 78 }
+        return [2]u8{ 'U', 'N' }
     }
     if state.urgent > 0 {
-        return [2]u8{ 85, 65 }
+        return [2]u8{ 'U', 'A' }
     }
-    return [2]u8{ 85, 81 }
+    return [2]u8{ 'U', 'Q' }
 }
 
 func review_board_ui_result_cells(state: ReviewBoardUiState) [2]u8 {

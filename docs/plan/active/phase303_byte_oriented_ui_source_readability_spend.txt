@@ -3,7 +3,7 @@ Phase 303 -- Byte-Oriented UI Source Readability Spend
 
 Status
 ------
-PROPOSED
+COMPLETED
 
 Purpose
 -------
@@ -205,6 +205,21 @@ Acceptance criteria
   restyling pass
 - the phase produces concrete evidence for the post-spend compiler audit in
   Phase 304
+
+Implementation outcome
+----------------------
+- The maintained UI and input spend landed in the owners named by the phase:
+  `kernel/src/input_event.mc`, `kernel/src/issue_rollup_app.mc`,
+  `examples/real/review_board/src/review_board_ui.mc`, and
+  `examples/real/issue_rollup/src/render/rollup_render.mc` now spell the
+  repeated ASCII bytes as single-byte literals instead of raw decimals.
+- The change stayed behavior-neutral. No routing, layout, persistence, or
+  compiler follow-through changed, and the remaining numeric values in the
+  touched files are still non-ASCII control or grouping bytes that are not
+  part of the readability spend.
+- `Phase 304` now has the post-spend evidence it needs to audit whether the
+  byte-literal slice is honestly spent or whether another bounded compiler
+  blocker remains.
 
 Future follow-up
 ----------------

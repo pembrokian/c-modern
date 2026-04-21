@@ -9,17 +9,17 @@ const ROLLUP_BUSY: i32 = 2
 const ROLLUP_ATTENTION: i32 = 3
 
 const ROLLUP_LAUNCH_STATUS_NONE: u8 = 0
-const ROLLUP_LAUNCH_STATUS_FRESH: u8 = 70
-const ROLLUP_LAUNCH_STATUS_RESUMED: u8 = 82
-const ROLLUP_LAUNCH_STATUS_INVALIDATED: u8 = 73
+const ROLLUP_LAUNCH_STATUS_FRESH: u8 = 'F'
+const ROLLUP_LAUNCH_STATUS_RESUMED: u8 = 'R'
+const ROLLUP_LAUNCH_STATUS_INVALIDATED: u8 = 'I'
 
-const ROLLUP_EMPTY_CELLS: [4]u8 = { 69, 77, 84, 89 }
-const ROLLUP_STEADY_CELLS: [4]u8 = { 83, 84, 68, 89 }
-const ROLLUP_BUSY_CELLS: [4]u8 = { 66, 85, 83, 89 }
-const ROLLUP_ATTENTION_CELLS: [4]u8 = { 65, 84, 84, 78 }
-const ROLLUP_FRESH_CELLS: [4]u8 = { 70, 82, 83, 72 }
-const ROLLUP_RESUMED_CELLS: [4]u8 = { 82, 83, 85, 77 }
-const ROLLUP_INVALIDATED_CELLS: [4]u8 = { 73, 78, 86, 68 }
+const ROLLUP_EMPTY_CELLS: [4]u8 = { 'E', 'M', 'T', 'Y' }
+const ROLLUP_STEADY_CELLS: [4]u8 = { 'S', 'T', 'D', 'Y' }
+const ROLLUP_BUSY_CELLS: [4]u8 = { 'B', 'U', 'S', 'Y' }
+const ROLLUP_ATTENTION_CELLS: [4]u8 = { 'A', 'T', 'T', 'N' }
+const ROLLUP_FRESH_CELLS: [4]u8 = { 'F', 'R', 'S', 'H' }
+const ROLLUP_RESUMED_CELLS: [4]u8 = { 'R', 'S', 'U', 'M' }
+const ROLLUP_INVALIDATED_CELLS: [4]u8 = { 'I', 'N', 'V', 'D' }
 
 func rollup_kind_with_manifest(summary: rollup_model.Summary, manifest: rollup_manifest.RollupManifest) i32 {
     if rollup_model.total_items(summary) == 0 {

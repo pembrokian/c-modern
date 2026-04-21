@@ -89,6 +89,32 @@ std::string DecodeStringLiteral(std::string_view literal) {
     return decoded;
 }
 
+std::optional<std::uint64_t> DecodeCharLiteral(std::string_view literal) {
+    if (literal.size() == 3 && literal.front() == '\'' && literal.back() == '\'') {
+        return static_cast<std::uint64_t>(static_cast<unsigned char>(literal[1]));
+    }
+
+    if (literal.size() == 4 && literal.front() == '\'' && literal.back() == '\'' && literal[1] == '\\') {
+        switch (literal[2]) {
+            case '0': return 0;
+            case 'a': return 7;
+            case 'b': return 8;
+            case 't': return 9;
+            case 'n': return 10;
+            case 'v': return 11;
+            case 'f': return 12;
+            case 'r': return 13;
+            case '\\': return static_cast<std::uint64_t>(static_cast<unsigned char>('\\'));
+            case '\'': return static_cast<std::uint64_t>(static_cast<unsigned char>('\''));
+            case '"': return static_cast<std::uint64_t>(static_cast<unsigned char>('"'));
+            default:
+                return std::nullopt;
+        }
+    }
+
+    return std::nullopt;
+}
+
 std::string EncodeLLVMStringBytes(std::string_view decoded) {
     std::ostringstream encoded;
     for (const unsigned char ch : decoded) {
@@ -131,6 +157,12 @@ std::string FormatLLVMLiteral(const BackendTypeInfo& type_info,
 
     if (type_info.backend_name == "ptr" && (value == "nil" || value == "null")) {
         return "null";
+    }
+
+    if (!type_info.backend_name.empty() && type_info.backend_name.front() == 'i') {
+        if (const auto decoded_char = DecodeCharLiteral(value); decoded_char.has_value()) {
+            return std::to_string(*decoded_char);
+        }
     }
 
     return std::string(value);

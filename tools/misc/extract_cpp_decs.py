@@ -2,8 +2,8 @@ import os
 from clang.cindex import Config, CursorKind, Index
 
 SOURCE_EXTS = ['.c', '.cpp', '.h', '.hpp']
-# SOURCE_DIRS = ['compiler']
-SOURCE_DIRS = ['tests/tool']
+SOURCE_DIRS = ['compiler']
+# SOURCE_DIRS = ['tests/tool']
 LIBCLANG_CANDIDATES = [
     os.environ.get('LIBCLANG_FILE'),
     '/opt/homebrew/Cellar/llvm@21/21.1.8/lib/libclang.dylib',
@@ -14,8 +14,8 @@ LIBCLANG_CANDIDATES = [
 
 # fixed output dir and file
 OUTPUT_DIR = 'tools/misc/extracted_cpp_decls'
-# OUTPUT_FILE = 'compiler_extracted_decs.txt'
-OUTPUT_FILE = 'tests_tools_extracted_decs.txt'
+OUTPUT_FILE = 'compiler_extracted_decs.txt'
+# OUTPUT_FILE = 'tests_tools_extracted_decs.txt'
 DECL_KINDS = {
     CursorKind.FUNCTION_DECL,
     CursorKind.NAMESPACE,

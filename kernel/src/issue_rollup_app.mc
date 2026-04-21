@@ -13,7 +13,7 @@ enum IssueRollupPresentKind {
 }
 
 const ISSUE_ROLLUP_LAUNCH_STATUS_NONE: u8 = 0
-const ISSUE_ROLLUP_KEY_FOCUS: u8 = 70
+const ISSUE_ROLLUP_KEY_FOCUS: u8 = 'F'
 
 struct IssueRollupAppState {
     interactive: issue_rollup_interactive.IssueRollupInteractiveState
@@ -59,9 +59,9 @@ func issue_rollup_manifest_is_custom(manifest: rollup_manifest.RollupManifest) b
 
 func issue_rollup_manifest_strip(manifest: rollup_manifest.RollupManifest) [surface_composition.SURFACE_REGION_CELL_COUNT]u8 {
     if issue_rollup_manifest_is_custom(manifest) {
-        return [surface_composition.SURFACE_REGION_CELL_COUNT]u8{ 67, 70 }
+        return [surface_composition.SURFACE_REGION_CELL_COUNT]u8{ 'C', 'F' }
     }
-    return [surface_composition.SURFACE_REGION_CELL_COUNT]u8{ 68, 70 }
+    return [surface_composition.SURFACE_REGION_CELL_COUNT]u8{ 'D', 'F' }
 }
 
 func issue_rollup_focus_strip(manifest: rollup_manifest.RollupManifest, focus: active_region.ActiveRegion) [surface_composition.SURFACE_REGION_CELL_COUNT]u8 {
@@ -71,9 +71,9 @@ func issue_rollup_focus_strip(manifest: rollup_manifest.RollupManifest, focus: a
 
     switch focus {
     case active_region.ActiveRegion.Status:
-        return [surface_composition.SURFACE_REGION_CELL_COUNT]u8{ 67, 83 }
+        return [surface_composition.SURFACE_REGION_CELL_COUNT]u8{ 'C', 'S' }
     default:
-        return [surface_composition.SURFACE_REGION_CELL_COUNT]u8{ 67, 70 }
+        return [surface_composition.SURFACE_REGION_CELL_COUNT]u8{ 'C', 'F' }
     }
 }
 

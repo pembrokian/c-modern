@@ -280,10 +280,20 @@ Phase 304 -- Post-Richer-UI Compiler Pressure Audit
   the current compiler pressure honestly or exposed one stronger bounded
   compiler front than the byte-literal slice.
 
+Phase 304 outcome:
+- the post-spend audit later concluded that Phases 302 and 303 fully spent the
+  byte-literal slice in the maintained UI and input owners, so the current
+  UI-facing compiler pressure is now honestly spent rather than deferred to a
+  stronger compiler front.
+- no stronger bounded compiler branch replaced it; the remaining pressure is
+  app-helper or packaging pressure, which keeps Band I focused on comparing
+  the installed `issue_rollup` path against the direct-launch `review_board`
+  path instead of reopening compiler work.
+
 Outcome checkpoint after Band H:
-- the repository should know whether the current UI-facing compiler pressure is
-  now genuinely spent or whether another compiler follow-through has become
-  stronger than packaging and the remaining loser branches.
+- the repository now knows that the current UI-facing compiler pressure is
+  genuinely spent, and that broader packaging is the next deferred branch to
+  audit rather than another compiler follow-through.
 
 Band I - Reopen App Packaging Only If The UI Wave Produces A Real Second Installed Consumer
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -348,6 +358,8 @@ Interpretation guide
   expansion into broader layout or input work.
 - If Band G lands cleanly and the byte-literal compiler pressure becomes the
   clearest next blocker, Band H should be preferred before any packaging step.
+- If Band H spends the byte-literal surface cleanly, move to Band I packaging
+  comparison rather than reopening compiler work.
 - If Band G lands cleanly but no second installed-program pressure appears,
   Band I should be delayed rather than forced.
 - If networking or durable file-like growth suddenly gains one stronger real
